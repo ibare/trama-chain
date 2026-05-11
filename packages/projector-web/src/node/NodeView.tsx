@@ -1,6 +1,6 @@
-import { useCallback, useEffect, useRef, useState } from 'react';
+import { memo, useCallback, useEffect, useRef, useState } from 'react';
 import { tokens } from '@trama/tokens';
-import { normalize, type Node } from '@trama/core';
+import { normalize, type NodeId } from '@trama/core';
 import { useModelStore, useUIStore } from '../store/index.js';
 import { combinerRegistry } from '../store/registries.js';
 import { formatValue, unitSuffix } from '../util/format.js';
@@ -8,11 +8,8 @@ import { getNodeLayout, type PinLayout } from './box.js';
 import { NodeMicroSlider } from './NodeMicroSlider.js';
 
 interface Props {
-  node: Node;
-  currentValue: number;
+  id: NodeId;
   incomingCount: number;
-  /** Canvas가 ephemeral 드래그 중에 넘기는 시각 오프셋. 모델에 commit되기 전까지 트랜스폼에만 반영. */
-  dragOffset?: { dx: number; dy: number } | null;
 }
 
 const THRESH_LOW = tokens.physical.thresholdNodeLow;
@@ -45,21 +42,18 @@ function combinerSymbol(key: string): string {
   }
 }
 
-export function NodeView({ node, currentValue, incomingCount, dragOffset }: Props): JSX.Element {
-  const layout = getNodeLayout(node, { incomingCount });
-  const { halfW, halfH, width, height } = layout;
-  const norm = normalize(currentValue, node.unit);
-  const opacity = lerp(OPACITY_LOW, OPACITY_HIGH, norm);
-
-  const isLow = norm < THRESH_LOW;
-  const isFocal = node.isFocal;
-  const stateClass = isFocal ? 'is-focal' : isLow ? 'is-low' : 'is-calm';
-
-  let animClass = '';
-  if (norm < THRESH_TIRED) animClass = 'is-tired';
-  else if (norm > THRESH_ALIVE) animClass = 'is-alive';
-
-  const pos = node.position ?? { x: 200, y: 200 };
+function NodeViewImpl({ id, incomingCount }: Props): JSX.Element | null {
+  // 좁은 셀렉터로 자기 노드만 구독. 다른 노드 변경에는 리렌더되지 않는다.
+  const node = useModelStore((s) => s.model.nodes[id]);
+  const currentValue = useModelStore((s) => {
+    const n = s.model.nodes[id];
+    return s.executionState.values[id] ?? n?.initialValue ?? 0;
+  });
+  // 자기 자신이 드래그 중일 때만 객체를 받는다. 다른 노드 드래그·드래그 없음 모두 null로 반환되어 Object.is로 리렌더가 차단된다.
+  const dragOffset = useUIStore((s) => {
+    const d = s.activeNodeDrag;
+    return d && d.nodeId === id ? d : null;
+  });
 
   const updateNode = useModelStore((s) => s.updateNode);
   const addEdge = useModelStore((s) => s.addEdge);
@@ -76,12 +70,15 @@ export function NodeView({ node, currentValue, incomingCount, dragOffset }: Prop
   const updateNodeDrag = useUIStore((s) => s.updateNodeDrag);
   const endNodeDrag = useUIStore((s) => s.endNodeDrag);
 
-  const isSelected = selection.kind === 'node' && selection.id === node.id;
+  // 모든 hook은 early return 이전에 호출되어야 한다. node가 잠시 undefined일 수
+  // 있으므로 안에서 옵셔널로 접근한다 (이벤트 핸들러는 node 미존재 시 발화하지
+  // 않으므로 안전).
+  const labelDraftSeed = node?.label ?? '';
+  const pos = node?.position ?? { x: 200, y: 200 };
 
   // Body 드래그 = 위치 이동 -------------------------------------------------
   // 드래그 중에는 모델을 건드리지 않는다. ui-store의 activeNodeDrag에 오프셋만
-  // 누적하고, pointerup 시점에 한 번만 model.position으로 commit한다. 매 mousemove
-  // 마다 발생하던 propagation·undo log 기록·전체 리렌더가 사라진다.
+  // 누적하고, pointerup 시점에 한 번만 model.position으로 commit한다.
   const moveRef = useRef<{
     startClientX: number;
     startClientY: number;
@@ -94,10 +91,10 @@ export function NodeView({ node, currentValue, incomingCount, dragOffset }: Prop
 
   const onBodyPointerDown = useCallback(
     (e: React.PointerEvent<SVGRectElement>) => {
-      if (editingNodeId === node.id) return;
+      if (editingNodeId === id) return;
       e.stopPropagation();
       (e.target as Element).setPointerCapture(e.pointerId);
-      selectNode(node.id);
+      selectNode(id);
       moveRef.current = {
         startClientX: e.clientX,
         startClientY: e.clientY,
@@ -108,7 +105,7 @@ export function NodeView({ node, currentValue, incomingCount, dragOffset }: Prop
         dragged: false,
       };
     },
-    [editingNodeId, node.id, pos.x, pos.y, selectNode],
+    [editingNodeId, id, pos.x, pos.y, selectNode],
   );
 
   const onBodyPointerMove = useCallback(
@@ -120,13 +117,13 @@ export function NodeView({ node, currentValue, incomingCount, dragOffset }: Prop
       if (!m.dragged) {
         if (Math.hypot(dx, dy) < DRAG_THRESHOLD_PX) return;
         m.dragged = true;
-        startNodeDrag(node.id);
+        startNodeDrag(id);
       }
       m.lastDx = dx;
       m.lastDy = dy;
       updateNodeDrag(dx, dy);
     },
-    [node.id, startNodeDrag, updateNodeDrag],
+    [id, startNodeDrag, updateNodeDrag],
   );
 
   const onBodyPointerUp = useCallback(
@@ -135,10 +132,9 @@ export function NodeView({ node, currentValue, incomingCount, dragOffset }: Prop
       moveRef.current = null;
       (e.target as Element).releasePointerCapture?.(e.pointerId);
       if (m?.dragged) {
-        // 드래그된 거리가 0이 아니면 단일 commit.
         if (m.lastDx !== 0 || m.lastDy !== 0) {
           updateNode(
-            node.id,
+            id,
             { position: { x: m.startPosX + m.lastDx, y: m.startPosY + m.lastDy } },
             'move-node',
             '위치 이동',
@@ -148,28 +144,32 @@ export function NodeView({ node, currentValue, incomingCount, dragOffset }: Prop
         return;
       }
       if (e.detail >= 2) {
-        setEditingNode(node.id);
+        setEditingNode(id);
       }
     },
-    [endNodeDrag, node.id, setEditingNode, updateNode],
+    [endNodeDrag, id, setEditingNode, updateNode],
   );
 
   // Socket 드래그 (엣지 생성) ----------------------------------------------
   const handleDragRef = useRef<{ dragged: boolean } | null>(null);
 
+  // layout은 hook 이후, 렌더 직전에 다시 계산하지만 콜백이 참조하는 right-pin
+  // 좌표는 node가 있어야 의미가 있다. 핸들러 안에서 안전 fallback.
   const onSocketPointerDown = useCallback(
     (e: React.PointerEvent<SVGCircleElement>) => {
+      if (!node) return;
       e.stopPropagation();
       (e.target as Element).setPointerCapture(e.pointerId);
       const lag: 0 | 1 = e.altKey ? 1 : 0;
-      const out = layout.rightPin.sockets[0];
+      const layoutNow = getNodeLayout(node, { incomingCount });
+      const out = layoutNow.rightPin.sockets[0];
       const startPoint = out
         ? { x: pos.x + out.x, y: pos.y + out.y }
         : { x: pos.x, y: pos.y };
-      startEdgeDraft(node.id, startPoint, startPoint, lag);
+      startEdgeDraft(id, startPoint, startPoint, lag);
       handleDragRef.current = { dragged: false };
     },
-    [layout.rightPin.sockets, node.id, pos.x, pos.y, startEdgeDraft],
+    [id, incomingCount, node, pos.x, pos.y, startEdgeDraft],
   );
 
   const onSocketPointerMove = useCallback(() => {
@@ -186,10 +186,10 @@ export function NodeView({ node, currentValue, incomingCount, dragOffset }: Prop
       const target = document.elementFromPoint(dropX, dropY);
       const groupEl = target?.closest?.('[data-trama-node-id]');
       const targetId = groupEl?.getAttribute('data-trama-node-id');
-      if (targetId && targetId !== node.id) {
+      if (targetId && targetId !== id) {
         const lag: 0 | 1 = e.altKey ? 1 : 0;
         const created = addEdge({
-          from: node.id,
+          from: id,
           to: targetId,
           shape: { kind: 'linear', params: { slope: 1, offset: 0 } },
           lag,
@@ -200,20 +200,41 @@ export function NodeView({ node, currentValue, incomingCount, dragOffset }: Prop
       }
       endEdgeDraft();
     },
-    [addEdge, endEdgeDraft, node.id, openFunctionPicker],
+    [addEdge, endEdgeDraft, id, openFunctionPicker],
   );
 
   // Inline name editor ---------------------------------------------------
-  const [nameDraft, setNameDraft] = useState(node.label);
+  const [nameDraft, setNameDraft] = useState(labelDraftSeed);
   useEffect(() => {
-    if (editingNodeId === node.id) setNameDraft(node.label);
-  }, [editingNodeId, node.id, node.label]);
+    if (editingNodeId === id && node) setNameDraft(node.label);
+  }, [editingNodeId, id, node]);
 
   const commitName = useCallback(() => {
+    if (!node) {
+      setEditingNode(null);
+      return;
+    }
     const v = nameDraft.trim();
-    if (v && v !== node.label) updateNode(node.id, { label: v }, 'rename-node', '이름 변경');
+    if (v && v !== node.label) updateNode(id, { label: v }, 'rename-node', '이름 변경');
     setEditingNode(null);
-  }, [nameDraft, node.id, node.label, setEditingNode, updateNode]);
+  }, [id, nameDraft, node, setEditingNode, updateNode]);
+
+  if (!node) return null;
+
+  const layout = getNodeLayout(node, { incomingCount });
+  const { halfW, halfH, width, height } = layout;
+  const norm = normalize(currentValue, node.unit);
+  const opacity = lerp(OPACITY_LOW, OPACITY_HIGH, norm);
+
+  const isLow = norm < THRESH_LOW;
+  const isFocal = node.isFocal;
+  const stateClass = isFocal ? 'is-focal' : isLow ? 'is-low' : 'is-calm';
+
+  let animClass = '';
+  if (norm < THRESH_TIRED) animClass = 'is-tired';
+  else if (norm > THRESH_ALIVE) animClass = 'is-alive';
+
+  const isSelected = selection.kind === 'node' && selection.id === id;
 
   const suffix = unitSuffix(node.unit);
   const combiner = combinerRegistry.get(node.combiner);
@@ -227,7 +248,7 @@ export function NodeView({ node, currentValue, incomingCount, dragOffset }: Prop
   return (
     <g
       className={`trama-node ${animClass}`}
-      data-trama-node-id={node.id}
+      data-trama-node-id={id}
       transform={`translate(${tx} ${ty})`}
       style={{ '--trama-node-opacity': opacity } as React.CSSProperties}
     >
@@ -245,7 +266,7 @@ export function NodeView({ node, currentValue, incomingCount, dragOffset }: Prop
           onPointerMove={onBodyPointerMove}
           onPointerUp={onBodyPointerUp}
         />
-        {editingNodeId === node.id ? (
+        {editingNodeId === id ? (
           <foreignObject
             x={-halfW + 12}
             y={layout.labelY - 14}
@@ -336,12 +357,18 @@ export function NodeView({ node, currentValue, incomingCount, dragOffset }: Prop
           </>
         )}
       </g>
-      {isSelected && editingNodeId !== node.id && (
+      {isSelected && editingNodeId !== id && (
         <NodeMicroSlider node={node} halfH={halfH} halfW={halfW} />
       )}
     </g>
   );
 }
+
+/**
+ * id·incomingCount만 props로 받으므로 Canvas 리렌더가 자식까지 전파되지 않는다.
+ * 내부에서는 자기 노드만 좁게 구독한다.
+ */
+export const NodeView = memo(NodeViewImpl);
 
 function PinShape({ pin, stateClass }: { pin: PinLayout; stateClass: string }): JSX.Element {
   return (
