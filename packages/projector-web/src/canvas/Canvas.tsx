@@ -17,6 +17,7 @@ export function Canvas(): JSX.Element {
   const edgeDraft = useUIStore((s) => s.edgeDraft);
   const updateEdgeDraft = useUIStore((s) => s.updateEdgeDraft);
   const endEdgeDraft = useUIStore((s) => s.endEdgeDraft);
+  const activeNodeDrag = useUIStore((s) => s.activeNodeDrag);
 
   const svgRef = useRef<SVGSVGElement | null>(null);
 
@@ -139,8 +140,17 @@ export function Canvas(): JSX.Element {
         const socketIdx = (incomingMap[toNode.id] ?? []).indexOf(eid);
         const fromLayout = getNodeLayout(fromNode, { incomingCount: fromIncoming });
         const toLayout = getNodeLayout(toNode, { incomingCount: toIncoming });
-        const fromPos = fromNode.position ?? { x: 0, y: 0 };
-        const toPos = toNode.position ?? { x: 0, y: 0 };
+        // 드래그 중인 노드는 model.position 위에 ephemeral 오프셋을 더해 엣지 끝점을 계산.
+        const fromBase = fromNode.position ?? { x: 0, y: 0 };
+        const toBase = toNode.position ?? { x: 0, y: 0 };
+        const fromPos =
+          activeNodeDrag && activeNodeDrag.nodeId === fromNode.id
+            ? { x: fromBase.x + activeNodeDrag.dx, y: fromBase.y + activeNodeDrag.dy }
+            : fromBase;
+        const toPos =
+          activeNodeDrag && activeNodeDrag.nodeId === toNode.id
+            ? { x: toBase.x + activeNodeDrag.dx, y: toBase.y + activeNodeDrag.dy }
+            : toBase;
         const sourceSocket = fromLayout.rightPin.sockets[0];
         const targetSocket =
           toLayout.leftPin.sockets[Math.max(0, socketIdx)] ?? toLayout.leftPin.sockets[0];
@@ -164,8 +174,18 @@ export function Canvas(): JSX.Element {
         if (!node) return null;
         const v = execState.values[nid] ?? node.initialValue;
         const incomingCount = incomingMap[node.id]?.length ?? 0;
+        const dragOffset =
+          activeNodeDrag && activeNodeDrag.nodeId === nid
+            ? { dx: activeNodeDrag.dx, dy: activeNodeDrag.dy }
+            : null;
         return (
-          <NodeView key={nid} node={node} currentValue={v} incomingCount={incomingCount} />
+          <NodeView
+            key={nid}
+            node={node}
+            currentValue={v}
+            incomingCount={incomingCount}
+            dragOffset={dragOffset}
+          />
         );
       })}
     </svg>

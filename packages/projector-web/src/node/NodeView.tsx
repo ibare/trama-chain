@@ -11,6 +11,8 @@ interface Props {
   node: Node;
   currentValue: number;
   incomingCount: number;
+  /** Canvas가 ephemeral 드래그 중에 넘기는 시각 오프셋. 모델에 commit되기 전까지 트랜스폼에만 반영. */
+  dragOffset?: { dx: number; dy: number } | null;
 }
 
 const THRESH_LOW = tokens.physical.thresholdNodeLow;
@@ -43,7 +45,7 @@ function combinerSymbol(key: string): string {
   }
 }
 
-export function NodeView({ node, currentValue, incomingCount }: Props): JSX.Element {
+export function NodeView({ node, currentValue, incomingCount, dragOffset }: Props): JSX.Element {
   const layout = getNodeLayout(node, { incomingCount });
   const { halfW, halfH, width, height } = layout;
   const norm = normalize(currentValue, node.unit);
@@ -70,15 +72,23 @@ export function NodeView({ node, currentValue, incomingCount }: Props): JSX.Elem
   const startEdgeDraft = useUIStore((s) => s.startEdgeDraft);
   const endEdgeDraft = useUIStore((s) => s.endEdgeDraft);
   const openFunctionPicker = useUIStore((s) => s.openFunctionPicker);
+  const startNodeDrag = useUIStore((s) => s.startNodeDrag);
+  const updateNodeDrag = useUIStore((s) => s.updateNodeDrag);
+  const endNodeDrag = useUIStore((s) => s.endNodeDrag);
 
   const isSelected = selection.kind === 'node' && selection.id === node.id;
 
   // Body 드래그 = 위치 이동 -------------------------------------------------
+  // 드래그 중에는 모델을 건드리지 않는다. ui-store의 activeNodeDrag에 오프셋만
+  // 누적하고, pointerup 시점에 한 번만 model.position으로 commit한다. 매 mousemove
+  // 마다 발생하던 propagation·undo log 기록·전체 리렌더가 사라진다.
   const moveRef = useRef<{
     startClientX: number;
     startClientY: number;
     startPosX: number;
     startPosY: number;
+    lastDx: number;
+    lastDy: number;
     dragged: boolean;
   } | null>(null);
 
@@ -93,6 +103,8 @@ export function NodeView({ node, currentValue, incomingCount }: Props): JSX.Elem
         startClientY: e.clientY,
         startPosX: pos.x,
         startPosY: pos.y,
+        lastDx: 0,
+        lastDy: 0,
         dragged: false,
       };
     },
@@ -105,16 +117,16 @@ export function NodeView({ node, currentValue, incomingCount }: Props): JSX.Elem
       if (!m) return;
       const dx = e.clientX - m.startClientX;
       const dy = e.clientY - m.startClientY;
-      if (!m.dragged && Math.hypot(dx, dy) < DRAG_THRESHOLD_PX) return;
-      m.dragged = true;
-      updateNode(
-        node.id,
-        { position: { x: m.startPosX + dx, y: m.startPosY + dy } },
-        'move-node',
-        '위치 이동',
-      );
+      if (!m.dragged) {
+        if (Math.hypot(dx, dy) < DRAG_THRESHOLD_PX) return;
+        m.dragged = true;
+        startNodeDrag(node.id);
+      }
+      m.lastDx = dx;
+      m.lastDy = dy;
+      updateNodeDrag(dx, dy);
     },
-    [node.id, updateNode],
+    [node.id, startNodeDrag, updateNodeDrag],
   );
 
   const onBodyPointerUp = useCallback(
@@ -122,11 +134,24 @@ export function NodeView({ node, currentValue, incomingCount }: Props): JSX.Elem
       const m = moveRef.current;
       moveRef.current = null;
       (e.target as Element).releasePointerCapture?.(e.pointerId);
-      if (!m?.dragged && e.detail >= 2) {
+      if (m?.dragged) {
+        // 드래그된 거리가 0이 아니면 단일 commit.
+        if (m.lastDx !== 0 || m.lastDy !== 0) {
+          updateNode(
+            node.id,
+            { position: { x: m.startPosX + m.lastDx, y: m.startPosY + m.lastDy } },
+            'move-node',
+            '위치 이동',
+          );
+        }
+        endNodeDrag();
+        return;
+      }
+      if (e.detail >= 2) {
         setEditingNode(node.id);
       }
     },
-    [node.id, setEditingNode],
+    [endNodeDrag, node.id, setEditingNode, updateNode],
   );
 
   // Socket 드래그 (엣지 생성) ----------------------------------------------
@@ -195,11 +220,15 @@ export function NodeView({ node, currentValue, incomingCount }: Props): JSX.Elem
   const combinerLabel = combiner?.labels.ko ?? node.combiner;
   const combinerSym = combinerSymbol(node.combiner);
 
+  // dragOffset이 있으면 transform에만 더해 렌더 (model.position은 그대로).
+  const tx = pos.x + (dragOffset?.dx ?? 0);
+  const ty = pos.y + (dragOffset?.dy ?? 0);
+
   return (
     <g
       className={`trama-node ${animClass}`}
       data-trama-node-id={node.id}
-      transform={`translate(${pos.x} ${pos.y})`}
+      transform={`translate(${tx} ${ty})`}
       style={{ '--trama-node-opacity': opacity } as React.CSSProperties}
     >
       <g className="trama-node-inner">
