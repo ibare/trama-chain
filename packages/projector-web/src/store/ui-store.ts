@@ -6,17 +6,6 @@ export type Selection =
   | { kind: 'node'; id: NodeId }
   | { kind: 'edge'; id: EdgeId };
 
-/**
- * 진행 중인 노드 위치 드래그. 모델에 즉시 반영하지 않고 ephemeral 오프셋만 들고 있다.
- * pointerup 시점에 한 번만 model.position으로 commit.
- */
-export interface ActiveNodeDrag {
-  nodeId: NodeId;
-  /** 드래그 시작 시점 대비 누적 오프셋 (캔버스 좌표) */
-  dx: number;
-  dy: number;
-}
-
 export interface EdgeDraft {
   fromNodeId: NodeId;
   /** 출발 소켓의 캔버스 좌표 (source 우측 핀 소켓) */
@@ -46,8 +35,6 @@ export interface RunFlashState {
 
 export interface UIStore {
   selection: Selection;
-  /** 진행 중인 노드 위치 드래그 (ephemeral) */
-  activeNodeDrag: ActiveNodeDrag | null;
   /** 진행 중인 엣지 드래그 */
   edgeDraft: EdgeDraft | null;
   /** 엣지에 새 노드 끼워넣기 의도 */
@@ -62,10 +49,6 @@ export interface UIStore {
   selectNode: (id: NodeId) => void;
   selectEdge: (id: EdgeId) => void;
   clearSelection: () => void;
-
-  startNodeDrag: (nodeId: NodeId) => void;
-  updateNodeDrag: (dx: number, dy: number) => void;
-  endNodeDrag: () => void;
 
   startEdgeDraft: (
     fromNodeId: NodeId,
@@ -88,7 +71,6 @@ export interface UIStore {
 
 export const useUIStore = create<UIStore>((set) => ({
   selection: { kind: 'none' },
-  activeNodeDrag: null,
   edgeDraft: null,
   insertNodeIntent: null,
   functionPicker: null,
@@ -98,11 +80,6 @@ export const useUIStore = create<UIStore>((set) => ({
   selectNode: (id) => set({ selection: { kind: 'node', id } }),
   selectEdge: (id) => set({ selection: { kind: 'edge', id } }),
   clearSelection: () => set({ selection: { kind: 'none' } }),
-
-  startNodeDrag: (nodeId) => set({ activeNodeDrag: { nodeId, dx: 0, dy: 0 } }),
-  updateNodeDrag: (dx, dy) =>
-    set((s) => (s.activeNodeDrag ? { activeNodeDrag: { ...s.activeNodeDrag, dx, dy } } : {})),
-  endNodeDrag: () => set({ activeNodeDrag: null }),
 
   startEdgeDraft: (fromNodeId, startPoint, pointer, lag = 0) =>
     set({ edgeDraft: { fromNodeId, startPoint, pointer, lag } }),

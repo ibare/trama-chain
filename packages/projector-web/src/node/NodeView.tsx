@@ -6,6 +6,11 @@ import { combinerRegistry } from '../store/registries.js';
 import { formatValue, unitSuffix } from '../util/format.js';
 import { getNodeLayout, type PinLayout } from './box.js';
 import { NodeMicroSlider } from './NodeMicroSlider.js';
+import {
+  getIncidentEdgeHandles,
+  registerNodeEl,
+  type EdgeHandle,
+} from '../canvas/drag-registry.js';
 
 interface Props {
   id: NodeId;
@@ -49,11 +54,6 @@ function NodeViewImpl({ id, incomingCount }: Props): JSX.Element | null {
     const n = s.model.nodes[id];
     return s.executionState.values[id] ?? n?.initialValue ?? 0;
   });
-  // 자기 자신이 드래그 중일 때만 객체를 받는다. 다른 노드 드래그·드래그 없음 모두 null로 반환되어 Object.is로 리렌더가 차단된다.
-  const dragOffset = useUIStore((s) => {
-    const d = s.activeNodeDrag;
-    return d && d.nodeId === id ? d : null;
-  });
 
   const updateNode = useModelStore((s) => s.updateNode);
   const addEdge = useModelStore((s) => s.addEdge);
@@ -66,9 +66,15 @@ function NodeViewImpl({ id, incomingCount }: Props): JSX.Element | null {
   const startEdgeDraft = useUIStore((s) => s.startEdgeDraft);
   const endEdgeDraft = useUIStore((s) => s.endEdgeDraft);
   const openFunctionPicker = useUIStore((s) => s.openFunctionPicker);
-  const startNodeDrag = useUIStore((s) => s.startNodeDrag);
-  const updateNodeDrag = useUIStore((s) => s.updateNodeDrag);
-  const endNodeDrag = useUIStore((s) => s.endNodeDrag);
+
+  // 노드 <g> 엘리먼트 ref — 드래그 중 imperative하게 transform을 갱신하고,
+  // 외부(EdgeView 핸들 호출자)에서도 이 노드 DOM에 접근할 수 있게 레지스트리에 등록.
+  const outerGRef = useRef<SVGGElement | null>(null);
+  useEffect(() => {
+    const el = outerGRef.current;
+    if (!el) return undefined;
+    return registerNodeEl(id, el);
+  }, [id]);
 
   // 모든 hook은 early return 이전에 호출되어야 한다. node가 잠시 undefined일 수
   // 있으므로 안에서 옵셔널로 접근한다 (이벤트 핸들러는 node 미존재 시 발화하지
@@ -77,8 +83,9 @@ function NodeViewImpl({ id, incomingCount }: Props): JSX.Element | null {
   const pos = node?.position ?? { x: 200, y: 200 };
 
   // Body 드래그 = 위치 이동 -------------------------------------------------
-  // 드래그 중에는 모델을 건드리지 않는다. ui-store의 activeNodeDrag에 오프셋만
-  // 누적하고, pointerup 시점에 한 번만 model.position으로 commit한다.
+  // 드래그 중에는 React 사이클을 거치지 않는다. 노드 <g>의 transform과 인접
+  // 엣지 <path>의 d를 setAttribute로 직접 갱신하고, pointerup 시점에 한 번만
+  // model.position으로 commit한다. 이후 React가 declarative 렌더로 덮어쓴다.
   const moveRef = useRef<{
     startClientX: number;
     startClientY: number;
@@ -87,6 +94,7 @@ function NodeViewImpl({ id, incomingCount }: Props): JSX.Element | null {
     lastDx: number;
     lastDy: number;
     dragged: boolean;
+    incidents: EdgeHandle[];
   } | null>(null);
 
   const onBodyPointerDown = useCallback(
@@ -103,6 +111,7 @@ function NodeViewImpl({ id, incomingCount }: Props): JSX.Element | null {
         lastDx: 0,
         lastDy: 0,
         dragged: false,
+        incidents: getIncidentEdgeHandles(id),
       };
     },
     [editingNodeId, id, pos.x, pos.y, selectNode],
@@ -117,13 +126,20 @@ function NodeViewImpl({ id, incomingCount }: Props): JSX.Element | null {
       if (!m.dragged) {
         if (Math.hypot(dx, dy) < DRAG_THRESHOLD_PX) return;
         m.dragged = true;
-        startNodeDrag(id);
       }
       m.lastDx = dx;
       m.lastDy = dy;
-      updateNodeDrag(dx, dy);
+      const gEl = outerGRef.current;
+      if (gEl) {
+        const nx = m.startPosX + dx;
+        const ny = m.startPosY + dy;
+        gEl.setAttribute('transform', `translate(${nx} ${ny})`);
+      }
+      for (const h of m.incidents) {
+        h.applyDrag(id, dx, dy);
+      }
     },
-    [id, startNodeDrag, updateNodeDrag],
+    [id],
   );
 
   const onBodyPointerUp = useCallback(
@@ -140,14 +156,13 @@ function NodeViewImpl({ id, incomingCount }: Props): JSX.Element | null {
             '위치 이동',
           );
         }
-        endNodeDrag();
         return;
       }
       if (e.detail >= 2) {
         setEditingNode(id);
       }
     },
-    [endNodeDrag, id, setEditingNode, updateNode],
+    [id, setEditingNode, updateNode],
   );
 
   // Socket 드래그 (엣지 생성) ----------------------------------------------
@@ -241,15 +256,15 @@ function NodeViewImpl({ id, incomingCount }: Props): JSX.Element | null {
   const combinerLabel = combiner?.labels.ko ?? node.combiner;
   const combinerSym = combinerSymbol(node.combiner);
 
-  // dragOffset이 있으면 transform에만 더해 렌더 (model.position은 그대로).
-  const tx = pos.x + (dragOffset?.dx ?? 0);
-  const ty = pos.y + (dragOffset?.dy ?? 0);
-
+  // 드래그 중 transform은 imperative하게 setAttribute로 갱신된다.
+  // 여기서는 declarative한 baseline만 그려둔다. pointerup에서 model.position이
+  // commit되면 React가 이 transform으로 자연스럽게 덮어쓴다.
   return (
     <g
+      ref={outerGRef}
       className={`trama-node ${animClass}`}
       data-trama-node-id={id}
-      transform={`translate(${tx} ${ty})`}
+      transform={`translate(${pos.x} ${pos.y})`}
       style={{ '--trama-node-opacity': opacity } as React.CSSProperties}
     >
       <g className="trama-node-inner">
