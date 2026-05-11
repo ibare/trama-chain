@@ -1,5 +1,4 @@
 import { tokens } from '@trama/tokens';
-import type { Node } from '@trama/core';
 
 const CARD_W = 184;
 const BASE_H = 82;
@@ -66,14 +65,7 @@ function buildPin(cx: number, cy: number, nSockets: number): PinLayout {
   };
 }
 
-/**
- * 노드 카드의 모든 절대 좌표(노드 중심 기준)를 반환한다.
- * 카드 폭은 고정, 높이는 (1) combiner 칩 유무 (2) 좌측 핀 소켓 수에 따라 자동 확장.
- */
-export function getNodeLayout(
-  _node: Node,
-  opts: { incomingCount: number },
-): NodeLayout {
+export function getNodeLayout(opts: { incomingCount: number }): NodeLayout {
   const incomingCount = Math.max(0, opts.incomingCount);
   const hasCombiner = incomingCount > 1;
   const baseH = hasCombiner ? BASE_H + COMBINER_ADD_H : BASE_H;
@@ -87,25 +79,17 @@ export function getNodeLayout(
   const halfH = height / 2;
   const cardTop = -halfH;
 
-  const labelY = cardTop + NAME_FROM_TOP;
-  const dividerY = cardTop + DIVIDER_FROM_TOP;
-  const valueY = cardTop + VALUE_FROM_TOP;
-  const combinerCenterY = hasCombiner ? cardTop + COMBINER_CENTER_FROM_TOP : null;
-
-  const leftPin = buildPin(-halfW, 0, inSockets);
-  const rightPin = buildPin(halfW, 0, 1);
-
   return {
     width: CARD_W,
     height,
     halfW,
     halfH,
-    labelY,
-    divider: { x1: -halfW + SIDE_INSET, x2: halfW - SIDE_INSET, y: dividerY },
-    valueY,
-    combinerCenterY,
+    labelY: cardTop + NAME_FROM_TOP,
+    divider: { x1: -halfW + SIDE_INSET, x2: halfW - SIDE_INSET, y: cardTop + DIVIDER_FROM_TOP },
+    valueY: cardTop + VALUE_FROM_TOP,
+    combinerCenterY: hasCombiner ? cardTop + COMBINER_CENTER_FROM_TOP : null,
     hasCombiner,
-    leftPin,
-    rightPin,
+    leftPin: buildPin(-halfW, 0, inSockets),
+    rightPin: buildPin(halfW, 0, 1),
   };
 }

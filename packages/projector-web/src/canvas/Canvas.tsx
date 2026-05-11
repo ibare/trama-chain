@@ -1,9 +1,10 @@
-import { useCallback, useEffect, useRef } from 'react';
-import { normalize } from '@trama/core';
+import { useCallback, useEffect, useMemo, useRef } from 'react';
+import { normalize, type EdgeId, type NodeId } from '@trama/core';
 import { useModelStore, useUIStore } from '../store/index.js';
 import { EdgeView } from '../edge/EdgeView.js';
 import { NodeView } from '../node/NodeView.js';
 import { EdgeDraftView } from './EdgeDraftView.js';
+import { getNodeLayout } from '../node/box.js';
 
 export function Canvas(): JSX.Element {
   const model = useModelStore((s) => s.model);
@@ -25,6 +26,17 @@ export function Canvas(): JSX.Element {
     const rect = svg.getBoundingClientRect();
     return { x: clientX - rect.left, y: clientY - rect.top };
   }, []);
+
+  // 각 노드별 incoming 엣지 id 목록 (edgeOrder 순서 유지) — 좌측 핀 소켓 인덱스 결정에 사용
+  const incomingMap = useMemo(() => {
+    const map: Record<NodeId, EdgeId[]> = {};
+    for (const eid of model.edgeOrder) {
+      const e = model.edges[eid];
+      if (!e) continue;
+      (map[e.to] ??= []).push(eid);
+    }
+    return map;
+  }, [model.edgeOrder, model.edges]);
 
   const onCanvasPointerDown = useCallback(
     (e: React.PointerEvent<SVGSVGElement>) => {
@@ -68,7 +80,6 @@ export function Canvas(): JSX.Element {
     if (edgeDraft) endEdgeDraft();
   }, [edgeDraft, endEdgeDraft]);
 
-  // 키보드: Delete, Cmd+Z, Cmd+Shift+Z
   const undo = useModelStore((s) => s.undo);
   const redo = useModelStore((s) => s.redo);
   const removeNode = useModelStore((s) => s.removeNode);
@@ -89,7 +100,6 @@ export function Canvas(): JSX.Element {
         return;
       }
       if (e.key === 'Delete' || e.key === 'Backspace') {
-        // editor 안에서 입력 중이면 무시
         const active = document.activeElement;
         if (active && (active.tagName === 'INPUT' || active.tagName === 'TEXTAREA')) return;
         if (selection.kind === 'node') {
@@ -122,16 +132,28 @@ export function Canvas(): JSX.Element {
         const toNode = model.nodes[edge.to];
         if (!fromNode || !toNode) return null;
         const srcValue = execState.values[edge.from] ?? fromNode.initialValue;
-        const dstValue = execState.values[edge.to] ?? toNode.initialValue;
         const norm = normalize(srcValue, fromNode.unit);
+
+        const fromIncoming = incomingMap[fromNode.id]?.length ?? 0;
+        const toIncoming = incomingMap[toNode.id]?.length ?? 0;
+        const socketIdx = (incomingMap[toNode.id] ?? []).indexOf(eid);
+        const fromLayout = getNodeLayout(fromNode, { incomingCount: fromIncoming });
+        const toLayout = getNodeLayout(toNode, { incomingCount: toIncoming });
+        const fromPos = fromNode.position ?? { x: 0, y: 0 };
+        const toPos = toNode.position ?? { x: 0, y: 0 };
+        const sourceSocket = fromLayout.rightPin.sockets[0];
+        const targetSocket =
+          toLayout.leftPin.sockets[Math.max(0, socketIdx)] ?? toLayout.leftPin.sockets[0];
+        if (!sourceSocket || !targetSocket) return null;
+        const start = { x: fromPos.x + sourceSocket.x, y: fromPos.y + sourceSocket.y };
+        const end = { x: toPos.x + targetSocket.x, y: toPos.y + targetSocket.y };
+
         return (
           <EdgeView
             key={eid}
             edge={edge}
-            fromNode={fromNode}
-            toNode={toNode}
-            fromValue={srcValue}
-            toValue={dstValue}
+            start={start}
+            end={end}
             sourceNormalized={norm}
           />
         );
@@ -141,7 +163,10 @@ export function Canvas(): JSX.Element {
         const node = model.nodes[nid];
         if (!node) return null;
         const v = execState.values[nid] ?? node.initialValue;
-        return <NodeView key={nid} node={node} currentValue={v} />;
+        const incomingCount = incomingMap[node.id]?.length ?? 0;
+        return (
+          <NodeView key={nid} node={node} currentValue={v} incomingCount={incomingCount} />
+        );
       })}
     </svg>
   );

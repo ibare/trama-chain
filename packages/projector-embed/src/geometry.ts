@@ -1,79 +1,45 @@
-import { tokens } from '@trama/tokens';
-
 export interface Point {
   x: number;
   y: number;
 }
 
-export interface BoxSize {
-  width: number;
-  height: number;
-}
-
-const DEFAULT_BOX: BoxSize = {
-  width: parseFloat(tokens.spacing.cardMinWidth),
-  height: parseFloat(tokens.spacing.cardMinHeight),
-};
-
-const EDGE_GAP = 4;
-
-function rectBoundaryHit(
-  center: Point,
-  halfW: number,
-  halfH: number,
-  dirX: number,
-  dirY: number,
-): Point {
-  const tx = dirX === 0 ? Infinity : halfW / Math.abs(dirX);
-  const ty = dirY === 0 ? Infinity : halfH / Math.abs(dirY);
-  const t = Math.min(tx, ty);
-  return { x: center.x + dirX * t, y: center.y + dirY * t };
-}
-
+/**
+ * 두 *소켓 좌표* 사이를 잇는 큐빅 베지에. 핀이 카드 좌우(수평)에 있으므로
+ * control point는 수평 방향으로 잡고, feedback이면 큰 곡률.
+ */
 export function staticEdgePath(
-  from: Point,
-  to: Point,
-  options: { lag: 0 | 1; fromBox?: BoxSize; toBox?: BoxSize } = { lag: 0 },
+  start: Point,
+  end: Point,
+  options: { lag: 0 | 1 } = { lag: 0 },
 ): { d: string; tip: Point; mid: Point; tangent: Point } {
-  const fromBox = options.fromBox ?? DEFAULT_BOX;
-  const toBox = options.toBox ?? DEFAULT_BOX;
+  const dx = end.x - start.x;
+  const dy = end.y - start.y;
 
-  const dx = to.x - from.x;
-  const dy = to.y - from.y;
-  const dist = Math.sqrt(dx * dx + dy * dy) || 1;
-  const ux = dx / dist;
-  const uy = dy / dist;
+  let p1: Point;
+  let p2: Point;
+  if (options.lag === 1) {
+    const ax = Math.max(80, Math.abs(dx) * 0.5 + 60);
+    const arcSign = dy >= 0 ? -1 : 1;
+    const arcMag = Math.abs(dy) * 0.5 + 70;
+    p1 = { x: start.x + ax, y: start.y + arcSign * arcMag };
+    p2 = { x: end.x - ax, y: end.y + arcSign * arcMag };
+  } else {
+    const pull = Math.max(40, Math.abs(dx) * 0.45);
+    p1 = { x: start.x + pull, y: start.y };
+    p2 = { x: end.x - pull, y: end.y };
+  }
 
-  const startHit = rectBoundaryHit(from, fromBox.width / 2, fromBox.height / 2, ux, uy);
-  const endHit = rectBoundaryHit(to, toBox.width / 2, toBox.height / 2, -ux, -uy);
-  const start: Point = { x: startHit.x + ux * EDGE_GAP, y: startHit.y + uy * EDGE_GAP };
-  const end: Point = { x: endHit.x - ux * EDGE_GAP, y: endHit.y - uy * EDGE_GAP };
-
-  const curl = options.lag === 1 ? 0.6 : 0.18;
-  const nx = -uy;
-  const ny = ux;
-  const offset = dist * curl;
-
-  const c1: Point = {
-    x: start.x + (end.x - start.x) * 0.3 + nx * offset,
-    y: start.y + (end.y - start.y) * 0.3 + ny * offset,
-  };
-  const c2: Point = {
-    x: start.x + (end.x - start.x) * 0.7 + nx * offset,
-    y: start.y + (end.y - start.y) * 0.7 + ny * offset,
-  };
-
-  const d = `M ${start.x} ${start.y} C ${c1.x} ${c1.y}, ${c2.x} ${c2.y}, ${end.x} ${end.y}`;
+  const d = `M ${start.x} ${start.y} C ${p1.x} ${p1.y}, ${p2.x} ${p2.y}, ${end.x} ${end.y}`;
 
   const mt = 0.5;
   const inv = 1 - mt;
   const mid: Point = {
-    x: inv ** 3 * start.x + 3 * inv ** 2 * mt * c1.x + 3 * inv * mt ** 2 * c2.x + mt ** 3 * end.x,
-    y: inv ** 3 * start.y + 3 * inv ** 2 * mt * c1.y + 3 * inv * mt ** 2 * c2.y + mt ** 3 * end.y,
+    x: inv ** 3 * start.x + 3 * inv ** 2 * mt * p1.x + 3 * inv * mt ** 2 * p2.x + mt ** 3 * end.x,
+    y: inv ** 3 * start.y + 3 * inv ** 2 * mt * p1.y + 3 * inv * mt ** 2 * p2.y + mt ** 3 * end.y,
   };
 
-  const tx = 3 * (end.x - c2.x);
-  const ty = 3 * (end.y - c2.y);
+  const tx = 3 * (end.x - p2.x);
+  const ty = 3 * (end.y - p2.y);
   const tlen = Math.sqrt(tx * tx + ty * ty) || 1;
   const tangent: Point = { x: tx / tlen, y: ty / tlen };
 
@@ -82,7 +48,7 @@ export function staticEdgePath(
 
 export function computeBounds(
   positions: Point[],
-  padding = 80,
+  padding = 100,
 ): { minX: number; minY: number; width: number; height: number } {
   if (positions.length === 0) {
     return { minX: 0, minY: 0, width: 600, height: 400 };

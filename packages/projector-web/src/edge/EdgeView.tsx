@@ -1,17 +1,13 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { tokens } from '@trama/tokens';
-import { type Edge, type Node } from '@trama/core';
+import type { Edge } from '@trama/core';
 import { useUIStore } from '../store/index.js';
-import { edgePath } from './geometry.js';
-import { getNodeBox } from '../node/box.js';
+import { edgePath, type Point } from './geometry.js';
 
 interface Props {
   edge: Edge;
-  fromNode: Node;
-  toNode: Node;
-  /** 각 노드의 *현재* 실행 값 (카드 크기·strained 판정 양쪽에 사용). */
-  fromValue: number;
-  toValue: number;
+  start: Point;
+  end: Point;
   /** propagation의 최종 상태에서 source의 정규화 값. strained 시각 판정용. */
   sourceNormalized: number;
   introducing?: boolean;
@@ -20,23 +16,10 @@ interface Props {
 const STRAINED_LOW = tokens.physical.thresholdEdgeStrainedLow;
 const STRAINED_HIGH = tokens.physical.thresholdEdgeStrainedHigh;
 
-export function EdgeView({
-  edge,
-  fromNode,
-  toNode,
-  fromValue,
-  toValue,
-  sourceNormalized,
-  introducing,
-}: Props): JSX.Element {
-  const from = fromNode.position ?? { x: 0, y: 0 };
-  const to = toNode.position ?? { x: 0, y: 0 };
-  const fromBox = getNodeBox(fromNode, fromValue);
-  const toBox = getNodeBox(toNode, toValue);
-
+export function EdgeView({ edge, start, end, sourceNormalized, introducing }: Props): JSX.Element {
   const { d, tip, tangent, mid } = useMemo(
-    () => edgePath(from, to, { lag: edge.lag, fromBox, toBox }),
-    [from.x, from.y, to.x, to.y, edge.lag, fromBox.width, fromBox.height, toBox.width, toBox.height],
+    () => edgePath(start, end, { lag: edge.lag }),
+    [start.x, start.y, end.x, end.y, edge.lag],
   );
 
   const isFeedback = edge.lag === 1;
@@ -53,7 +36,6 @@ export function EdgeView({
   const selectEdge = useUIStore((s) => s.selectEdge);
   const [hover, setHover] = useState(false);
 
-  // shape 변경 감지 → 모핑 클래스 잠깐 부여 (§ 11.6)
   const [morphing, setMorphing] = useState(false);
   const lastShapeKind = useRef(edge.shape.kind);
   useEffect(() => {

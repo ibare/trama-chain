@@ -176,9 +176,9 @@ export const tokens = {
 
 ### 4.3 토큰 family
 
-**색상**: `canvas-bg`, `canvas-grid`, `node-fill-calm`, `node-stroke-calm`, `node-fill-low`, `node-stroke-low`, `node-fill-focal`, `node-stroke-focal`, `node-text-primary`, `node-text-low`, `edge-default`, `edge-feedback`, `edge-strained`, `edge-introducing`, `text-question`, `text-hint`, `affordance-hint`
+**색상**: `canvas-bg`, `canvas-grid`, `node-fill-calm`, `node-stroke-calm`, `node-fill-low`, `node-stroke-low`, `node-fill-focal`, `node-stroke-focal`, `node-text-primary`, `node-text-low`, `edge-default`, `edge-feedback`, `edge-strained`, `edge-introducing`, `text-question`, `text-hint`, `affordance-hint`, `pin-fill`, `pin-stroke`, `socket-ring-default`, `socket-ring-focal`, `socket-dot-default`, `socket-dot-focal`, `combiner-fill`, `combiner-text`, `divider-subtle`
 
-**여백·크기**: `canvas-margin`, `canvas-padding`, `node-label-gap`, `node-handle-offset`, `edge-hit-tolerance`, `card-padding`, `card-gap`, `radius-node`, `radius-card`, `radius-pill`, `radius-picker`, `stroke-edge-default`, `stroke-edge-feedback`, `stroke-edge-strained`, `stroke-node-default`, `radius-node-min`, `radius-node-max`
+**여백·크기**: `canvas-margin`, `canvas-padding`, `node-label-gap`, `node-handle-offset`, `edge-hit-tolerance`, `card-padding`, `card-gap`, `radius-node`, `radius-card`, `radius-pill`, `radius-picker`, `stroke-edge-default`, `stroke-edge-feedback`, `stroke-edge-strained`, `stroke-node-default`, `radius-node-min`, `radius-node-max`, `pin-min-size`, `pin-padding`, `pin-socket-gap`, `pin-offset`, `pin-radius`, `socket-size`, `socket-dot-size`, `socket-ring-stroke`, `combiner-padding-x`, `combiner-padding-y`, `radius-combiner`, `divider-stroke`
 
 **타이포그래피**: `text-question`, `text-node-name`, `text-node-value`, `text-node-unit`, `text-hint`, `text-picker-label`, `text-step-count`, `font-serif-question`, `font-sans-default`
 
@@ -619,18 +619,20 @@ export function TramaEmbed(props: {
 
 ### 10.2 엣지 생성 — 일반 / Feedback 구분
 
-엣지 생성은 두 방식:
+엣지는 노드 카드 좌우의 **포트 핀 안에 있는 소켓**에서 시작·종료한다.
 
-- **일반 엣지** (lag=0): 노드 외곽 핸들에서 단순 드래그 → 다른 노드. 기본.
+- **일반 엣지** (lag=0): source의 우측 핀 소켓에서 드래그 → 다른 노드의 좌측 핀 위로 드롭. 기본.
 - **Feedback 엣지** (lag=1): 같은 드래그 동작에 *수식자 키*(예: Alt) 또는 *드래그 후 핸드 표시되는 토글*로 lag 지정. 생성 직후 시각적으로 즉시 다른 모양(§ 11.6).
+- **다중 입력**: target 노드의 좌측 핀에는 입력 엣지 수만큼 소켓이 세로로 쌓이며 핀이 길어진다. 새 엣지가 추가되면 다음 소켓이 자동으로 생기고, 삭제되면 다음 소켓들이 위로 당겨진다. 엣지의 도착점은 항상 자신이 차지하는 소켓 좌표.
+- **출력 소켓은 1개**: 같은 source에서 여러 엣지가 나가도 우측 핀의 단일 소켓에서 출발한다 (분기는 화살표 fan-out으로 표현).
 
 생성 직후 함수 picker 자동 표시. 미선택 닫기 시 기본 `linear`.
 
 ### 10.3 값 스크럽
-- 노드 본체 좌우 드래그 → `initialValue` 변경
-- 드래그 중 60fps: SVG attribute를 ref로 직접 조작, 드롭 시 zustand 커밋
-- 변경 즉시 *현재 실행 상태* 재계산 (`steps=1`이면 단일 propagation, `steps>1`이면 전체 trajectory 재계산)
-- 드롭 시 하나의 undo 단위
+- 노드 선택 시 카드 아래에 *마이크로 슬라이더* 등장 → `initialValue` 변경 (단위 범위 내)
+- 슬라이더 조작은 60fps: 변경 즉시 *현재 실행 상태* 재계산 (`steps=1`이면 단일 propagation, `steps>1`이면 전체 trajectory 재계산)
+- 노드 본체 좌우 드래그는 *카드 위치 이동*에 사용 (값 스크럽이 아님). 위치 이동도 하나의 undo 단위.
+- 슬라이더 드롭 시 하나의 undo 단위
 
 ### 10.4 엣지에 노드 끼워넣기 (일급 제스처)
 
@@ -671,15 +673,37 @@ export function TramaEmbed(props: {
 
 ## 11. 물성 시각화 명세
 
-### 11.1 노드 본체 (정규화 값 v ∈ [0, 1])
+### 11.1 노드 카드 구조
 
-- 크기: `radius-node-min` ~ `radius-node-max` 보간
+노드는 둥근 사각형 카드로 그려진다. 카드 자체는 *고정 폭*이며 높이는 (1) combiner 칩 유무, (2) 좌측 핀 소켓 수에 따라 자동 확장된다.
+
+**카드 본문 (위 → 아래):**
+
+1. **노드 이름** (`text-node-name`): 가운데 정렬. 인라인 편집 가능.
+2. **구분선**: `divider-subtle` 색, `divider-stroke` 굵기. 좌우 카드 inset 안에서만 그어짐.
+3. **값 + 단위**: 큰 값 (`text-node-value`) + 작은 단위 suffix (`text-node-unit`). 가운데 정렬.
+4. **Combiner 칩** *(다중 입력 노드만 노출)*: `radius-combiner`로 둥글린 캡슐. `combiner-fill` 배경 + `combiner-text` 텍스트. 좌측 핀에 들어오는 엣지가 2개 이상일 때만 등장.
+
+**카드 본체 시각 상태** (정규화 값 v ∈ [0, 1]):
+
 - 투명도: `opacity-node-low` ~ `opacity-node-high` 보간
-- 색상:
-  - v < `threshold-node-low`: low 톤
-  - 그 외: calm 톤
+- 색상: v < `threshold-node-low` → low 톤, 그 외 → calm 톤
 - focal 노드: 항상 focal 톤
 - 전환: `duration-scrub-response`, `easing-fade-natural`
+
+### 11.1.1 포트 핀과 소켓
+
+카드 좌우에 *캡슐형 포트 핀*이 절반만 돌출되어 붙어 있다. 핀 안에 소켓이 들어간다.
+
+- **핀 모양**: 둥근 캡슐. `pin-fill` 배경 + `pin-stroke` 테두리. `border-radius`는 `pin-radius` 토큰 (어떤 높이에서도 양 끝이 둥글게 유지될 만큼 큰 값).
+- **핀 크기**: 폭 `pin-min-size` (고정). 높이는 소켓 수에 따라 `pin-padding * 2 + sockets * socket-size + (sockets-1) * pin-socket-gap`로 자동 확장. 최소 높이도 `pin-min-size`.
+- **핀 위치**: 카드 좌·우 edge에서 폭의 절반만큼 바깥으로 돌출. 수직 중심은 카드 수직 중심과 동일.
+- **소켓 시각**: 외곽 ring (`socket-ring-default`, 두께 `socket-ring-stroke`) + 내부 dot (`socket-dot-default`). focal 노드는 `socket-ring-focal` / `socket-dot-focal`.
+- **소켓 크기**: 외곽 지름 `socket-size`, dot 지름 `socket-dot-size`.
+- **소켓 배치**:
+  - 좌측 핀: incoming 엣지 수만큼 (없으면 1개). 위→아래 순서로 `edgeOrder`의 incoming 인덱스에 매핑.
+  - 우측 핀: 항상 1개 (output).
+- **엣지 종점**: 모든 엣지는 source 우측 소켓 좌표에서 시작해 target 좌측 *해당 소켓* 좌표에서 끝난다.
 
 ### 11.2 노드 상태 애니메이션 (상호 배타)
 

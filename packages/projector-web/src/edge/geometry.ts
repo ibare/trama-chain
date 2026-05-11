@@ -1,90 +1,50 @@
-import { tokens } from '@trama/tokens';
-
 export interface Point {
   x: number;
   y: number;
 }
 
-export interface BoxSize {
-  width: number;
-  height: number;
-}
-
-const DEFAULT_BOX: BoxSize = {
-  width: parseFloat(tokens.spacing.cardMinWidth),
-  height: parseFloat(tokens.spacing.cardMinHeight),
-};
-
-const EDGE_GAP = 4;
-
-interface EdgePathOptions {
+export interface EdgePathOptions {
   lag: 0 | 1;
-  fromBox?: BoxSize;
-  toBox?: BoxSize;
 }
 
 /**
- * 카드 중심에서 단위벡터 방향으로 진행할 때 사각형 경계와 만나는 점.
- * halfW, halfH는 사각형의 절반 폭/높이. 결과는 *center로부터의 오프셋*이 아니라 absolute point.
- */
-export function rectBoundaryHit(
-  center: Point,
-  halfW: number,
-  halfH: number,
-  dirX: number,
-  dirY: number,
-): Point {
-  const tx = dirX === 0 ? Infinity : halfW / Math.abs(dirX);
-  const ty = dirY === 0 ? Infinity : halfH / Math.abs(dirY);
-  const t = Math.min(tx, ty);
-  return { x: center.x + dirX * t, y: center.y + dirY * t };
-}
-
-/**
- * 두 노드 중심 사이를 잇는 큐빅 베지에. 경계 사각형에서 시작·종료하도록 보정.
- * feedback이면 곡률을 크게.
+ * 두 *소켓 좌표* 사이를 잇는 큐빅 베지에.
+ * 소켓은 항상 카드 좌우(수평) 방향이므로 control point는 수평 방향으로 잡아 자연스럽게 흐른다.
+ * feedback(lag=1)이면 수직 방향으로 큰 곡률을 더해 루프 형태로.
  */
 export function edgePath(
-  from: Point,
-  to: Point,
+  start: Point,
+  end: Point,
   options: EdgePathOptions = { lag: 0 },
 ): { d: string; tip: Point; mid: Point; tangent: Point } {
-  const fromBox = options.fromBox ?? DEFAULT_BOX;
-  const toBox = options.toBox ?? DEFAULT_BOX;
+  const { p0, p1, p2, p3 } = edgeControls(start, end, options);
+  const d = `M ${p0.x} ${p0.y} C ${p1.x} ${p1.y}, ${p2.x} ${p2.y}, ${p3.x} ${p3.y}`;
+  const mid = bezierAt(p0, p1, p2, p3, 0.5);
+  const tangent = bezierTangent(p0, p1, p2, p3, 1.0);
+  return { d, tip: p3, mid, tangent };
+}
 
-  const dx = to.x - from.x;
-  const dy = to.y - from.y;
-  const dist = Math.sqrt(dx * dx + dy * dy) || 1;
-  const ux = dx / dist;
-  const uy = dy / dist;
+export function edgeControls(
+  start: Point,
+  end: Point,
+  options: EdgePathOptions = { lag: 0 },
+): { p0: Point; p1: Point; p2: Point; p3: Point } {
+  const dx = end.x - start.x;
+  const dy = end.y - start.y;
 
-  // 각 박스의 boundary에서 시작/종료, 거기서 EDGE_GAP만큼 더 후진.
-  const startHit = rectBoundaryHit(from, fromBox.width / 2, fromBox.height / 2, ux, uy);
-  const endHit = rectBoundaryHit(to, toBox.width / 2, toBox.height / 2, -ux, -uy);
-  const start: Point = { x: startHit.x + ux * EDGE_GAP, y: startHit.y + uy * EDGE_GAP };
-  const end: Point = { x: endHit.x - ux * EDGE_GAP, y: endHit.y - uy * EDGE_GAP };
+  if (options.lag === 1) {
+    const ax = Math.max(80, Math.abs(dx) * 0.5 + 60);
+    const arcSign = dy >= 0 ? -1 : 1;
+    const arcMag = Math.abs(dy) * 0.5 + 70;
+    const p1: Point = { x: start.x + ax, y: start.y + arcSign * arcMag };
+    const p2: Point = { x: end.x - ax, y: end.y + arcSign * arcMag };
+    return { p0: start, p1, p2, p3: end };
+  }
 
-  // 곡률
-  const curl = options.lag === 1 ? 0.6 : 0.18;
-  const nx = -uy;
-  const ny = ux;
-  const offset = dist * curl;
-
-  const c1: Point = {
-    x: start.x + (end.x - start.x) * 0.3 + nx * offset,
-    y: start.y + (end.y - start.y) * 0.3 + ny * offset,
-  };
-  const c2: Point = {
-    x: start.x + (end.x - start.x) * 0.7 + nx * offset,
-    y: start.y + (end.y - start.y) * 0.7 + ny * offset,
-  };
-
-  const d = `M ${start.x} ${start.y} C ${c1.x} ${c1.y}, ${c2.x} ${c2.y}, ${end.x} ${end.y}`;
-
-  const mid = bezierAt(start, c1, c2, end, 0.5);
-  const tangent = bezierTangent(start, c1, c2, end, 1.0);
-
-  return { d, tip: end, mid, tangent };
+  const pull = Math.max(40, Math.abs(dx) * 0.45);
+  const p1: Point = { x: start.x + pull, y: start.y };
+  const p2: Point = { x: end.x - pull, y: end.y };
+  return { p0: start, p1, p2, p3: end };
 }
 
 export function bezierAt(p0: Point, p1: Point, p2: Point, p3: Point, t: number): Point {
@@ -104,7 +64,6 @@ export function bezierTangent(p0: Point, p1: Point, p2: Point, p3: Point, t: num
   return { x: x / len, y: y / len };
 }
 
-/** 클릭 포인트와 베지어 경로 사이의 최단 거리(근사). */
 export function bezierDistanceTo(
   p0: Point,
   p1: Point,
@@ -129,36 +88,4 @@ export function bezierDistanceTo(
     }
   }
   return { dist: bestDist, t: bestT, point: best };
-}
-
-/** edgePath와 동일한 control point 추출. 내부 재사용. */
-export function edgeControls(
-  from: Point,
-  to: Point,
-  options: EdgePathOptions = { lag: 0 },
-): { p0: Point; p1: Point; p2: Point; p3: Point } {
-  const fromBox = options.fromBox ?? DEFAULT_BOX;
-  const toBox = options.toBox ?? DEFAULT_BOX;
-  const dx = to.x - from.x;
-  const dy = to.y - from.y;
-  const dist = Math.sqrt(dx * dx + dy * dy) || 1;
-  const ux = dx / dist;
-  const uy = dy / dist;
-  const startHit = rectBoundaryHit(from, fromBox.width / 2, fromBox.height / 2, ux, uy);
-  const endHit = rectBoundaryHit(to, toBox.width / 2, toBox.height / 2, -ux, -uy);
-  const start: Point = { x: startHit.x + ux * EDGE_GAP, y: startHit.y + uy * EDGE_GAP };
-  const end: Point = { x: endHit.x - ux * EDGE_GAP, y: endHit.y - uy * EDGE_GAP };
-  const curl = options.lag === 1 ? 0.6 : 0.18;
-  const nx = -uy;
-  const ny = ux;
-  const offset = dist * curl;
-  const p1: Point = {
-    x: start.x + (end.x - start.x) * 0.3 + nx * offset,
-    y: start.y + (end.y - start.y) * 0.3 + ny * offset,
-  };
-  const p2: Point = {
-    x: start.x + (end.x - start.x) * 0.7 + nx * offset,
-    y: start.y + (end.y - start.y) * 0.7 + ny * offset,
-  };
-  return { p0: start, p1, p2, p3: end };
 }

@@ -6,30 +6,24 @@ import {
   normalize,
   parseTrama,
   propagateOneStep,
+  type EdgeId,
   type Node,
+  type NodeId,
 } from '@trama/core';
 import { combinerRegistry, shapeRegistry } from './registries.js';
 import { computeBounds, staticEdgePath } from './geometry.js';
+import { getNodeLayout, type PinLayout } from './layout.js';
 import { formatValue, unitSuffix } from './format.js';
 
-const CARD_MIN_W = parseFloat(tokens.spacing.cardMinWidth);
-const CARD_MAX_W = parseFloat(tokens.spacing.cardMaxWidth);
-const CARD_MIN_H = parseFloat(tokens.spacing.cardMinHeight);
-const CARD_MAX_H = parseFloat(tokens.spacing.cardMaxHeight);
 const CARD_CORNER = parseFloat(tokens.spacing.cardCornerRadius);
+const PIN_RADIUS = parseFloat(tokens.spacing.pinRadius);
+const SOCKET_SIZE = parseFloat(tokens.spacing.socketSize);
+const SOCKET_DOT_SIZE = parseFloat(tokens.spacing.socketDotSize);
 const OPACITY_LOW = tokens.physical.opacityNodeLow;
 const OPACITY_HIGH = tokens.physical.opacityNodeHigh;
 const THRESH_LOW = tokens.physical.thresholdNodeLow;
 const STRAINED_LOW = tokens.physical.thresholdEdgeStrainedLow;
 const STRAINED_HIGH = tokens.physical.thresholdEdgeStrainedHigh;
-
-function boxFor(value: number, unit: import('@trama/core').Unit): { width: number; height: number } {
-  const norm = normalize(value, unit);
-  return {
-    width: CARD_MIN_W + (CARD_MAX_W - CARD_MIN_W) * norm,
-    height: CARD_MIN_H + (CARD_MAX_H - CARD_MIN_H) * norm,
-  };
-}
 
 interface Props {
   json: string;
@@ -39,6 +33,21 @@ interface Props {
 
 function lerp(a: number, b: number, t: number): number {
   return a + (b - a) * t;
+}
+
+function combinerSymbol(key: string): string {
+  switch (key) {
+    case 'sum':
+      return '+';
+    case 'product':
+      return '×';
+    case 'average':
+      return 'Ø';
+    case 'max':
+      return '↑';
+    default:
+      return '·';
+  }
 }
 
 export function TramaEmbed({ json, height = 360, showQuestion = true }: Props): JSX.Element {
@@ -68,6 +77,19 @@ export function TramaEmbed({ json, height = 360, showQuestion = true }: Props): 
   }
 
   const { model, values } = result;
+
+  const incomingMap: Record<NodeId, EdgeId[]> = {};
+  for (const eid of model.edgeOrder) {
+    const e = model.edges[eid];
+    if (!e) continue;
+    (incomingMap[e.to] ??= []).push(eid);
+  }
+
+  const layouts: Record<NodeId, ReturnType<typeof getNodeLayout>> = {};
+  for (const nid of model.nodeOrder) {
+    layouts[nid] = getNodeLayout({ incomingCount: incomingMap[nid]?.length ?? 0 });
+  }
+
   const positions = model.nodeOrder
     .map((id) => model.nodes[id]?.position)
     .filter((p): p is { x: number; y: number } => !!p);
@@ -93,13 +115,20 @@ export function TramaEmbed({ json, height = 360, showQuestion = true }: Props): 
           const fromNode = model.nodes[edge.from];
           const toNode = model.nodes[edge.to];
           if (!fromNode || !toNode) return null;
-          const from = fromNode.position ?? { x: 0, y: 0 };
-          const to = toNode.position ?? { x: 0, y: 0 };
+          const fromPos = fromNode.position ?? { x: 0, y: 0 };
+          const toPos = toNode.position ?? { x: 0, y: 0 };
+          const fromLayout = layouts[edge.from]!;
+          const toLayout = layouts[edge.to]!;
+          const socketIdx = (incomingMap[edge.to] ?? []).indexOf(eid);
+          const src = fromLayout.rightPin.sockets[0];
+          const dst = toLayout.leftPin.sockets[Math.max(0, socketIdx)] ?? toLayout.leftPin.sockets[0];
+          if (!src || !dst) return null;
+          const start = { x: fromPos.x + src.x, y: fromPos.y + src.y };
+          const end = { x: toPos.x + dst.x, y: toPos.y + dst.y };
+
+          const { d, tip, tangent, mid } = staticEdgePath(start, end, { lag: edge.lag });
+
           const srcValue = values[edge.from] ?? fromNode.initialValue;
-          const dstValue = values[edge.to] ?? toNode.initialValue;
-          const fromBox = boxFor(srcValue, fromNode.unit);
-          const toBox = boxFor(dstValue, toNode.unit);
-          const { d, tip, tangent, mid } = staticEdgePath(from, to, { lag: edge.lag, fromBox, toBox });
           const srcNorm = normalize(srcValue, fromNode.unit);
           const isFeedback = edge.lag === 1;
           const isStrained = srcNorm < STRAINED_LOW || srcNorm > STRAINED_HIGH;
@@ -125,25 +154,33 @@ export function TramaEmbed({ json, height = 360, showQuestion = true }: Props): 
         {model.nodeOrder.map((nid) => {
           const node = model.nodes[nid];
           if (!node) return null;
+          const layout = layouts[nid]!;
           const v = values[nid] ?? node.initialValue;
-          return <StaticNode key={nid} node={node} currentValue={v} />;
+          return <StaticNode key={nid} node={node} layout={layout} currentValue={v} />;
         })}
       </svg>
     </div>
   );
 }
 
-function StaticNode({ node, currentValue }: { node: Node; currentValue: number }): JSX.Element {
+function StaticNode({
+  node,
+  layout,
+  currentValue,
+}: {
+  node: Node;
+  layout: ReturnType<typeof getNodeLayout>;
+  currentValue: number;
+}): JSX.Element {
   const norm = normalize(currentValue, node.unit);
-  const { width, height } = boxFor(currentValue, node.unit);
-  const halfW = width / 2;
-  const halfH = height / 2;
   const opacity = lerp(OPACITY_LOW, OPACITY_HIGH, norm);
   const isLow = norm < THRESH_LOW;
   const isFocal = node.isFocal;
   const stateClass = isFocal ? 'is-focal' : isLow ? 'is-low' : 'is-calm';
   const pos = node.position ?? { x: 0, y: 0 };
   const suffix = unitSuffix(node.unit);
+  const combiner = combinerRegistry.get(node.combiner);
+  const combinerLabel = combiner?.labels.ko ?? node.combiner;
   return (
     <g
       className="trama-embed-node"
@@ -152,24 +189,131 @@ function StaticNode({ node, currentValue }: { node: Node; currentValue: number }
     >
       <rect
         className={`trama-embed-node-body ${stateClass}`}
-        x={-halfW}
-        y={-halfH}
-        width={width}
-        height={height}
+        x={-layout.halfW}
+        y={-layout.halfH}
+        width={layout.width}
+        height={layout.height}
         rx={CARD_CORNER}
         ry={CARD_CORNER}
       />
-      <text className="trama-embed-node-label" y={-halfH + 18}>
+      <text className="trama-embed-node-label" x={0} y={layout.labelY} textAnchor="middle">
         {node.label}
       </text>
-      <text className="trama-embed-node-value" y={4}>
+      <line
+        className="trama-embed-node-divider"
+        x1={layout.divider.x1}
+        x2={layout.divider.x2}
+        y1={layout.divider.y}
+        y2={layout.divider.y}
+      />
+      <text className="trama-embed-node-value" x={0} y={layout.valueY} textAnchor="middle">
         {formatValue(currentValue, node.unit)}
+        {suffix && (
+          <tspan className="trama-embed-node-unit" dx="6">
+            {suffix}
+          </tspan>
+        )}
       </text>
-      {suffix && (
-        <text className="trama-embed-node-unit" y={halfH - 8}>
-          {suffix}
-        </text>
+      {layout.hasCombiner && layout.combinerCenterY !== null && (
+        <CombinerChip
+          symbol={combinerSymbol(node.combiner)}
+          label={combinerLabel}
+          cy={layout.combinerCenterY}
+        />
       )}
+      <PinShape pin={layout.leftPin} stateClass={stateClass} />
+      {layout.leftPin.sockets.map((s, i) => (
+        <SocketVisual key={`l${i}`} cx={s.x} cy={s.y} stateClass={stateClass} />
+      ))}
+      <PinShape pin={layout.rightPin} stateClass={stateClass} />
+      {layout.rightPin.sockets[0] && (
+        <SocketVisual
+          cx={layout.rightPin.sockets[0].x}
+          cy={layout.rightPin.sockets[0].y}
+          stateClass={stateClass}
+        />
+      )}
+    </g>
+  );
+}
+
+function PinShape({ pin, stateClass }: { pin: PinLayout; stateClass: string }): JSX.Element {
+  return (
+    <rect
+      className={`trama-embed-node-pin ${stateClass}`}
+      x={pin.rectX}
+      y={pin.rectY}
+      width={pin.width}
+      height={pin.height}
+      rx={Math.min(PIN_RADIUS, pin.width / 2, pin.height / 2)}
+      ry={Math.min(PIN_RADIUS, pin.width / 2, pin.height / 2)}
+    />
+  );
+}
+
+function SocketVisual({
+  cx,
+  cy,
+  stateClass,
+}: {
+  cx: number;
+  cy: number;
+  stateClass: string;
+}): JSX.Element {
+  return (
+    <g>
+      <circle
+        className={`trama-embed-node-socket-ring ${stateClass}`}
+        cx={cx}
+        cy={cy}
+        r={SOCKET_SIZE / 2}
+      />
+      <circle
+        className={`trama-embed-node-socket-dot ${stateClass}`}
+        cx={cx}
+        cy={cy}
+        r={SOCKET_DOT_SIZE / 2}
+      />
+    </g>
+  );
+}
+
+function CombinerChip({
+  symbol,
+  label,
+  cy,
+}: {
+  symbol: string;
+  label: string;
+  cy: number;
+}): JSX.Element {
+  const text = `${symbol} ${label}`;
+  const paddingX = parseFloat(tokens.spacing.combinerPaddingX);
+  const fontSize = parseFloat(tokens.typography.textNodeUnit) * 16;
+  const approxCharW = fontSize * 0.55;
+  const innerW = text.length * approxCharW;
+  const w = innerW + paddingX * 2;
+  const h = parseFloat(tokens.spacing.combinerPaddingY) * 2 + fontSize + 2;
+  const radius = Math.min(parseFloat(tokens.spacing.radiusCombiner), h / 2);
+  return (
+    <g>
+      <rect
+        className="trama-embed-node-combiner"
+        x={-w / 2}
+        y={cy - h / 2}
+        width={w}
+        height={h}
+        rx={radius}
+        ry={radius}
+      />
+      <text
+        className="trama-embed-node-combiner-text"
+        x={0}
+        y={cy + fontSize / 3}
+        textAnchor="middle"
+      >
+        {text}
+      </text>
     </g>
   );
 }

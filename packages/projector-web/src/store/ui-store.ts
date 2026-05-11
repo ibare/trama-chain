@@ -8,6 +8,8 @@ export type Selection =
 
 export interface EdgeDraft {
   fromNodeId: NodeId;
+  /** 출발 소켓의 캔버스 좌표 (source 우측 핀 소켓) */
+  startPoint: { x: number; y: number };
   /** 캔버스 좌표계의 현재 포인터 위치 */
   pointer: { x: number; y: number };
   /** Alt 키 등으로 사용자가 feedback 엣지를 그리겠다고 표시 */
@@ -48,7 +50,12 @@ export interface UIStore {
   selectEdge: (id: EdgeId) => void;
   clearSelection: () => void;
 
-  startEdgeDraft: (fromNodeId: NodeId, pointer: { x: number; y: number }, lag?: 0 | 1) => void;
+  startEdgeDraft: (
+    fromNodeId: NodeId,
+    startPoint: { x: number; y: number },
+    pointer: { x: number; y: number },
+    lag?: 0 | 1,
+  ) => void;
   updateEdgeDraft: (pointer: { x: number; y: number }, lag?: 0 | 1) => void;
   endEdgeDraft: () => void;
 
@@ -74,8 +81,8 @@ export const useUIStore = create<UIStore>((set) => ({
   selectEdge: (id) => set({ selection: { kind: 'edge', id } }),
   clearSelection: () => set({ selection: { kind: 'none' } }),
 
-  startEdgeDraft: (fromNodeId, pointer, lag = 0) =>
-    set({ edgeDraft: { fromNodeId, pointer, lag } }),
+  startEdgeDraft: (fromNodeId, startPoint, pointer, lag = 0) =>
+    set({ edgeDraft: { fromNodeId, startPoint, pointer, lag } }),
   updateEdgeDraft: (pointer, lag) =>
     set((s) =>
       s.edgeDraft ? { edgeDraft: { ...s.edgeDraft, pointer, lag: lag ?? s.edgeDraft.lag } } : {},
