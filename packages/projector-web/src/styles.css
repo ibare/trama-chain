@@ -45,9 +45,10 @@
 [data-trama-root] .trama-node {
   cursor: grab;
   opacity: var(--trama-node-opacity, 1);
-  transition:
-    transform var(--motion-duration-scrub-response) var(--motion-easing-fade-natural),
-    opacity var(--motion-duration-scrub-response) var(--motion-easing-fade-natural);
+  /* transform은 절대 transition 대상에 두지 않는다.
+     truth 위치를 보간하면 같은 좌표를 즉시 반영하는 엣지 path와 시각 분리가 발생.
+     opacity 등 transform과 무관한 속성만 보간. */
+  transition: opacity var(--motion-duration-scrub-response) var(--motion-easing-fade-natural);
   animation: trama-node-enter var(--motion-duration-pop-spring) var(--motion-easing-soft-spring) both;
 }
 

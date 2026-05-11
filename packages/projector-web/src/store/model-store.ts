@@ -92,6 +92,16 @@ function record(
   }
 }
 
+/** Node patch가 propagation 결과에 영향을 줄 수 있는 필드를 포함하는지. */
+function patchAffectsValues(patch: Partial<Omit<Node, 'id'>>): boolean {
+  return (
+    'initialValue' in patch ||
+    'unit' in patch ||
+    'combiner' in patch ||
+    'isFocal' in patch
+  );
+}
+
 function computeExecutionState(model: Model): {
   executionState: ExecutionState;
   trajectory: ExecutionState[];
@@ -173,12 +183,16 @@ export const useModelStore = create<ModelStore>((set, get) => ({
     const before = get().model;
     const after = updateNodeOp(before, id, patch);
     if (after === before) return;
-    const exec = computeExecutionState(after);
+    // 값에 영향을 주는 필드가 patch에 있을 때만 propagation 재실행.
+    // position·label만 바뀌었다면 시뮬레이션은 그대로다.
+    const exec = patchAffectsValues(patch) ? computeExecutionState(after) : null;
+    // 같은 노드에 대한 move-node·rename-node 등 연속 변경은 undo 한 칸으로 병합.
+    const shouldCoalesce = kind === 'move-node' || kind === 'rename-node';
     set((s) => {
-      record(s, before, after, kind, label, { nodeId: id });
+      record(s, before, after, kind, label, { nodeId: id }, shouldCoalesce);
       return {
         model: after,
-        ...exec,
+        ...(exec ?? {}),
         canUndo: s.log.canUndo(),
         canRedo: s.log.canRedo(),
       };
