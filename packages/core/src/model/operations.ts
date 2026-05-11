@@ -22,7 +22,8 @@ function touch(model: Model, now: number = Date.now()): Model {
 
 export interface AddNodeInput {
   label: string;
-  unit: Node['unit'];
+  unitId: string;
+  unitOverride?: Node['unitOverride'];
   initialValue: number;
   position?: { x: number; y: number } | null;
   combiner?: string;
@@ -36,7 +37,8 @@ export function addNode(model: Model, input: AddNodeInput, now?: number): Model 
   const node: Node = {
     id,
     label: input.label,
-    unit: input.unit,
+    unitId: input.unitId,
+    unitOverride: input.unitOverride,
     initialValue: input.initialValue,
     position: input.position ?? null,
     combiner: input.combiner ?? 'sum',

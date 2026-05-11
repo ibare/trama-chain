@@ -1,8 +1,17 @@
 import type { CombinerRegistry } from '../combiners/index.js';
-import type { Model } from '../model/index.js';
+import type { Model, Node } from '../model/index.js';
 import type { ShapeRegistry } from '../functions/index.js';
 import type { Rng } from '../functions/types.js';
-import { clamp01, clampToUnit, denormalize, normalize } from '../units/index.js';
+import {
+  clamp01,
+  clampToUnit,
+  defaultUnitCatalog,
+  denormalize,
+  normalize,
+  resolveUnit,
+  type ResolvedUnit,
+  type UnitCatalog,
+} from '../units/index.js';
 import { MissingCombinerError, MissingShapeError } from './errors.js';
 import { defaultRng } from './rng.js';
 import type { ExecutionState } from './state.js';
@@ -11,9 +20,27 @@ import { buildTopology, type InstantaneousTopology } from './topology.js';
 export interface PropagateOptions {
   shapeRegistry: ShapeRegistry;
   combinerRegistry: CombinerRegistry;
+  /** 단위 카탈로그. 미지정 시 기본 카탈로그. 알 수 없는 unitId는 free로 폴백. */
+  unitCatalog?: UnitCatalog;
   rng?: Rng;
   /** 이미 계산된 위상을 재사용하려면 전달 */
   topology?: InstantaneousTopology;
+}
+
+const FREE_FALLBACK: ResolvedUnit = {
+  id: 'free',
+  kind: 'free',
+  suffix: '',
+  labels: [],
+  min: 0,
+  max: 1,
+  step: 0.01,
+};
+
+function nodeUnit(node: Node, catalog: UnitCatalog): ResolvedUnit {
+  const def = catalog.get(node.unitId);
+  if (!def) return FREE_FALLBACK;
+  return resolveUnit(def, node.unitOverride);
 }
 
 /**
@@ -28,6 +55,7 @@ export function propagateOneStep(
 ): ExecutionState {
   const topology = options.topology ?? buildTopology(model);
   const rng = options.rng ?? defaultRng;
+  const catalog = options.unitCatalog ?? defaultUnitCatalog;
   const next: Record<string, number> = { ...state.values };
 
   for (const nid of topology.order) {
@@ -42,12 +70,15 @@ export function propagateOneStep(
     const combiner = options.combinerRegistry.get(node.combiner);
     if (!combiner) throw new MissingCombinerError(node.combiner);
 
+    const targetUnit = nodeUnit(node, catalog);
+
     const contributions: number[] = [];
     for (const edge of incoming) {
       const source = model.nodes[edge.from];
       if (!source) continue;
+      const sourceUnit = nodeUnit(source, catalog);
       const sourceValue = next[edge.from] ?? source.initialValue;
-      const normalizedIn = normalize(sourceValue, source.unit);
+      const normalizedIn = normalize(sourceValue, sourceUnit);
       const shape = options.shapeRegistry.get(edge.shape.kind);
       if (!shape) throw new MissingShapeError(edge.shape.kind);
       const parsed = shape.paramsSchema.safeParse(edge.shape.params);
@@ -55,11 +86,11 @@ export function propagateOneStep(
       let out01 = shape.compute(normalizedIn, params, { rng });
       if (edge.inverted) out01 = clamp01(1 - out01);
       // target unit 스케일로 환원
-      contributions.push(denormalize(out01, node.unit));
+      contributions.push(denormalize(out01, targetUnit));
     }
 
     const combined = combiner.combine(contributions);
-    next[nid] = clampToUnit(combined, node.unit);
+    next[nid] = clampToUnit(combined, targetUnit);
   }
 
   return { values: next };
@@ -73,10 +104,11 @@ export function propagateOneStep(
 export function applyFeedbackEdges(
   state: ExecutionState,
   model: Model,
-  options: Pick<PropagateOptions, 'combinerRegistry' | 'topology'>,
+  options: Pick<PropagateOptions, 'combinerRegistry' | 'topology' | 'unitCatalog'>,
 ): ExecutionState {
   const topology = options.topology ?? buildTopology(model);
   if (topology.feedbackEdges.length === 0) return state;
+  const catalog = options.unitCatalog ?? defaultUnitCatalog;
   const next: Record<string, number> = { ...state.values };
 
   // target별로 feedback contributions 모으기
@@ -108,7 +140,7 @@ export function applyFeedbackEdges(
     // sum이면 누적, average면 평균 등 사용자가 의도 표현 가능.
     const baseValue = next[tid] ?? target.initialValue;
     const combined = combiner.combine([baseValue, ...contribs]);
-    next[tid] = clampToUnit(combined, target.unit);
+    next[tid] = clampToUnit(combined, nodeUnit(target, catalog));
   }
 
   return { values: next };

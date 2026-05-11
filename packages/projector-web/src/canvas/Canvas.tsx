@@ -69,8 +69,8 @@ export function Canvas(): JSX.Element {
       const pos = toCanvasCoords(e.clientX, e.clientY);
       const node = addNode({
         label: '새 변수',
-        unit: { kind: 'scale', min: 0, max: 1 },
-        initialValue: 0.5,
+        unitId: 'rating-10',
+        initialValue: 5,
         position: pos,
         isFocal: nodeCount === 0,
       });

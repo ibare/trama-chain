@@ -1,21 +1,21 @@
 import { z } from 'zod';
 
-export const UnitSchema = z.discriminatedUnion('kind', [
-  z.object({
-    kind: z.literal('number'),
-    suffix: z.string(),
-    min: z.number(),
-    max: z.number(),
-  }),
-  z.object({ kind: z.literal('scale'), min: z.number(), max: z.number() }),
-  z.object({ kind: z.literal('label'), values: z.array(z.string()) }),
-  z.object({ kind: z.literal('free') }),
-]);
+export const UnitOverrideSchema = z
+  .object({
+    min: z.number().optional(),
+    max: z.number().optional(),
+    step: z.number().positive().optional(),
+    suffix: z.string().optional(),
+    labels: z.array(z.string()).optional(),
+  })
+  .strict();
 
 export const NodeSchema = z.object({
   id: z.string(),
   label: z.string(),
-  unit: UnitSchema,
+  /** 카탈로그 단위 키. 알 수 없는 키면 documentToModel에서 free로 폴백. */
+  unitId: z.string(),
+  unitOverride: UnitOverrideSchema.optional(),
   initialValue: z.number(),
   position: z.object({ x: z.number(), y: z.number() }).nullable(),
   combiner: z.string(),

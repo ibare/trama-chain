@@ -9,7 +9,7 @@ describe('OperationLog', () => {
     const m1 = addNode(m0, {
       id: 'a',
       label: 'A',
-      unit: { kind: 'free' },
+      unitId: 'free',
       initialValue: 0,
     });
     log.record({ kind: 'add-node', label: '노드 추가', before: m0, after: m1 });
@@ -24,7 +24,7 @@ describe('OperationLog', () => {
     const log = new OperationLog();
     let m = createEmptyModel(0);
     const m0 = m;
-    m = addNode(m, { id: 'a', label: 'A', unit: { kind: 'free' }, initialValue: 0 });
+    m = addNode(m, { id: 'a', label: 'A', unitId: 'free', initialValue: 0 });
     const m1 = m;
     log.record({ kind: 'add-node', label: 'add', before: m0, after: m1 });
 
@@ -67,7 +67,7 @@ describe('OperationLog', () => {
   it('record clears redo stack', () => {
     const log = new OperationLog();
     const m0 = createEmptyModel(0);
-    const m1 = addNode(m0, { id: 'a', label: 'A', unit: { kind: 'free' }, initialValue: 0 });
+    const m1 = addNode(m0, { id: 'a', label: 'A', unitId: 'free', initialValue: 0 });
     log.record({ kind: 'add-node', label: 'add', before: m0, after: m1 });
     log.undo();
     expect(log.canRedo()).toBe(true);

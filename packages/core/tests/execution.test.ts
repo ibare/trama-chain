@@ -20,16 +20,23 @@ import { mulberry32 } from '../src/execution/rng.js';
 const shapes = createDefaultShapeRegistry();
 const combiners = createDefaultCombinerRegistry();
 
+/**
+ * 테스트용 ad-hoc number 단위 — number kind 베이스 카탈로그('count') 위에
+ * min/max/suffix를 override로 얹는다. spread해서 addNode에 풀어 넣는다.
+ */
 function numberUnit(min: number, max: number, suffix = '') {
-  return { kind: 'number' as const, suffix, min, max };
+  return {
+    unitId: 'count',
+    unitOverride: { min, max, suffix },
+  } as const;
 }
 
 describe('topology', () => {
   it('orders simple chain', () => {
     let m = createEmptyModel();
-    m = addNode(m, { id: 'a', label: 'A', unit: numberUnit(0, 10), initialValue: 0 });
-    m = addNode(m, { id: 'b', label: 'B', unit: numberUnit(0, 10), initialValue: 0 });
-    m = addNode(m, { id: 'c', label: 'C', unit: numberUnit(0, 10), initialValue: 0 });
+    m = addNode(m, { id: 'a', label: 'A', ...numberUnit(0, 10), initialValue: 0 });
+    m = addNode(m, { id: 'b', label: 'B', ...numberUnit(0, 10), initialValue: 0 });
+    m = addNode(m, { id: 'c', label: 'C', ...numberUnit(0, 10), initialValue: 0 });
     m = addEdge(m, { from: 'a', to: 'b', shape: { kind: 'linear', params: { slope: 1, offset: 0 } } });
     m = addEdge(m, { from: 'b', to: 'c', shape: { kind: 'linear', params: { slope: 1, offset: 0 } } });
     const t = buildTopology(m);
@@ -38,8 +45,8 @@ describe('topology', () => {
 
   it('throws on instantaneous cycle', () => {
     let m = createEmptyModel();
-    m = addNode(m, { id: 'a', label: 'A', unit: numberUnit(0, 10), initialValue: 0 });
-    m = addNode(m, { id: 'b', label: 'B', unit: numberUnit(0, 10), initialValue: 0 });
+    m = addNode(m, { id: 'a', label: 'A', ...numberUnit(0, 10), initialValue: 0 });
+    m = addNode(m, { id: 'b', label: 'B', ...numberUnit(0, 10), initialValue: 0 });
     m = addEdge(m, { from: 'a', to: 'b', shape: { kind: 'linear', params: { slope: 1, offset: 0 } } });
     m = addEdge(m, { from: 'b', to: 'a', shape: { kind: 'linear', params: { slope: 1, offset: 0 } } });
     expect(() => buildTopology(m)).toThrow(InstantaneousCycleError);
@@ -47,8 +54,8 @@ describe('topology', () => {
 
   it('allows feedback (lag=1) cycle without error', () => {
     let m = createEmptyModel();
-    m = addNode(m, { id: 'a', label: 'A', unit: numberUnit(0, 10), initialValue: 0 });
-    m = addNode(m, { id: 'b', label: 'B', unit: numberUnit(0, 10), initialValue: 0 });
+    m = addNode(m, { id: 'a', label: 'A', ...numberUnit(0, 10), initialValue: 0 });
+    m = addNode(m, { id: 'b', label: 'B', ...numberUnit(0, 10), initialValue: 0 });
     m = addEdge(m, { from: 'a', to: 'b', shape: { kind: 'linear', params: { slope: 1, offset: 0 } } });
     m = addEdge(m, {
       from: 'b',
@@ -63,8 +70,8 @@ describe('topology', () => {
 describe('propagateOneStep', () => {
   it('linear chain propagates', () => {
     let m = createEmptyModel();
-    m = addNode(m, { id: 'a', label: 'A', unit: numberUnit(0, 100), initialValue: 50 });
-    m = addNode(m, { id: 'b', label: 'B', unit: numberUnit(0, 100), initialValue: 0 });
+    m = addNode(m, { id: 'a', label: 'A', ...numberUnit(0, 100), initialValue: 50 });
+    m = addNode(m, { id: 'b', label: 'B', ...numberUnit(0, 100), initialValue: 0 });
     m = addEdge(m, {
       from: 'a',
       to: 'b',
@@ -80,12 +87,12 @@ describe('propagateOneStep', () => {
 
   it('sum combiner combines multiple inputs', () => {
     let m = createEmptyModel();
-    m = addNode(m, { id: 'a', label: 'A', unit: numberUnit(0, 10), initialValue: 5 });
-    m = addNode(m, { id: 'b', label: 'B', unit: numberUnit(0, 10), initialValue: 3 });
+    m = addNode(m, { id: 'a', label: 'A', ...numberUnit(0, 10), initialValue: 5 });
+    m = addNode(m, { id: 'b', label: 'B', ...numberUnit(0, 10), initialValue: 3 });
     m = addNode(m, {
       id: 'c',
       label: 'C',
-      unit: numberUnit(0, 20),
+      ...numberUnit(0, 20),
       initialValue: 0,
       combiner: 'sum',
     });
@@ -103,8 +110,8 @@ describe('propagateOneStep', () => {
 
   it('inverted edge flips output', () => {
     let m = createEmptyModel();
-    m = addNode(m, { id: 'a', label: 'A', unit: numberUnit(0, 10), initialValue: 8 });
-    m = addNode(m, { id: 'b', label: 'B', unit: numberUnit(0, 10), initialValue: 0 });
+    m = addNode(m, { id: 'a', label: 'A', ...numberUnit(0, 10), initialValue: 8 });
+    m = addNode(m, { id: 'b', label: 'B', ...numberUnit(0, 10), initialValue: 0 });
     m = addEdge(m, {
       from: 'a',
       to: 'b',
@@ -126,14 +133,14 @@ describe('executeModel (N-step)', () => {
     m = addNode(m, {
       id: 'balance',
       label: '잔액',
-      unit: numberUnit(0, 10000),
+      ...numberUnit(0, 10000),
       initialValue: 1000,
       combiner: 'sum',
     });
     m = addNode(m, {
       id: 'interest',
       label: '이자',
-      unit: numberUnit(0, 1000),
+      ...numberUnit(0, 1000),
       initialValue: 0,
     });
     // interest = 0.1 * balance (slope 0.1)
@@ -192,20 +199,20 @@ function stochasticSlotModel(): Model {
   m = addNode(m, {
     id: 'balance',
     label: '잔액',
-    unit: numberUnit(0, 30000000, 'krw'),
+    ...numberUnit(0, 30000000, 'krw'),
     initialValue: 10000000,
     combiner: 'sum',
   });
   m = addNode(m, {
     id: 'bet',
     label: '회당 베팅',
-    unit: numberUnit(10000, 1000000, 'krw'),
+    ...numberUnit(10000, 1000000, 'krw'),
     initialValue: 50000,
   });
   m = addNode(m, {
     id: 'outcome',
     label: '회당 결과',
-    unit: numberUnit(-1000000, 5000000, 'krw'),
+    ...numberUnit(-1000000, 5000000, 'krw'),
     initialValue: 0,
   });
   m = addEdge(m, {

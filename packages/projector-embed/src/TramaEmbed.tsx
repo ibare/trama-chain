@@ -1,19 +1,38 @@
 import { useMemo } from 'react';
 import { tokens } from '@trama/tokens';
 import {
+  defaultUnitCatalog,
   documentToModel,
   initializeFromInitialValues,
   normalize,
   parseTrama,
   propagateOneStep,
+  resolveUnit,
   type EdgeId,
   type Node,
   type NodeId,
+  type ResolvedUnit,
 } from '@trama/core';
 import { combinerRegistry, shapeRegistry } from './registries.js';
 import { computeBounds, staticEdgePath } from './geometry.js';
 import { getNodeLayout, type PinLayout } from './layout.js';
-import { formatValue, unitSuffix } from './format.js';
+import { formatNodeValue } from './format.js';
+
+const FREE_FALLBACK: ResolvedUnit = {
+  id: 'free',
+  kind: 'free',
+  suffix: '',
+  labels: [],
+  min: 0,
+  max: 1,
+  step: 0.01,
+};
+
+function resolveNodeUnit(node: Node): ResolvedUnit {
+  const def = defaultUnitCatalog.get(node.unitId);
+  if (!def) return FREE_FALLBACK;
+  return resolveUnit(def, node.unitOverride);
+}
 
 const CARD_CORNER = parseFloat(tokens.spacing.cardCornerRadius);
 const PIN_RADIUS = parseFloat(tokens.spacing.pinRadius);
@@ -129,7 +148,7 @@ export function TramaEmbed({ json, height = 360, showQuestion = true }: Props): 
           const { d, tip, tangent, mid } = staticEdgePath(start, end, { lag: edge.lag });
 
           const srcValue = values[edge.from] ?? fromNode.initialValue;
-          const srcNorm = normalize(srcValue, fromNode.unit);
+          const srcNorm = normalize(srcValue, resolveNodeUnit(fromNode));
           const isFeedback = edge.lag === 1;
           const isStrained = srcNorm < STRAINED_LOW || srcNorm > STRAINED_HIGH;
           const cls = [
@@ -172,13 +191,14 @@ function StaticNode({
   layout: ReturnType<typeof getNodeLayout>;
   currentValue: number;
 }): JSX.Element {
-  const norm = normalize(currentValue, node.unit);
+  const unit = resolveNodeUnit(node);
+  const norm = normalize(currentValue, unit);
   const opacity = lerp(OPACITY_LOW, OPACITY_HIGH, norm);
   const isLow = norm < THRESH_LOW;
   const isFocal = node.isFocal;
   const stateClass = isFocal ? 'is-focal' : isLow ? 'is-low' : 'is-calm';
   const pos = node.position ?? { x: 0, y: 0 };
-  const suffix = unitSuffix(node.unit);
+  const formatted = formatNodeValue(currentValue, unit);
   const combiner = combinerRegistry.get(node.combiner);
   const combinerLabel = combiner?.labels.ko ?? node.combiner;
   return (
@@ -207,10 +227,10 @@ function StaticNode({
         y2={layout.divider.y}
       />
       <text className="trama-embed-node-value" x={0} y={layout.valueY} textAnchor="middle">
-        {formatValue(currentValue, node.unit)}
-        {suffix && (
+        {formatted.primary}
+        {formatted.accessory && (
           <tspan className="trama-embed-node-unit" dx="6">
-            {suffix}
+            {formatted.accessory}
           </tspan>
         )}
       </text>

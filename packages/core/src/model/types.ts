@@ -1,4 +1,4 @@
-import type { Unit } from '../units/index.js';
+import type { UnitOverride } from '../units/index.js';
 
 export type ModelId = string;
 export type NodeId = string;
@@ -9,7 +9,10 @@ export type EdgeLag = 0 | 1;
 export interface Node {
   id: NodeId;
   label: string;
-  unit: Unit;
+  /** 카탈로그 단위 키 (예: 'kg', 'rating-10', 'confidence'). */
+  unitId: string;
+  /** 카탈로그 기본값을 노드별로 좁힐 때만 채운다. 비어 있으면 카탈로그 default. */
+  unitOverride?: UnitOverride;
   initialValue: number;
   position: { x: number; y: number } | null;
   /** Combiner key, registered in CombinerRegistry */

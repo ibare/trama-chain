@@ -15,7 +15,8 @@ const DOC_KEY_ORDER: (keyof TramaDocument)[] = [
 const NODE_KEY_ORDER: (keyof TramaNode)[] = [
   'id',
   'label',
-  'unit',
+  'unitId',
+  'unitOverride',
   'initialValue',
   'position',
   'combiner',

@@ -28,7 +28,8 @@ function buildModel() {
   m = addNode(m, {
     id: 'n-weight',
     label: '체중',
-    unit: { kind: 'number', suffix: 'kg', min: 40, max: 110 },
+    unitId: 'kg',
+    unitOverride: { min: 40, max: 110 },
     initialValue: 70,
     position: { x: 540, y: 170 },
     combiner: 'sum',
@@ -37,7 +38,8 @@ function buildModel() {
   m = addNode(m, {
     id: 'n-intake',
     label: '섭취량',
-    unit: { kind: 'number', suffix: 'kcal', min: 0, max: 4000 },
+    unitId: 'count',
+    unitOverride: { min: 0, max: 4000, suffix: 'kcal' },
     initialValue: 2200,
     position: { x: 200, y: 170 },
   });
@@ -168,7 +170,8 @@ describe('serialize / parse round-trip', () => {
     m = addNode(m, {
       id: 'n-balance',
       label: '잔액',
-      unit: { kind: 'number', suffix: 'krw', min: 0, max: 30000000 },
+      unitId: 'krw',
+      unitOverride: { min: 0, max: 30000000 },
       initialValue: 10000000,
       position: { x: 400, y: 170 },
       combiner: 'sum',
@@ -177,7 +180,8 @@ describe('serialize / parse round-trip', () => {
     m = addNode(m, {
       id: 'n-outcome',
       label: '회당 결과',
-      unit: { kind: 'number', suffix: 'krw', min: -1000000, max: 5000000 },
+      unitId: 'krw',
+      unitOverride: { min: -1000000, max: 5000000 },
       initialValue: 0,
       position: { x: 250, y: 170 },
     });

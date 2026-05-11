@@ -1,30 +1,13 @@
 import { useCallback } from 'react';
-import type { Node, Unit } from '@trama/core';
+import type { Node } from '@trama/core';
 import { useModelStore } from '../store/index.js';
-import { formatValue } from '../util/format.js';
+import { formatNodeValue } from '../util/format.js';
+import { resolveNodeUnit } from '../util/unit-resolver.js';
 
 interface Props {
   node: Node;
   halfW: number;
   halfH: number;
-}
-
-interface SliderBounds {
-  min: number;
-  max: number;
-  step: number;
-}
-
-function boundsFor(unit: Unit): SliderBounds {
-  switch (unit.kind) {
-    case 'scale':
-    case 'number':
-      return { min: unit.min, max: unit.max, step: (unit.max - unit.min) / 100 };
-    case 'label':
-      return { min: 0, max: unit.values.length - 1, step: 1 };
-    case 'free':
-      return { min: -1, max: 1, step: 0.01 };
-  }
 }
 
 const SLIDER_WIDTH = 160;
@@ -34,7 +17,8 @@ const SLIDER_GAP = 8;
 export function NodeMicroSlider({ node, halfW: _halfW, halfH }: Props): JSX.Element {
   void _halfW;
   const scrubInitialValue = useModelStore((s) => s.scrubInitialValue);
-  const { min, max, step } = boundsFor(node.unit);
+  const unit = resolveNodeUnit(node);
+  const { min, max, step } = boundsForSlider(unit);
   const value = node.initialValue;
 
   const onChange = useCallback(
@@ -49,6 +33,8 @@ export function NodeMicroSlider({ node, halfW: _halfW, halfH }: Props): JSX.Elem
   const stop = useCallback((e: React.PointerEvent | React.MouseEvent) => {
     e.stopPropagation();
   }, []);
+
+  const formatted = formatNodeValue(value, unit);
 
   return (
     <foreignObject
@@ -73,8 +59,21 @@ export function NodeMicroSlider({ node, halfW: _halfW, halfH }: Props): JSX.Elem
           value={value}
           onChange={onChange}
         />
-        <span className="trama-node-slider-readout">{formatValue(value, node.unit)}</span>
+        <span className="trama-node-slider-readout">
+          {formatted.primary}
+          {formatted.accessory && <span className="trama-readout-accessory"> {formatted.accessory}</span>}
+        </span>
       </div>
     </foreignObject>
   );
+}
+
+function boundsForSlider(unit: ReturnType<typeof resolveNodeUnit>) {
+  if (unit.kind === 'label') {
+    return { min: 0, max: Math.max(0, unit.labels.length - 1), step: 1 };
+  }
+  if (unit.kind === 'free') {
+    return { min: 0, max: 1, step: 0.01 };
+  }
+  return { min: unit.min, max: unit.max, step: unit.step };
 }

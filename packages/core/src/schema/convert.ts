@@ -27,7 +27,8 @@ function nodeToDoc(n: Node): TramaNode {
   return {
     id: n.id,
     label: n.label,
-    unit: n.unit,
+    unitId: n.unitId,
+    unitOverride: n.unitOverride,
     initialValue: n.initialValue,
     position: n.position,
     combiner: n.combiner,
@@ -55,7 +56,8 @@ export function documentToModel(doc: TramaDocument): Model {
     nodes[n.id] = {
       id: n.id,
       label: n.label,
-      unit: n.unit,
+      unitId: n.unitId,
+      unitOverride: n.unitOverride,
       initialValue: n.initialValue,
       position: n.position,
       combiner: n.combiner,

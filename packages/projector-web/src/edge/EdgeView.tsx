@@ -3,6 +3,7 @@ import { tokens } from '@trama/tokens';
 import { normalize, type EdgeId } from '@trama/core';
 import { useModelStore, useUIStore } from '../store/index.js';
 import { getNodeLayout } from '../node/box.js';
+import { resolveNodeUnit } from '../util/unit-resolver.js';
 import { edgePath, type Point } from './geometry.js';
 import { registerEdgeHandle, type EdgeHandle } from '../canvas/drag-registry.js';
 
@@ -122,7 +123,7 @@ function EdgeViewImpl({
 
   if (!edge || !fromNode || !toNode) return null;
 
-  const norm = normalize(srcValue, fromNode.unit);
+  const norm = normalize(srcValue, resolveNodeUnit(fromNode));
   const isFeedback = edge.lag === 1;
   const isStrained = norm < STRAINED_LOW || norm > STRAINED_HIGH;
   const baseClasses = ['trama-edge'];

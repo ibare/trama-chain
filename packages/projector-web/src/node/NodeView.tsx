@@ -3,7 +3,8 @@ import { tokens } from '@trama/tokens';
 import { normalize, type NodeId } from '@trama/core';
 import { useModelStore, useUIStore } from '../store/index.js';
 import { combinerRegistry } from '../store/registries.js';
-import { formatValue, unitSuffix } from '../util/format.js';
+import { formatNodeValue } from '../util/format.js';
+import { resolveNodeUnit } from '../util/unit-resolver.js';
 import { getNodeLayout, type PinLayout } from './box.js';
 import { NodeMicroSlider } from './NodeMicroSlider.js';
 import {
@@ -238,7 +239,8 @@ function NodeViewImpl({ id, incomingCount }: Props): JSX.Element | null {
 
   const layout = getNodeLayout(node, { incomingCount });
   const { halfW, halfH, width, height } = layout;
-  const norm = normalize(currentValue, node.unit);
+  const unit = resolveNodeUnit(node);
+  const norm = normalize(currentValue, unit);
   const opacity = lerp(OPACITY_LOW, OPACITY_HIGH, norm);
 
   const isLow = norm < THRESH_LOW;
@@ -251,7 +253,7 @@ function NodeViewImpl({ id, incomingCount }: Props): JSX.Element | null {
 
   const isSelected = selection.kind === 'node' && selection.id === id;
 
-  const suffix = unitSuffix(node.unit);
+  const formatted = formatNodeValue(currentValue, unit);
   const combiner = combinerRegistry.get(node.combiner);
   const combinerLabel = combiner?.labels.ko ?? node.combiner;
   const combinerSym = combinerSymbol(node.combiner);
@@ -316,12 +318,12 @@ function NodeViewImpl({ id, incomingCount }: Props): JSX.Element | null {
           y2={layout.divider.y}
         />
 
-        {/* 값 + 단위 */}
+        {/* 값 + 단위 표기. accessory(suffix 또는 '/ max')는 별도 tspan으로 그려 작게. */}
         <text className="trama-node-value" x={0} y={layout.valueY} textAnchor="middle">
-          {formatValue(currentValue, node.unit)}
-          {suffix && (
+          {formatted.primary}
+          {formatted.accessory && (
             <tspan className="trama-node-unit" dx="6">
-              {suffix}
+              {formatted.accessory}
             </tspan>
           )}
         </text>
