@@ -7,6 +7,7 @@ import { formatNodeValue } from '../util/format.js';
 import { resolveNodeUnit } from '../util/unit-resolver.js';
 import { getNodeLayout, type PinLayout } from './box.js';
 import { NodeMicroSlider } from './NodeMicroSlider.js';
+import { UnitInspector } from './UnitInspector.js';
 import {
   getIncidentEdgeHandles,
   registerNodeEl,
@@ -67,6 +68,8 @@ function NodeViewImpl({ id, incomingCount }: Props): JSX.Element | null {
   const startEdgeDraft = useUIStore((s) => s.startEdgeDraft);
   const endEdgeDraft = useUIStore((s) => s.endEdgeDraft);
   const openFunctionPicker = useUIStore((s) => s.openFunctionPicker);
+  const unitInspectorNodeId = useUIStore((s) => s.unitInspector?.nodeId ?? null);
+  const openUnitInspector = useUIStore((s) => s.openUnitInspector);
 
   // 노드 <g> 엘리먼트 ref — 드래그 중 imperative하게 transform을 갱신하고,
   // 외부(EdgeView 핸들 호출자)에서도 이 노드 DOM에 접근할 수 있게 레지스트리에 등록.
@@ -318,11 +321,18 @@ function NodeViewImpl({ id, incomingCount }: Props): JSX.Element | null {
           y2={layout.divider.y}
         />
 
-        {/* 값 + 단위 표기. accessory(suffix 또는 '/ max')는 별도 tspan으로 그려 작게. */}
+        {/* 값 + 단위 표기. accessory(suffix 또는 '/ max') tspan 클릭으로 인스펙터를 연다. */}
         <text className="trama-node-value" x={0} y={layout.valueY} textAnchor="middle">
           {formatted.primary}
           {formatted.accessory && (
-            <tspan className="trama-node-unit" dx="6">
+            <tspan
+              className="trama-node-unit"
+              dx="6"
+              onPointerDown={(e) => {
+                e.stopPropagation();
+                openUnitInspector(id);
+              }}
+            >
               {formatted.accessory}
             </tspan>
           )}
@@ -376,6 +386,9 @@ function NodeViewImpl({ id, incomingCount }: Props): JSX.Element | null {
       </g>
       {isSelected && editingNodeId !== id && (
         <NodeMicroSlider node={node} halfH={halfH} halfW={halfW} />
+      )}
+      {unitInspectorNodeId === id && (
+        <UnitInspector node={node} halfW={halfW} halfH={halfH} />
       )}
     </g>
   );

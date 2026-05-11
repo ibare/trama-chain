@@ -96,7 +96,8 @@ function record(
 function patchAffectsValues(patch: Partial<Omit<Node, 'id'>>): boolean {
   return (
     'initialValue' in patch ||
-    'unit' in patch ||
+    'unitId' in patch ||
+    'unitOverride' in patch ||
     'combiner' in patch ||
     'isFocal' in patch
   );

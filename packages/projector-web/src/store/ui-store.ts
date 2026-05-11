@@ -28,6 +28,10 @@ export interface FunctionPickerState {
   anchor: { x: number; y: number };
 }
 
+export interface UnitInspectorState {
+  nodeId: NodeId;
+}
+
 export interface RunFlashState {
   step: number;
   total: number;
@@ -41,6 +45,8 @@ export interface UIStore {
   insertNodeIntent: InsertNodeFromEdgeIntent | null;
   /** 함수 picker 열림 상태 */
   functionPicker: FunctionPickerState | null;
+  /** 단위 인스펙터 열림 상태 (선택된 노드의 단위·범위 편집) */
+  unitInspector: UnitInspectorState | null;
   /** 인라인 이름 편집 중인 노드 */
   editingNodeId: NodeId | null;
   /** N-step 실행 시 현재 시각화 단계 (애니메이션용) */
@@ -65,6 +71,9 @@ export interface UIStore {
   openFunctionPicker: (edgeId: EdgeId, anchor: { x: number; y: number }) => void;
   closeFunctionPicker: () => void;
 
+  openUnitInspector: (nodeId: NodeId) => void;
+  closeUnitInspector: () => void;
+
   setEditingNode: (id: NodeId | null) => void;
   setRunFlash: (s: RunFlashState | null) => void;
 }
@@ -74,6 +83,7 @@ export const useUIStore = create<UIStore>((set) => ({
   edgeDraft: null,
   insertNodeIntent: null,
   functionPicker: null,
+  unitInspector: null,
   editingNodeId: null,
   runFlash: null,
 
@@ -95,6 +105,9 @@ export const useUIStore = create<UIStore>((set) => ({
 
   openFunctionPicker: (edgeId, anchor) => set({ functionPicker: { edgeId, anchor } }),
   closeFunctionPicker: () => set({ functionPicker: null }),
+
+  openUnitInspector: (nodeId) => set({ unitInspector: { nodeId } }),
+  closeUnitInspector: () => set({ unitInspector: null }),
 
   setEditingNode: (id) => set({ editingNodeId: id }),
   setRunFlash: (s) => set({ runFlash: s }),

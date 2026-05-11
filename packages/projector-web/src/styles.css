@@ -103,7 +103,10 @@
 [data-trama-root] .trama-node-unit {
   font-size: var(--typography-text-node-unit);
   fill: var(--color-node-text-low);
-  pointer-events: none;
+  cursor: pointer;
+}
+[data-trama-root] .trama-node-unit:hover {
+  fill: var(--color-node-text-primary);
 }
 
 /* 카드 내부 구분선 --------------------------------------------------- */
@@ -582,6 +585,137 @@
 
 [data-trama-root] .trama-shape-editor button {
   align-self: flex-start;
+  background: transparent;
+  border: 1px dashed var(--color-node-stroke-calm);
+  border-radius: var(--spacing-radius-pill);
+  padding: 3px 10px;
+  font-family: inherit;
+  font-size: var(--typography-text-picker-label);
+  color: var(--color-node-text-low);
+  cursor: pointer;
+}
+
+/* 단위·범위 인스펙터 ------------------------------------------------ */
+[data-trama-root] .trama-unit-inspector {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  padding: 12px;
+  background: var(--color-canvas-bg);
+  border: 1px solid var(--color-node-stroke-calm);
+  border-radius: var(--spacing-radius-picker);
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.08);
+  width: 100%;
+  height: 100%;
+  box-sizing: border-box;
+  font-family: inherit;
+  overflow: hidden;
+}
+
+[data-trama-root] .trama-unit-inspector-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  font-size: var(--typography-text-picker-label);
+  color: var(--color-node-text-low);
+}
+
+[data-trama-root] .trama-unit-inspector-close {
+  background: transparent;
+  border: none;
+  cursor: pointer;
+  color: var(--color-node-text-low);
+  font-size: 16px;
+  line-height: 1;
+  padding: 2px 6px;
+}
+
+[data-trama-root] .trama-unit-inspector-categories {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px;
+}
+
+[data-trama-root] .trama-unit-inspector-chip {
+  background: transparent;
+  border: 1px solid var(--color-node-stroke-calm);
+  border-radius: var(--spacing-radius-pill);
+  padding: 2px 8px;
+  font-family: inherit;
+  font-size: var(--typography-text-picker-label);
+  color: var(--color-node-text-low);
+  cursor: pointer;
+}
+
+[data-trama-root] .trama-unit-inspector-chip.is-active {
+  border-color: var(--color-node-stroke-focal);
+  color: var(--color-node-text-primary);
+}
+
+[data-trama-root] .trama-unit-inspector-units {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px;
+  max-height: 96px;
+  overflow-y: auto;
+  padding-bottom: 4px;
+  border-bottom: 1px dashed var(--color-node-stroke-calm);
+}
+
+[data-trama-root] .trama-unit-inspector-unit {
+  background: var(--color-node-fill-calm);
+  border: 1px solid transparent;
+  border-radius: var(--spacing-radius-card);
+  padding: 4px 10px;
+  font-family: inherit;
+  font-size: var(--typography-text-picker-label);
+  color: var(--color-node-text-primary);
+  cursor: pointer;
+}
+
+[data-trama-root] .trama-unit-inspector-unit:hover {
+  border-color: var(--color-node-stroke-calm);
+}
+
+[data-trama-root] .trama-unit-inspector-unit.is-active {
+  border-color: var(--color-node-stroke-focal);
+}
+
+[data-trama-root] .trama-unit-inspector-range {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+[data-trama-root] .trama-unit-inspector-range label {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  font-size: var(--typography-text-picker-label);
+  color: var(--color-node-text-low);
+  gap: 8px;
+}
+
+[data-trama-root] .trama-unit-inspector-range input {
+  font-family: inherit;
+  font-size: var(--typography-text-picker-label);
+  background: transparent;
+  border: none;
+  border-bottom: 1px solid var(--color-node-stroke-calm);
+  outline: none;
+  width: 80px;
+  text-align: right;
+  font-variant-numeric: tabular-nums;
+  color: var(--color-node-text-primary);
+}
+
+[data-trama-root] .trama-unit-inspector-footer {
+  display: flex;
+  justify-content: flex-end;
+  margin-top: auto;
+}
+
+[data-trama-root] .trama-unit-inspector-reset {
   background: transparent;
   border: 1px dashed var(--color-node-stroke-calm);
   border-radius: var(--spacing-radius-pill);
