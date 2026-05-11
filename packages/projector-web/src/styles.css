@@ -1,0 +1,547 @@
+/* Trama projector-web 스타일.
+   토큰 CSS는 @trama/tokens/css에서 import — 호스트 페이지에 누출되지 않도록
+   [data-trama-root] 스코프 안에서만 변수 참조. 글로벌 :root 변수 사용 금지.
+*/
+
+@import '@trama/tokens/css';
+
+[data-trama-root] {
+  width: 100%;
+  height: 100%;
+  position: relative;
+  font-family: var(--typography-font-sans-default);
+  color: var(--color-node-text-primary);
+  background: var(--color-canvas-bg);
+  overflow: hidden;
+  user-select: none;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+}
+
+[data-trama-root] *,
+[data-trama-root] *::before,
+[data-trama-root] *::after {
+  box-sizing: border-box;
+}
+
+[data-trama-root] .trama-canvas {
+  width: 100%;
+  height: 100%;
+  display: block;
+  cursor: default;
+}
+
+[data-trama-root] .trama-canvas-bg {
+  fill: var(--color-canvas-bg);
+}
+
+[data-trama-root] .trama-canvas-grid {
+  stroke: var(--color-canvas-grid);
+  stroke-width: 1;
+  fill: none;
+}
+
+/* Node ------------------------------------------------------------------- */
+[data-trama-root] .trama-node {
+  cursor: grab;
+  opacity: var(--trama-node-opacity, 1);
+  transition:
+    transform var(--motion-duration-scrub-response) var(--motion-easing-fade-natural),
+    opacity var(--motion-duration-scrub-response) var(--motion-easing-fade-natural);
+  animation: trama-node-enter var(--motion-duration-pop-spring) var(--motion-easing-soft-spring) both;
+}
+
+@keyframes trama-node-enter {
+  from { opacity: 0; }
+  to { opacity: var(--trama-node-opacity, 1); }
+}
+
+[data-trama-root] .trama-node:active {
+  cursor: grabbing;
+}
+
+[data-trama-root] .trama-node-body {
+  transition:
+    fill var(--motion-duration-scrub-response) var(--motion-easing-fade-natural),
+    stroke var(--motion-duration-scrub-response) var(--motion-easing-fade-natural),
+    width var(--motion-duration-scrub-response) var(--motion-easing-fade-natural),
+    height var(--motion-duration-scrub-response) var(--motion-easing-fade-natural),
+    x var(--motion-duration-scrub-response) var(--motion-easing-fade-natural),
+    y var(--motion-duration-scrub-response) var(--motion-easing-fade-natural);
+}
+
+[data-trama-root] .trama-node-body.is-calm {
+  fill: var(--color-node-fill-calm);
+  stroke: var(--color-node-stroke-calm);
+  stroke-width: var(--spacing-stroke-node-default);
+}
+
+[data-trama-root] .trama-node-body.is-low {
+  fill: var(--color-node-fill-low);
+  stroke: var(--color-node-stroke-low);
+}
+
+[data-trama-root] .trama-node-body.is-focal {
+  fill: var(--color-node-fill-focal);
+  stroke: var(--color-node-stroke-focal);
+  stroke-width: calc(var(--spacing-stroke-node-default) * 1.5);
+}
+
+[data-trama-root] .trama-node-label {
+  font-size: var(--typography-text-node-name);
+  fill: var(--color-node-text-primary);
+  text-anchor: middle;
+  pointer-events: none;
+  font-weight: 500;
+}
+
+[data-trama-root] .trama-node-value {
+  font-size: var(--typography-text-node-value);
+  fill: var(--color-node-text-primary);
+  text-anchor: middle;
+  pointer-events: none;
+  font-variant-numeric: tabular-nums;
+}
+
+[data-trama-root] .trama-node-unit {
+  font-size: var(--typography-text-node-unit);
+  fill: var(--color-node-text-low);
+  text-anchor: middle;
+  pointer-events: none;
+}
+
+[data-trama-root] .trama-node-step-overlay {
+  font-size: var(--typography-text-step-count);
+  fill: var(--color-edge-feedback);
+  font-variant-numeric: tabular-nums;
+  pointer-events: none;
+}
+
+[data-trama-root] .trama-node-slider {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  background: var(--color-canvas-bg);
+  border: 1px solid var(--color-node-stroke-calm);
+  border-radius: var(--spacing-radius-pill);
+  padding: 4px 10px;
+  box-shadow: 0 2px 6px rgba(0, 0, 0, 0.06);
+}
+
+[data-trama-root] .trama-node-slider input[type='range'] {
+  flex: 1;
+  appearance: none;
+  -webkit-appearance: none;
+  background: transparent;
+  margin: 0;
+  height: 16px;
+  cursor: pointer;
+}
+
+[data-trama-root] .trama-node-slider input[type='range']::-webkit-slider-runnable-track {
+  height: 3px;
+  background: var(--color-node-stroke-calm);
+  border-radius: 2px;
+}
+
+[data-trama-root] .trama-node-slider input[type='range']::-moz-range-track {
+  height: 3px;
+  background: var(--color-node-stroke-calm);
+  border-radius: 2px;
+}
+
+[data-trama-root] .trama-node-slider input[type='range']::-webkit-slider-thumb {
+  -webkit-appearance: none;
+  width: 12px;
+  height: 12px;
+  background: var(--color-node-fill-focal);
+  border: 1.25px solid var(--color-node-stroke-focal);
+  border-radius: 50%;
+  margin-top: -5px;
+}
+
+[data-trama-root] .trama-node-slider input[type='range']::-moz-range-thumb {
+  width: 12px;
+  height: 12px;
+  background: var(--color-node-fill-focal);
+  border: 1.25px solid var(--color-node-stroke-focal);
+  border-radius: 50%;
+}
+
+[data-trama-root] .trama-node-slider-readout {
+  font-family: var(--typography-font-sans-default);
+  font-size: var(--typography-text-step-count);
+  font-variant-numeric: tabular-nums;
+  color: var(--color-node-text-low);
+  min-width: 36px;
+  text-align: right;
+}
+
+/* Animations: 호흡, 기울임 -------------------------------------------------- */
+@keyframes trama-breath {
+  0%, 100% { transform: scale(1); }
+  50% { transform: scale(calc(1 + var(--physical-scale-breath-amplitude, 0.025))); }
+}
+
+@keyframes trama-tilt {
+  0%, 100% { transform: rotate(0) translate(0, 0); }
+  25% { transform: rotate(calc(var(--physical-angle-tilt-tired, 1.6) * 1deg)) translate(0.2px, 0.4px); }
+  75% { transform: rotate(calc(var(--physical-angle-tilt-tired, 1.6) * -1deg)) translate(-0.2px, -0.4px); }
+}
+
+[data-trama-root] .trama-node.is-alive .trama-node-inner {
+  transform-origin: center;
+  transform-box: fill-box;
+  animation: trama-breath var(--motion-duration-breath) var(--motion-easing-breath-curve) infinite;
+}
+
+[data-trama-root] .trama-node.is-tired .trama-node-inner {
+  transform-origin: center;
+  transform-box: fill-box;
+  animation: trama-tilt var(--motion-duration-tilt-soft) var(--motion-easing-fade-natural) infinite;
+}
+
+/* Edge ------------------------------------------------------------------- */
+[data-trama-root] .trama-edge {
+  fill: none;
+  stroke: var(--color-edge-default);
+  stroke-width: var(--spacing-stroke-edge-default);
+  stroke-linecap: round;
+  pointer-events: stroke;
+  cursor: pointer;
+  transition:
+    stroke var(--motion-duration-fade-in) var(--motion-easing-fade-natural),
+    stroke-width var(--motion-duration-fade-in) var(--motion-easing-fade-natural),
+    opacity var(--motion-duration-fade-in) var(--motion-easing-fade-natural);
+}
+
+[data-trama-root] .trama-edge-hit {
+  fill: none;
+  stroke: transparent;
+  stroke-width: var(--spacing-edge-hit-tolerance);
+  pointer-events: stroke;
+  cursor: pointer;
+}
+
+[data-trama-root] .trama-edge.is-feedback {
+  stroke: var(--color-edge-feedback);
+  stroke-dasharray: var(--physical-dasharray-edge-feedback);
+}
+
+[data-trama-root] .trama-edge.is-strained {
+  stroke: var(--color-edge-strained);
+  stroke-dasharray: var(--physical-dasharray-edge-strained);
+  stroke-width: var(--spacing-stroke-edge-strained);
+}
+
+[data-trama-root] .trama-edge.is-introducing {
+  stroke-dasharray: 1000;
+  stroke-dashoffset: 1000;
+  animation: trama-edge-draw var(--motion-duration-edge-draw) var(--motion-easing-snap-in) forwards;
+}
+
+[data-trama-root] .trama-edge-group {
+  animation: trama-edge-fade-in var(--motion-duration-fade-in) var(--motion-easing-fade-natural) both;
+}
+
+@keyframes trama-edge-draw {
+  to { stroke-dashoffset: 0; }
+}
+
+@keyframes trama-edge-fade-in {
+  from { opacity: 0; }
+  to { opacity: 1; }
+}
+
+/* 함수 변경 시 미세 깜빡임 (§ 11.6) */
+[data-trama-root] .trama-edge-group.is-morphing .trama-edge {
+  animation: trama-edge-shape-morph var(--motion-duration-shape-morph) var(--motion-easing-fade-natural);
+}
+
+@keyframes trama-edge-shape-morph {
+  0% { opacity: 0.95; }
+  50% { opacity: 1; stroke-width: calc(var(--spacing-stroke-edge-default) * 1.6); }
+  100% { opacity: 1; }
+}
+
+/* 화살표 마커 */
+[data-trama-root] .trama-arrow {
+  fill: var(--color-edge-default);
+}
+[data-trama-root] .trama-arrow.is-feedback {
+  fill: var(--color-edge-feedback);
+}
+[data-trama-root] .trama-arrow.is-strained {
+  fill: var(--color-edge-strained);
+}
+
+/* Affordances ------------------------------------------------------------ */
+[data-trama-root] .trama-affordance {
+  fill: var(--color-affordance-hint);
+  opacity: 0;
+  transition: opacity var(--motion-duration-fade-in) var(--motion-easing-fade-natural);
+  cursor: pointer;
+}
+
+[data-trama-root] .trama-affordance.is-visible {
+  opacity: 0.6;
+}
+
+[data-trama-root] .trama-affordance:hover {
+  opacity: 1;
+}
+
+[data-trama-root] .trama-insert-affordance {
+  fill: var(--color-affordance-hint);
+  opacity: 0;
+  cursor: pointer;
+  transition: opacity var(--motion-duration-fade-in) var(--motion-easing-fade-natural);
+}
+
+[data-trama-root] .trama-edge-group:hover .trama-insert-affordance,
+[data-trama-root] .trama-insert-affordance.is-active {
+  opacity: 0.85;
+}
+
+/* Picker ---------------------------------------------------------------- */
+[data-trama-root] .trama-picker {
+  position: absolute;
+  background: var(--color-canvas-bg);
+  border: 1px solid var(--color-node-stroke-calm);
+  border-radius: var(--spacing-radius-picker);
+  padding: var(--spacing-card-padding);
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(120px, 1fr));
+  gap: var(--spacing-card-gap);
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.08);
+  max-width: 480px;
+  z-index: 10;
+  animation: trama-picker-in var(--motion-duration-picker-open) var(--motion-easing-snap-in);
+}
+
+@keyframes trama-picker-in {
+  from { opacity: 0; transform: translateY(4px) scale(0.98); }
+  to { opacity: 1; transform: translateY(0) scale(1); }
+}
+
+[data-trama-root] .trama-picker-card {
+  background: var(--color-node-fill-calm);
+  border: 1px solid transparent;
+  border-radius: var(--spacing-radius-card);
+  padding: 10px;
+  cursor: pointer;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  align-items: stretch;
+  transition: border-color var(--motion-duration-fade-in) var(--motion-easing-fade-natural);
+}
+[data-trama-root] .trama-picker-card:hover,
+[data-trama-root] .trama-picker-card.is-selected {
+  border-color: var(--color-node-stroke-focal);
+}
+[data-trama-root] .trama-picker-card-label {
+  font-size: var(--typography-text-picker-label);
+  color: var(--color-node-text-primary);
+}
+[data-trama-root] .trama-picker-preview {
+  width: 100%;
+  height: 40px;
+  stroke: var(--color-node-stroke-focal);
+  stroke-width: 1.5;
+  fill: none;
+}
+
+/* Inline node-name editor */
+[data-trama-root] .trama-node-name-input {
+  font-family: inherit;
+  font-size: var(--typography-text-node-name);
+  background: transparent;
+  border: none;
+  outline: 1px dashed var(--color-affordance-hint);
+  text-align: center;
+  padding: 1px 6px;
+  border-radius: 4px;
+  color: var(--color-node-text-primary);
+}
+
+/* Execution control */
+[data-trama-root] .trama-exec-control {
+  position: absolute;
+  bottom: var(--spacing-canvas-margin);
+  left: 50%;
+  transform: translateX(-50%);
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  background: var(--color-canvas-bg);
+  border: 1px solid var(--color-node-stroke-calm);
+  border-radius: var(--spacing-radius-pill);
+  padding: 8px 14px;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.06);
+}
+
+[data-trama-root] .trama-exec-control input[type="number"] {
+  width: 64px;
+  font-family: inherit;
+  font-size: var(--typography-text-picker-label);
+  font-variant-numeric: tabular-nums;
+  background: transparent;
+  border: none;
+  border-bottom: 1px solid var(--color-node-stroke-calm);
+  text-align: right;
+  outline: none;
+}
+
+[data-trama-root] .trama-exec-control input[type="text"] {
+  width: 56px;
+  font-family: inherit;
+  font-size: var(--typography-text-picker-label);
+  background: transparent;
+  border: none;
+  border-bottom: 1px solid var(--color-node-stroke-calm);
+  outline: none;
+}
+
+[data-trama-root] .trama-exec-control button {
+  background: var(--color-node-fill-calm);
+  border: 1px solid var(--color-node-stroke-calm);
+  border-radius: var(--spacing-radius-pill);
+  padding: 4px 10px;
+  font-family: inherit;
+  font-size: var(--typography-text-picker-label);
+  cursor: pointer;
+  color: var(--color-node-text-primary);
+  transition: background var(--motion-duration-fade-in) var(--motion-easing-fade-natural);
+}
+
+[data-trama-root] .trama-exec-control button:hover {
+  background: var(--color-node-fill-focal);
+}
+
+[data-trama-root] .trama-exec-step-indicator {
+  font-family: inherit;
+  font-size: var(--typography-text-step-count);
+  font-variant-numeric: tabular-nums;
+  color: var(--color-text-hint);
+  padding-left: 8px;
+  border-left: 1px solid var(--color-node-stroke-calm);
+}
+
+/* Question header */
+[data-trama-root] .trama-question {
+  position: absolute;
+  top: var(--spacing-canvas-margin);
+  left: 50%;
+  transform: translateX(-50%);
+  font-family: var(--typography-font-serif-question);
+  font-size: var(--typography-text-question);
+  color: var(--color-text-question);
+  max-width: 70%;
+  text-align: center;
+  pointer-events: none;
+}
+
+/* Empty state prompt */
+[data-trama-root] .trama-empty-prompt {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  align-items: center;
+  justify-content: center;
+  padding: var(--spacing-canvas-margin);
+}
+
+[data-trama-root] .trama-empty-prompt h2 {
+  font-family: var(--typography-font-serif-question);
+  font-size: var(--typography-text-question);
+  color: var(--color-text-question);
+  margin: 0;
+  text-align: center;
+}
+
+[data-trama-root] .trama-empty-prompt input {
+  font-family: inherit;
+  font-size: var(--typography-text-picker-label);
+  background: transparent;
+  border: none;
+  border-bottom: 1px solid var(--color-node-stroke-calm);
+  outline: none;
+  padding: 6px 10px;
+  text-align: center;
+  width: min(520px, 80vw);
+  color: var(--color-node-text-primary);
+}
+
+[data-trama-root] .trama-empty-prompt input::placeholder {
+  color: var(--color-text-hint);
+}
+
+[data-trama-root] .trama-empty-prompt .trama-empty-hint {
+  font-size: var(--typography-text-hint);
+  color: var(--color-text-hint);
+  text-align: center;
+  max-width: 480px;
+}
+
+/* Step count overlay during iteration */
+[data-trama-root] .trama-step-count {
+  font-size: var(--typography-text-step-count);
+  fill: var(--color-text-hint);
+  text-anchor: middle;
+  font-variant-numeric: tabular-nums;
+  pointer-events: none;
+}
+
+/* Piecewise / Stochastic inline editors */
+[data-trama-root] .trama-shape-editor {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  padding-top: 8px;
+  border-top: 1px dashed var(--color-node-stroke-calm);
+  width: 100%;
+}
+
+[data-trama-root] .trama-shape-editor label {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  font-size: var(--typography-text-picker-label);
+  color: var(--color-node-text-low);
+  gap: 8px;
+}
+
+[data-trama-root] .trama-shape-editor input {
+  font-family: inherit;
+  font-size: var(--typography-text-picker-label);
+  background: transparent;
+  border: none;
+  border-bottom: 1px solid var(--color-node-stroke-calm);
+  outline: none;
+  width: 80px;
+  text-align: right;
+  font-variant-numeric: tabular-nums;
+  color: var(--color-node-text-primary);
+}
+
+[data-trama-root] .trama-piecewise-point-row {
+  display: grid;
+  grid-template-columns: 1fr 1fr auto;
+  gap: 8px;
+  align-items: center;
+}
+
+[data-trama-root] .trama-shape-editor button {
+  align-self: flex-start;
+  background: transparent;
+  border: 1px dashed var(--color-node-stroke-calm);
+  border-radius: var(--spacing-radius-pill);
+  padding: 3px 10px;
+  font-family: inherit;
+  font-size: var(--typography-text-picker-label);
+  color: var(--color-node-text-low);
+  cursor: pointer;
+}

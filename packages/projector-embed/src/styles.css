@@ -1,0 +1,128 @@
+/* Trama projector-embed 정적 스타일.
+   토큰은 [data-trama-root] 스코프 안에서만 참조. 글로벌 :root 누출 없음. */
+
+@import '@trama/tokens/css';
+
+[data-trama-root].trama-embed {
+  width: 100%;
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  padding: 10px 14px;
+  font-family: var(--typography-font-sans-default);
+  color: var(--color-node-text-primary);
+  background: var(--color-canvas-bg);
+  border-radius: 10px;
+  border: 1px solid var(--color-node-stroke-calm);
+  overflow: hidden;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+}
+
+[data-trama-root].trama-embed *,
+[data-trama-root].trama-embed *::before,
+[data-trama-root].trama-embed *::after {
+  box-sizing: border-box;
+}
+
+[data-trama-root] .trama-embed-question {
+  font-family: var(--typography-font-serif-question);
+  font-size: 1rem;
+  color: var(--color-text-question);
+  letter-spacing: -0.005em;
+}
+
+[data-trama-root] .trama-embed-canvas {
+  flex: 1;
+  width: 100%;
+  min-height: 0;
+  display: block;
+}
+
+[data-trama-root] .trama-canvas-bg {
+  fill: var(--color-canvas-bg);
+}
+
+[data-trama-root] .trama-embed-node {
+  pointer-events: none;
+}
+
+[data-trama-root] .trama-embed-node-body {
+  stroke-width: var(--spacing-stroke-node-default);
+}
+
+[data-trama-root] .trama-embed-node-body.is-calm {
+  fill: var(--color-node-fill-calm);
+  stroke: var(--color-node-stroke-calm);
+}
+
+[data-trama-root] .trama-embed-node-body.is-low {
+  fill: var(--color-node-fill-low);
+  stroke: var(--color-node-stroke-low);
+}
+
+[data-trama-root] .trama-embed-node-body.is-focal {
+  fill: var(--color-node-fill-focal);
+  stroke: var(--color-node-stroke-focal);
+  stroke-width: calc(var(--spacing-stroke-node-default) * 1.5);
+}
+
+[data-trama-root] .trama-embed-node-label {
+  font-size: var(--typography-text-node-name);
+  fill: var(--color-node-text-primary);
+  text-anchor: middle;
+  font-weight: 500;
+}
+
+[data-trama-root] .trama-embed-node-value {
+  font-size: var(--typography-text-node-value);
+  fill: var(--color-node-text-primary);
+  text-anchor: middle;
+  font-variant-numeric: tabular-nums;
+}
+
+[data-trama-root] .trama-embed-node-unit {
+  font-size: var(--typography-text-node-unit);
+  fill: var(--color-node-text-low);
+  text-anchor: middle;
+}
+
+[data-trama-root] .trama-embed-edge {
+  fill: none;
+  stroke: var(--color-edge-default);
+  stroke-width: var(--spacing-stroke-edge-default);
+  stroke-linecap: round;
+}
+
+[data-trama-root] .trama-embed-edge.is-strained {
+  stroke: var(--color-edge-strained);
+  stroke-dasharray: var(--physical-dasharray-edge-strained);
+  stroke-width: var(--spacing-stroke-edge-strained);
+}
+
+[data-trama-root] .trama-embed-edge.is-feedback {
+  stroke: var(--color-edge-feedback);
+  stroke-dasharray: var(--physical-dasharray-edge-feedback);
+  stroke-width: var(--spacing-stroke-edge-feedback);
+}
+
+[data-trama-root] .trama-embed-arrow {
+  fill: var(--color-edge-default);
+}
+
+[data-trama-root] .trama-embed-arrow.is-feedback {
+  fill: var(--color-edge-feedback);
+}
+
+[data-trama-root] .trama-embed-step-count {
+  text-anchor: middle;
+  font-size: var(--typography-text-step-count);
+  fill: var(--color-edge-feedback);
+}
+
+[data-trama-root].trama-embed-error {
+  display: block;
+  font-size: var(--typography-text-hint);
+  color: var(--color-node-text-primary);
+}
