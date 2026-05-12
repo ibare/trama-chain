@@ -1,16 +1,44 @@
 /**
- * 캔버스 뷰포트의 현재 zoom 배율을 imperative하게 노출한다.
- * 노드 드래그가 클라이언트 픽셀 단위의 dx/dy를 받는데, 콘텐츠 g가 scale(zoom)이면
- * 캔버스 단위 이동량은 dx/zoom이 된다. 노드 드래그가 React로 zoom을 구독하면
- * zoom 변경마다 노드들이 리렌더되므로, 드래그 시작 시점에 한 번 읽기만 하면 되는
- * 이 패턴이 가장 가볍다.
+ * 캔버스 뷰포트(panX, panY, zoom)를 모듈 싱글톤으로 보관·구독한다.
+ *
+ * Canvas 컴포넌트가 진실의 출처(useState)이지만, 캔버스 밖에 떠 있는 패널
+ * (UnitInspectorLayer 등)이 노드 위치를 화면 좌표로 변환해야 해서 외부에서도
+ * 읽고 구독할 수 있어야 한다. zustand store에 올리지 않고 모듈 싱글톤으로
+ * 둔 이유는 노드 드래그가 클라이언트 dx/dy를 zoom으로 나누는 정도의 가벼운
+ * 읽기에서 React 구독을 거치지 않게 하기 위함.
  */
-let currentZoom = 1;
-
-export function getCurrentZoom(): number {
-  return currentZoom;
+export interface Viewport {
+  panX: number;
+  panY: number;
+  zoom: number;
 }
 
-export function setCurrentZoom(z: number): void {
-  currentZoom = z;
+let viewport: Viewport = { panX: 0, panY: 0, zoom: 1 };
+const listeners = new Set<() => void>();
+
+export function getViewport(): Viewport {
+  return viewport;
+}
+
+export function setViewport(next: Viewport): void {
+  if (
+    next.panX === viewport.panX &&
+    next.panY === viewport.panY &&
+    next.zoom === viewport.zoom
+  ) {
+    return;
+  }
+  viewport = next;
+  listeners.forEach((l) => l());
+}
+
+export function subscribeViewport(cb: () => void): () => void {
+  listeners.add(cb);
+  return () => {
+    listeners.delete(cb);
+  };
+}
+
+export function getCurrentZoom(): number {
+  return viewport.zoom;
 }

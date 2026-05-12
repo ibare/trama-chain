@@ -1,27 +1,25 @@
-import { useMemo } from 'react';
-import { isValueNode, type NodeId } from '@trama/core';
-import { useModelStore } from '../store/index.js';
+import { useMemo, useSyncExternalStore } from 'react';
+import { isValueNode } from '@trama/core';
+import { useModelStore, useUIStore } from '../store/index.js';
 import { getNodeLayout } from './box.js';
 import {
   UNIT_INSPECTOR_PANEL_HEIGHT,
   UNIT_INSPECTOR_PANEL_WIDTH,
   UnitInspector,
 } from './UnitInspector.js';
-import { placePanel } from '../util/panel-placement.js';
-
-interface Props {
-  nodeId: NodeId;
-  /** Canvas의 가시 영역 — placePanel의 bounds로 쓰임. SVG의 clientWidth/Height. */
-  bounds: { width: number; height: number };
-}
+import { FloatingPanel } from '../util/FloatingPanel.js';
+import { getViewport, subscribeViewport } from '../canvas/viewport.js';
 
 /**
- * UnitInspector를 노드 그룹 밖, Canvas 최상단 레이어에 띄우는 어댑터.
- * z-order(다른 노드 위로 항상)와 화면 경계 클램프(우→좌 flip)를 처리.
+ * UnitInspector를 노드 우상단 옆에 띄우는 어댑터.
+ * 노드 위치(캔버스 좌표) → viewport 변환 → 화면 좌표 anchor.
  */
-export function UnitInspectorLayer({ nodeId, bounds }: Props): JSX.Element | null {
-  const node = useModelStore((s) => s.model.nodes[nodeId]);
+export function UnitInspectorLayer(): JSX.Element | null {
+  const nodeId = useUIStore((s) => s.unitInspector?.nodeId ?? null);
+  const closeInspector = useUIStore((s) => s.closeUnitInspector);
+  const node = useModelStore((s) => (nodeId ? s.model.nodes[nodeId] : null));
   const incomingCount = useModelStore((s) => {
+    if (!nodeId) return 0;
     let n = 0;
     for (const eid of s.model.edgeOrder) {
       const e = s.model.edges[eid];
@@ -30,18 +28,31 @@ export function UnitInspectorLayer({ nodeId, bounds }: Props): JSX.Element | nul
     return n;
   });
 
-  const placement = useMemo(() => {
+  const viewport = useSyncExternalStore(subscribeViewport, getViewport, getViewport);
+
+  const anchor = useMemo(() => {
     if (!node || !node.position) return null;
     const layout = getNodeLayout(node, { incomingCount });
-    return placePanel({
-      anchor: { x: node.position.x + layout.halfW, y: node.position.y - layout.halfH },
-      panel: { w: UNIT_INSPECTOR_PANEL_WIDTH, h: UNIT_INSPECTOR_PANEL_HEIGHT },
-      bounds: { minX: 8, minY: 8, maxX: bounds.width - 8, maxY: bounds.height - 8 },
-      gap: { x: 14, y: 0 },
-    });
-  }, [node, incomingCount, bounds.width, bounds.height]);
+    const canvasAnchorX = node.position.x + layout.halfW;
+    const canvasAnchorY = node.position.y - layout.halfH;
+    return {
+      x: viewport.panX + canvasAnchorX * viewport.zoom,
+      y: viewport.panY + canvasAnchorY * viewport.zoom,
+    };
+  }, [node, incomingCount, viewport.panX, viewport.panY, viewport.zoom]);
 
-  if (!node || !placement) return null;
+  if (!node || !anchor) return null;
   if (!isValueNode(node)) return null;
-  return <UnitInspector node={node} x={placement.x} y={placement.y} />;
+
+  return (
+    <FloatingPanel
+      anchor={anchor}
+      onClose={closeInspector}
+      placement={{ kind: 'side', gap: { x: 14, y: 0 } }}
+      size={{ width: UNIT_INSPECTOR_PANEL_WIDTH, height: UNIT_INSPECTOR_PANEL_HEIGHT }}
+      className="trama-unit-inspector"
+    >
+      <UnitInspector node={node} />
+    </FloatingPanel>
+  );
 }

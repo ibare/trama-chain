@@ -345,18 +345,28 @@ function ValueNodeViewImpl({ id, incomingCount }: Props): JSX.Element | null {
         <text className="trama-node-value" x={0} y={layout.valueY} textAnchor="middle">
           {formatted.primary}
           {formatted.accessory && (
-            <tspan
-              className="trama-node-unit"
-              dx="6"
-              onPointerDown={(e) => {
-                e.stopPropagation();
-                openUnitInspector(id);
-              }}
-            >
+            <tspan className="trama-node-unit" dx="6">
               {formatted.accessory}
             </tspan>
           )}
         </text>
+        <rect
+          className="trama-node-value-hit"
+          x={-halfW + 12}
+          y={layout.valueY - 16}
+          width={width - 24}
+          height={28}
+          onPointerDown={(e) => {
+            // hit rect가 body 위에 있어 body의 onPointerDown이 호출되지 않으므로
+            // 선택만 직접 처리. 드래그 시작 영역은 label·빈 공간으로 한정한다.
+            e.stopPropagation();
+            selectNode(id);
+          }}
+          onClick={(e) => {
+            e.stopPropagation();
+            openUnitInspector(id);
+          }}
+        />
 
         {layout.hasCombiner && layout.combinerCenterY !== null && (
           <CombinerChip

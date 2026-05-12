@@ -12,9 +12,6 @@ import { resolveNodeUnit } from '../util/unit-resolver.js';
 interface Props {
   /** UnitInspector는 ValueNode 전용. FunctionNode는 별도 FunctionInspector. */
   node: ValueNode;
-  /** 패널 좌상단 좌표 (SVG/캔버스 좌표계 기준). 외부에서 placePanel로 산출. */
-  x: number;
-  y: number;
 }
 
 export const UNIT_INSPECTOR_PANEL_WIDTH = 288;
@@ -28,7 +25,7 @@ export const UNIT_INSPECTOR_PANEL_HEIGHT = 340;
  * - 범위 편집: 같은 unitId 안의 min/max/step만 override하면 initialValue는 새
  *   범위로 클램프만.
  */
-export function UnitInspector({ node, x, y }: Props): JSX.Element {
+export function UnitInspector({ node }: Props): JSX.Element {
   const updateNode = useModelStore((s) => s.updateNode);
   const closeInspector = useUIStore((s) => s.closeUnitInspector);
 
@@ -102,28 +99,10 @@ export function UnitInspector({ node, x, y }: Props): JSX.Element {
     );
   }, [currentDef, node.id, updateNode]);
 
-  // 캔버스 hover/drag 영향 차단
-  const stop = useCallback((e: React.PointerEvent | React.MouseEvent) => {
-    e.stopPropagation();
-  }, []);
-
   const showRangeEditor = unit.kind === 'number' || unit.kind === 'scale';
 
   return (
-    <foreignObject
-      x={x}
-      y={y}
-      width={UNIT_INSPECTOR_PANEL_WIDTH}
-      height={UNIT_INSPECTOR_PANEL_HEIGHT}
-    >
-      <div
-        className="trama-unit-inspector"
-        onPointerDown={stop}
-        onPointerMove={stop}
-        onPointerUp={stop}
-        onMouseDown={stop}
-        onClick={stop}
-      >
+    <>
         <header className="trama-unit-inspector-header">
           <span>단위</span>
           <button
@@ -209,12 +188,11 @@ export function UnitInspector({ node, x, y }: Props): JSX.Element {
           </div>
         )}
 
-        <footer className="trama-unit-inspector-footer">
-          <button type="button" className="trama-unit-inspector-reset" onClick={onReset}>
-            기본값으로 리셋
-          </button>
-        </footer>
-      </div>
-    </foreignObject>
+      <footer className="trama-unit-inspector-footer">
+        <button type="button" className="trama-unit-inspector-reset" onClick={onReset}>
+          기본값으로 리셋
+        </button>
+      </footer>
+    </>
   );
 }

@@ -9,6 +9,7 @@ import {
 import './styles.css';
 import { Canvas } from './canvas/Canvas.js';
 import { FunctionPicker } from './function-picker/FunctionPicker.js';
+import { UnitInspectorLayer } from './node/UnitInspectorLayer.js';
 import { ExecutionControl } from './execution-control/ExecutionControl.js';
 import { InsertNodeHandler } from './interactions/InsertNodeHandler.js';
 import { useModelStore } from './store/index.js';
@@ -93,6 +94,7 @@ export function TramaEditor({ initialJson, onChange, options }: Props): JSX.Elem
 
       <Canvas />
       <FunctionPicker />
+      <UnitInspectorLayer />
       <ExecutionControl />
       <InsertNodeHandler />
     </div>

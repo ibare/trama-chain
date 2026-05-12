@@ -100,12 +100,12 @@
 [data-trama-root] .trama-node-unit {
   font-size: var(--typography-text-node-unit);
   fill: var(--color-node-text-low);
-  /* 부모 .trama-node-value가 pointer-events:none이라 명시적으로 되살린다. */
-  pointer-events: auto;
-  cursor: pointer;
 }
-[data-trama-root] .trama-node-unit:hover {
-  fill: var(--color-node-text-primary);
+
+/* 값+단위 묶음 위에 깔린 클릭 영역. 단위 변경 인스펙터를 연다. */
+[data-trama-root] .trama-node-value-hit {
+  fill: transparent;
+  cursor: pointer;
 }
 
 /* 카드 내부 구분선 --------------------------------------------------- */
@@ -294,25 +294,30 @@
   opacity: 0.85;
 }
 
-/* Picker ---------------------------------------------------------------- */
-[data-trama-root] .trama-picker {
+/* Floating panel — picker·inspector 공통 셸 ----------------------------- */
+[data-trama-root] .trama-floating-panel {
   position: absolute;
   background: var(--color-canvas-bg);
   border: 1px solid var(--color-node-stroke-calm);
   border-radius: var(--spacing-radius-picker);
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.08);
+  box-sizing: border-box;
+  z-index: 10;
+  animation: trama-floating-in var(--motion-duration-picker-open) var(--motion-easing-snap-in);
+}
+
+@keyframes trama-floating-in {
+  from { opacity: 0; transform: translateY(4px) scale(0.98); }
+  to { opacity: 1; transform: translateY(0) scale(1); }
+}
+
+/* Picker ---------------------------------------------------------------- */
+[data-trama-root] .trama-picker {
   padding: var(--spacing-card-padding);
   display: grid;
   grid-template-columns: repeat(auto-fill, minmax(120px, 1fr));
   gap: var(--spacing-card-gap);
-  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.08);
   max-width: 480px;
-  z-index: 10;
-  animation: trama-picker-in var(--motion-duration-picker-open) var(--motion-easing-snap-in);
-}
-
-@keyframes trama-picker-in {
-  from { opacity: 0; transform: translateY(4px) scale(0.98); }
-  to { opacity: 1; transform: translateY(0) scale(1); }
 }
 
 [data-trama-root] .trama-picker-card {
@@ -543,13 +548,6 @@
   flex-direction: column;
   gap: 10px;
   padding: 12px;
-  background: var(--color-canvas-bg);
-  border: 1px solid var(--color-node-stroke-calm);
-  border-radius: var(--spacing-radius-picker);
-  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.08);
-  width: 100%;
-  height: 100%;
-  box-sizing: border-box;
   font-family: inherit;
   overflow: hidden;
 }
