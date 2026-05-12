@@ -36,9 +36,22 @@ export const FunctionNodeSchema = z.object({
   description: z.string().nullable().optional(),
 });
 
+export const ConstantNodeSchema = z.object({
+  kind: z.literal('constant'),
+  id: z.string(),
+  label: z.string(),
+  value: z.number(),
+  /** 카탈로그 항목 식별자. 사용자 정의 임의 수면 비어 있다. */
+  constantKey: z.string().optional(),
+  position: z.object({ x: z.number(), y: z.number() }).nullable(),
+  isFocal: z.boolean(),
+  description: z.string().nullable().optional(),
+});
+
 export const NodeSchema = z.discriminatedUnion('kind', [
   ValueNodeSchema,
   FunctionNodeSchema,
+  ConstantNodeSchema,
 ]);
 
 export const EdgeSchema = z.object({
@@ -75,4 +88,5 @@ export type TramaDocument = z.infer<typeof TramaDocumentSchema>;
 export type TramaNode = z.infer<typeof NodeSchema>;
 export type TramaValueNode = z.infer<typeof ValueNodeSchema>;
 export type TramaFunctionNode = z.infer<typeof FunctionNodeSchema>;
+export type TramaConstantNode = z.infer<typeof ConstantNodeSchema>;
 export type TramaEdge = z.infer<typeof EdgeSchema>;

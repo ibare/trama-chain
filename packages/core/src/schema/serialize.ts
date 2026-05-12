@@ -1,4 +1,5 @@
 import type {
+  TramaConstantNode,
   TramaDocument,
   TramaEdge,
   TramaFunctionNode,
@@ -42,6 +43,17 @@ const FUNCTION_NODE_KEY_ORDER: (keyof TramaFunctionNode)[] = [
   'description',
 ];
 
+const CONSTANT_NODE_KEY_ORDER: (keyof TramaConstantNode)[] = [
+  'kind',
+  'id',
+  'label',
+  'value',
+  'constantKey',
+  'position',
+  'isFocal',
+  'description',
+];
+
 const EDGE_KEY_ORDER: (keyof TramaEdge)[] = [
   'id',
   'from',
@@ -74,7 +86,8 @@ function orderObject<T extends object>(obj: T, order: readonly (keyof T)[]): T {
 
 function orderNode(n: TramaNode): TramaNode {
   if (n.kind === 'value') return orderObject(n, VALUE_NODE_KEY_ORDER);
-  return orderObject(n, FUNCTION_NODE_KEY_ORDER);
+  if (n.kind === 'function') return orderObject(n, FUNCTION_NODE_KEY_ORDER);
+  return orderObject(n, CONSTANT_NODE_KEY_ORDER);
 }
 
 /** TramaDocument → 결정적인 JSON 문자열 (들여쓰기 2칸). */

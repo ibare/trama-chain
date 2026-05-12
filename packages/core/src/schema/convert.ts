@@ -1,6 +1,14 @@
-import type { Edge, FunctionNode, Model, Node, ValueNode } from '../model/index.js';
-import { isValueNode } from '../model/index.js';
 import type {
+  ConstantNode,
+  Edge,
+  FunctionNode,
+  Model,
+  Node,
+  ValueNode,
+} from '../model/index.js';
+import { isFunctionNode, isValueNode } from '../model/index.js';
+import type {
+  TramaConstantNode,
   TramaDocument,
   TramaEdge,
   TramaFunctionNode,
@@ -46,13 +54,27 @@ function nodeToDoc(n: Node): TramaNode {
     };
     return doc;
   }
-  const doc: TramaFunctionNode = {
-    kind: 'function',
+  if (isFunctionNode(n)) {
+    const doc: TramaFunctionNode = {
+      kind: 'function',
+      id: n.id,
+      label: n.label,
+      functionKey: n.functionKey,
+      outputUnitId: n.outputUnitId,
+      outputUnitOverride: n.outputUnitOverride,
+      position: n.position,
+      isFocal: n.isFocal,
+      description: n.description ?? null,
+    };
+    return doc;
+  }
+  // isConstantNode
+  const doc: TramaConstantNode = {
+    kind: 'constant',
     id: n.id,
     label: n.label,
-    functionKey: n.functionKey,
-    outputUnitId: n.outputUnitId,
-    outputUnitOverride: n.outputUnitOverride,
+    value: n.value,
+    constantKey: n.constantKey,
     position: n.position,
     isFocal: n.isFocal,
     description: n.description ?? null,
@@ -91,7 +113,7 @@ export function documentToModel(doc: TramaDocument): Model {
         description: n.description ?? null,
       };
       nodes[n.id] = node;
-    } else {
+    } else if (n.kind === 'function') {
       const node: FunctionNode = {
         kind: 'function',
         id: n.id,
@@ -99,6 +121,18 @@ export function documentToModel(doc: TramaDocument): Model {
         functionKey: n.functionKey,
         outputUnitId: n.outputUnitId,
         outputUnitOverride: n.outputUnitOverride,
+        position: n.position,
+        isFocal: n.isFocal,
+        description: n.description ?? null,
+      };
+      nodes[n.id] = node;
+    } else {
+      const node: ConstantNode = {
+        kind: 'constant',
+        id: n.id,
+        label: n.label,
+        value: n.value,
+        constantKey: n.constantKey,
         position: n.position,
         isFocal: n.isFocal,
         description: n.description ?? null,

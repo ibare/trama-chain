@@ -220,10 +220,26 @@ const functionNodeDescriptor: NodeKindDescriptor<Extract<Node, { kind: 'function
   },
 };
 
+const constantNodeDescriptor: NodeKindDescriptor<Extract<Node, { kind: 'constant' }>> = {
+  kind: 'constant',
+  outputsRaw: true,
+  canBeFeedbackTarget: false,
+  initialValue: (node) => node.value,
+  initialValid: () => true,
+  outputUnit: () => FREE_FALLBACK,
+  // 상수는 incoming을 받지 않는다 — 초기값으로 결정되고 매 step 동일.
+  // 슬롯/엣지를 통한 입력이 있더라도 무시하고 자기 value를 유지한다.
+  propagate: (node, ctx) => {
+    ctx.next[node.id] = node.value;
+    ctx.validNodes.add(node.id);
+  },
+};
+
 export function createDefaultNodeKindRegistry(): NodeKindRegistry {
   return createNodeKindRegistry()
     .register(valueNodeDescriptor)
-    .register(functionNodeDescriptor);
+    .register(functionNodeDescriptor)
+    .register(constantNodeDescriptor);
 }
 
 /**

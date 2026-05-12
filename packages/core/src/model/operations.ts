@@ -1,4 +1,5 @@
 import type {
+  ConstantNode,
   Edge,
   EdgeId,
   FunctionNode,
@@ -89,6 +90,42 @@ export function addFunctionNode(
     functionKey: input.functionKey,
     outputUnitId: input.outputUnitId,
     outputUnitOverride: input.outputUnitOverride,
+    position: input.position ?? null,
+    isFocal: input.isFocal ?? false,
+    description: input.description ?? null,
+  };
+  return touch(
+    {
+      ...model,
+      nodes: { ...model.nodes, [id]: node },
+      nodeOrder: [...model.nodeOrder, id],
+    },
+    now,
+  );
+}
+
+export interface AddConstantNodeInput {
+  label: string;
+  value: number;
+  constantKey?: string;
+  position?: { x: number; y: number } | null;
+  isFocal?: boolean;
+  description?: string | null;
+  id?: NodeId;
+}
+
+export function addConstantNode(
+  model: Model,
+  input: AddConstantNodeInput,
+  now?: number,
+): Model {
+  const id = input.id ?? makeNodeId();
+  const node: ConstantNode = {
+    kind: 'constant',
+    id,
+    label: input.label,
+    value: input.value,
+    constantKey: input.constantKey,
     position: input.position ?? null,
     isFocal: input.isFocal ?? false,
     description: input.description ?? null,

@@ -36,13 +36,33 @@ export interface FunctionNode {
   description?: string | null;
 }
 
-export type Node = ValueNode | FunctionNode;
+/**
+ * 상수 노드 — 사용자/카탈로그가 부여한 고정 수치.
+ * - `value`: 실행 시 항상 사용되는 수치 (π·g 등 카탈로그 값 또는 사용자 임의 수).
+ * - `constantKey`: 카탈로그 항목 식별자. 사용자 정의 임의 수면 비어있다.
+ * - 단위는 raw 통과 — 하류 ValueNode는 자동 단위 폴백.
+ */
+export interface ConstantNode {
+  kind: 'constant';
+  id: NodeId;
+  label: string;
+  value: number;
+  constantKey?: string;
+  position: { x: number; y: number } | null;
+  isFocal: boolean;
+  description?: string | null;
+}
+
+export type Node = ValueNode | FunctionNode | ConstantNode;
 
 export function isValueNode(n: Node): n is ValueNode {
   return n.kind === 'value';
 }
 export function isFunctionNode(n: Node): n is FunctionNode {
   return n.kind === 'function';
+}
+export function isConstantNode(n: Node): n is ConstantNode {
+  return n.kind === 'constant';
 }
 
 export interface Edge {
