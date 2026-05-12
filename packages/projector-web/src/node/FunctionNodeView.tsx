@@ -1,4 +1,4 @@
-import { memo, useCallback, useEffect, useRef } from 'react';
+import { memo, useCallback, useRef } from 'react';
 import { tokens } from '@trama/tokens';
 import {
   getFunctionSlotOccupancy,
@@ -11,12 +11,7 @@ import {
 import { useModelStore, useUIStore } from '../store/index.js';
 import { functionRegistry } from '../store/registries.js';
 import { layoutForFunctionDef, type FunctionPinLayout } from './function-box.js';
-import {
-  getIncidentEdgeHandles,
-  registerNodeEl,
-  type EdgeHandle,
-} from '../canvas/drag-registry.js';
-import { getCurrentZoom } from '../canvas/viewport.js';
+import { NodeFrame } from './NodeFrame.js';
 
 interface Props {
   id: NodeId;
@@ -26,7 +21,6 @@ const PIN_RADIUS = parseFloat(tokens.spacing.pinRadius);
 const SOCKET_SIZE = parseFloat(tokens.spacing.socketSize);
 const SOCKET_DOT_SIZE = parseFloat(tokens.spacing.socketDotSize);
 const CARD_CORNER = parseFloat(tokens.spacing.cardCornerRadius);
-const DRAG_THRESHOLD_PX = 3;
 
 function FunctionNodeViewImpl({ id }: Props): JSX.Element | null {
   const node = useModelStore((s) => s.model.nodes[id]);
@@ -34,101 +28,16 @@ function FunctionNodeViewImpl({ id }: Props): JSX.Element | null {
   const updateNode = useModelStore((s) => s.updateNode);
   const addEdge = useModelStore((s) => s.addEdge);
   const selection = useUIStore((s) => s.selection);
-  const selectNode = useUIStore((s) => s.selectNode);
   const startEdgeDraft = useUIStore((s) => s.startEdgeDraft);
   const endEdgeDraft = useUIStore((s) => s.endEdgeDraft);
 
-  const outerGRef = useRef<SVGGElement | null>(null);
-  useEffect(() => {
-    const el = outerGRef.current;
-    if (!el) return undefined;
-    return registerNodeEl(id, el);
-  }, [id]);
-
   const pos = node?.position ?? { x: 200, y: 200 };
-
-  const moveRef = useRef<{
-    startClientX: number;
-    startClientY: number;
-    startPosX: number;
-    startPosY: number;
-    lastDx: number;
-    lastDy: number;
-    dragged: boolean;
-    zoom: number;
-    incidents: EdgeHandle[];
-  } | null>(null);
-
-  const onBodyPointerDown = useCallback(
-    (e: React.PointerEvent<SVGRectElement>) => {
-      e.stopPropagation();
-      (e.target as Element).setPointerCapture(e.pointerId);
-      selectNode(id);
-      moveRef.current = {
-        startClientX: e.clientX,
-        startClientY: e.clientY,
-        startPosX: pos.x,
-        startPosY: pos.y,
-        lastDx: 0,
-        lastDy: 0,
-        dragged: false,
-        zoom: getCurrentZoom(),
-        incidents: getIncidentEdgeHandles(id),
-      };
-    },
-    [id, pos.x, pos.y, selectNode],
-  );
-
-  const onBodyPointerMove = useCallback(
-    (e: React.PointerEvent<SVGRectElement>) => {
-      const m = moveRef.current;
-      if (!m) return;
-      const dxClient = e.clientX - m.startClientX;
-      const dyClient = e.clientY - m.startClientY;
-      if (!m.dragged) {
-        if (Math.hypot(dxClient, dyClient) < DRAG_THRESHOLD_PX) return;
-        m.dragged = true;
-      }
-      const dx = dxClient / m.zoom;
-      const dy = dyClient / m.zoom;
-      m.lastDx = dx;
-      m.lastDy = dy;
-      const gEl = outerGRef.current;
-      if (gEl) {
-        const nx = m.startPosX + dx;
-        const ny = m.startPosY + dy;
-        gEl.setAttribute('transform', `translate(${nx} ${ny})`);
-      }
-      for (const h of m.incidents) {
-        h.applyDrag(id, dx, dy);
-      }
-    },
-    [id],
-  );
-
-  const onBodyPointerUp = useCallback(
-    (e: React.PointerEvent<SVGRectElement>) => {
-      const m = moveRef.current;
-      moveRef.current = null;
-      (e.target as Element).releasePointerCapture?.(e.pointerId);
-      if (m?.dragged && (m.lastDx !== 0 || m.lastDy !== 0)) {
-        updateNode(
-          id,
-          { position: { x: m.startPosX + m.lastDx, y: m.startPosY + m.lastDy } },
-          'move-node',
-          '위치 이동',
-        );
-      }
-    },
-    [id, updateNode],
-  );
 
   const handleDragRef = useRef<{ dragged: boolean } | null>(null);
 
   const onSocketPointerDown = useCallback(
     (e: React.PointerEvent<SVGCircleElement>) => {
       if (!node || !isValid) return;
-      e.stopPropagation();
       (e.target as Element).setPointerCapture(e.pointerId);
       const lag: 0 | 1 = e.altKey ? 1 : 0;
       const startPoint = { x: pos.x, y: pos.y };
@@ -243,80 +152,66 @@ function FunctionNodeViewImpl({ id }: Props): JSX.Element | null {
   const stateClass = isValid ? 'is-calm' : 'is-low';
 
   return (
-    <g
-      ref={outerGRef}
-      className={`trama-node trama-function-node ${isValid ? '' : 'is-invalid'}`}
-      data-trama-node-id={id}
-      transform={`translate(${pos.x} ${pos.y})`}
+    <NodeFrame
+      id={id}
+      pos={pos}
+      width={width}
+      height={height}
+      className={`trama-function-node${isValid ? '' : ' is-invalid'}`}
     >
-      <g className="trama-node-inner">
-        <rect
-          className={`trama-node-body trama-function-body ${stateClass}${isSelected ? ' is-selected' : ''}`}
-          x={-halfW}
-          y={-halfH}
-          width={width}
-          height={height}
-          rx={CARD_CORNER}
-          ry={CARD_CORNER}
-          onPointerDown={onBodyPointerDown}
-          onPointerMove={onBodyPointerMove}
-          onPointerUp={onBodyPointerUp}
-        />
-        <text
-          className="trama-function-symbol"
-          x={0}
-          y={symbolY}
-          textAnchor="middle"
-        >
-          {def.symbol}
-        </text>
-        <text
-          className="trama-function-label"
-          x={0}
-          y={labelY}
-          textAnchor="middle"
-        >
-          {node.label || def.labels.ko}
-        </text>
+      <rect
+        className={`trama-node-body trama-function-body ${stateClass}${isSelected ? ' is-selected' : ''}`}
+        x={-halfW}
+        y={-halfH}
+        width={width}
+        height={height}
+        rx={CARD_CORNER}
+        ry={CARD_CORNER}
+      />
+      <text className="trama-function-symbol" x={0} y={symbolY} textAnchor="middle">
+        {def.symbol}
+      </text>
+      <text className="trama-function-label" x={0} y={labelY} textAnchor="middle">
+        {node.label || def.labels.ko}
+      </text>
 
-        {/* 입력 슬롯 — 슬롯별 개별 핀. anchor 위치로 분산되므로 슬롯마다 작은 핀.
-            각 슬롯에 hit 영역을 둬서 엣지 드롭 시 정확한 슬롯을 식별. */}
-        {layout.inputSockets.map((s, i) => (
-          <g key={`in${s.slotIndex}`}>
-            <PinShape pin={layout.inputPins[i]!} stateClass={stateClass} />
-            <SocketVisual cx={s.x} cy={s.y} stateClass={stateClass} />
-            <circle
-              className="trama-node-socket-hit"
-              data-trama-slot-index={s.slotIndex}
-              cx={s.x}
-              cy={s.y}
-              r={Math.max(SOCKET_SIZE, 12)}
-            />
-          </g>
-        ))}
+      {/* 입력 슬롯 — 슬롯별 개별 핀. anchor 위치로 분산되므로 슬롯마다 작은 핀.
+          각 슬롯에 hit 영역을 둬서 엣지 드롭 시 정확한 슬롯을 식별. */}
+      {layout.inputSockets.map((s, i) => (
+        <g key={`in${s.slotIndex}`}>
+          <PinShape pin={layout.inputPins[i]!} stateClass={stateClass} />
+          <SocketVisual cx={s.x} cy={s.y} stateClass={stateClass} />
+          <circle
+            className="trama-node-socket-hit"
+            data-trama-slot-index={s.slotIndex}
+            cx={s.x}
+            cy={s.y}
+            r={Math.max(SOCKET_SIZE, 12)}
+          />
+        </g>
+      ))}
 
-        {/* 출력 핀 — valid일 때만 보임 */}
-        {isValid && (
-          <>
-            <PinShape pin={layout.outputPin} stateClass={stateClass} />
-            <SocketVisual
-              cx={layout.outputSocket.x}
-              cy={layout.outputSocket.y}
-              stateClass={stateClass}
-            />
-            <circle
-              className="trama-node-socket-hit"
-              cx={layout.outputSocket.x}
-              cy={layout.outputSocket.y}
-              r={Math.max(SOCKET_SIZE, 12)}
-              onPointerDown={onSocketPointerDown}
-              onPointerMove={onSocketPointerMove}
-              onPointerUp={onSocketPointerUp}
-            />
-          </>
-        )}
-      </g>
-    </g>
+      {/* 출력 핀 — valid일 때만 보임 */}
+      {isValid && (
+        <>
+          <PinShape pin={layout.outputPin} stateClass={stateClass} />
+          <SocketVisual
+            cx={layout.outputSocket.x}
+            cy={layout.outputSocket.y}
+            stateClass={stateClass}
+          />
+          <circle
+            className="trama-node-socket-hit"
+            cx={layout.outputSocket.x}
+            cy={layout.outputSocket.y}
+            r={Math.max(SOCKET_SIZE, 12)}
+            onPointerDown={onSocketPointerDown}
+            onPointerMove={onSocketPointerMove}
+            onPointerUp={onSocketPointerUp}
+          />
+        </>
+      )}
+    </NodeFrame>
   );
 }
 

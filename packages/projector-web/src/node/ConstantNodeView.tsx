@@ -2,12 +2,7 @@ import { memo, useCallback, useEffect, useRef, useState } from 'react';
 import { tokens } from '@trama/tokens';
 import { isConstantNode, type NodeId } from '@trama/core';
 import { useModelStore, useUIStore } from '../store/index.js';
-import {
-  getIncidentEdgeHandles,
-  registerNodeEl,
-  type EdgeHandle,
-} from '../canvas/drag-registry.js';
-import { getCurrentZoom } from '../canvas/viewport.js';
+import { NodeFrame } from './NodeFrame.js';
 
 interface Props {
   id: NodeId;
@@ -24,7 +19,6 @@ const PIN_RADIUS = parseFloat(tokens.spacing.pinRadius);
 const SOCKET_SIZE = parseFloat(tokens.spacing.socketSize);
 const SOCKET_DOT_SIZE = parseFloat(tokens.spacing.socketDotSize);
 const CARD_CORNER = parseFloat(tokens.spacing.cardCornerRadius);
-const DRAG_THRESHOLD_PX = 3;
 
 function formatConstantValue(v: number): string {
   if (!Number.isFinite(v)) return '·';
@@ -41,116 +35,29 @@ function ConstantNodeViewImpl({ id }: Props): JSX.Element | null {
   const updateNode = useModelStore((s) => s.updateNode);
   const addEdge = useModelStore((s) => s.addEdge);
   const selection = useUIStore((s) => s.selection);
-  const selectNode = useUIStore((s) => s.selectNode);
   const editingNodeId = useUIStore((s) => s.editingNodeId);
   const setEditingNode = useUIStore((s) => s.setEditingNode);
   const startEdgeDraft = useUIStore((s) => s.startEdgeDraft);
   const endEdgeDraft = useUIStore((s) => s.endEdgeDraft);
-
-  const outerGRef = useRef<SVGGElement | null>(null);
-  useEffect(() => {
-    const el = outerGRef.current;
-    if (!el) return undefined;
-    return registerNodeEl(id, el);
-  }, [id]);
 
   const pos = node?.position ?? { x: 200, y: 200 };
   const labelDraftSeed = node?.label ?? '';
   const valueDraftSeed = node && isConstantNode(node) ? node.value : 0;
   const isCustom = node && isConstantNode(node) && (node.constantKey ?? '') === 'custom';
 
-  const moveRef = useRef<{
-    startClientX: number;
-    startClientY: number;
-    startPosX: number;
-    startPosY: number;
-    lastDx: number;
-    lastDy: number;
-    dragged: boolean;
-    zoom: number;
-    incidents: EdgeHandle[];
-  } | null>(null);
-
-  const onBodyPointerDown = useCallback(
-    (e: React.PointerEvent<SVGRectElement>) => {
-      if (editingNodeId === id) return;
-      e.stopPropagation();
-      (e.target as Element).setPointerCapture(e.pointerId);
-      selectNode(id);
-      moveRef.current = {
-        startClientX: e.clientX,
-        startClientY: e.clientY,
-        startPosX: pos.x,
-        startPosY: pos.y,
-        lastDx: 0,
-        lastDy: 0,
-        dragged: false,
-        zoom: getCurrentZoom(),
-        incidents: getIncidentEdgeHandles(id),
-      };
-    },
-    [editingNodeId, id, pos.x, pos.y, selectNode],
-  );
-
-  const onBodyPointerMove = useCallback(
-    (e: React.PointerEvent<SVGRectElement>) => {
-      const m = moveRef.current;
-      if (!m) return;
-      const dxClient = e.clientX - m.startClientX;
-      const dyClient = e.clientY - m.startClientY;
-      if (!m.dragged) {
-        if (Math.hypot(dxClient, dyClient) < DRAG_THRESHOLD_PX) return;
-        m.dragged = true;
-      }
-      const dx = dxClient / m.zoom;
-      const dy = dyClient / m.zoom;
-      m.lastDx = dx;
-      m.lastDy = dy;
-      const gEl = outerGRef.current;
-      if (gEl) {
-        const nx = m.startPosX + dx;
-        const ny = m.startPosY + dy;
-        gEl.setAttribute('transform', `translate(${nx} ${ny})`);
-      }
-      for (const h of m.incidents) {
-        h.applyDrag(id, dx, dy);
-      }
-    },
-    [id],
-  );
-
-  const onBodyPointerUp = useCallback(
-    (e: React.PointerEvent<SVGRectElement>) => {
-      const m = moveRef.current;
-      moveRef.current = null;
-      (e.target as Element).releasePointerCapture?.(e.pointerId);
-      if (m?.dragged && (m.lastDx !== 0 || m.lastDy !== 0)) {
-        updateNode(
-          id,
-          { position: { x: m.startPosX + m.lastDx, y: m.startPosY + m.lastDy } },
-          'move-node',
-          '위치 이동',
-        );
-      }
-    },
-    [id, updateNode],
-  );
+  // 인라인 편집 중에는 drag 시작을 막아 input 포커스가 끊기지 않게.
+  const canStartDrag = useCallback(() => editingNodeId !== id, [editingNodeId, id]);
 
   // 사용자 정의 임의 수에 한해, 본체 더블클릭으로 수치 인라인 편집 진입.
   // 카탈로그 상수(π·g 등)는 값이 고정 의미라 편집 불가 — 라벨만 편집.
-  const onBodyDoubleClick = useCallback(
-    (e: React.MouseEvent<SVGRectElement>) => {
-      e.stopPropagation();
-      setEditingNode(id);
-    },
-    [id, setEditingNode],
-  );
+  const onBodyDoubleClick = useCallback(() => {
+    setEditingNode(id);
+  }, [id, setEditingNode]);
 
   const handleDragRef = useRef<{ dragged: boolean } | null>(null);
 
   const onSocketPointerDown = useCallback(
     (e: React.PointerEvent<SVGCircleElement>) => {
-      e.stopPropagation();
       (e.target as Element).setPointerCapture(e.pointerId);
       const lag: 0 | 1 = e.altKey ? 1 : 0;
       const startPoint = { x: pos.x, y: pos.y };
@@ -256,127 +163,109 @@ function ConstantNodeViewImpl({ id }: Props): JSX.Element | null {
   const valueText = formatConstantValue(node.value);
 
   return (
-    <g
-      ref={outerGRef}
-      className="trama-node trama-constant-node"
-      data-trama-node-id={id}
-      transform={`translate(${pos.x} ${pos.y})`}
+    <NodeFrame
+      id={id}
+      pos={pos}
+      width={CARD_W}
+      height={CARD_H}
+      className="trama-constant-node"
+      canStartDrag={canStartDrag}
+      onBodyDoubleClick={onBodyDoubleClick}
     >
-      <g className="trama-node-inner">
-        <rect
-          className={`trama-node-body ${stateClass}${isSelected ? ' is-selected' : ''}`}
-          x={-halfW}
-          y={-halfH}
-          width={CARD_W}
-          height={CARD_H}
-          rx={CARD_CORNER}
-          ry={CARD_CORNER}
-          onPointerDown={onBodyPointerDown}
-          onPointerMove={onBodyPointerMove}
-          onPointerUp={onBodyPointerUp}
-          onDoubleClick={onBodyDoubleClick}
-        />
+      <rect
+        className={`trama-node-body ${stateClass}${isSelected ? ' is-selected' : ''}`}
+        x={-halfW}
+        y={-halfH}
+        width={CARD_W}
+        height={CARD_H}
+        rx={CARD_CORNER}
+        ry={CARD_CORNER}
+      />
 
-        {isEditing ? (
-          <foreignObject x={-halfW + 8} y={cardTop + 18} width={CARD_W - 16} height={CARD_H - 28}>
-            <div className="trama-constant-editor">
+      {isEditing ? (
+        <foreignObject x={-halfW + 8} y={cardTop + 18} width={CARD_W - 16} height={CARD_H - 28}>
+          <div className="trama-constant-editor">
+            <input
+              className="trama-node-name-input"
+              value={nameDraft}
+              autoFocus
+              onChange={(e) => setNameDraft(e.target.value)}
+              onKeyDown={(e) => {
+                if (e.key === 'Enter' && !isCustom) commitEdit();
+                if (e.key === 'Escape') setEditingNode(null);
+              }}
+              onBlur={() => {
+                if (!isCustom) commitEdit();
+              }}
+              onPointerDown={(e) => e.stopPropagation()}
+              placeholder="라벨"
+            />
+            {isCustom && (
               <input
                 className="trama-node-name-input"
-                value={nameDraft}
-                autoFocus
-                onChange={(e) => setNameDraft(e.target.value)}
+                value={valueDraft}
+                type="number"
+                step="any"
+                onChange={(e) => setValueDraft(e.target.value)}
                 onKeyDown={(e) => {
-                  if (e.key === 'Enter' && !isCustom) commitEdit();
+                  if (e.key === 'Enter') commitEdit();
                   if (e.key === 'Escape') setEditingNode(null);
                 }}
-                onBlur={() => {
-                  if (!isCustom) commitEdit();
-                }}
+                onBlur={commitEdit}
                 onPointerDown={(e) => e.stopPropagation()}
-                placeholder="라벨"
+                placeholder="수치"
               />
-              {isCustom && (
-                <input
-                  className="trama-node-name-input"
-                  value={valueDraft}
-                  type="number"
-                  step="any"
-                  onChange={(e) => setValueDraft(e.target.value)}
-                  onKeyDown={(e) => {
-                    if (e.key === 'Enter') commitEdit();
-                    if (e.key === 'Escape') setEditingNode(null);
-                  }}
-                  onBlur={commitEdit}
-                  onPointerDown={(e) => e.stopPropagation()}
-                  placeholder="수치"
-                />
-              )}
-            </div>
-          </foreignObject>
-        ) : (
-          <>
-            <text
-              className="trama-function-symbol"
-              x={0}
-              y={symbolY}
-              textAnchor="middle"
-            >
-              {symbol}
-            </text>
-            <text
-              className="trama-function-label"
-              x={0}
-              y={labelY}
-              textAnchor="middle"
-            >
-              {node.label}
-            </text>
-            <text
-              className="trama-node-unit"
-              x={0}
-              y={valueY}
-              textAnchor="middle"
-            >
-              {valueText}
-            </text>
-          </>
-        )}
+            )}
+          </div>
+        </foreignObject>
+      ) : (
+        <>
+          <text className="trama-function-symbol" x={0} y={symbolY} textAnchor="middle">
+            {symbol}
+          </text>
+          <text className="trama-function-label" x={0} y={labelY} textAnchor="middle">
+            {node.label}
+          </text>
+          <text className="trama-node-unit" x={0} y={valueY} textAnchor="middle">
+            {valueText}
+          </text>
+        </>
+      )}
 
-        {/* 우측 핀 (출력) — 상수는 항상 valid */}
-        <rect
-          className={`trama-node-pin ${stateClass}`}
-          x={rightCx - PIN_W / 2}
-          y={-PIN_W / 2}
-          width={PIN_W}
-          height={PIN_W}
-          rx={Math.min(PIN_RADIUS, PIN_W / 2)}
-          ry={Math.min(PIN_RADIUS, PIN_W / 2)}
-        />
-        <g pointerEvents="none">
-          <circle
-            className={`trama-node-socket-ring ${stateClass}`}
-            cx={rightCx}
-            cy={0}
-            r={SOCKET_SIZE / 2}
-          />
-          <circle
-            className={`trama-node-socket-dot ${stateClass}`}
-            cx={rightCx}
-            cy={0}
-            r={SOCKET_DOT_SIZE / 2}
-          />
-        </g>
+      {/* 우측 핀 (출력) — 상수는 항상 valid */}
+      <rect
+        className={`trama-node-pin ${stateClass}`}
+        x={rightCx - PIN_W / 2}
+        y={-PIN_W / 2}
+        width={PIN_W}
+        height={PIN_W}
+        rx={Math.min(PIN_RADIUS, PIN_W / 2)}
+        ry={Math.min(PIN_RADIUS, PIN_W / 2)}
+      />
+      <g pointerEvents="none">
         <circle
-          className="trama-node-socket-hit"
+          className={`trama-node-socket-ring ${stateClass}`}
           cx={rightCx}
           cy={0}
-          r={Math.max(SOCKET_SIZE, 12)}
-          onPointerDown={onSocketPointerDown}
-          onPointerMove={onSocketPointerMove}
-          onPointerUp={onSocketPointerUp}
+          r={SOCKET_SIZE / 2}
+        />
+        <circle
+          className={`trama-node-socket-dot ${stateClass}`}
+          cx={rightCx}
+          cy={0}
+          r={SOCKET_DOT_SIZE / 2}
         />
       </g>
-    </g>
+      <circle
+        className="trama-node-socket-hit"
+        cx={rightCx}
+        cy={0}
+        r={Math.max(SOCKET_SIZE, 12)}
+        onPointerDown={onSocketPointerDown}
+        onPointerMove={onSocketPointerMove}
+        onPointerUp={onSocketPointerUp}
+      />
+    </NodeFrame>
   );
 }
 

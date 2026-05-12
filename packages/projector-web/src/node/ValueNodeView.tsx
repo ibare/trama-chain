@@ -13,12 +13,8 @@ import { formatNodeValue } from '../util/format.js';
 import { resolveNodeUnit } from '../util/unit-resolver.js';
 import { getNodeLayout, type PinLayout } from './box.js';
 import { NodeBorderTrack } from './NodeBorderTrack.js';
-import {
-  getIncidentEdgeHandles,
-  registerNodeEl,
-  type EdgeHandle,
-} from '../canvas/drag-registry.js';
-import { getCurrentZoom } from '../canvas/viewport.js';
+import { NodeFrame } from './NodeFrame.js';
+import { InteractiveArea } from './InteractiveArea.js';
 
 interface Props {
   id: NodeId;
@@ -29,7 +25,6 @@ const CARD_CORNER = parseFloat(tokens.spacing.cardCornerRadius);
 const PIN_RADIUS = parseFloat(tokens.spacing.pinRadius);
 const SOCKET_SIZE = parseFloat(tokens.spacing.socketSize);
 const SOCKET_DOT_SIZE = parseFloat(tokens.spacing.socketDotSize);
-const DRAG_THRESHOLD_PX = 3;
 
 function combinerSymbol(key: string): string {
   switch (key) {
@@ -76,109 +71,21 @@ function ValueNodeViewImpl({ id, incomingCount }: Props): JSX.Element | null {
     return false;
   });
 
-  const outerGRef = useRef<SVGGElement | null>(null);
-  useEffect(() => {
-    const el = outerGRef.current;
-    if (!el) return undefined;
-    return registerNodeEl(id, el);
-  }, [id]);
-
   const labelDraftSeed = node?.label ?? '';
   const pos = node?.position ?? { x: 200, y: 200 };
 
-  const moveRef = useRef<{
-    startClientX: number;
-    startClientY: number;
-    startPosX: number;
-    startPosY: number;
-    /** 캔버스 단위 누적 이동량 — dx_client / zoom. */
-    lastDx: number;
-    lastDy: number;
-    dragged: boolean;
-    /** 드래그 시작 시점에 캡처한 zoom. 드래그 중 줌이 바뀌어도 일관 유지. */
-    zoom: number;
-    incidents: EdgeHandle[];
-  } | null>(null);
+  // 인라인 편집 중에는 drag 시작을 막아 input 포커스가 끊기지 않게.
+  const canStartDrag = useCallback(() => editingNodeId !== id, [editingNodeId, id]);
 
-  const onBodyPointerDown = useCallback(
-    (e: React.PointerEvent<SVGRectElement>) => {
-      if (editingNodeId === id) return;
-      e.stopPropagation();
-      (e.target as Element).setPointerCapture(e.pointerId);
-      selectNode(id);
-      moveRef.current = {
-        startClientX: e.clientX,
-        startClientY: e.clientY,
-        startPosX: pos.x,
-        startPosY: pos.y,
-        lastDx: 0,
-        lastDy: 0,
-        dragged: false,
-        zoom: getCurrentZoom(),
-        incidents: getIncidentEdgeHandles(id),
-      };
-    },
-    [editingNodeId, id, pos.x, pos.y, selectNode],
-  );
-
-  const onBodyPointerMove = useCallback(
-    (e: React.PointerEvent<SVGRectElement>) => {
-      const m = moveRef.current;
-      if (!m) return;
-      const dxClient = e.clientX - m.startClientX;
-      const dyClient = e.clientY - m.startClientY;
-      if (!m.dragged) {
-        if (Math.hypot(dxClient, dyClient) < DRAG_THRESHOLD_PX) return;
-        m.dragged = true;
-      }
-      const dx = dxClient / m.zoom;
-      const dy = dyClient / m.zoom;
-      m.lastDx = dx;
-      m.lastDy = dy;
-      const gEl = outerGRef.current;
-      if (gEl) {
-        const nx = m.startPosX + dx;
-        const ny = m.startPosY + dy;
-        gEl.setAttribute('transform', `translate(${nx} ${ny})`);
-      }
-      for (const h of m.incidents) {
-        h.applyDrag(id, dx, dy);
-      }
-    },
-    [id],
-  );
-
-  const onBodyPointerUp = useCallback(
-    (e: React.PointerEvent<SVGRectElement>) => {
-      const m = moveRef.current;
-      moveRef.current = null;
-      (e.target as Element).releasePointerCapture?.(e.pointerId);
-      if (m?.dragged && (m.lastDx !== 0 || m.lastDy !== 0)) {
-        updateNode(
-          id,
-          { position: { x: m.startPosX + m.lastDx, y: m.startPosY + m.lastDy } },
-          'move-node',
-          '위치 이동',
-        );
-      }
-    },
-    [id, updateNode],
-  );
-
-  const onBodyDoubleClick = useCallback(
-    (e: React.MouseEvent<SVGRectElement>) => {
-      e.stopPropagation();
-      setEditingNode(id);
-    },
-    [id, setEditingNode],
-  );
+  const onBodyDoubleClick = useCallback(() => {
+    setEditingNode(id);
+  }, [id, setEditingNode]);
 
   const handleDragRef = useRef<{ dragged: boolean } | null>(null);
 
   const onSocketPointerDown = useCallback(
     (e: React.PointerEvent<SVGCircleElement>) => {
       if (!node) return;
-      e.stopPropagation();
       (e.target as Element).setPointerCapture(e.pointerId);
       const lag: 0 | 1 = e.altKey ? 1 : 0;
       const layoutNow = getNodeLayout(node, { incomingCount });
@@ -316,133 +223,122 @@ function ValueNodeViewImpl({ id, incomingCount }: Props): JSX.Element | null {
   const combinerSym = combinerSymbol(node.combiner);
 
   return (
-    <g
-      ref={outerGRef}
-      className="trama-node"
-      data-trama-node-id={id}
-      transform={`translate(${pos.x} ${pos.y})`}
+    <NodeFrame
+      id={id}
+      pos={pos}
+      width={width}
+      height={height}
+      canStartDrag={canStartDrag}
+      onBodyDoubleClick={onBodyDoubleClick}
     >
-      <g className="trama-node-inner">
-        <rect
-          className={`trama-node-body ${stateClass}`}
-          x={-halfW}
-          y={-halfH}
-          width={width}
-          height={height}
-          rx={CARD_CORNER}
-          ry={CARD_CORNER}
-          onPointerDown={onBodyPointerDown}
-          onPointerMove={onBodyPointerMove}
-          onPointerUp={onBodyPointerUp}
-          onDoubleClick={onBodyDoubleClick}
-        />
-        {editingNodeId === id ? (
-          <foreignObject
-            x={-halfW + 12}
-            y={layout.labelY - 14}
-            width={width - 24}
-            height={26}
-          >
-            <input
-              className="trama-node-name-input"
-              value={nameDraft}
-              autoFocus
-              onChange={(e) => setNameDraft(e.target.value)}
-              onBlur={commitName}
-              onKeyDown={(e) => {
-                if (e.key === 'Enter') commitName();
-                if (e.key === 'Escape') setEditingNode(null);
-              }}
-              onPointerDown={(e) => e.stopPropagation()}
-            />
-          </foreignObject>
-        ) : (
-          <text className="trama-node-label" x={0} y={layout.labelY} textAnchor="middle">
-            {node.label}
-          </text>
-        )}
-
-        <line
-          className="trama-node-divider"
-          x1={layout.divider.x1}
-          x2={layout.divider.x2}
-          y1={layout.divider.y}
-          y2={layout.divider.y}
-        />
-
-        <text className="trama-node-value" x={0} y={layout.valueY} textAnchor="middle">
-          {formatted.primary}
-          {formatted.accessory && (
-            <tspan className="trama-node-unit" dx="6">
-              {formatted.accessory}
-            </tspan>
-          )}
-        </text>
-        <rect
-          className="trama-node-value-hit"
+      <rect
+        className={`trama-node-body ${stateClass}`}
+        x={-halfW}
+        y={-halfH}
+        width={width}
+        height={height}
+        rx={CARD_CORNER}
+        ry={CARD_CORNER}
+      />
+      {editingNodeId === id ? (
+        <foreignObject
           x={-halfW + 12}
-          y={layout.valueY - 16}
+          y={layout.labelY - 14}
           width={width - 24}
-          height={28}
-          onPointerDown={(e) => {
-            // hit rect가 body 위에 있어 body의 onPointerDown이 호출되지 않으므로
-            // 선택만 직접 처리. 드래그 시작 영역은 label·빈 공간으로 한정한다.
-            e.stopPropagation();
-            selectNode(id);
-          }}
-          onClick={(e) => {
-            e.stopPropagation();
-            openUnitInspector(id);
-          }}
-        />
-
-        {layout.hasCombiner && layout.combinerCenterY !== null && (
-          <CombinerChip
-            symbol={combinerSym}
-            label={combinerLabel}
-            cy={layout.combinerCenterY}
+          height={26}
+        >
+          <input
+            className="trama-node-name-input"
+            value={nameDraft}
+            autoFocus
+            onChange={(e) => setNameDraft(e.target.value)}
+            onBlur={commitName}
+            onKeyDown={(e) => {
+              if (e.key === 'Enter') commitName();
+              if (e.key === 'Escape') setEditingNode(null);
+            }}
+            onPointerDown={(e) => e.stopPropagation()}
           />
-        )}
+        </foreignObject>
+      ) : (
+        <text className="trama-node-label" x={0} y={layout.labelY} textAnchor="middle">
+          {node.label}
+        </text>
+      )}
 
-        {isFocal && playbackStep !== null && (
-          <text
-            className="trama-node-step-overlay"
-            x={halfW + 6}
-            y={-halfH + 10}
-          >
-            step {playbackStep + 1} / {trajectoryLength}
-          </text>
-        )}
+      <line
+        className="trama-node-divider"
+        x1={layout.divider.x1}
+        x2={layout.divider.x2}
+        y1={layout.divider.y}
+        y2={layout.divider.y}
+      />
 
-        <PinShape pin={layout.leftPin} stateClass={stateClass} />
-        {layout.leftPin.sockets.map((s, i) => (
-          <SocketVisual key={`l${i}`} cx={s.x} cy={s.y} stateClass={stateClass} />
-        ))}
+      <text className="trama-node-value" x={0} y={layout.valueY} textAnchor="middle">
+        {formatted.primary}
+        {formatted.accessory && (
+          <tspan className="trama-node-unit" dx="6">
+            {formatted.accessory}
+          </tspan>
+        )}
+      </text>
+      {/* 값+단위 영역을 InteractiveArea로 — 클릭 시 단위 인스펙터, 선택은 직접 처리.
+          드래그는 InteractiveArea가 hit를 잡은 시점에 NodeFrame의 drag rect로 흐르지
+          않으므로(같은 g 형제, topmost가 우선) 별도 stopPropagation 불필요. */}
+      <InteractiveArea
+        x={-halfW + 12}
+        y={layout.valueY - 16}
+        width={width - 24}
+        height={28}
+        hitClassName="trama-node-value-hit"
+        onClick={() => {
+          selectNode(id);
+          openUnitInspector(id);
+        }}
+      />
 
-        <PinShape pin={layout.rightPin} stateClass={stateClass} />
-        {layout.rightPin.sockets[0] && (
-          <>
-            <SocketVisual
-              cx={layout.rightPin.sockets[0].x}
-              cy={layout.rightPin.sockets[0].y}
-              stateClass={stateClass}
-            />
-            <circle
-              className="trama-node-socket-hit"
-              cx={layout.rightPin.sockets[0].x}
-              cy={layout.rightPin.sockets[0].y}
-              r={Math.max(SOCKET_SIZE, 12)}
-              onPointerDown={onSocketPointerDown}
-              onPointerMove={onSocketPointerMove}
-              onPointerUp={onSocketPointerUp}
-            />
-          </>
-        )}
-        {isInputNode && editingNodeId !== id && (
-          <NodeBorderTrack node={node} halfH={halfH} halfW={halfW} />
-        )}
-      </g>
-    </g>
+      {layout.hasCombiner && layout.combinerCenterY !== null && (
+        <CombinerChip
+          symbol={combinerSym}
+          label={combinerLabel}
+          cy={layout.combinerCenterY}
+        />
+      )}
+
+      {isFocal && playbackStep !== null && (
+        <text className="trama-node-step-overlay" x={halfW + 6} y={-halfH + 10}>
+          step {playbackStep + 1} / {trajectoryLength}
+        </text>
+      )}
+
+      <PinShape pin={layout.leftPin} stateClass={stateClass} />
+      {layout.leftPin.sockets.map((s, i) => (
+        <SocketVisual key={`l${i}`} cx={s.x} cy={s.y} stateClass={stateClass} />
+      ))}
+
+      <PinShape pin={layout.rightPin} stateClass={stateClass} />
+      {layout.rightPin.sockets[0] && (
+        <>
+          <SocketVisual
+            cx={layout.rightPin.sockets[0].x}
+            cy={layout.rightPin.sockets[0].y}
+            stateClass={stateClass}
+          />
+          <circle
+            className="trama-node-socket-hit"
+            cx={layout.rightPin.sockets[0].x}
+            cy={layout.rightPin.sockets[0].y}
+            r={Math.max(SOCKET_SIZE, 12)}
+            onPointerDown={onSocketPointerDown}
+            onPointerMove={onSocketPointerMove}
+            onPointerUp={onSocketPointerUp}
+          />
+        </>
+      )}
+      {isInputNode && editingNodeId !== id && (
+        <NodeBorderTrack node={node} halfH={halfH} halfW={halfW} />
+      )}
+    </NodeFrame>
   );
 }
 
