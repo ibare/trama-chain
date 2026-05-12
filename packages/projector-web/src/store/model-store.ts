@@ -2,12 +2,15 @@ import { create } from 'zustand';
 import {
   OperationLog,
   addEdge as addEdgeOp,
+  addFunctionNode as addFunctionNodeOp,
   addValueNode as addValueNodeOp,
   buildTopology,
   createEmptyModel,
   executeModel,
+  getFunctionSlotOccupancy,
   hasFeedbackEdges,
   initializeFromInitialValues,
+  isFunctionNode,
   modelToDocument,
   propagateOneStep,
   removeEdge as removeEdgeOp,
@@ -20,6 +23,7 @@ import {
 } from '@trama/core';
 import type {
   AddEdgeInput,
+  AddFunctionNodeInput,
   AddValueNodeInput,
   Edge,
   EdgeId,
@@ -55,6 +59,11 @@ export interface ModelStore {
   exportToJson: () => string;
 
   addNode: (input: AddValueNodeInput, opKind?: OperationKind, label?: string) => Node;
+  addFunctionNode: (
+    input: AddFunctionNodeInput,
+    opKind?: OperationKind,
+    label?: string,
+  ) => Node | null;
   updateNode: (id: NodeId, patch: NodePatch, kind?: OperationKind, label?: string) => void;
   removeNode: (id: NodeId) => void;
 
@@ -189,6 +198,26 @@ export const useModelStore = create<ModelStore>((set, get) => ({
     return node;
   },
 
+  addFunctionNode: (input, opKind = 'add-node', label = '함수 노드 추가') => {
+    // functionKey가 레지스트리에 없으면 추가 거부.
+    if (!functionRegistry.has(input.functionKey)) return null;
+    const before = get().model;
+    const after = addFunctionNodeOp(before, input);
+    const newId = after.nodeOrder[after.nodeOrder.length - 1]!;
+    const node = after.nodes[newId]!;
+    const exec = computeExecutionState(after);
+    set((s) => {
+      record(s, before, after, opKind, label, { nodeId: newId, node });
+      return {
+        model: after,
+        ...exec,
+        canUndo: s.log.canUndo(),
+        canRedo: s.log.canRedo(),
+      };
+    });
+    return node;
+  },
+
   updateNode: (id, patch, kind = 'update-node', label = '노드 수정') => {
     const before = get().model;
     const after = updateNodeOp(before, id, patch);
@@ -227,6 +256,17 @@ export const useModelStore = create<ModelStore>((set, get) => ({
 
   addEdge: (input) => {
     const before = get().model;
+    // 슬롯 검증: target이 FunctionNode면 slotIndex가 유효하고 비어 있어야.
+    const targetNode = before.nodes[input.to];
+    if (targetNode && isFunctionNode(targetNode)) {
+      const def = functionRegistry.get(targetNode.functionKey);
+      if (!def) return null;
+      const arity = def.slots.length;
+      const slot = input.slotIndex;
+      if (typeof slot !== 'number' || slot < 0 || slot >= arity) return null;
+      const occupied = getFunctionSlotOccupancy(before, input.to);
+      if (occupied.some((o) => o.slotIndex === slot)) return null;
+    }
     // 사이클 사전 검사: lag=0이면 instantaneous DAG가 유지되는지 확인
     const candidate = addEdgeOp(before, input);
     if ((input.lag ?? 0) === 0) {
