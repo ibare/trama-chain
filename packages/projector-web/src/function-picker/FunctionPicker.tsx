@@ -37,7 +37,25 @@ export function FunctionPicker(): JSX.Element | null {
     [close, edge, updateEdge],
   );
 
+  // 변환 제거 = identity linear(slope=1, offset=0)로 복원. 엣지가 raw로 흘러간다.
+  const removeShape = useCallback(() => {
+    if (!edge) return;
+    updateEdge(
+      edge.id,
+      { shape: { kind: 'linear', params: { slope: 1, offset: 0 } } },
+      'change-shape',
+      '변환 제거',
+    );
+    close();
+  }, [close, edge, updateEdge]);
+
   if (!picker || !edge) return null;
+
+  // 현재 변환이 실제로 값을 가공하는가? identity(linear slope=1 offset=0)면 제거할 게 없다.
+  const isIdentity =
+    edge.shape.kind === 'linear' &&
+    edge.shape.params.slope === 1 &&
+    edge.shape.params.offset === 0;
 
   const currentDef = shapeRegistry.get(edge.shape.kind);
   const currentParamFields = currentDef?.paramFields ?? [];
@@ -60,12 +78,28 @@ export function FunctionPicker(): JSX.Element | null {
             onClick={() => selectShape(s.key)}
           >
             <svg className="trama-picker-preview" viewBox="0 0 96 36" preserveAspectRatio="none">
-              <path d={path} />
+              <line
+                className="trama-picker-preview-baseline"
+                x1={0}
+                y1={36}
+                x2={96}
+                y2={36}
+              />
+              <path className="trama-picker-preview-fill" d={`${path} L 96 36 L 0 36 Z`} />
+              <path className="trama-picker-preview-stroke" d={path} />
             </svg>
             <div className="trama-picker-card-label">{s.labels.ko}</div>
           </div>
         );
       })}
+      <button
+        type="button"
+        className="trama-picker-remove"
+        onClick={removeShape}
+        disabled={isIdentity}
+      >
+        변환 제거
+      </button>
       {edge.shape.kind === 'piecewise' && <PiecewiseEditor edge={edge} />}
       {edge.shape.kind === 'stochastic' && <StochasticEditor edge={edge} />}
       {edge.shape.kind === 'inverseU' && <InverseUCurveEditor edge={edge} />}
