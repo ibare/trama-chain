@@ -1,5 +1,5 @@
 import { useMemo } from 'react';
-import type { NodeId } from '@trama/core';
+import { isValueNode, type NodeId } from '@trama/core';
 import { useModelStore } from '../store/index.js';
 import { getNodeLayout } from './box.js';
 import {
@@ -42,5 +42,6 @@ export function UnitInspectorLayer({ nodeId, bounds }: Props): JSX.Element | nul
   }, [node, incomingCount, bounds.width, bounds.height]);
 
   if (!node || !placement) return null;
+  if (!isValueNode(node)) return null;
   return <UnitInspector node={node} x={placement.x} y={placement.y} />;
 }

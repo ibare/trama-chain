@@ -1,6 +1,11 @@
-import type { TramaDocument, TramaEdge, TramaNode } from './document.js';
+import type {
+  TramaDocument,
+  TramaEdge,
+  TramaFunctionNode,
+  TramaNode,
+  TramaValueNode,
+} from './document.js';
 
-// 키 순서 (문서 결정성):
 const DOC_KEY_ORDER: (keyof TramaDocument)[] = [
   'trama',
   'id',
@@ -12,7 +17,8 @@ const DOC_KEY_ORDER: (keyof TramaDocument)[] = [
   'edges',
 ];
 
-const NODE_KEY_ORDER: (keyof TramaNode)[] = [
+const VALUE_NODE_KEY_ORDER: (keyof TramaValueNode)[] = [
+  'kind',
   'id',
   'label',
   'unitId',
@@ -24,6 +30,18 @@ const NODE_KEY_ORDER: (keyof TramaNode)[] = [
   'description',
 ];
 
+const FUNCTION_NODE_KEY_ORDER: (keyof TramaFunctionNode)[] = [
+  'kind',
+  'id',
+  'label',
+  'functionKey',
+  'outputUnitId',
+  'outputUnitOverride',
+  'position',
+  'isFocal',
+  'description',
+];
+
 const EDGE_KEY_ORDER: (keyof TramaEdge)[] = [
   'id',
   'from',
@@ -31,6 +49,7 @@ const EDGE_KEY_ORDER: (keyof TramaEdge)[] = [
   'shape',
   'inverted',
   'lag',
+  'slotIndex',
   'description',
 ];
 
@@ -43,7 +62,6 @@ function orderObject<T extends object>(obj: T, order: readonly (keyof T)[]): T {
       ];
     }
   }
-  // 잔여 키는 정렬해서 뒤에 붙임 (description optional 등)
   const extras = Object.keys(obj).filter(
     (k) => !(order as readonly string[]).includes(k),
   );
@@ -54,10 +72,15 @@ function orderObject<T extends object>(obj: T, order: readonly (keyof T)[]): T {
   return out;
 }
 
+function orderNode(n: TramaNode): TramaNode {
+  if (n.kind === 'value') return orderObject(n, VALUE_NODE_KEY_ORDER);
+  return orderObject(n, FUNCTION_NODE_KEY_ORDER);
+}
+
 /** TramaDocument → 결정적인 JSON 문자열 (들여쓰기 2칸). */
 export function serializeTrama(doc: TramaDocument): string {
   const ordered: TramaDocument = orderObject(doc, DOC_KEY_ORDER);
-  const orderedNodes = doc.nodes.map((n) => orderObject(n, NODE_KEY_ORDER));
+  const orderedNodes = doc.nodes.map(orderNode);
   const orderedEdges = doc.edges.map((e) => orderObject(e, EDGE_KEY_ORDER));
   const payload: TramaDocument = { ...ordered, nodes: orderedNodes, edges: orderedEdges };
   return JSON.stringify(payload, null, 2);

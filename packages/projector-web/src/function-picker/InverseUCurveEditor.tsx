@@ -44,8 +44,16 @@ export function InverseUCurveEditor({ edge }: Props): JSX.Element | null {
   const fromNode = model.nodes[edge.from];
   const toNode = model.nodes[edge.to];
 
-  const aUnit = useMemo(() => (fromNode ? resolveNodeUnit(fromNode) : null), [fromNode]);
-  const bUnit = useMemo(() => (toNode ? resolveNodeUnit(toNode) : null), [toNode]);
+  // InverseU curve editor는 ValueNode↔ValueNode 엣지에서만 의미를 가진다.
+  // FunctionNode가 끼어 있으면 단위가 없어 도메인 라벨을 못 그리므로 폴백.
+  const aUnit = useMemo(
+    () => (fromNode && fromNode.kind === 'value' ? resolveNodeUnit(fromNode) : null),
+    [fromNode],
+  );
+  const bUnit = useMemo(
+    () => (toNode && toNode.kind === 'value' ? resolveNodeUnit(toNode) : null),
+    [toNode],
+  );
 
   const params = edge.shape.params as Partial<InverseUParams>;
   const peak = typeof params.peak === 'number' ? clamp01(params.peak) : 0.5;

@@ -6,7 +6,8 @@ export type EdgeId = string;
 
 export type EdgeLag = 0 | 1;
 
-export interface Node {
+export interface ValueNode {
+  kind: 'value';
   id: NodeId;
   label: string;
   /** 카탈로그 단위 키 (예: 'kg', 'rating-10', 'confidence'). */
@@ -21,6 +22,29 @@ export interface Node {
   description?: string | null;
 }
 
+export interface FunctionNode {
+  kind: 'function';
+  id: NodeId;
+  label: string;
+  /** FunctionRegistry 키 (예: 'multiply', 'add'). */
+  functionKey: string;
+  /** 출력 단위. 함수가 자동 도출하지 못하거나 사용자가 덮어쓸 때 채움. */
+  outputUnitId?: string;
+  outputUnitOverride?: UnitOverride;
+  position: { x: number; y: number } | null;
+  isFocal: boolean;
+  description?: string | null;
+}
+
+export type Node = ValueNode | FunctionNode;
+
+export function isValueNode(n: Node): n is ValueNode {
+  return n.kind === 'value';
+}
+export function isFunctionNode(n: Node): n is FunctionNode {
+  return n.kind === 'function';
+}
+
 export interface Edge {
   id: EdgeId;
   from: NodeId;
@@ -29,6 +53,8 @@ export interface Edge {
   inverted: boolean;
   /** 0: same-timestep instantaneous. 1: feedback to next timestep. */
   lag: EdgeLag;
+  /** target이 FunctionNode일 때 슬롯 인덱스(0-based). ValueNode target에선 무시. */
+  slotIndex?: number;
   description?: string | null;
 }
 

@@ -2,7 +2,7 @@ import { create } from 'zustand';
 import {
   OperationLog,
   addEdge as addEdgeOp,
-  addNode as addNodeOp,
+  addValueNode as addValueNodeOp,
   buildTopology,
   createEmptyModel,
   executeModel,
@@ -20,13 +20,14 @@ import {
 } from '@trama/core';
 import type {
   AddEdgeInput,
-  AddNodeInput,
+  AddValueNodeInput,
   Edge,
   EdgeId,
   ExecutionState,
   Model,
   Node,
   NodeId,
+  NodePatch,
   Operation,
   OperationKind,
 } from '@trama/core';
@@ -53,8 +54,8 @@ export interface ModelStore {
   loadFromJson: (json: string) => boolean;
   exportToJson: () => string;
 
-  addNode: (input: AddNodeInput, opKind?: OperationKind, label?: string) => Node;
-  updateNode: (id: NodeId, patch: Partial<Omit<Node, 'id'>>, kind?: OperationKind, label?: string) => void;
+  addNode: (input: AddValueNodeInput, opKind?: OperationKind, label?: string) => Node;
+  updateNode: (id: NodeId, patch: NodePatch, kind?: OperationKind, label?: string) => void;
   removeNode: (id: NodeId) => void;
 
   addEdge: (input: AddEdgeInput) => Edge | null;
@@ -93,13 +94,17 @@ function record(
 }
 
 /** Node patch가 propagation 결과에 영향을 줄 수 있는 필드를 포함하는지. */
-function patchAffectsValues(patch: Partial<Omit<Node, 'id'>>): boolean {
+function patchAffectsValues(patch: NodePatch): boolean {
+  const p = patch as Record<string, unknown>;
   return (
-    'initialValue' in patch ||
-    'unitId' in patch ||
-    'unitOverride' in patch ||
-    'combiner' in patch ||
-    'isFocal' in patch
+    'initialValue' in p ||
+    'unitId' in p ||
+    'unitOverride' in p ||
+    'combiner' in p ||
+    'isFocal' in p ||
+    'functionKey' in p ||
+    'outputUnitId' in p ||
+    'outputUnitOverride' in p
   );
 }
 
@@ -164,7 +169,7 @@ export const useModelStore = create<ModelStore>((set, get) => ({
 
   addNode: (input, opKind = 'add-node', label = '노드 추가') => {
     const before = get().model;
-    const after = addNodeOp(before, input);
+    const after = addValueNodeOp(before, input);
     const newId = after.nodeOrder[after.nodeOrder.length - 1]!;
     const node = after.nodes[newId]!;
     const exec = computeExecutionState(after);

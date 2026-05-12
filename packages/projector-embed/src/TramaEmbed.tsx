@@ -4,6 +4,7 @@ import {
   defaultUnitCatalog,
   documentToModel,
   initializeFromInitialValues,
+  isValueNode,
   normalize,
   parseTrama,
   propagateOneStep,
@@ -12,6 +13,7 @@ import {
   type Node,
   type NodeId,
   type ResolvedUnit,
+  type ValueNode,
 } from '@trama/core';
 import { combinerRegistry, shapeRegistry } from './registries.js';
 import { computeBounds, staticEdgePath } from './geometry.js';
@@ -29,9 +31,14 @@ const FREE_FALLBACK: ResolvedUnit = {
 };
 
 function resolveNodeUnit(node: Node): ResolvedUnit {
+  if (!isValueNode(node)) return FREE_FALLBACK;
   const def = defaultUnitCatalog.get(node.unitId);
   if (!def) return FREE_FALLBACK;
   return resolveUnit(def, node.unitOverride);
+}
+
+function valueNodeInitial(node: Node): number {
+  return isValueNode(node) ? node.initialValue : 0;
 }
 
 const CARD_CORNER = parseFloat(tokens.spacing.cardCornerRadius);
@@ -147,7 +154,7 @@ export function TramaEmbed({ json, height = 360, showQuestion = true }: Props): 
 
           const { d, tip, tangent, mid } = staticEdgePath(start, end, { lag: edge.lag });
 
-          const srcValue = values[edge.from] ?? fromNode.initialValue;
+          const srcValue = values[edge.from] ?? valueNodeInitial(fromNode);
           const srcNorm = normalize(srcValue, resolveNodeUnit(fromNode));
           const isFeedback = edge.lag === 1;
           const isStrained = srcNorm < STRAINED_LOW || srcNorm > STRAINED_HIGH;
@@ -172,7 +179,7 @@ export function TramaEmbed({ json, height = 360, showQuestion = true }: Props): 
         })}
         {model.nodeOrder.map((nid) => {
           const node = model.nodes[nid];
-          if (!node) return null;
+          if (!node || !isValueNode(node)) return null; // FunctionNode 렌더링은 Phase 5
           const layout = layouts[nid]!;
           const v = values[nid] ?? node.initialValue;
           return <StaticNode key={nid} node={node} layout={layout} currentValue={v} />;
@@ -187,7 +194,7 @@ function StaticNode({
   layout,
   currentValue,
 }: {
-  node: Node;
+  node: ValueNode;
   layout: ReturnType<typeof getNodeLayout>;
   currentValue: number;
 }): JSX.Element {

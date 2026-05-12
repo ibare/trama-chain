@@ -10,7 +10,8 @@ export const UnitOverrideSchema = z
   })
   .strict();
 
-export const NodeSchema = z.object({
+export const ValueNodeSchema = z.object({
+  kind: z.literal('value'),
   id: z.string(),
   label: z.string(),
   /** 카탈로그 단위 키. 알 수 없는 키면 documentToModel에서 free로 폴백. */
@@ -23,6 +24,23 @@ export const NodeSchema = z.object({
   description: z.string().nullable().optional(),
 });
 
+export const FunctionNodeSchema = z.object({
+  kind: z.literal('function'),
+  id: z.string(),
+  label: z.string(),
+  functionKey: z.string(),
+  outputUnitId: z.string().optional(),
+  outputUnitOverride: UnitOverrideSchema.optional(),
+  position: z.object({ x: z.number(), y: z.number() }).nullable(),
+  isFocal: z.boolean(),
+  description: z.string().nullable().optional(),
+});
+
+export const NodeSchema = z.discriminatedUnion('kind', [
+  ValueNodeSchema,
+  FunctionNodeSchema,
+]);
+
 export const EdgeSchema = z.object({
   id: z.string(),
   from: z.string(),
@@ -33,6 +51,7 @@ export const EdgeSchema = z.object({
   }),
   inverted: z.boolean(),
   lag: z.union([z.literal(0), z.literal(1)]),
+  slotIndex: z.number().int().min(0).optional(),
   description: z.string().nullable().optional(),
 });
 
@@ -54,4 +73,6 @@ export const TramaDocumentSchema = z.object({
 
 export type TramaDocument = z.infer<typeof TramaDocumentSchema>;
 export type TramaNode = z.infer<typeof NodeSchema>;
+export type TramaValueNode = z.infer<typeof ValueNodeSchema>;
+export type TramaFunctionNode = z.infer<typeof FunctionNodeSchema>;
 export type TramaEdge = z.infer<typeof EdgeSchema>;

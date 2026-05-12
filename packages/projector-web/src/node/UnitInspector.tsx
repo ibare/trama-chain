@@ -2,15 +2,16 @@ import { useCallback, useMemo, useState } from 'react';
 import {
   categoryLabels,
   defaultUnitCatalog,
-  type Node,
   type UnitCategory,
   type UnitDef,
+  type ValueNode,
 } from '@trama/core';
 import { useModelStore, useUIStore } from '../store/index.js';
 import { resolveNodeUnit } from '../util/unit-resolver.js';
 
 interface Props {
-  node: Node;
+  /** UnitInspector는 ValueNode 전용. FunctionNode는 별도 FunctionInspector. */
+  node: ValueNode;
   /** 패널 좌상단 좌표 (SVG/캔버스 좌표계 기준). 외부에서 placePanel로 산출. */
   x: number;
   y: number;

@@ -1,6 +1,6 @@
 import { memo, useCallback, useEffect, useRef, useState } from 'react';
 import { tokens } from '@trama/tokens';
-import { normalize, type NodeId } from '@trama/core';
+import { isValueNode, normalize, type NodeId } from '@trama/core';
 import { useModelStore, useUIStore } from '../store/index.js';
 import { combinerRegistry } from '../store/registries.js';
 import { formatNodeValue } from '../util/format.js';
@@ -53,7 +53,8 @@ function NodeViewImpl({ id, incomingCount }: Props): JSX.Element | null {
   const node = useModelStore((s) => s.model.nodes[id]);
   const currentValue = useModelStore((s) => {
     const n = s.model.nodes[id];
-    return s.executionState.values[id] ?? n?.initialValue ?? 0;
+    const fallback = n && isValueNode(n) ? n.initialValue : 0;
+    return s.executionState.values[id] ?? fallback;
   });
 
   const updateNode = useModelStore((s) => s.updateNode);
@@ -252,6 +253,8 @@ function NodeViewImpl({ id, incomingCount }: Props): JSX.Element | null {
   }, [id, nameDraft, node, setEditingNode, updateNode]);
 
   if (!node) return null;
+  // FunctionNode 렌더링은 Phase 5에서 별도 컴포넌트로 분리한다. 여기서는 ValueNode만.
+  if (!isValueNode(node)) return null;
 
   const layout = getNodeLayout(node, { incomingCount });
   const { halfW, halfH, width, height } = layout;

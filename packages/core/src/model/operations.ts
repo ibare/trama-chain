@@ -1,4 +1,13 @@
-import type { Edge, EdgeId, Model, Node, NodeId } from './types.js';
+import type {
+  Edge,
+  EdgeId,
+  FunctionNode,
+  Model,
+  Node,
+  NodeId,
+  ValueNode,
+} from './types.js';
+import { isFunctionNode } from './types.js';
 import { makeEdgeId, makeModelId, makeNodeId } from './ids.js';
 
 export function createEmptyModel(now: number = Date.now()): Model {
@@ -20,10 +29,10 @@ function touch(model: Model, now: number = Date.now()): Model {
   return { ...model, updatedAt: now };
 }
 
-export interface AddNodeInput {
+export interface AddValueNodeInput {
   label: string;
   unitId: string;
-  unitOverride?: Node['unitOverride'];
+  unitOverride?: ValueNode['unitOverride'];
   initialValue: number;
   position?: { x: number; y: number } | null;
   combiner?: string;
@@ -32,9 +41,10 @@ export interface AddNodeInput {
   id?: NodeId;
 }
 
-export function addNode(model: Model, input: AddNodeInput, now?: number): Model {
+export function addValueNode(model: Model, input: AddValueNodeInput, now?: number): Model {
   const id = input.id ?? makeNodeId();
-  const node: Node = {
+  const node: ValueNode = {
+    kind: 'value',
     id,
     label: input.label,
     unitId: input.unitId,
@@ -55,15 +65,60 @@ export function addNode(model: Model, input: AddNodeInput, now?: number): Model 
   );
 }
 
+export interface AddFunctionNodeInput {
+  label: string;
+  functionKey: string;
+  outputUnitId?: string;
+  outputUnitOverride?: FunctionNode['outputUnitOverride'];
+  position?: { x: number; y: number } | null;
+  isFocal?: boolean;
+  description?: string | null;
+  id?: NodeId;
+}
+
+export function addFunctionNode(
+  model: Model,
+  input: AddFunctionNodeInput,
+  now?: number,
+): Model {
+  const id = input.id ?? makeNodeId();
+  const node: FunctionNode = {
+    kind: 'function',
+    id,
+    label: input.label,
+    functionKey: input.functionKey,
+    outputUnitId: input.outputUnitId,
+    outputUnitOverride: input.outputUnitOverride,
+    position: input.position ?? null,
+    isFocal: input.isFocal ?? false,
+    description: input.description ?? null,
+  };
+  return touch(
+    {
+      ...model,
+      nodes: { ...model.nodes, [id]: node },
+      nodeOrder: [...model.nodeOrder, id],
+    },
+    now,
+  );
+}
+
+/** distributive union patch — ValueNode 필드와 FunctionNode 필드를 동시에 받을 수 있게. */
+export type NodePatch = Node extends infer N
+  ? N extends Node
+    ? Partial<Omit<N, 'id' | 'kind'>>
+    : never
+  : never;
+
 export function updateNode(
   model: Model,
   id: NodeId,
-  patch: Partial<Omit<Node, 'id'>>,
+  patch: NodePatch,
   now?: number,
 ): Model {
   const existing = model.nodes[id];
   if (!existing) return model;
-  const next: Node = { ...existing, ...patch, id };
+  const next = { ...existing, ...patch, id, kind: existing.kind } as Node;
   return touch(
     {
       ...model,
@@ -99,6 +154,7 @@ export interface AddEdgeInput {
   shape: Edge['shape'];
   inverted?: boolean;
   lag?: Edge['lag'];
+  slotIndex?: number;
   description?: string | null;
   id?: EdgeId;
 }
@@ -112,6 +168,7 @@ export function addEdge(model: Model, input: AddEdgeInput, now?: number): Model 
     shape: input.shape,
     inverted: input.inverted ?? false,
     lag: input.lag ?? 0,
+    slotIndex: input.slotIndex,
     description: input.description ?? null,
   };
   return touch(
@@ -170,4 +227,23 @@ export function hasFeedbackEdges(model: Model): boolean {
     if (e && e.lag === 1) return true;
   }
   return false;
+}
+
+/**
+ * FunctionNode의 채워진 슬롯 집합을 반환. UI/검증용.
+ */
+export function getFunctionSlotOccupancy(
+  model: Model,
+  nodeId: NodeId,
+): { slotIndex: number; edgeId: EdgeId }[] {
+  const node = model.nodes[nodeId];
+  if (!node || !isFunctionNode(node)) return [];
+  const occupied: { slotIndex: number; edgeId: EdgeId }[] = [];
+  for (const eid of model.edgeOrder) {
+    const e = model.edges[eid];
+    if (!e || e.to !== nodeId) continue;
+    if (typeof e.slotIndex !== 'number') continue;
+    occupied.push({ slotIndex: e.slotIndex, edgeId: eid });
+  }
+  return occupied.sort((a, b) => a.slotIndex - b.slotIndex);
 }

@@ -1,11 +1,11 @@
 import { useCallback } from 'react';
-import type { Node } from '@trama/core';
+import type { ValueNode } from '@trama/core';
 import { useModelStore } from '../store/index.js';
 import { formatNodeValue } from '../util/format.js';
 import { resolveNodeUnit } from '../util/unit-resolver.js';
 
 interface Props {
-  node: Node;
+  node: ValueNode;
   halfW: number;
   halfH: number;
 }

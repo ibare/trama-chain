@@ -1,5 +1,12 @@
-import type { Edge, Model, Node } from '../model/index.js';
-import type { TramaDocument, TramaEdge, TramaNode } from './document.js';
+import type { Edge, FunctionNode, Model, Node, ValueNode } from '../model/index.js';
+import { isValueNode } from '../model/index.js';
+import type {
+  TramaDocument,
+  TramaEdge,
+  TramaFunctionNode,
+  TramaNode,
+  TramaValueNode,
+} from './document.js';
 
 export function modelToDocument(model: Model): TramaDocument {
   return {
@@ -24,36 +31,9 @@ export function modelToDocument(model: Model): TramaDocument {
 }
 
 function nodeToDoc(n: Node): TramaNode {
-  return {
-    id: n.id,
-    label: n.label,
-    unitId: n.unitId,
-    unitOverride: n.unitOverride,
-    initialValue: n.initialValue,
-    position: n.position,
-    combiner: n.combiner,
-    isFocal: n.isFocal,
-    description: n.description ?? null,
-  };
-}
-
-function edgeToDoc(e: Edge): TramaEdge {
-  return {
-    id: e.id,
-    from: e.from,
-    to: e.to,
-    shape: e.shape,
-    inverted: e.inverted,
-    lag: e.lag,
-    description: e.description ?? null,
-  };
-}
-
-export function documentToModel(doc: TramaDocument): Model {
-  const nodes: Record<string, Node> = {};
-  const nodeOrder: string[] = [];
-  for (const n of doc.nodes) {
-    nodes[n.id] = {
+  if (isValueNode(n)) {
+    const doc: TramaValueNode = {
+      kind: 'value',
       id: n.id,
       label: n.label,
       unitId: n.unitId,
@@ -64,6 +44,67 @@ export function documentToModel(doc: TramaDocument): Model {
       isFocal: n.isFocal,
       description: n.description ?? null,
     };
+    return doc;
+  }
+  const doc: TramaFunctionNode = {
+    kind: 'function',
+    id: n.id,
+    label: n.label,
+    functionKey: n.functionKey,
+    outputUnitId: n.outputUnitId,
+    outputUnitOverride: n.outputUnitOverride,
+    position: n.position,
+    isFocal: n.isFocal,
+    description: n.description ?? null,
+  };
+  return doc;
+}
+
+function edgeToDoc(e: Edge): TramaEdge {
+  return {
+    id: e.id,
+    from: e.from,
+    to: e.to,
+    shape: e.shape,
+    inverted: e.inverted,
+    lag: e.lag,
+    slotIndex: e.slotIndex,
+    description: e.description ?? null,
+  };
+}
+
+export function documentToModel(doc: TramaDocument): Model {
+  const nodes: Record<string, Node> = {};
+  const nodeOrder: string[] = [];
+  for (const n of doc.nodes) {
+    if (n.kind === 'value') {
+      const node: ValueNode = {
+        kind: 'value',
+        id: n.id,
+        label: n.label,
+        unitId: n.unitId,
+        unitOverride: n.unitOverride,
+        initialValue: n.initialValue,
+        position: n.position,
+        combiner: n.combiner,
+        isFocal: n.isFocal,
+        description: n.description ?? null,
+      };
+      nodes[n.id] = node;
+    } else {
+      const node: FunctionNode = {
+        kind: 'function',
+        id: n.id,
+        label: n.label,
+        functionKey: n.functionKey,
+        outputUnitId: n.outputUnitId,
+        outputUnitOverride: n.outputUnitOverride,
+        position: n.position,
+        isFocal: n.isFocal,
+        description: n.description ?? null,
+      };
+      nodes[n.id] = node;
+    }
     nodeOrder.push(n.id);
   }
   const edges: Record<string, Edge> = {};
@@ -76,6 +117,7 @@ export function documentToModel(doc: TramaDocument): Model {
       shape: { kind: e.shape.kind, params: e.shape.params },
       inverted: e.inverted,
       lag: e.lag,
+      slotIndex: e.slotIndex,
       description: e.description ?? null,
     };
     edgeOrder.push(e.id);

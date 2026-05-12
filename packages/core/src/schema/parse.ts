@@ -56,6 +56,7 @@ function validateAgainstRegistry(doc: TramaDocument, options: ParseOptions): voi
   const { shapeRegistry, combinerRegistry } = options;
   if (combinerRegistry) {
     for (const n of doc.nodes) {
+      if (n.kind !== 'value') continue;
       if (!combinerRegistry.has(n.combiner)) {
         throw new TramaParseError(
           `node ${n.id}: combiner "${n.combiner}" not registered`,

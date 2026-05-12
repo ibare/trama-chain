@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import {
   addEdge,
-  addNode,
+  addValueNode,
   createEmptyModel,
   setExecution,
   setQuestion,
@@ -25,7 +25,7 @@ function buildModel() {
   let m = createEmptyModel(1731234567890);
   m = { ...m, id: 'mdl-test', createdAt: 1731234567890, updatedAt: 1731234567890 };
   m = setQuestion(m, '왜 내 체중이 늘지?', 1731234567890);
-  m = addNode(m, {
+  m = addValueNode(m, {
     id: 'n-weight',
     label: '체중',
     unitId: 'kg',
@@ -35,7 +35,7 @@ function buildModel() {
     combiner: 'sum',
     isFocal: true,
   });
-  m = addNode(m, {
+  m = addValueNode(m, {
     id: 'n-intake',
     label: '섭취량',
     unitId: 'count',
@@ -73,9 +73,9 @@ describe('serialize / parse round-trip', () => {
     // 최상위 첫 키는 'trama', 마지막은 'edges'
     const firstKeyMatch = /^{\s*"([^"]+)":/.exec(json);
     expect(firstKeyMatch?.[1]).toBe('trama');
-    // 노드 첫 키는 'id'
+    // 노드 첫 키는 'kind' (discriminator 우선)
     const nodeKeyMatch = /"nodes":\s*\[\s*\{\s*"([^"]+)":/.exec(json);
-    expect(nodeKeyMatch?.[1]).toBe('id');
+    expect(nodeKeyMatch?.[1]).toBe('kind');
   });
 
   it('rejects malformed JSON', () => {
@@ -109,7 +109,8 @@ describe('serialize / parse round-trip', () => {
 
   it('rejects unregistered combiner with registry', () => {
     const doc = modelToDocument(buildModel());
-    doc.nodes[0]!.combiner = 'nope';
+    const n0 = doc.nodes[0]!;
+    if (n0.kind === 'value') n0.combiner = 'nope';
     expect(() =>
       parseTrama(serializeTrama(doc), { combinerRegistry: combiners }),
     ).toThrow(/combiner.*not registered/);
@@ -167,7 +168,7 @@ describe('serialize / parse round-trip', () => {
     m = { ...m, id: 'mdl-slot', createdAt: 1731234567890, updatedAt: 1731234567890 };
     m = setQuestion(m, '천만원으로 슬롯머신 200번 돌리면 얼마 남을까?', 1731234567890);
     m = setExecution(m, { steps: 200, stepUnit: '회' });
-    m = addNode(m, {
+    m = addValueNode(m, {
       id: 'n-balance',
       label: '잔액',
       unitId: 'krw',
@@ -177,7 +178,7 @@ describe('serialize / parse round-trip', () => {
       combiner: 'sum',
       isFocal: true,
     });
-    m = addNode(m, {
+    m = addValueNode(m, {
       id: 'n-outcome',
       label: '회당 결과',
       unitId: 'krw',

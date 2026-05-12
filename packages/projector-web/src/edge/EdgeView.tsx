@@ -1,6 +1,6 @@
 import { memo, useEffect, useMemo, useRef, useState } from 'react';
 import { tokens } from '@trama/tokens';
-import { normalize, type EdgeId } from '@trama/core';
+import { isValueNode, normalize, type EdgeId } from '@trama/core';
 import { useModelStore, useUIStore } from '../store/index.js';
 import { getNodeLayout } from '../node/box.js';
 import { resolveNodeUnit } from '../util/unit-resolver.js';
@@ -42,7 +42,8 @@ function EdgeViewImpl({
   const srcValue = useModelStore((s) => {
     if (!fromId) return 0;
     const n = s.model.nodes[fromId];
-    return s.executionState.values[fromId] ?? n?.initialValue ?? 0;
+    const fallback = n && isValueNode(n) ? n.initialValue : 0;
+    return s.executionState.values[fromId] ?? fallback;
   });
 
   const openFunctionPicker = useUIStore((s) => s.openFunctionPicker);
@@ -123,7 +124,8 @@ function EdgeViewImpl({
 
   if (!edge || !fromNode || !toNode) return null;
 
-  const norm = normalize(srcValue, resolveNodeUnit(fromNode));
+  // FunctionNode source는 단위 정규화 의미가 없음 — strained 시각화는 0으로 처리.
+  const norm = isValueNode(fromNode) ? normalize(srcValue, resolveNodeUnit(fromNode)) : 0.5;
   const isFeedback = edge.lag === 1;
   const isStrained = norm < STRAINED_LOW || norm > STRAINED_HIGH;
   const baseClasses = ['trama-edge'];

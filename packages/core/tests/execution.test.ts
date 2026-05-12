@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import {
   addEdge,
-  addNode,
+  addValueNode,
   createEmptyModel,
   setExecution,
   type Model,
@@ -22,7 +22,7 @@ const combiners = createDefaultCombinerRegistry();
 
 /**
  * 테스트용 ad-hoc number 단위 — number kind 베이스 카탈로그('count') 위에
- * min/max/suffix를 override로 얹는다. spread해서 addNode에 풀어 넣는다.
+ * min/max/suffix를 override로 얹는다. spread해서 addValueNode에 풀어 넣는다.
  */
 function numberUnit(min: number, max: number, suffix = '') {
   return {
@@ -34,9 +34,9 @@ function numberUnit(min: number, max: number, suffix = '') {
 describe('topology', () => {
   it('orders simple chain', () => {
     let m = createEmptyModel();
-    m = addNode(m, { id: 'a', label: 'A', ...numberUnit(0, 10), initialValue: 0 });
-    m = addNode(m, { id: 'b', label: 'B', ...numberUnit(0, 10), initialValue: 0 });
-    m = addNode(m, { id: 'c', label: 'C', ...numberUnit(0, 10), initialValue: 0 });
+    m = addValueNode(m, { id: 'a', label: 'A', ...numberUnit(0, 10), initialValue: 0 });
+    m = addValueNode(m, { id: 'b', label: 'B', ...numberUnit(0, 10), initialValue: 0 });
+    m = addValueNode(m, { id: 'c', label: 'C', ...numberUnit(0, 10), initialValue: 0 });
     m = addEdge(m, { from: 'a', to: 'b', shape: { kind: 'linear', params: { slope: 1, offset: 0 } } });
     m = addEdge(m, { from: 'b', to: 'c', shape: { kind: 'linear', params: { slope: 1, offset: 0 } } });
     const t = buildTopology(m);
@@ -45,8 +45,8 @@ describe('topology', () => {
 
   it('throws on instantaneous cycle', () => {
     let m = createEmptyModel();
-    m = addNode(m, { id: 'a', label: 'A', ...numberUnit(0, 10), initialValue: 0 });
-    m = addNode(m, { id: 'b', label: 'B', ...numberUnit(0, 10), initialValue: 0 });
+    m = addValueNode(m, { id: 'a', label: 'A', ...numberUnit(0, 10), initialValue: 0 });
+    m = addValueNode(m, { id: 'b', label: 'B', ...numberUnit(0, 10), initialValue: 0 });
     m = addEdge(m, { from: 'a', to: 'b', shape: { kind: 'linear', params: { slope: 1, offset: 0 } } });
     m = addEdge(m, { from: 'b', to: 'a', shape: { kind: 'linear', params: { slope: 1, offset: 0 } } });
     expect(() => buildTopology(m)).toThrow(InstantaneousCycleError);
@@ -54,8 +54,8 @@ describe('topology', () => {
 
   it('allows feedback (lag=1) cycle without error', () => {
     let m = createEmptyModel();
-    m = addNode(m, { id: 'a', label: 'A', ...numberUnit(0, 10), initialValue: 0 });
-    m = addNode(m, { id: 'b', label: 'B', ...numberUnit(0, 10), initialValue: 0 });
+    m = addValueNode(m, { id: 'a', label: 'A', ...numberUnit(0, 10), initialValue: 0 });
+    m = addValueNode(m, { id: 'b', label: 'B', ...numberUnit(0, 10), initialValue: 0 });
     m = addEdge(m, { from: 'a', to: 'b', shape: { kind: 'linear', params: { slope: 1, offset: 0 } } });
     m = addEdge(m, {
       from: 'b',
@@ -70,8 +70,8 @@ describe('topology', () => {
 describe('propagateOneStep', () => {
   it('linear chain propagates', () => {
     let m = createEmptyModel();
-    m = addNode(m, { id: 'a', label: 'A', ...numberUnit(0, 100), initialValue: 50 });
-    m = addNode(m, { id: 'b', label: 'B', ...numberUnit(0, 100), initialValue: 0 });
+    m = addValueNode(m, { id: 'a', label: 'A', ...numberUnit(0, 100), initialValue: 50 });
+    m = addValueNode(m, { id: 'b', label: 'B', ...numberUnit(0, 100), initialValue: 0 });
     m = addEdge(m, {
       from: 'a',
       to: 'b',
@@ -87,9 +87,9 @@ describe('propagateOneStep', () => {
 
   it('sum combiner combines multiple inputs', () => {
     let m = createEmptyModel();
-    m = addNode(m, { id: 'a', label: 'A', ...numberUnit(0, 10), initialValue: 5 });
-    m = addNode(m, { id: 'b', label: 'B', ...numberUnit(0, 10), initialValue: 3 });
-    m = addNode(m, {
+    m = addValueNode(m, { id: 'a', label: 'A', ...numberUnit(0, 10), initialValue: 5 });
+    m = addValueNode(m, { id: 'b', label: 'B', ...numberUnit(0, 10), initialValue: 3 });
+    m = addValueNode(m, {
       id: 'c',
       label: 'C',
       ...numberUnit(0, 20),
@@ -110,8 +110,8 @@ describe('propagateOneStep', () => {
 
   it('inverted edge flips output', () => {
     let m = createEmptyModel();
-    m = addNode(m, { id: 'a', label: 'A', ...numberUnit(0, 10), initialValue: 8 });
-    m = addNode(m, { id: 'b', label: 'B', ...numberUnit(0, 10), initialValue: 0 });
+    m = addValueNode(m, { id: 'a', label: 'A', ...numberUnit(0, 10), initialValue: 8 });
+    m = addValueNode(m, { id: 'b', label: 'B', ...numberUnit(0, 10), initialValue: 0 });
     m = addEdge(m, {
       from: 'a',
       to: 'b',
@@ -130,14 +130,14 @@ describe('propagateOneStep', () => {
 describe('executeModel (N-step)', () => {
   it('deterministic compound growth via feedback', () => {
     let m = createEmptyModel();
-    m = addNode(m, {
+    m = addValueNode(m, {
       id: 'balance',
       label: '잔액',
       ...numberUnit(0, 10000),
       initialValue: 1000,
       combiner: 'sum',
     });
-    m = addNode(m, {
+    m = addValueNode(m, {
       id: 'interest',
       label: '이자',
       ...numberUnit(0, 1000),
@@ -196,20 +196,20 @@ describe('executeModel (N-step)', () => {
 
 function stochasticSlotModel(): Model {
   let m = createEmptyModel();
-  m = addNode(m, {
+  m = addValueNode(m, {
     id: 'balance',
     label: '잔액',
     ...numberUnit(0, 30000000, 'krw'),
     initialValue: 10000000,
     combiner: 'sum',
   });
-  m = addNode(m, {
+  m = addValueNode(m, {
     id: 'bet',
     label: '회당 베팅',
     ...numberUnit(10000, 1000000, 'krw'),
     initialValue: 50000,
   });
-  m = addNode(m, {
+  m = addValueNode(m, {
     id: 'outcome',
     label: '회당 결과',
     ...numberUnit(-1000000, 5000000, 'krw'),
