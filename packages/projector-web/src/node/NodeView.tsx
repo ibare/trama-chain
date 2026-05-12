@@ -7,6 +7,7 @@ import { formatNodeValue } from '../util/format.js';
 import { resolveNodeUnit } from '../util/unit-resolver.js';
 import { getNodeLayout, type PinLayout } from './box.js';
 import { NodeMicroSlider } from './NodeMicroSlider.js';
+import { FunctionNodeView } from './FunctionNodeView.js';
 import {
   getIncidentEdgeHandles,
   registerNodeEl,
@@ -16,6 +17,17 @@ import {
 interface Props {
   id: NodeId;
   incomingCount: number;
+}
+
+/**
+ * 노드 dispatcher — kind에 따라 ValueNodeView 또는 FunctionNodeView로 분기.
+ * Canvas는 이 컴포넌트만 import하여 균일하게 렌더링.
+ */
+function NodeViewDispatchImpl({ id, incomingCount }: Props): JSX.Element | null {
+  const kind = useModelStore((s) => s.model.nodes[id]?.kind);
+  if (!kind) return null;
+  if (kind === 'function') return <FunctionNodeView id={id} />;
+  return <ValueNodeViewImpl id={id} incomingCount={incomingCount} />;
 }
 
 const THRESH_LOW = tokens.physical.thresholdNodeLow;
@@ -48,7 +60,7 @@ function combinerSymbol(key: string): string {
   }
 }
 
-function NodeViewImpl({ id, incomingCount }: Props): JSX.Element | null {
+function ValueNodeViewImpl({ id, incomingCount }: Props): JSX.Element | null {
   // 좁은 셀렉터로 자기 노드만 구독. 다른 노드 변경에는 리렌더되지 않는다.
   const node = useModelStore((s) => s.model.nodes[id]);
   const currentValue = useModelStore((s) => {
@@ -253,7 +265,6 @@ function NodeViewImpl({ id, incomingCount }: Props): JSX.Element | null {
   }, [id, nameDraft, node, setEditingNode, updateNode]);
 
   if (!node) return null;
-  // FunctionNode 렌더링은 Phase 5에서 별도 컴포넌트로 분리한다. 여기서는 ValueNode만.
   if (!isValueNode(node)) return null;
 
   const layout = getNodeLayout(node, { incomingCount });
@@ -410,9 +421,10 @@ function NodeViewImpl({ id, incomingCount }: Props): JSX.Element | null {
 
 /**
  * id·incomingCount만 props로 받으므로 Canvas 리렌더가 자식까지 전파되지 않는다.
- * 내부에서는 자기 노드만 좁게 구독한다.
+ * 내부에서는 자기 노드만 좁게 구독한다. NodeView는 dispatcher로, kind에 따라
+ * ValueNodeView·FunctionNodeView로 분기.
  */
-export const NodeView = memo(NodeViewImpl);
+export const NodeView = memo(NodeViewDispatchImpl);
 
 function PinShape({ pin, stateClass }: { pin: PinLayout; stateClass: string }): JSX.Element {
   return (
