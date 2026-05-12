@@ -36,7 +36,7 @@ export const DEFAULT_CABLE_CONFIG: CableConfig = {
   gravity: 0.55,
   iterations: 5,
   segments: 24,
-  slack: 1.04,
+  slack: 0.64,
 };
 
 /** 모듈 전역 on/off 플래그 — 회귀 시 false로 두면 기존 베지어 경로로 폴백. */
