@@ -32,6 +32,13 @@ export interface UnitInspectorState {
   nodeId: NodeId;
 }
 
+export interface CanvasContextMenuState {
+  /** 화면 좌표 — 메뉴 div 배치용 */
+  screen: { x: number; y: number };
+  /** 캔버스(SVG) 좌표 — 새로 만드는 노드의 position에 쓰임 */
+  canvas: { x: number; y: number };
+}
+
 export interface RunFlashState {
   step: number;
   total: number;
@@ -47,6 +54,8 @@ export interface UIStore {
   functionPicker: FunctionPickerState | null;
   /** 단위 인스펙터 열림 상태 (선택된 노드의 단위·범위 편집) */
   unitInspector: UnitInspectorState | null;
+  /** 캔버스 우클릭 컨텍스트 메뉴 */
+  canvasContextMenu: CanvasContextMenuState | null;
   /** 인라인 이름 편집 중인 노드 */
   editingNodeId: NodeId | null;
   /** N-step 실행 시 현재 시각화 단계 (애니메이션용) */
@@ -74,6 +83,12 @@ export interface UIStore {
   openUnitInspector: (nodeId: NodeId) => void;
   closeUnitInspector: () => void;
 
+  openCanvasContextMenu: (
+    screen: { x: number; y: number },
+    canvas: { x: number; y: number },
+  ) => void;
+  closeCanvasContextMenu: () => void;
+
   setEditingNode: (id: NodeId | null) => void;
   setRunFlash: (s: RunFlashState | null) => void;
 }
@@ -84,6 +99,7 @@ export const useUIStore = create<UIStore>((set) => ({
   insertNodeIntent: null,
   functionPicker: null,
   unitInspector: null,
+  canvasContextMenu: null,
   editingNodeId: null,
   runFlash: null,
 
@@ -108,6 +124,10 @@ export const useUIStore = create<UIStore>((set) => ({
 
   openUnitInspector: (nodeId) => set({ unitInspector: { nodeId } }),
   closeUnitInspector: () => set({ unitInspector: null }),
+
+  openCanvasContextMenu: (screen, canvas) =>
+    set({ canvasContextMenu: { screen, canvas } }),
+  closeCanvasContextMenu: () => set({ canvasContextMenu: null }),
 
   setEditingNode: (id) => set({ editingNodeId: id }),
   setRunFlash: (s) => set({ runFlash: s }),

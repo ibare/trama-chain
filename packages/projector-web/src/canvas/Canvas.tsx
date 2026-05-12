@@ -5,6 +5,7 @@ import { EdgeView } from '../edge/EdgeView.js';
 import { NodeView } from '../node/NodeView.js';
 import { UnitInspectorLayer } from '../node/UnitInspectorLayer.js';
 import { EdgeDraftView } from './EdgeDraftView.js';
+import { CanvasContextMenu } from './CanvasContextMenu.js';
 
 export function Canvas(): JSX.Element {
   // 좁은 셀렉터 — Canvas 자체는 topology(노드·엣지 목록) 변경에만 리렌더된다.
@@ -20,6 +21,8 @@ export function Canvas(): JSX.Element {
   const clearSelection = useUIStore((s) => s.clearSelection);
   const closeFunctionPicker = useUIStore((s) => s.closeFunctionPicker);
   const clearInsertIntent = useUIStore((s) => s.clearInsertNodeIntent);
+  const openCanvasContextMenu = useUIStore((s) => s.openCanvasContextMenu);
+  const closeCanvasContextMenu = useUIStore((s) => s.closeCanvasContextMenu);
   const edgeDraft = useUIStore((s) => s.edgeDraft);
   const updateEdgeDraft = useUIStore((s) => s.updateEdgeDraft);
   const endEdgeDraft = useUIStore((s) => s.endEdgeDraft);
@@ -77,9 +80,23 @@ export function Canvas(): JSX.Element {
         clearSelection();
         closeFunctionPicker();
         clearInsertIntent();
+        closeCanvasContextMenu();
       }
     },
-    [clearSelection, closeFunctionPicker, clearInsertIntent],
+    [clearSelection, closeFunctionPicker, clearInsertIntent, closeCanvasContextMenu],
+  );
+
+  const onCanvasContextMenu = useCallback(
+    (e: React.MouseEvent<SVGSVGElement>) => {
+      // 빈 영역에서만 컨텍스트 메뉴를 띄운다 — 노드·엣지 위 우클릭은 기본 동작
+      // 또는 추후 각자의 메뉴로 위임.
+      const target = e.target as Element;
+      if (target !== e.currentTarget && !target.classList?.contains?.('trama-canvas-bg')) return;
+      e.preventDefault();
+      const canvasPos = toCanvasCoords(e.clientX, e.clientY);
+      openCanvasContextMenu({ x: e.clientX, y: e.clientY }, canvasPos);
+    },
+    [openCanvasContextMenu, toCanvasCoords],
   );
 
   const onCanvasDoubleClick = useCallback(
@@ -149,11 +166,13 @@ export function Canvas(): JSX.Element {
   }, [redo, removeEdge, removeNode, selection, undo]);
 
   return (
+    <>
     <svg
       ref={svgRef}
       className="trama-canvas"
       onPointerDown={onCanvasPointerDown}
       onDoubleClick={onCanvasDoubleClick}
+      onContextMenu={onCanvasContextMenu}
       onPointerMove={onPointerMove}
       onPointerUp={onPointerUp}
     >
@@ -184,5 +203,7 @@ export function Canvas(): JSX.Element {
         <UnitInspectorLayer nodeId={unitInspectorNodeId} bounds={svgSize} />
       )}
     </svg>
+    <CanvasContextMenu />
+    </>
   );
 }
