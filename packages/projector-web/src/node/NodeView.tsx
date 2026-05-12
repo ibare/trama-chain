@@ -71,6 +71,17 @@ function NodeViewImpl({ id, incomingCount }: Props): JSX.Element | null {
   const unitInspectorNodeId = useUIStore((s) => s.unitInspector?.nodeId ?? null);
   const openUnitInspector = useUIStore((s) => s.openUnitInspector);
 
+  // lag=0 인입 엣지가 하나라도 있으면 매 step마다 propagation이 값을 덮어쓰므로
+  // initialValue 슬라이더는 사용자에게 거짓 affordance가 된다. (입력 노드 혹은
+  // 인입이 lag=1 feedback 뿐인 노드에서만 슬라이더가 실제 의미를 가진다.)
+  const hasLag0Incoming = useModelStore((s) => {
+    for (const eid of s.model.edgeOrder) {
+      const e = s.model.edges[eid];
+      if (e && e.to === id && e.lag === 0) return true;
+    }
+    return false;
+  });
+
   // 노드 <g> 엘리먼트 ref — 드래그 중 imperative하게 transform을 갱신하고,
   // 외부(EdgeView 핸들 호출자)에서도 이 노드 DOM에 접근할 수 있게 레지스트리에 등록.
   const outerGRef = useRef<SVGGElement | null>(null);
@@ -389,7 +400,7 @@ function NodeViewImpl({ id, incomingCount }: Props): JSX.Element | null {
           </>
         )}
       </g>
-      {isSelected && editingNodeId !== id && (
+      {isSelected && editingNodeId !== id && !hasLag0Incoming && (
         <NodeMicroSlider node={node} halfH={halfH} halfW={halfW} />
       )}
       {unitInspectorNodeId === id && (
