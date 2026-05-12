@@ -1,0 +1,264 @@
+import type { CombinerRegistry } from '../combiners/index.js';
+import type { ShapeRegistry } from '../functions/index.js';
+import type { Rng } from '../functions/types.js';
+import type { Edge, Model, Node, NodeId } from '../model/index.js';
+import { isValueNode } from '../model/index.js';
+import type { FunctionRegistry } from '../node-functions/index.js';
+import {
+  clamp01,
+  clampToUnit,
+  denormalize,
+  normalize,
+  resolveUnit,
+  type ResolvedUnit,
+  type UnitCatalog,
+} from '../units/index.js';
+import {
+  MissingCombinerError,
+  MissingFunctionError,
+  MissingShapeError,
+} from './errors.js';
+
+/**
+ * 단위가 명시되지 않은 노드(예: outputUnitId 없는 FunctionNode)의 폴백.
+ * 값은 raw로 흐르고, 시각화 단계에서 자동 단위 추론이 동작한다.
+ */
+export const FREE_FALLBACK: ResolvedUnit = {
+  id: 'free',
+  kind: 'free',
+  suffix: '',
+  labels: [],
+  min: 0,
+  max: 1,
+  step: 0.01,
+};
+
+/**
+ * 한 노드의 lag=0 전파 단계에서 디스크립터가 사용하는 컨텍스트.
+ * next/validNodes는 의도적으로 가변(mutate) — 한 step 내에서 디스크립터가
+ * 직접 갱신해 다음 노드로 흘러간다.
+ */
+export interface PropagateContext {
+  model: Model;
+  incoming: ReadonlyArray<Edge>;
+  next: Record<NodeId, number>;
+  validNodes: Set<NodeId>;
+  catalog: UnitCatalog;
+  shapeRegistry: ShapeRegistry;
+  combinerRegistry: CombinerRegistry;
+  functionRegistry: FunctionRegistry;
+  nodeKindRegistry: NodeKindRegistry;
+  rng: Rng;
+}
+
+/**
+ * 노드 종류별 동작을 한 곳에 모은 디스크립터.
+ * 새 노드 종류 추가 시 디스크립터를 작성·등록하면 전파·초기화·피드백·단위
+ * 해석이 모두 라우팅된다.
+ */
+export interface NodeKindDescriptor<N extends Node = Node> {
+  kind: N['kind'];
+  /** 초기 state.values에 기록할 값. undefined면 미기록(propagate 단계에서 채움). */
+  initialValue(node: N): number | undefined;
+  /** 초기 validNodes 포함 여부 — 출력 핀이 노출되고 하류가 이 값을 쓸 수 있는지. */
+  initialValid(node: N): boolean;
+  /** 이 노드의 출력 단위. raw 통과(outputsRaw=true)여도 시각화·클램프 폴백용으로 의미가 있다. */
+  outputUnit(node: N, catalog: UnitCatalog): ResolvedUnit;
+  /**
+   * 이 노드를 source로 두는 엣지가 raw passthrough인지.
+   * true면 ValueNode 타깃의 normalize/shape/denormalize 파이프라인이 우회되고
+   * 타깃의 단위 클램프도 건너뛴다 (예: 함수 결과 1760이 cm[0..250]에 짓이겨지지 않게).
+   */
+  outputsRaw: boolean;
+  /** lag=1 feedback 엣지의 target이 될 수 있는지. */
+  canBeFeedbackTarget: boolean;
+  /**
+   * lag=0 전파. incoming을 보고 next[node.id]를 갱신·validNodes를 조정.
+   * incoming이 비어 있고 디스크립터가 외부 입력이 없는 종류면 기존 값을 유지하는 것이 일반적.
+   */
+  propagate(node: N, ctx: PropagateContext): void;
+}
+
+class NodeKindRegistryImpl {
+  private readonly map = new Map<string, NodeKindDescriptor<Node>>();
+
+  register<N extends Node>(desc: NodeKindDescriptor<N>): this {
+    this.map.set(desc.kind, desc as unknown as NodeKindDescriptor<Node>);
+    return this;
+  }
+
+  get(kind: Node['kind']): NodeKindDescriptor<Node> | undefined {
+    return this.map.get(kind);
+  }
+
+  forNode(node: Node): NodeKindDescriptor<Node> | undefined {
+    return this.map.get(node.kind);
+  }
+
+  kinds(): string[] {
+    return Array.from(this.map.keys());
+  }
+}
+
+export type NodeKindRegistry = NodeKindRegistryImpl;
+
+export function createNodeKindRegistry(): NodeKindRegistry {
+  return new NodeKindRegistryImpl();
+}
+
+// ---------------------------------------------------------------------------
+// Built-in descriptors
+// ---------------------------------------------------------------------------
+
+const valueNodeDescriptor: NodeKindDescriptor<Extract<Node, { kind: 'value' }>> = {
+  kind: 'value',
+  outputsRaw: false,
+  canBeFeedbackTarget: true,
+  initialValue: (node) => node.initialValue,
+  initialValid: () => true,
+  outputUnit: (node, catalog) => {
+    const def = catalog.get(node.unitId);
+    if (!def) return FREE_FALLBACK;
+    return resolveUnit(def, node.unitOverride);
+  },
+  propagate: (node, ctx) => {
+    const incoming = ctx.incoming;
+    if (incoming.length === 0) return; // 입력 없음: 기존 값 유지
+
+    const combiner = ctx.combinerRegistry.get(node.combiner);
+    if (!combiner) throw new MissingCombinerError(node.combiner);
+
+    const targetUnit = ctx.nodeKindRegistry.forNode(node)?.outputUnit(node, ctx.catalog) ?? FREE_FALLBACK;
+
+    // raw passthrough 소스(예: FunctionNode·ConstantNode)는 정규화·셰이프·역정규화·
+    // 타깃 단위 클램프를 모두 건너뛴다. 의미적으로 단위가 정의되지 않은 raw 수치이므로
+    // 타깃 단위 범위에 짓이겨지면 안 된다.
+    let hasRawSource = false;
+    const contributions: number[] = [];
+    for (const edge of incoming) {
+      const source = ctx.model.nodes[edge.from];
+      if (!source) continue;
+      if (!ctx.validNodes.has(edge.from)) continue;
+      const sourceValue =
+        ctx.next[edge.from] ?? (isValueNode(source) ? source.initialValue : 0);
+      const sourceDesc = ctx.nodeKindRegistry.forNode(source);
+      if (sourceDesc?.outputsRaw) {
+        hasRawSource = true;
+        contributions.push(sourceValue);
+        continue;
+      }
+      const sourceUnit = sourceDesc?.outputUnit(source, ctx.catalog) ?? FREE_FALLBACK;
+      const normalizedIn = normalize(sourceValue, sourceUnit);
+      const shape = ctx.shapeRegistry.get(edge.shape.kind);
+      if (!shape) throw new MissingShapeError(edge.shape.kind);
+      const parsed = shape.paramsSchema.safeParse(edge.shape.params);
+      const params = parsed.success ? parsed.data : shape.defaultParams;
+      let out01 = shape.compute(normalizedIn, params, { rng: ctx.rng });
+      if (edge.inverted) out01 = clamp01(1 - out01);
+      contributions.push(denormalize(out01, targetUnit));
+    }
+
+    if (contributions.length === 0) return; // 모든 source 무효: 값 유지
+    const combined = combiner.combine(contributions);
+    ctx.next[node.id] = hasRawSource ? combined : clampToUnit(combined, targetUnit);
+    ctx.validNodes.add(node.id);
+  },
+};
+
+const functionNodeDescriptor: NodeKindDescriptor<Extract<Node, { kind: 'function' }>> = {
+  kind: 'function',
+  outputsRaw: true,
+  canBeFeedbackTarget: false,
+  initialValue: () => undefined,
+  initialValid: () => false,
+  outputUnit: (node, catalog) => {
+    if (!node.outputUnitId) return FREE_FALLBACK;
+    const def = catalog.get(node.outputUnitId);
+    if (!def) return FREE_FALLBACK;
+    return resolveUnit(def, node.outputUnitOverride);
+  },
+  propagate: (node, ctx) => {
+    const def = ctx.functionRegistry.get(node.functionKey);
+    if (!def) throw new MissingFunctionError(node.functionKey);
+
+    const arity = def.slots.length;
+    const inputs: number[] = new Array(arity);
+    const filled = new Array<boolean>(arity).fill(false);
+
+    for (const edge of ctx.incoming) {
+      const slot = edge.slotIndex;
+      if (typeof slot !== 'number' || slot < 0 || slot >= arity) continue;
+      if (filled[slot]) continue;
+      const source = ctx.model.nodes[edge.from];
+      if (!source) continue;
+      if (!ctx.validNodes.has(edge.from)) continue;
+      const value =
+        ctx.next[edge.from] ?? (isValueNode(source) ? source.initialValue : 0);
+      inputs[slot] = value;
+      filled[slot] = true;
+    }
+
+    if (!filled.every((f) => f)) {
+      ctx.validNodes.delete(node.id);
+      return;
+    }
+
+    const out = def.compute(inputs);
+    if (!Number.isFinite(out)) {
+      ctx.validNodes.delete(node.id);
+      return;
+    }
+
+    // outputUnitId가 명시된 경우에만 그 단위로 클램프. 미지정이면 raw 그대로.
+    if (node.outputUnitId) {
+      const outUnit = functionNodeDescriptor.outputUnit(node, ctx.catalog);
+      ctx.next[node.id] = clampToUnit(out, outUnit);
+    } else {
+      ctx.next[node.id] = out;
+    }
+    ctx.validNodes.add(node.id);
+  },
+};
+
+export function createDefaultNodeKindRegistry(): NodeKindRegistry {
+  return createNodeKindRegistry()
+    .register(valueNodeDescriptor)
+    .register(functionNodeDescriptor);
+}
+
+/**
+ * 라이브러리 내부에서 등록 누락을 빠르게 잡기 위해 단일 기본 인스턴스를 제공.
+ * 옵션을 통해 명시 주입하지 않은 경로의 폴백.
+ */
+export const defaultNodeKindRegistry = createDefaultNodeKindRegistry();
+
+/**
+ * 디스크립터를 통해 출력 단위를 얻는다. 등록되지 않은 종류면 FREE_FALLBACK.
+ * propagate.ts와 외부(UI)에서 안전하게 쓰기 위한 헬퍼.
+ */
+export function getNodeOutputUnit(
+  node: Node,
+  catalog: UnitCatalog,
+  registry: NodeKindRegistry = defaultNodeKindRegistry,
+): ResolvedUnit {
+  const desc = registry.forNode(node);
+  if (!desc) return FREE_FALLBACK;
+  return desc.outputUnit(node, catalog);
+}
+
+/** 노드의 raw passthrough 여부. 미등록 종류는 false. */
+export function isRawOutputNode(
+  node: Node,
+  registry: NodeKindRegistry = defaultNodeKindRegistry,
+): boolean {
+  return registry.forNode(node)?.outputsRaw ?? false;
+}
+
+/** 노드가 피드백 target이 될 수 있는지. 미등록 종류는 false. */
+export function canBeFeedbackTarget(
+  node: Node,
+  registry: NodeKindRegistry = defaultNodeKindRegistry,
+): boolean {
+  return registry.forNode(node)?.canBeFeedbackTarget ?? false;
+}
+
