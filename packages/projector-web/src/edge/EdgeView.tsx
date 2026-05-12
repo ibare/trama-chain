@@ -4,7 +4,7 @@ import { isFunctionNode, isValueNode, normalize, type EdgeId, type Node } from '
 import { useModelStore, useUIStore } from '../store/index.js';
 import { functionRegistry } from '../store/registries.js';
 import { getNodeLayout } from '../node/box.js';
-import { getFunctionNodeLayout } from '../node/function-box.js';
+import { layoutForFunctionDef } from '../node/function-box.js';
 import { resolveNodeUnit } from '../util/unit-resolver.js';
 import { edgePath, type Point } from './geometry.js';
 import { registerEdgeHandle, type EdgeHandle } from '../canvas/drag-registry.js';
@@ -218,9 +218,9 @@ export const EdgeView = memo(EdgeViewImpl);
 function rightOutputSocket(node: Node, fromIncomingCount: number): Point {
   if (isFunctionNode(node)) {
     const def = functionRegistry.get(node.functionKey);
-    const arity = def?.slots.length ?? 1;
-    const layout = getFunctionNodeLayout(arity);
-    return layout.rightPin.sockets[0] ?? { x: 0, y: 0 };
+    if (!def) return { x: 0, y: 0 };
+    const layout = layoutForFunctionDef(def);
+    return { x: layout.outputSocket.x, y: layout.outputSocket.y };
   }
   const layout = getNodeLayout(node, { incomingCount: fromIncomingCount });
   return layout.rightPin.sockets[0] ?? { x: 0, y: 0 };
@@ -230,13 +230,11 @@ function rightOutputSocket(node: Node, fromIncomingCount: number): Point {
 function leftInputSocket(node: Node, toIncomingCount: number, socketIndex: number): Point {
   if (isFunctionNode(node)) {
     const def = functionRegistry.get(node.functionKey);
-    const arity = def?.slots.length ?? 1;
-    const layout = getFunctionNodeLayout(arity);
-    // FunctionNode의 slotIndex는 edge.slotIndex와 일치. 없으면 0.
+    if (!def) return { x: 0, y: 0 };
+    const layout = layoutForFunctionDef(def);
     const idx = Math.max(0, socketIndex);
-    return (
-      layout.leftPin.sockets[idx] ?? layout.leftPin.sockets[0] ?? { x: 0, y: 0 }
-    );
+    const s = layout.inputSockets[idx] ?? layout.inputSockets[0];
+    return s ? { x: s.x, y: s.y } : { x: 0, y: 0 };
   }
   const layout = getNodeLayout(node, { incomingCount: toIncomingCount });
   return (

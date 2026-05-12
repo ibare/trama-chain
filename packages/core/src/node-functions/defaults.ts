@@ -38,9 +38,18 @@ const subtract: FunctionDefinition = {
   key: 'subtract',
   labels: { ko: '뺄셈', en: 'Subtract' },
   symbol: '−',
+  // 비가환: 피감수=TL 코너, 감수=BL 코너. 위치 자체로 슬롯 의미를 전달.
   slots: [
-    { label: { ko: '피감수', en: 'minuend' }, constraint: { kind: 'number' } },
-    { label: { ko: '감수', en: 'subtrahend' }, constraint: { kind: 'sameAsSlot', ref: 0 } },
+    {
+      label: { ko: '피감수', en: 'minuend' },
+      constraint: { kind: 'number' },
+      anchor: { side: 'left', t: 0.18 },
+    },
+    {
+      label: { ko: '감수', en: 'subtrahend' },
+      constraint: { kind: 'sameAsSlot', ref: 0 },
+      anchor: { side: 'left', t: 0.82 },
+    },
   ],
   compute: ([a, b]) => (a ?? 0) - (b ?? 0),
   deriveOutputUnit: passthroughSlotUnit(0),
@@ -50,9 +59,18 @@ const divide: FunctionDefinition = {
   key: 'divide',
   labels: { ko: '나눗셈', en: 'Divide' },
   symbol: '÷',
+  // 비가환: 분자=TL 코너, 분모=BL 코너. 분수 표기와 자연스럽게 매핑.
   slots: [
-    { label: { ko: '분자', en: 'numerator' }, constraint: { kind: 'number' } },
-    { label: { ko: '분모', en: 'denominator' }, constraint: { kind: 'number' } },
+    {
+      label: { ko: '분자', en: 'numerator' },
+      constraint: { kind: 'number' },
+      anchor: { side: 'left', t: 0.18 },
+    },
+    {
+      label: { ko: '분모', en: 'denominator' },
+      constraint: { kind: 'number' },
+      anchor: { side: 'left', t: 0.82 },
+    },
   ],
   compute: ([a, b]) => {
     if (b === 0 || b === undefined) return Number.NaN;

@@ -9,7 +9,7 @@ import {
 } from '@trama/core';
 import { useModelStore, useUIStore } from '../store/index.js';
 import { functionRegistry } from '../store/registries.js';
-import { getFunctionNodeLayout, type FunctionPinLayout } from './function-box.js';
+import { layoutForFunctionDef, type FunctionPinLayout } from './function-box.js';
 import {
   getIncidentEdgeHandles,
   registerNodeEl,
@@ -207,7 +207,7 @@ function FunctionNodeViewImpl({ id }: Props): JSX.Element | null {
   const def = functionRegistry.get(node.functionKey);
   if (!def) return null;
 
-  const layout = getFunctionNodeLayout(def.slots.length);
+  const layout = layoutForFunctionDef(def);
   const { halfW, halfH, width, height, symbolY, labelY } = layout;
   const isSelected = selection.kind === 'node' && selection.id === id;
   const stateClass = isValid ? 'is-calm' : 'is-low';
@@ -249,11 +249,11 @@ function FunctionNodeViewImpl({ id }: Props): JSX.Element | null {
           {node.label || def.labels.ko}
         </text>
 
-        {/* 좌측 핀 (입력 슬롯) — slotIndex 0..arity-1.
+        {/* 입력 슬롯 — 슬롯별 개별 핀. anchor 위치로 분산되므로 슬롯마다 작은 핀.
             각 슬롯에 hit 영역을 둬서 엣지 드롭 시 정확한 슬롯을 식별. */}
-        <PinShape pin={layout.leftPin} stateClass={stateClass} />
-        {layout.leftPin.sockets.map((s) => (
+        {layout.inputSockets.map((s, i) => (
           <g key={`in${s.slotIndex}`}>
+            <PinShape pin={layout.inputPins[i]!} stateClass={stateClass} />
             <SocketVisual cx={s.x} cy={s.y} stateClass={stateClass} />
             <circle
               className="trama-node-socket-hit"
@@ -265,19 +265,19 @@ function FunctionNodeViewImpl({ id }: Props): JSX.Element | null {
           </g>
         ))}
 
-        {/* 우측 핀 (출력) — valid일 때만 보임 */}
+        {/* 출력 핀 — valid일 때만 보임 */}
         {isValid && (
           <>
-            <PinShape pin={layout.rightPin} stateClass={stateClass} />
+            <PinShape pin={layout.outputPin} stateClass={stateClass} />
             <SocketVisual
-              cx={layout.rightPin.sockets[0]!.x}
-              cy={layout.rightPin.sockets[0]!.y}
+              cx={layout.outputSocket.x}
+              cy={layout.outputSocket.y}
               stateClass={stateClass}
             />
             <circle
               className="trama-node-socket-hit"
-              cx={layout.rightPin.sockets[0]!.x}
-              cy={layout.rightPin.sockets[0]!.y}
+              cx={layout.outputSocket.x}
+              cy={layout.outputSocket.y}
               r={Math.max(SOCKET_SIZE, 12)}
               onPointerDown={onSocketPointerDown}
               onPointerMove={onSocketPointerMove}

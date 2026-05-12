@@ -14,10 +14,28 @@ export type FunctionInputConstraint =
   | { kind: 'sameAsSlot'; ref: number }
   | { kind: 'category'; category: UnitCategory };
 
+/**
+ * 소켓을 카드 변 위 어느 지점에 매다는지 — UI 위치 메타.
+ * 비가환 함수(나눗셈·뺄셈)는 슬롯 위치 자체로 의미를 전달하기 위해 사용.
+ *
+ * - `side`: 어느 변에 붙는지. left/right는 보통 입출력, top/bottom은 분기·합류용.
+ * - `t`: 변을 따른 정규화 좌표. 0=상단/좌측, 1=하단/우측, 0.5=중앙.
+ *   카드 모서리에 가까이 두고 싶으면 0.15·0.85 같은 값을 쓴다.
+ */
+export interface SocketAnchor {
+  side: 'left' | 'right' | 'top' | 'bottom';
+  t: number;
+}
+
 export interface FunctionSlot {
   /** 슬롯의 의미적 이름. UI에 작게 표시됨. */
   label: { ko: string; en: string };
   constraint: FunctionInputConstraint;
+  /**
+   * 소켓을 카드 어디에 둘지. 비가환 함수에서 슬롯 의미를 위치로 전달하기 위해 사용.
+   * 미지정 시 좌측 변에 슬롯들이 균등 분포(폴백). 가환 함수(곱셈·덧셈 등)는 폴백으로 충분.
+   */
+  anchor?: SocketAnchor;
 }
 
 export interface FunctionDefinition {
@@ -30,6 +48,11 @@ export interface FunctionDefinition {
    * 슬롯 라벨로 사용자에게 노출.
    */
   slots: readonly FunctionSlot[];
+  /**
+   * 출력 소켓 위치. 미지정 시 우측 변 중앙(폴백).
+   * 출력 의미가 특수한 함수(예: 분기·다축 결과)는 명시할 수 있다.
+   */
+  outputAnchor?: SocketAnchor;
   /**
    * 슬롯 순서대로 raw 입력값을 받아 raw 출력. 정규화 거치지 않음.
    * - 도메인 외 결과는 NaN/Infinity 가능 — propagate가 validNodes에서 제외.
