@@ -3,7 +3,7 @@ import { useUIStore } from '../store/index.js';
 import { listNodeKindUIs } from '../node/kind-catalog.js';
 import '../node/register-default-kinds.js';
 
-const MENU_WIDTH = 200;
+const MENU_WIDTH = 520;
 const MENU_PADDING = 8;
 
 /**
@@ -42,8 +42,11 @@ export function CanvasContextMenu(): JSX.Element | null {
   }));
 
   // 화면 경계 클램프 — 정확한 메뉴 높이는 렌더 후 측정 가능하지만 v1엔 근사.
-  const totalItems = sections.reduce((n, s) => n + s.items.length, 0);
-  const approxHeight = 12 + totalItems * 30 + sections.length * 28;
+  // 그리드 폭 520px 기준, 한 행에 약 5개 chip이 들어간다고 가정.
+  const approxHeight = sections.reduce((acc, s) => {
+    const rows = Math.max(1, Math.ceil(s.items.length / 5));
+    return acc + 28 /* header */ + rows * 36 + 12 /* gaps */;
+  }, 12);
   const vw = typeof window !== 'undefined' ? window.innerWidth : 1024;
   const vh = typeof window !== 'undefined' ? window.innerHeight : 768;
   let left = state.screen.x;
@@ -67,25 +70,27 @@ export function CanvasContextMenu(): JSX.Element | null {
       onContextMenu={(e) => e.preventDefault()}
     >
       {sections.map((section, idx) => (
-        <div key={section.label}>
+        <div key={section.label} className="trama-context-menu-section">
           {idx > 0 && <div className="trama-context-menu-divider" />}
           <div className="trama-context-menu-section-label">{section.label}</div>
-          {section.items.map((it) => (
-            <button
-              key={it.key}
-              type="button"
-              className="trama-context-menu-item"
-              onClick={() => {
-                it.onSelect(state.canvas);
-                close();
-              }}
-            >
-              {it.symbol && (
-                <span className="trama-context-menu-symbol">{it.symbol}</span>
-              )}
-              <span className="trama-context-menu-label">{it.label}</span>
-            </button>
-          ))}
+          <div className="trama-context-menu-grid">
+            {section.items.map((it) => (
+              <button
+                key={it.key}
+                type="button"
+                className="trama-context-menu-chip"
+                onClick={() => {
+                  it.onSelect(state.canvas);
+                  close();
+                }}
+              >
+                {it.symbol && (
+                  <span className="trama-context-menu-symbol">{it.symbol}</span>
+                )}
+                <span className="trama-context-menu-label">{it.label}</span>
+              </button>
+            ))}
+          </div>
         </div>
       ))}
     </div>
