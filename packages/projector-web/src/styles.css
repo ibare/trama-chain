@@ -59,9 +59,19 @@
 }
 
 [data-trama-root] .trama-node-body {
+  /* 평소엔 alpha 0인 4개 레이어를 깔아둔다. 선택 시 같은 구조의 filter가
+     alpha만 바꿔주므로 두 상태 사이를 transition으로 부드럽게 보간할 수 있다.
+     (filter:none ↔ 다층 chain은 브라우저별로 보간이 매끄럽지 않다.) */
+  filter:
+    drop-shadow(0 1px 1px rgba(42, 38, 32, 0))
+    drop-shadow(0 3px 6px rgba(42, 38, 32, 0))
+    drop-shadow(0 10px 20px rgba(42, 38, 32, 0))
+    drop-shadow(0 0 1px rgba(42, 38, 32, 0));
   transition:
     fill var(--motion-duration-scrub-response) var(--motion-easing-fade-natural),
-    stroke var(--motion-duration-scrub-response) var(--motion-easing-fade-natural);
+    stroke var(--motion-duration-scrub-response) var(--motion-easing-fade-natural),
+    stroke-width var(--motion-duration-fade-in) var(--motion-easing-fade-natural),
+    filter var(--motion-duration-fade-in) var(--motion-easing-fade-natural);
   /* body는 시각 전용. drag는 NodeFrame이 z-order 가장 아래에 깐 .trama-node-drag-hit가
      처리한다. body가 클릭을 가로채면 그 아래 drag rect로 hit가 도달하지 못한다. */
   pointer-events: none;
@@ -98,6 +108,24 @@
   fill: var(--color-node-fill-focal);
   stroke: var(--color-node-stroke-focal);
   stroke-width: var(--spacing-stroke-node-default);
+}
+
+/* 선택 강조 — 톤 변종과 무관하게 동일한 그림자·테두리.
+   filter chaining으로 contact / mid / far 3단 그림자를 누적해
+   따뜻한 종이 위에 카드가 들린 듯한 깊이감을 만든다. 색은 본문
+   텍스트 색(#2a2620) 기반의 warm dark로 캔버스 톤과 어울리게.
+   - contact: 닿아있는 가장자리. 짧고 진함.
+   - mid:     주된 부피감.
+   - far:     멀고 옅고 크게 퍼져 노드를 "캔버스 위로" 띄움.
+   - ambient: 전 방향 흐릿한 환경광 보정. */
+[data-trama-root] .trama-node-body.is-selected {
+  stroke: var(--color-node-stroke-focal);
+  stroke-width: calc(var(--spacing-stroke-node-default) * 1.5);
+  filter:
+    drop-shadow(0 1px 1px rgba(42, 38, 32, 0.18))
+    drop-shadow(0 3px 6px rgba(42, 38, 32, 0.16))
+    drop-shadow(0 10px 20px rgba(42, 38, 32, 0.14))
+    drop-shadow(0 0 1px rgba(42, 38, 32, 0.20));
 }
 
 [data-trama-root] .trama-node-label {
@@ -821,11 +849,6 @@
   stroke: var(--color-node-stroke-low);
   stroke-dasharray: 4 3;
 }
-[data-trama-root] .trama-function-body.is-selected {
-  stroke: var(--color-node-stroke-focal);
-  stroke-width: calc(var(--spacing-stroke-node-default) * 1.5);
-}
-
 [data-trama-root] .trama-function-symbol {
   font-size: 28px;
   font-weight: 600;

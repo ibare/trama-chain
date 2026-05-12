@@ -54,6 +54,9 @@ function ValueNodeViewImpl({ id, incomingCount }: Props): JSX.Element | null {
   const setEditingNode = useUIStore((s) => s.setEditingNode);
   const startEdgeDraft = useUIStore((s) => s.startEdgeDraft);
   const openUnitInspector = useUIStore((s) => s.openUnitInspector);
+  const isSelected = useUIStore(
+    (s) => s.selection.kind === 'node' && s.selection.id === id,
+  );
 
   // lag=0 인입 엣지가 하나라도 있으면 매 step마다 propagation이 값을 덮어쓰므로
   // initialValue 슬라이더는 사용자에게 거짓 affordance가 된다.
@@ -150,7 +153,7 @@ function ValueNodeViewImpl({ id, incomingCount }: Props): JSX.Element | null {
       onBodyDoubleClick={onBodyDoubleClick}
     >
       <rect
-        className={`trama-node-body ${stateClass}`}
+        className={`trama-node-body ${stateClass}${isSelected ? ' is-selected' : ''}`}
         x={-halfW}
         y={-halfH}
         width={width}
