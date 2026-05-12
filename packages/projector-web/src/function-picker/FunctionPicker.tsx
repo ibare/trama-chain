@@ -1,6 +1,7 @@
 import { useCallback, useMemo } from 'react';
 import { useModelStore, useUIStore } from '../store/index.js';
 import { shapeRegistry } from '../store/registries.js';
+import { InverseUCurveEditor } from './InverseUCurveEditor.js';
 import { PiecewiseEditor } from './PiecewiseEditor.js';
 import { ShapeParamEditor } from './ShapeParamEditor.js';
 import { StochasticEditor } from './StochasticEditor.js';
@@ -66,8 +67,10 @@ export function FunctionPicker(): JSX.Element | null {
       })}
       {edge.shape.kind === 'piecewise' && <PiecewiseEditor edge={edge} />}
       {edge.shape.kind === 'stochastic' && <StochasticEditor edge={edge} />}
+      {edge.shape.kind === 'inverseU' && <InverseUCurveEditor edge={edge} />}
       {edge.shape.kind !== 'piecewise' &&
         edge.shape.kind !== 'stochastic' &&
+        edge.shape.kind !== 'inverseU' &&
         currentParamFields.length > 0 && (
           <ShapeParamEditor edge={edge} fields={currentParamFields} />
         )}

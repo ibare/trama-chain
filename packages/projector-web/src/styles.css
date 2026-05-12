@@ -727,3 +727,68 @@
   color: var(--color-node-text-low);
   cursor: pointer;
 }
+
+/* inverseU 곡선 직접조작 에디터 ----------------------------------- */
+[data-trama-root] .trama-curve-editor {
+  padding-top: 10px;
+  border-top: 1px dashed var(--color-node-stroke-calm);
+  width: 100%;
+}
+
+[data-trama-root] .trama-curve-axis {
+  stroke: var(--color-node-stroke-calm);
+  stroke-width: 1;
+}
+
+[data-trama-root] .trama-curve-axis-label {
+  font-family: inherit;
+  font-size: var(--typography-text-step-count);
+  fill: var(--color-node-text-low);
+  font-variant-numeric: tabular-nums;
+  pointer-events: none;
+}
+
+[data-trama-root] .trama-curve-axis-name {
+  font-family: inherit;
+  font-size: var(--typography-text-step-count);
+  fill: var(--color-text-hint);
+  pointer-events: none;
+}
+
+[data-trama-root] .trama-curve-guide {
+  stroke: var(--color-node-stroke-calm);
+  stroke-width: 1;
+  stroke-dasharray: 3 3;
+  pointer-events: none;
+}
+
+[data-trama-root] .trama-curve-line {
+  fill: none;
+  stroke: var(--color-node-stroke-focal);
+  stroke-width: 2;
+  pointer-events: none;
+}
+
+[data-trama-root] .trama-curve-handle {
+  fill: var(--color-node-fill-focal);
+  stroke: var(--color-node-stroke-focal);
+  stroke-width: 1.5;
+  cursor: grab;
+  touch-action: none;
+}
+
+[data-trama-root] .trama-curve-handle:active {
+  cursor: grabbing;
+}
+
+[data-trama-root] .trama-curve-handle.is-secondary {
+  fill: var(--color-canvas-bg);
+}
+
+[data-trama-root] .trama-curve-handle-label {
+  font-family: inherit;
+  font-size: var(--typography-text-step-count);
+  fill: var(--color-node-text-primary);
+  font-variant-numeric: tabular-nums;
+  pointer-events: none;
+}
