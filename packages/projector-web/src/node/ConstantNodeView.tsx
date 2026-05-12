@@ -11,11 +11,11 @@ interface Props {
   id: NodeId;
 }
 
-const CARD_W = 144;
-const CARD_H = 96;
-const SYMBOL_Y_FROM_TOP = 38;
-const LABEL_Y_FROM_TOP = 62;
-const VALUE_Y_FROM_TOP = 80;
+const CARD_W = 240;
+const CARD_H = 124;
+const SIDE_INSET = 18;
+const LABEL_Y_FROM_TOP = 28;
+const VALUE_Y_FROM_TOP = 78;
 
 const SOCKET_SIZE = parseFloat(tokens.spacing.socketSize);
 const CARD_CORNER = parseFloat(tokens.spacing.cardCornerRadius);
@@ -101,19 +101,15 @@ function ConstantNodeViewImpl({ id }: Props): JSX.Element | null {
   const halfW = CARD_W / 2;
   const halfH = CARD_H / 2;
   const cardTop = -halfH;
-  const symbolY = cardTop + SYMBOL_Y_FROM_TOP;
+  const textX = -halfW + SIDE_INSET;
   const labelY = cardTop + LABEL_Y_FROM_TOP;
   const valueY = cardTop + VALUE_Y_FROM_TOP;
   const rightCx = halfW;
 
   const isSelected = selection.kind === 'node' && selection.id === id;
-  const stateClass = 'is-focal'; // 상수는 항상 "입력"성 — 사용자가 의미를 설정한 값
+  const stateClass = 'is-focal';
   const isEditing = editingNodeId === id;
 
-  // 심볼: 라벨이 짧으면(2자 이하) 라벨 자체를, 길면 첫 글자. 카탈로그 정의가 있다면
-  // constantKey와 매칭되는 ConstantDefinition에서 가져오는 게 더 정확하지만,
-  // v1엔 단순화 — 사용자 라벨이 보통 심볼 역할을 한다 (π·g·½ 등은 라벨이 이미 심볼).
-  const symbol = node.label.length <= 2 ? node.label : node.label.charAt(0);
   const valueText = formatConstantValue(node.value);
 
   return (
@@ -137,7 +133,7 @@ function ConstantNodeViewImpl({ id }: Props): JSX.Element | null {
       />
 
       {isEditing ? (
-        <foreignObject x={-halfW + 8} y={cardTop + 18} width={CARD_W - 16} height={CARD_H - 28}>
+        <foreignObject x={textX} y={cardTop + 14} width={CARD_W - SIDE_INSET * 2} height={CARD_H - 28}>
           <div className="trama-constant-editor">
             <input
               className="trama-node-name-input"
@@ -174,13 +170,10 @@ function ConstantNodeViewImpl({ id }: Props): JSX.Element | null {
         </foreignObject>
       ) : (
         <>
-          <text className="trama-function-symbol" x={0} y={symbolY} textAnchor="middle">
-            {symbol}
-          </text>
-          <text className="trama-function-label" x={0} y={labelY} textAnchor="middle">
+          <text className="trama-node-label" x={textX} y={labelY} textAnchor="start">
             {node.label}
           </text>
-          <text className="trama-node-unit" x={0} y={valueY} textAnchor="middle">
+          <text className="trama-node-value" x={textX} y={valueY} textAnchor="start">
             {valueText}
           </text>
         </>

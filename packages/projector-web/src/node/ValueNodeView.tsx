@@ -163,9 +163,9 @@ function ValueNodeViewImpl({ id, incomingCount }: Props): JSX.Element | null {
       />
       {editingNodeId === id ? (
         <foreignObject
-          x={-halfW + 12}
+          x={layout.textX}
           y={layout.labelY - 14}
-          width={width - 24}
+          width={width - (layout.textX - -halfW) * 2}
           height={26}
         >
           <input
@@ -182,20 +182,12 @@ function ValueNodeViewImpl({ id, incomingCount }: Props): JSX.Element | null {
           />
         </foreignObject>
       ) : (
-        <text className="trama-node-label" x={0} y={layout.labelY} textAnchor="middle">
+        <text className="trama-node-label" x={layout.textX} y={layout.labelY} textAnchor="start">
           {node.label}
         </text>
       )}
 
-      <line
-        className="trama-node-divider"
-        x1={layout.divider.x1}
-        x2={layout.divider.x2}
-        y1={layout.divider.y}
-        y2={layout.divider.y}
-      />
-
-      <text className="trama-node-value" x={0} y={layout.valueY} textAnchor="middle">
+      <text className="trama-node-value" x={layout.textX} y={layout.valueY} textAnchor="start">
         {formatted.primary}
         {formatted.accessory && (
           <tspan className="trama-node-unit" dx="6">
@@ -203,14 +195,12 @@ function ValueNodeViewImpl({ id, incomingCount }: Props): JSX.Element | null {
           </tspan>
         )}
       </text>
-      {/* 값+단위 영역을 InteractiveArea로 — 클릭 시 단위 인스펙터, 선택은 직접 처리.
-          드래그는 InteractiveArea가 hit를 잡은 시점에 NodeFrame의 drag rect로 흐르지
-          않으므로(같은 g 형제, topmost가 우선) 별도 stopPropagation 불필요. */}
+      {/* 값+단위 영역을 InteractiveArea로 — 클릭 시 단위 인스펙터, 선택은 직접 처리. */}
       <InteractiveArea
-        x={-halfW + 12}
-        y={layout.valueY - 16}
-        width={width - 24}
-        height={28}
+        x={layout.textX}
+        y={layout.valueY - 32}
+        width={width - 36}
+        height={44}
         hitClassName="trama-node-value-hit"
         onClick={() => {
           selectNode(id);
@@ -255,7 +245,11 @@ function ValueNodeViewImpl({ id, incomingCount }: Props): JSX.Element | null {
         </>
       )}
       {isInputNode && editingNodeId !== id && (
-        <NodeBorderTrack node={node} halfH={halfH} halfW={halfW} />
+        <NodeBorderTrack
+          node={node}
+          halfW={halfW}
+          trackY={layout.trackY}
+        />
       )}
     </NodeFrame>
   );

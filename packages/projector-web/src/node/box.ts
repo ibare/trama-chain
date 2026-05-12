@@ -1,14 +1,14 @@
 import { tokens } from '@trama/tokens';
 import type { Node } from '@trama/core';
 
-const CARD_W = 184;
-const BASE_H = 82;
+const CARD_W = 240;
+const BASE_H = 124;
 const COMBINER_ADD_H = 44;
-const NAME_FROM_TOP = 24;
-const DIVIDER_FROM_TOP = 36;
-const VALUE_FROM_TOP = 62;
-const COMBINER_CENTER_FROM_TOP = 96;
-const SIDE_INSET = 16;
+const NAME_FROM_TOP = 28;
+const VALUE_FROM_TOP = 78;
+const COMBINER_CENTER_FROM_TOP = 156;
+const TRACK_FROM_BOTTOM = 24;
+const SIDE_INSET = 18;
 
 const PIN_W = parseFloat(tokens.spacing.pinMinSize);
 const PIN_PAD = parseFloat(tokens.spacing.pinPadding);
@@ -35,9 +35,12 @@ export interface NodeLayout {
   height: number;
   halfW: number;
   halfH: number;
+  /** 좌측 정렬 텍스트의 x 시작점 (라벨·값 공통). */
+  textX: number;
   labelY: number;
-  divider: { x1: number; x2: number; y: number };
   valueY: number;
+  /** 입력성 ValueNode의 슬라이더 트랙 y 좌표 (노드 안쪽 하단). */
+  trackY: number;
   combinerCenterY: number | null;
   hasCombiner: boolean;
   leftPin: PinLayout;
@@ -88,9 +91,9 @@ export function getNodeLayout(
   const cardTop = -halfH;
 
   const labelY = cardTop + NAME_FROM_TOP;
-  const dividerY = cardTop + DIVIDER_FROM_TOP;
   const valueY = cardTop + VALUE_FROM_TOP;
   const combinerCenterY = hasCombiner ? cardTop + COMBINER_CENTER_FROM_TOP : null;
+  const trackY = halfH - TRACK_FROM_BOTTOM;
 
   const leftPin = buildPin(-halfW, 0, inSockets);
   const rightPin = buildPin(halfW, 0, 1);
@@ -100,9 +103,10 @@ export function getNodeLayout(
     height,
     halfW,
     halfH,
+    textX: -halfW + SIDE_INSET,
     labelY,
-    divider: { x1: -halfW + SIDE_INSET, x2: halfW - SIDE_INSET, y: dividerY },
     valueY,
+    trackY,
     combinerCenterY,
     hasCombiner,
     leftPin,

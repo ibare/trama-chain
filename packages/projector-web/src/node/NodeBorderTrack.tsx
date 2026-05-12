@@ -1,5 +1,4 @@
 import { useCallback, useRef } from 'react';
-import { tokens } from '@trama/tokens';
 import type { ValueNode } from '@trama/core';
 import { useModelStore } from '../store/index.js';
 import { resolveNodeUnit } from '../util/unit-resolver.js';
@@ -8,13 +7,13 @@ import { getCurrentZoom } from '../canvas/viewport.js';
 interface Props {
   node: ValueNode;
   halfW: number;
-  halfH: number;
+  /** 트랙(슬라이더)의 y 좌표. 노드 안쪽 하단 padding 지점. */
+  trackY: number;
 }
 
-const CARD_CORNER = parseFloat(tokens.spacing.cardCornerRadius);
-const TRACK_INSET = CARD_CORNER + 4;
-const HANDLE_RADIUS = 7;
-const HIT_HEIGHT = 16;
+const TRACK_INSET = 18;
+const HANDLE_RADIUS = 9;
+const HIT_HEIGHT = 22;
 
 interface SliderBounds {
   min: number;
@@ -41,18 +40,16 @@ function snap(v: number, step: number): number {
   return Math.round(v / step) * step;
 }
 
-export function NodeBorderTrack({ node, halfW, halfH }: Props): JSX.Element | null {
+export function NodeBorderTrack({ node, halfW, trackY }: Props): JSX.Element | null {
   const scrubInitialValue = useModelStore((s) => s.scrubInitialValue);
   const unit = resolveNodeUnit(node);
   const { min, max, step } = boundsForSlider(unit);
   const range = max - min;
   const value = node.initialValue;
 
-  const rawTrackLen = 2 * halfW - 2 * TRACK_INSET;
-  const trackLen = rawTrackLen * 0.8;
+  const trackLen = 2 * halfW - 2 * TRACK_INSET;
   const trackLeft = -trackLen / 2;
   const trackRight = trackLen / 2;
-  const trackY = halfH;
 
   const norm = range > 0 ? clamp((value - min) / range, 0, 1) : 0;
   const handleX = trackLeft + norm * trackLen;

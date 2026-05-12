@@ -131,23 +131,24 @@
 [data-trama-root] .trama-node-label {
   font-size: var(--typography-text-node-name);
   fill: var(--color-node-text-primary);
-  text-anchor: middle;
   pointer-events: none;
   font-weight: 500;
 }
 
 [data-trama-root] .trama-node-value {
-  font-size: var(--typography-text-node-value);
+  font-size: 2.25rem;
   fill: var(--color-node-text-primary);
-  text-anchor: middle;
   pointer-events: none;
   font-variant-numeric: tabular-nums;
+  font-weight: 700;
+  letter-spacing: -0.01em;
 }
 
 [data-trama-root] .trama-node-unit {
   font-size: var(--typography-text-node-unit);
   fill: var(--color-node-text-low);
   pointer-events: none;
+  font-weight: 400;
 }
 
 /* 값+단위 묶음 위에 깔린 클릭 영역. 단위 변경 인스펙터를 연다. */
@@ -405,7 +406,7 @@
 /* Floating panel — picker·inspector 공통 셸 ----------------------------- */
 [data-trama-root] .trama-floating-panel {
   position: absolute;
-  background: var(--color-canvas-bg);
+  background: var(--color-node-fill-calm);
   border: 1px solid var(--color-node-stroke-calm);
   border-radius: var(--spacing-radius-picker);
   box-shadow: 0 8px 24px rgba(0, 0, 0, 0.08);
@@ -936,7 +937,7 @@
 
 /* Canvas context menu ---------------------------------------------------- */
 .trama-context-menu {
-  background: var(--color-canvas-bg);
+  background: var(--color-node-fill-calm);
   border: 1px solid var(--color-node-stroke-calm);
   border-radius: var(--spacing-radius-picker);
   padding: 10px;
