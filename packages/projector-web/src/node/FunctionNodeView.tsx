@@ -15,6 +15,7 @@ import {
   registerNodeEl,
   type EdgeHandle,
 } from '../canvas/drag-registry.js';
+import { getCurrentZoom } from '../canvas/viewport.js';
 
 interface Props {
   id: NodeId;
@@ -53,6 +54,7 @@ function FunctionNodeViewImpl({ id }: Props): JSX.Element | null {
     lastDx: number;
     lastDy: number;
     dragged: boolean;
+    zoom: number;
     incidents: EdgeHandle[];
   } | null>(null);
 
@@ -69,6 +71,7 @@ function FunctionNodeViewImpl({ id }: Props): JSX.Element | null {
         lastDx: 0,
         lastDy: 0,
         dragged: false,
+        zoom: getCurrentZoom(),
         incidents: getIncidentEdgeHandles(id),
       };
     },
@@ -79,12 +82,14 @@ function FunctionNodeViewImpl({ id }: Props): JSX.Element | null {
     (e: React.PointerEvent<SVGRectElement>) => {
       const m = moveRef.current;
       if (!m) return;
-      const dx = e.clientX - m.startClientX;
-      const dy = e.clientY - m.startClientY;
+      const dxClient = e.clientX - m.startClientX;
+      const dyClient = e.clientY - m.startClientY;
       if (!m.dragged) {
-        if (Math.hypot(dx, dy) < DRAG_THRESHOLD_PX) return;
+        if (Math.hypot(dxClient, dyClient) < DRAG_THRESHOLD_PX) return;
         m.dragged = true;
       }
+      const dx = dxClient / m.zoom;
+      const dy = dyClient / m.zoom;
       m.lastDx = dx;
       m.lastDy = dy;
       const gEl = outerGRef.current;

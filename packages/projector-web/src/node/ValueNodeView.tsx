@@ -18,6 +18,7 @@ import {
   registerNodeEl,
   type EdgeHandle,
 } from '../canvas/drag-registry.js';
+import { getCurrentZoom } from '../canvas/viewport.js';
 
 interface Props {
   id: NodeId;
@@ -100,9 +101,12 @@ function ValueNodeViewImpl({ id, incomingCount }: Props): JSX.Element | null {
     startClientY: number;
     startPosX: number;
     startPosY: number;
+    /** 캔버스 단위 누적 이동량 — dx_client / zoom. */
     lastDx: number;
     lastDy: number;
     dragged: boolean;
+    /** 드래그 시작 시점에 캡처한 zoom. 드래그 중 줌이 바뀌어도 일관 유지. */
+    zoom: number;
     incidents: EdgeHandle[];
   } | null>(null);
 
@@ -120,6 +124,7 @@ function ValueNodeViewImpl({ id, incomingCount }: Props): JSX.Element | null {
         lastDx: 0,
         lastDy: 0,
         dragged: false,
+        zoom: getCurrentZoom(),
         incidents: getIncidentEdgeHandles(id),
       };
     },
@@ -130,12 +135,14 @@ function ValueNodeViewImpl({ id, incomingCount }: Props): JSX.Element | null {
     (e: React.PointerEvent<SVGRectElement>) => {
       const m = moveRef.current;
       if (!m) return;
-      const dx = e.clientX - m.startClientX;
-      const dy = e.clientY - m.startClientY;
+      const dxClient = e.clientX - m.startClientX;
+      const dyClient = e.clientY - m.startClientY;
       if (!m.dragged) {
-        if (Math.hypot(dx, dy) < DRAG_THRESHOLD_PX) return;
+        if (Math.hypot(dxClient, dyClient) < DRAG_THRESHOLD_PX) return;
         m.dragged = true;
       }
+      const dx = dxClient / m.zoom;
+      const dy = dyClient / m.zoom;
       m.lastDx = dx;
       m.lastDy = dy;
       const gEl = outerGRef.current;

@@ -6,6 +6,12 @@ import { NodeView } from '../node/NodeView.js';
 import { UnitInspectorLayer } from '../node/UnitInspectorLayer.js';
 import { EdgeDraftView } from './EdgeDraftView.js';
 import { CanvasContextMenu } from './CanvasContextMenu.js';
+import { setCurrentZoom } from './viewport.js';
+
+const ZOOM_MIN = 0.2;
+const ZOOM_MAX = 4;
+const ZOOM_WHEEL_INTENSITY = 0.0015;
+const PAN_THRESHOLD_PX = 3;
 
 export function Canvas(): JSX.Element {
   // 좁은 셀렉터 — Canvas 자체는 topology(노드·엣지 목록) 변경에만 리렌더된다.
@@ -30,6 +36,19 @@ export function Canvas(): JSX.Element {
   const svgRef = useRef<SVGSVGElement | null>(null);
   const unitInspectorNodeId = useUIStore((s) => s.unitInspector?.nodeId ?? null);
 
+  // 뷰포트(pan·zoom). Canvas만 리렌더되며 자식 NodeView는 React.memo로 안정.
+  const [viewport, setViewport] = useState<{ panX: number; panY: number; zoom: number }>({
+    panX: 0,
+    panY: 0,
+    zoom: 1,
+  });
+  // 드래그·휠 핸들러가 closure 없이 최신 viewport를 읽도록 ref도 유지.
+  const viewportRef = useRef(viewport);
+  viewportRef.current = viewport;
+  useEffect(() => {
+    setCurrentZoom(viewport.zoom);
+  }, [viewport.zoom]);
+
   // SVG의 실제 가시 크기 — 패널 배치 helper의 bounds로 쓰임. 리사이즈에 반응.
   const [svgSize, setSvgSize] = useState<{ width: number; height: number }>({
     width: typeof window !== 'undefined' ? window.innerWidth : 1024,
@@ -52,7 +71,11 @@ export function Canvas(): JSX.Element {
     const svg = svgRef.current;
     if (!svg) return { x: clientX, y: clientY };
     const rect = svg.getBoundingClientRect();
-    return { x: clientX - rect.left, y: clientY - rect.top };
+    const { panX, panY, zoom } = viewportRef.current;
+    return {
+      x: (clientX - rect.left - panX) / zoom,
+      y: (clientY - rect.top - panY) / zoom,
+    };
   }, []);
 
   // incomingMap: to-node 기준 incoming 엣지 id 목록. edgeOrder 또는 edges 변경 시
@@ -74,14 +97,39 @@ export function Canvas(): JSX.Element {
     return m;
   }, [nodeOrder, incomingMap]);
 
+  // 빈 영역 드래그로 패닝. 좌클릭만, 노드/엣지/배경 외 요소는 통과.
+  const panRef = useRef<{
+    startClientX: number;
+    startClientY: number;
+    startPanX: number;
+    startPanY: number;
+    dragged: boolean;
+    pointerId: number;
+  } | null>(null);
+
   const onCanvasPointerDown = useCallback(
     (e: React.PointerEvent<SVGSVGElement>) => {
-      if (e.target === e.currentTarget || (e.target as Element).classList?.contains?.('trama-canvas-bg')) {
-        clearSelection();
-        closeFunctionPicker();
-        clearInsertIntent();
-        closeCanvasContextMenu();
-      }
+      const target = e.target as Element;
+      const isBackground =
+        e.target === e.currentTarget || target.classList?.contains?.('trama-canvas-bg');
+      if (!isBackground) return;
+      // 빈 영역 클릭: 선택·메뉴 등 정리.
+      clearSelection();
+      closeFunctionPicker();
+      clearInsertIntent();
+      closeCanvasContextMenu();
+      // 좌클릭만 패닝.
+      if (e.button !== 0) return;
+      target.setPointerCapture?.(e.pointerId);
+      const v = viewportRef.current;
+      panRef.current = {
+        startClientX: e.clientX,
+        startClientY: e.clientY,
+        startPanX: v.panX,
+        startPanY: v.panY,
+        dragged: false,
+        pointerId: e.pointerId,
+      };
     },
     [clearSelection, closeFunctionPicker, clearInsertIntent, closeCanvasContextMenu],
   );
@@ -118,6 +166,15 @@ export function Canvas(): JSX.Element {
 
   const onPointerMove = useCallback(
     (e: React.PointerEvent<SVGSVGElement>) => {
+      const pan = panRef.current;
+      if (pan) {
+        const dx = e.clientX - pan.startClientX;
+        const dy = e.clientY - pan.startClientY;
+        if (!pan.dragged && Math.hypot(dx, dy) < PAN_THRESHOLD_PX) return;
+        pan.dragged = true;
+        setViewport((v) => ({ ...v, panX: pan.startPanX + dx, panY: pan.startPanY + dy }));
+        return;
+      }
       if (!edgeDraft) return;
       const pos = toCanvasCoords(e.clientX, e.clientY);
       const lag: 0 | 1 = e.altKey ? 1 : 0;
@@ -126,15 +183,45 @@ export function Canvas(): JSX.Element {
     [edgeDraft, toCanvasCoords, updateEdgeDraft],
   );
 
-  const onPointerUp = useCallback(() => {
-    if (edgeDraft) endEdgeDraft();
-  }, [edgeDraft, endEdgeDraft]);
+  const onPointerUp = useCallback(
+    (e: React.PointerEvent<SVGSVGElement>) => {
+      if (panRef.current) {
+        (e.target as Element).releasePointerCapture?.(panRef.current.pointerId);
+        panRef.current = null;
+      }
+      if (edgeDraft) endEdgeDraft();
+    },
+    [edgeDraft, endEdgeDraft],
+  );
 
   const undo = useModelStore((s) => s.undo);
   const redo = useModelStore((s) => s.redo);
   const removeNode = useModelStore((s) => s.removeNode);
   const removeEdge = useModelStore((s) => s.removeEdge);
   const selection = useUIStore((s) => s.selection);
+
+  // 휠 줌 — 마우스 포커스 줌. React onWheel은 passive로 등록될 수 있어
+  // preventDefault가 막힐 수 있으므로 native addEventListener({passive:false}).
+  useEffect(() => {
+    const el = svgRef.current;
+    if (!el) return undefined;
+    const onWheel = (e: WheelEvent) => {
+      e.preventDefault();
+      const v = viewportRef.current;
+      const factor = Math.exp(-e.deltaY * ZOOM_WHEEL_INTENSITY);
+      const next = Math.max(ZOOM_MIN, Math.min(ZOOM_MAX, v.zoom * factor));
+      if (next === v.zoom) return;
+      const rect = el.getBoundingClientRect();
+      const mx = e.clientX - rect.left;
+      const my = e.clientY - rect.top;
+      // 마우스 위치의 캔버스 좌표가 줌 후에도 같은 클라이언트 위치를 가리키도록 pan 보정.
+      const panX = mx - (mx - v.panX) * (next / v.zoom);
+      const panY = my - (my - v.panY) * (next / v.zoom);
+      setViewport({ panX, panY, zoom: next });
+    };
+    el.addEventListener('wheel', onWheel, { passive: false });
+    return () => el.removeEventListener('wheel', onWheel);
+  }, []);
 
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
@@ -177,26 +264,31 @@ export function Canvas(): JSX.Element {
       onPointerUp={onPointerUp}
     >
       <rect className="trama-canvas-bg" x={0} y={0} width="100%" height="100%" />
-      {edgeOrder.map((eid) => {
-        const e = edges[eid];
-        if (!e) return null;
-        const fromIncoming = incomingCountByNode[e.from] ?? 0;
-        const toIncoming = incomingCountByNode[e.to] ?? 0;
-        const socketIndex = (incomingMap[e.to] ?? []).indexOf(eid);
-        return (
-          <EdgeView
-            key={eid}
-            edgeId={eid}
-            fromIncomingCount={fromIncoming}
-            toIncomingCount={toIncoming}
-            socketIndex={socketIndex}
-          />
-        );
-      })}
-      {edgeDraft && <EdgeDraftView />}
-      {nodeOrder.map((nid) => (
-        <NodeView key={nid} id={nid} incomingCount={incomingCountByNode[nid] ?? 0} />
-      ))}
+      <g
+        className="trama-canvas-content"
+        transform={`translate(${viewport.panX} ${viewport.panY}) scale(${viewport.zoom})`}
+      >
+        {edgeOrder.map((eid) => {
+          const e = edges[eid];
+          if (!e) return null;
+          const fromIncoming = incomingCountByNode[e.from] ?? 0;
+          const toIncoming = incomingCountByNode[e.to] ?? 0;
+          const socketIndex = (incomingMap[e.to] ?? []).indexOf(eid);
+          return (
+            <EdgeView
+              key={eid}
+              edgeId={eid}
+              fromIncomingCount={fromIncoming}
+              toIncomingCount={toIncoming}
+              socketIndex={socketIndex}
+            />
+          );
+        })}
+        {edgeDraft && <EdgeDraftView />}
+        {nodeOrder.map((nid) => (
+          <NodeView key={nid} id={nid} incomingCount={incomingCountByNode[nid] ?? 0} />
+        ))}
+      </g>
       {/* 떠 있는 패널 — 모든 노드 위에 그려져 z-order 보장. 노드 그룹 안에서
           렌더하면 그 노드보다 뒤에 그려진 다른 노드에 의해 가려진다. */}
       {unitInspectorNodeId && (
