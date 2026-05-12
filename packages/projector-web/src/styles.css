@@ -78,7 +78,7 @@
 [data-trama-root] .trama-node-body.is-focal {
   fill: var(--color-node-fill-focal);
   stroke: var(--color-node-stroke-focal);
-  stroke-width: calc(var(--spacing-stroke-node-default) * 1.5);
+  stroke-width: var(--spacing-stroke-node-default);
 }
 
 [data-trama-root] .trama-node-label {
