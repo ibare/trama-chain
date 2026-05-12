@@ -151,22 +151,26 @@ function NodeViewImpl({ id, incomingCount }: Props): JSX.Element | null {
       const m = moveRef.current;
       moveRef.current = null;
       (e.target as Element).releasePointerCapture?.(e.pointerId);
-      if (m?.dragged) {
-        if (m.lastDx !== 0 || m.lastDy !== 0) {
-          updateNode(
-            id,
-            { position: { x: m.startPosX + m.lastDx, y: m.startPosY + m.lastDy } },
-            'move-node',
-            '위치 이동',
-          );
-        }
-        return;
-      }
-      if (e.detail >= 2) {
-        setEditingNode(id);
+      if (m?.dragged && (m.lastDx !== 0 || m.lastDy !== 0)) {
+        updateNode(
+          id,
+          { position: { x: m.startPosX + m.lastDx, y: m.startPosY + m.lastDy } },
+          'move-node',
+          '위치 이동',
+        );
       }
     },
-    [id, setEditingNode, updateNode],
+    [id, updateNode],
+  );
+
+  // 네이티브 dblclick으로 이름 편집 진입. pointerup의 e.detail은 setPointerCapture
+  // 사이클이 끼면 카운트가 풀려 불안정.
+  const onBodyDoubleClick = useCallback(
+    (e: React.MouseEvent<SVGRectElement>) => {
+      e.stopPropagation();
+      setEditingNode(id);
+    },
+    [id, setEditingNode],
   );
 
   // Socket 드래그 (엣지 생성) ----------------------------------------------
@@ -285,6 +289,7 @@ function NodeViewImpl({ id, incomingCount }: Props): JSX.Element | null {
           onPointerDown={onBodyPointerDown}
           onPointerMove={onBodyPointerMove}
           onPointerUp={onBodyPointerUp}
+          onDoubleClick={onBodyDoubleClick}
         />
         {editingNodeId === id ? (
           <foreignObject
