@@ -181,6 +181,9 @@
 
 [data-trama-root] .trama-node-slider input[type='range'] {
   flex: 1;
+  /* flex item의 min-width:auto가 input의 내재 min-width(~129px)로 잡혀
+     foreignObject 밖으로 오버플로하지 않도록 명시적으로 0으로 누름. */
+  min-width: 0;
   appearance: none;
   -webkit-appearance: none;
   background: transparent;

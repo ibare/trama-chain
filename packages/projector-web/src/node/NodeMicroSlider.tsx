@@ -10,8 +10,8 @@ interface Props {
   halfH: number;
 }
 
-const SLIDER_WIDTH = 160;
-const SLIDER_HEIGHT = 36;
+const SLIDER_WIDTH = 200;
+const SLIDER_HEIGHT = 44;
 const SLIDER_GAP = 8;
 
 export function NodeMicroSlider({ node, halfW: _halfW, halfH }: Props): JSX.Element {
