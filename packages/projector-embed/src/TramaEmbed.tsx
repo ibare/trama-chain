@@ -45,9 +45,6 @@ const CARD_CORNER = parseFloat(tokens.spacing.cardCornerRadius);
 const PIN_RADIUS = parseFloat(tokens.spacing.pinRadius);
 const SOCKET_SIZE = parseFloat(tokens.spacing.socketSize);
 const SOCKET_DOT_SIZE = parseFloat(tokens.spacing.socketDotSize);
-const OPACITY_LOW = tokens.physical.opacityNodeLow;
-const OPACITY_HIGH = tokens.physical.opacityNodeHigh;
-const THRESH_LOW = tokens.physical.thresholdNodeLow;
 const STRAINED_LOW = tokens.physical.thresholdEdgeStrainedLow;
 const STRAINED_HIGH = tokens.physical.thresholdEdgeStrainedHigh;
 
@@ -55,10 +52,6 @@ interface Props {
   json: string;
   height?: number;
   showQuestion?: boolean;
-}
-
-function lerp(a: number, b: number, t: number): number {
-  return a + (b - a) * t;
 }
 
 function combinerSymbol(key: string): string {
@@ -203,11 +196,8 @@ function StaticNode({
   currentValue: number;
 }): JSX.Element {
   const unit = resolveNodeUnit(node);
-  const norm = normalize(currentValue, unit);
-  const opacity = lerp(OPACITY_LOW, OPACITY_HIGH, norm);
-  const isLow = norm < THRESH_LOW;
   const isFocal = node.isFocal;
-  const stateClass = isFocal ? 'is-focal' : isLow ? 'is-low' : 'is-calm';
+  const stateClass = isFocal ? 'is-focal' : 'is-calm';
   const pos = node.position ?? { x: 0, y: 0 };
   const formatted = formatNodeValue(currentValue, unit);
   const combiner = combinerRegistry.get(node.combiner);
@@ -216,7 +206,6 @@ function StaticNode({
     <g
       className="trama-embed-node"
       transform={`translate(${pos.x} ${pos.y})`}
-      style={{ opacity }}
     >
       <rect
         className={`trama-embed-node-body ${stateClass}`}

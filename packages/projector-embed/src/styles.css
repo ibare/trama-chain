@@ -57,11 +57,6 @@
   stroke: var(--color-node-stroke-calm);
 }
 
-[data-trama-root] .trama-embed-node-body.is-low {
-  fill: var(--color-node-fill-low);
-  stroke: var(--color-node-stroke-low);
-}
-
 [data-trama-root] .trama-embed-node-body.is-focal {
   fill: var(--color-node-fill-focal);
   stroke: var(--color-node-stroke-focal);
