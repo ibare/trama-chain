@@ -10,14 +10,22 @@ export function EditorRoute(): JSX.Element {
 
   const initialJson = useMemo(() => (id ? loadModelJson(id) : null), [id]);
 
-  const onChange = useCallback((json: string) => {
-    try {
-      const doc = parseTrama(json, { shapeRegistry, combinerRegistry });
-      saveModel(documentToModel(doc));
-    } catch {
-      // 잘못된 상태 — 저장 스킵
-    }
-  }, []);
+  const onChange = useCallback(
+    (json: string) => {
+      try {
+        const doc = parseTrama(json, { shapeRegistry, combinerRegistry });
+        const m = documentToModel(doc);
+        // 라우트의 id와 다른 모델은 저장하지 않는다. HMR로 store가 잠시 새 빈
+        // 모델로 리셋된 상태에서 디바운스 onChange가 흘러나와도 그게 새 엔트리로
+        // 박히지 않도록 막는 안전벨트.
+        if (!id || m.id !== id) return;
+        saveModel(m);
+      } catch {
+        // 잘못된 상태 — 저장 스킵
+      }
+    },
+    [id],
+  );
 
   const onExport = useCallback(() => {
     if (!id) return;

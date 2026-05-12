@@ -30,10 +30,11 @@ export function TramaEditor({ initialJson, onChange, options }: Props): JSX.Elem
   const model = useModelStore((s) => s.model);
   const setQuestion = useModelStore((s) => s.setQuestion);
 
-  const loadedRef = useRef(false);
+  // initialJson이 바뀌거나(라우트 id 변경) store가 교체될 때마다(HMR이 모듈을
+  // 재평가해 setModel 참조가 바뀔 때) 다시 로드한다. loadedRef로 영구 차단하면
+  // HMR 후 store가 새 빈 모델(새 id, question=null)로 리셋되고 그 상태가
+  // 디바운스 onChange를 통해 그대로 저장되어 새 "제목 없는 모델"이 매번 생긴다.
   useEffect(() => {
-    if (loadedRef.current) return;
-    loadedRef.current = true;
     try {
       const doc = parseTrama(initialJson, { shapeRegistry, combinerRegistry });
       setModel(documentToModel(doc));
