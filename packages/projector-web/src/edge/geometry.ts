@@ -11,17 +11,33 @@ export interface EdgePathOptions {
  * 두 *소켓 좌표* 사이를 잇는 큐빅 베지에.
  * 소켓은 항상 카드 좌우(수평) 방향이므로 control point는 수평 방향으로 잡아 자연스럽게 흐른다.
  * feedback(lag=1)이면 수직 방향으로 큰 곡률을 더해 루프 형태로.
+ *
+ * 화살표가 목표 소켓에 가려지지 않도록 끝점을 접선 방향으로 END_INSET만큼
+ * 후퇴시킨다. 어느 노드 종류든 일관된 시각적 간격이 생긴다.
  */
+const END_INSET = 12;
+
 export function edgePath(
   start: Point,
   end: Point,
   options: EdgePathOptions = { lag: 0 },
 ): { d: string; tip: Point; mid: Point; tangent: Point } {
-  const { p0, p1, p2, p3 } = edgeControls(start, end, options);
-  const d = `M ${p0.x} ${p0.y} C ${p1.x} ${p1.y}, ${p2.x} ${p2.y}, ${p3.x} ${p3.y}`;
-  const mid = bezierAt(p0, p1, p2, p3, 0.5);
-  const tangent = bezierTangent(p0, p1, p2, p3, 1.0);
-  return { d, tip: p3, mid, tangent };
+  const controls = edgeControls(start, end, options);
+  const tangentAtEnd = bezierTangent(
+    controls.p0,
+    controls.p1,
+    controls.p2,
+    controls.p3,
+    1.0,
+  );
+  // p3를 접선 방향으로 후퇴 — 곡선 형태는 거의 보존된다(12px 내 변경).
+  const tip: Point = {
+    x: controls.p3.x - tangentAtEnd.x * END_INSET,
+    y: controls.p3.y - tangentAtEnd.y * END_INSET,
+  };
+  const d = `M ${controls.p0.x} ${controls.p0.y} C ${controls.p1.x} ${controls.p1.y}, ${controls.p2.x} ${controls.p2.y}, ${tip.x} ${tip.y}`;
+  const mid = bezierAt(controls.p0, controls.p1, controls.p2, tip, 0.5);
+  return { d, tip, mid, tangent: tangentAtEnd };
 }
 
 export function edgeControls(
