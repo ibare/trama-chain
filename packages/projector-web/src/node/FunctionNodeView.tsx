@@ -3,8 +3,10 @@ import { tokens } from '@trama/tokens';
 import { isFunctionNode, isNodeValid, type NodeId } from '@trama/core';
 import { useModelStore, useUIStore } from '../store/index.js';
 import { functionRegistry } from '../store/registries.js';
-import { layoutForFunctionDef, type FunctionPinLayout } from './function-box.js';
+import { layoutForFunctionDef } from './function-box.js';
 import { NodeFrame } from './NodeFrame.js';
+import { Socket } from './Socket.js';
+import { useInputConnectionMask, useOutputConnected } from './use-socket-connections.js';
 import { registerInputSocket } from '../canvas/socket-registry.js';
 import { completeEdgeDraft } from '../canvas/edge-draft-actions.js';
 
@@ -12,9 +14,7 @@ interface Props {
   id: NodeId;
 }
 
-const PIN_RADIUS = parseFloat(tokens.spacing.pinRadius);
 const SOCKET_SIZE = parseFloat(tokens.spacing.socketSize);
-const SOCKET_DOT_SIZE = parseFloat(tokens.spacing.socketDotSize);
 const CARD_CORNER = parseFloat(tokens.spacing.cardCornerRadius);
 
 function FunctionNodeViewImpl({ id }: Props): JSX.Element | null {
@@ -22,6 +22,8 @@ function FunctionNodeViewImpl({ id }: Props): JSX.Element | null {
   const isValid = useModelStore((s) => isNodeValid(s.executionState, id));
   const selection = useUIStore((s) => s.selection);
   const startEdgeDraft = useUIStore((s) => s.startEdgeDraft);
+  const inputMask = useInputConnectionMask(id);
+  const outputConnected = useOutputConnected(id);
 
   const pos = node?.position ?? { x: 200, y: 200 };
   const functionKey = node && isFunctionNode(node) ? node.functionKey : null;
@@ -99,10 +101,9 @@ function FunctionNodeViewImpl({ id }: Props): JSX.Element | null {
 
       {/* 입력 슬롯 — 슬롯별 개별 핀. anchor 위치로 분산되므로 슬롯마다 작은 핀.
           각 슬롯에 hit 영역을 둬서 엣지 드롭 시 정확한 슬롯을 식별. */}
-      {layout.inputSockets.map((s, i) => (
+      {layout.inputSockets.map((s) => (
         <g key={`in${s.slotIndex}`}>
-          <PinShape pin={layout.inputPins[i]!} stateClass={stateClass} />
-          <SocketVisual cx={s.x} cy={s.y} stateClass={stateClass} />
+          <Socket cx={s.x} cy={s.y} connected={(inputMask & (1 << s.slotIndex)) !== 0} />
           <circle
             className="trama-node-socket-hit"
             data-trama-slot-index={s.slotIndex}
@@ -113,14 +114,13 @@ function FunctionNodeViewImpl({ id }: Props): JSX.Element | null {
         </g>
       ))}
 
-      {/* 출력 핀 — valid일 때만 보임 */}
+      {/* 출력 소켓 — valid일 때만 보임 */}
       {isValid && (
         <>
-          <PinShape pin={layout.outputPin} stateClass={stateClass} />
-          <SocketVisual
+          <Socket
             cx={layout.outputSocket.x}
             cy={layout.outputSocket.y}
-            stateClass={stateClass}
+            connected={outputConnected}
           />
           <circle
             className="trama-node-socket-hit"
@@ -138,49 +138,3 @@ function FunctionNodeViewImpl({ id }: Props): JSX.Element | null {
 
 export const FunctionNodeView = memo(FunctionNodeViewImpl);
 
-function PinShape({
-  pin,
-  stateClass,
-}: {
-  pin: FunctionPinLayout;
-  stateClass: string;
-}): JSX.Element {
-  return (
-    <rect
-      className={`trama-node-pin ${stateClass}`}
-      x={pin.rectX}
-      y={pin.rectY}
-      width={pin.width}
-      height={pin.height}
-      rx={Math.min(PIN_RADIUS, pin.width / 2, pin.height / 2)}
-      ry={Math.min(PIN_RADIUS, pin.width / 2, pin.height / 2)}
-    />
-  );
-}
-
-function SocketVisual({
-  cx,
-  cy,
-  stateClass,
-}: {
-  cx: number;
-  cy: number;
-  stateClass: string;
-}): JSX.Element {
-  return (
-    <g pointerEvents="none">
-      <circle
-        className={`trama-node-socket-ring ${stateClass}`}
-        cx={cx}
-        cy={cy}
-        r={SOCKET_SIZE / 2}
-      />
-      <circle
-        className={`trama-node-socket-dot ${stateClass}`}
-        cx={cx}
-        cy={cy}
-        r={SOCKET_DOT_SIZE / 2}
-      />
-    </g>
-  );
-}

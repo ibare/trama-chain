@@ -3,6 +3,8 @@ import { tokens } from '@trama/tokens';
 import { isConstantNode, type NodeId } from '@trama/core';
 import { useModelStore, useUIStore } from '../store/index.js';
 import { NodeFrame } from './NodeFrame.js';
+import { Socket } from './Socket.js';
+import { useOutputConnected } from './use-socket-connections.js';
 import { completeEdgeDraft } from '../canvas/edge-draft-actions.js';
 
 interface Props {
@@ -15,10 +17,7 @@ const SYMBOL_Y_FROM_TOP = 38;
 const LABEL_Y_FROM_TOP = 62;
 const VALUE_Y_FROM_TOP = 80;
 
-const PIN_W = parseFloat(tokens.spacing.pinMinSize);
-const PIN_RADIUS = parseFloat(tokens.spacing.pinRadius);
 const SOCKET_SIZE = parseFloat(tokens.spacing.socketSize);
-const SOCKET_DOT_SIZE = parseFloat(tokens.spacing.socketDotSize);
 const CARD_CORNER = parseFloat(tokens.spacing.cardCornerRadius);
 
 function formatConstantValue(v: number): string {
@@ -38,6 +37,7 @@ function ConstantNodeViewImpl({ id }: Props): JSX.Element | null {
   const editingNodeId = useUIStore((s) => s.editingNodeId);
   const setEditingNode = useUIStore((s) => s.setEditingNode);
   const startEdgeDraft = useUIStore((s) => s.startEdgeDraft);
+  const outputConnected = useOutputConnected(id);
 
   const pos = node?.position ?? { x: 200, y: 200 };
   const labelDraftSeed = node?.label ?? '';
@@ -186,30 +186,8 @@ function ConstantNodeViewImpl({ id }: Props): JSX.Element | null {
         </>
       )}
 
-      {/* 우측 핀 (출력) — 상수는 항상 valid */}
-      <rect
-        className={`trama-node-pin ${stateClass}`}
-        x={rightCx - PIN_W / 2}
-        y={-PIN_W / 2}
-        width={PIN_W}
-        height={PIN_W}
-        rx={Math.min(PIN_RADIUS, PIN_W / 2)}
-        ry={Math.min(PIN_RADIUS, PIN_W / 2)}
-      />
-      <g pointerEvents="none">
-        <circle
-          className={`trama-node-socket-ring ${stateClass}`}
-          cx={rightCx}
-          cy={0}
-          r={SOCKET_SIZE / 2}
-        />
-        <circle
-          className={`trama-node-socket-dot ${stateClass}`}
-          cx={rightCx}
-          cy={0}
-          r={SOCKET_DOT_SIZE / 2}
-        />
-      </g>
+      {/* 우측 출력 소켓 — 상수는 항상 valid */}
+      <Socket cx={rightCx} cy={0} connected={outputConnected} />
       <circle
         className="trama-node-socket-hit"
         cx={rightCx}

@@ -135,29 +135,15 @@
   pointer-events: none;
 }
 
-/* 포트 핀 ------------------------------------------------------------ */
-[data-trama-root] .trama-node-pin {
-  fill: var(--color-pin-fill);
-  stroke: var(--color-pin-stroke);
-  stroke-width: 1;
-  pointer-events: none;
-  transition: stroke var(--motion-duration-scrub-response) var(--motion-easing-fade-natural);
-}
-
+/* 소켓 --------------------------------------------------------------- */
 [data-trama-root] .trama-node-socket-ring {
-  fill: none;
-  stroke: var(--color-socket-ring-default);
+  fill: var(--color-pin-fill);
+  stroke: var(--color-socket-ring);
   stroke-width: var(--spacing-socket-ring-stroke);
-}
-[data-trama-root] .trama-node-socket-ring.is-focal {
-  stroke: var(--color-socket-ring-focal);
 }
 
 [data-trama-root] .trama-node-socket-dot {
-  fill: var(--color-socket-dot-default);
-}
-[data-trama-root] .trama-node-socket-dot.is-focal {
-  fill: var(--color-socket-dot-focal);
+  fill: var(--color-socket-dot);
 }
 
 [data-trama-root] .trama-node-socket-hit {

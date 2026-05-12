@@ -14,6 +14,8 @@ import {
 } from './conditional-box.js';
 import { NodeFrame } from './NodeFrame.js';
 import { InteractiveArea } from './InteractiveArea.js';
+import { Socket } from './Socket.js';
+import { useInputConnectionMask, useOutputConnected } from './use-socket-connections.js';
 import { registerInputSocket } from '../canvas/socket-registry.js';
 import { completeEdgeDraft } from '../canvas/edge-draft-actions.js';
 
@@ -24,10 +26,7 @@ interface Props {
 const CARD_W = CONDITIONAL_CARD_W;
 const CARD_H = CONDITIONAL_CARD_H;
 const SLOT_LABEL_INSET = 20;
-const PIN_W = parseFloat(tokens.spacing.pinMinSize);
-const PIN_RADIUS = parseFloat(tokens.spacing.pinRadius);
 const SOCKET_SIZE = parseFloat(tokens.spacing.socketSize);
-const SOCKET_DOT_SIZE = parseFloat(tokens.spacing.socketDotSize);
 const CARD_CORNER = parseFloat(tokens.spacing.cardCornerRadius);
 
 const OPERATORS: ConditionalOperator[] = ['>', '==', '!='];
@@ -39,6 +38,9 @@ function ConditionalNodeViewImpl({ id }: Props): JSX.Element | null {
   const updateNode = useModelStore((s) => s.updateNode);
   const selection = useUIStore((s) => s.selection);
   const startEdgeDraft = useUIStore((s) => s.startEdgeDraft);
+  const inputMask = useInputConnectionMask(id);
+  const outTrueConnected = useOutputConnected(id, 0);
+  const outFalseConnected = useOutputConnected(id, 1);
 
   const pos = node?.position ?? { x: 200, y: 200 };
   const layout = getConditionalNodeLayout();
@@ -174,8 +176,7 @@ function ConditionalNodeViewImpl({ id }: Props): JSX.Element | null {
           >
             {s.label}
           </text>
-          <PinShape side="left" cx={s.x} cy={s.y} stateClass={stateClass} />
-          <SocketVisual cx={s.x} cy={s.y} stateClass={stateClass} />
+          <Socket cx={s.x} cy={s.y} connected={(inputMask & (1 << s.slot)) !== 0} />
           <circle
             className="trama-node-socket-hit"
             data-trama-slot-index={s.slot}
@@ -189,7 +190,7 @@ function ConditionalNodeViewImpl({ id }: Props): JSX.Element | null {
       {/* 출력 슬롯 (TR=참, BR=거짓) — 두 슬롯 모두 항상 노출, valid 여부는 상태 클래스로. */}
       {outputSlots.map((s) => {
         const handlers = makeOutputHandlers(s.slot, s.valid);
-        const slotState = s.valid ? 'is-calm' : 'is-low';
+        const slotConnected = s.slot === 0 ? outTrueConnected : outFalseConnected;
         return (
           <g key={`out${s.slot}`} className={s.valid ? '' : 'is-inactive-output'}>
             <text
@@ -200,8 +201,7 @@ function ConditionalNodeViewImpl({ id }: Props): JSX.Element | null {
             >
               {s.label}
             </text>
-            <PinShape side="right" cx={s.x} cy={s.y} stateClass={slotState} />
-            <SocketVisual cx={s.x} cy={s.y} stateClass={slotState} />
+            <Socket cx={s.x} cy={s.y} connected={slotConnected} />
             <circle
               className="trama-node-socket-hit"
               cx={s.x}
@@ -219,54 +219,3 @@ function ConditionalNodeViewImpl({ id }: Props): JSX.Element | null {
 
 export const ConditionalNodeView = memo(ConditionalNodeViewImpl);
 
-function PinShape({
-  side,
-  cx,
-  cy,
-  stateClass,
-}: {
-  side: 'left' | 'right';
-  cx: number;
-  cy: number;
-  stateClass: string;
-}): JSX.Element {
-  void side;
-  return (
-    <rect
-      className={`trama-node-pin ${stateClass}`}
-      x={cx - PIN_W / 2}
-      y={cy - PIN_W / 2}
-      width={PIN_W}
-      height={PIN_W}
-      rx={Math.min(PIN_RADIUS, PIN_W / 2)}
-      ry={Math.min(PIN_RADIUS, PIN_W / 2)}
-    />
-  );
-}
-
-function SocketVisual({
-  cx,
-  cy,
-  stateClass,
-}: {
-  cx: number;
-  cy: number;
-  stateClass: string;
-}): JSX.Element {
-  return (
-    <g pointerEvents="none">
-      <circle
-        className={`trama-node-socket-ring ${stateClass}`}
-        cx={cx}
-        cy={cy}
-        r={SOCKET_SIZE / 2}
-      />
-      <circle
-        className={`trama-node-socket-dot ${stateClass}`}
-        cx={cx}
-        cy={cy}
-        r={SOCKET_DOT_SIZE / 2}
-      />
-    </g>
-  );
-}

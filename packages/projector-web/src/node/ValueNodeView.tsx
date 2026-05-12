@@ -5,10 +5,12 @@ import { useModelStore, useUIStore } from '../store/index.js';
 import { combinerRegistry } from '../store/registries.js';
 import { formatNodeValue } from '../util/format.js';
 import { resolveNodeUnit } from '../util/unit-resolver.js';
-import { getNodeLayout, type PinLayout } from './box.js';
+import { getNodeLayout } from './box.js';
 import { NodeBorderTrack } from './NodeBorderTrack.js';
 import { NodeFrame } from './NodeFrame.js';
 import { InteractiveArea } from './InteractiveArea.js';
+import { Socket } from './Socket.js';
+import { useOutputConnected } from './use-socket-connections.js';
 import { registerInputSocket } from '../canvas/socket-registry.js';
 import { completeEdgeDraft } from '../canvas/edge-draft-actions.js';
 
@@ -18,9 +20,7 @@ interface Props {
 }
 
 const CARD_CORNER = parseFloat(tokens.spacing.cardCornerRadius);
-const PIN_RADIUS = parseFloat(tokens.spacing.pinRadius);
 const SOCKET_SIZE = parseFloat(tokens.spacing.socketSize);
-const SOCKET_DOT_SIZE = parseFloat(tokens.spacing.socketDotSize);
 
 function combinerSymbol(key: string): string {
   switch (key) {
@@ -46,6 +46,7 @@ function ValueNodeViewImpl({ id, incomingCount }: Props): JSX.Element | null {
   });
 
   const updateNode = useModelStore((s) => s.updateNode);
+  const outputConnected = useOutputConnected(id);
   const playbackStep = useModelStore((s) => s.playbackStep);
   const trajectoryLength = useModelStore((s) => s.trajectory.length);
   const selectNode = useUIStore((s) => s.selectNode);
@@ -228,18 +229,17 @@ function ValueNodeViewImpl({ id, incomingCount }: Props): JSX.Element | null {
         </text>
       )}
 
-      <PinShape pin={layout.leftPin} stateClass={stateClass} />
+      {/* 좌측 소켓은 incomingCount만큼 connected, 그 외(0 입력시 fallback 1개)는 비어있음. */}
       {layout.leftPin.sockets.map((s, i) => (
-        <SocketVisual key={`l${i}`} cx={s.x} cy={s.y} stateClass={stateClass} />
+        <Socket key={`l${i}`} cx={s.x} cy={s.y} connected={i < incomingCount} />
       ))}
 
-      <PinShape pin={layout.rightPin} stateClass={stateClass} />
       {layout.rightPin.sockets[0] && (
         <>
-          <SocketVisual
+          <Socket
             cx={layout.rightPin.sockets[0].x}
             cy={layout.rightPin.sockets[0].y}
-            stateClass={stateClass}
+            connected={outputConnected}
           />
           <circle
             className="trama-node-socket-hit"
@@ -259,47 +259,6 @@ function ValueNodeViewImpl({ id, incomingCount }: Props): JSX.Element | null {
 }
 
 export const ValueNodeView = memo(ValueNodeViewImpl);
-
-function PinShape({ pin, stateClass }: { pin: PinLayout; stateClass: string }): JSX.Element {
-  return (
-    <rect
-      className={`trama-node-pin ${stateClass}`}
-      x={pin.rectX}
-      y={pin.rectY}
-      width={pin.width}
-      height={pin.height}
-      rx={Math.min(PIN_RADIUS, pin.width / 2, pin.height / 2)}
-      ry={Math.min(PIN_RADIUS, pin.width / 2, pin.height / 2)}
-    />
-  );
-}
-
-function SocketVisual({
-  cx,
-  cy,
-  stateClass,
-}: {
-  cx: number;
-  cy: number;
-  stateClass: string;
-}): JSX.Element {
-  return (
-    <g pointerEvents="none">
-      <circle
-        className={`trama-node-socket-ring ${stateClass}`}
-        cx={cx}
-        cy={cy}
-        r={SOCKET_SIZE / 2}
-      />
-      <circle
-        className={`trama-node-socket-dot ${stateClass}`}
-        cx={cx}
-        cy={cy}
-        r={SOCKET_DOT_SIZE / 2}
-      />
-    </g>
-  );
-}
 
 function CombinerChip({
   symbol,
