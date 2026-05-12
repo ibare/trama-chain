@@ -103,6 +103,8 @@
 [data-trama-root] .trama-node-unit {
   font-size: var(--typography-text-node-unit);
   fill: var(--color-node-text-low);
+  /* 부모 .trama-node-value가 pointer-events:none이라 명시적으로 되살린다. */
+  pointer-events: auto;
   cursor: pointer;
 }
 [data-trama-root] .trama-node-unit:hover {
