@@ -15,7 +15,9 @@ import {
   isConditionalNode,
   isFunctionNode,
   modelToDocument,
+  outputKey,
   propagateOneStep,
+  recomputeNode,
   removeEdge as removeEdgeOp,
   removeNode as removeNodeOp,
   serializeTrama,
@@ -42,6 +44,12 @@ import type {
 } from '@trama/core';
 import { tokens } from '@trama/tokens';
 import { combinerRegistry, functionRegistry, shapeRegistry } from './registries.js';
+import {
+  setArrivalHandler,
+  spawnPulse,
+  type Pulse,
+} from '../pulse/pulse-registry.js';
+import { triggerNodeFlash } from '../pulse/node-flash-registry.js';
 
 const STEP_TICK_MS = parseFloat(tokens.motion.durationStepTick);
 
@@ -122,14 +130,32 @@ function patchAffectsValues(patch: NodePatch): boolean {
   const p = patch as Record<string, unknown>;
   return (
     'initialValue' in p ||
+    'value' in p ||
     'unitId' in p ||
     'unitOverride' in p ||
     'combiner' in p ||
     'isFocal' in p ||
     'functionKey' in p ||
     'outputUnitId' in p ||
-    'outputUnitOverride' in p
+    'outputUnitOverride' in p ||
+    'operator' in p
   );
+}
+
+/**
+ * patch가 *오직* "노드 자체의 출력값"만 바꾸는 단순 변경인지.
+ * true면 펄스 경로로 전파 가능 (구조적 변경이 아니므로 그래프 위상이 유지된다).
+ * false면 unit/combiner/function 등 구조적 의미 변경 — 전체 재계산이 안전.
+ */
+function patchIsSimpleValueChange(patch: NodePatch): boolean {
+  const keys = Object.keys(patch);
+  if (keys.length === 0) return false;
+  for (const k of keys) {
+    if (k !== 'initialValue' && k !== 'value' && k !== 'label' && k !== 'position') {
+      return false;
+    }
+  }
+  return 'initialValue' in patch || 'value' in patch;
 }
 
 function computeExecutionState(model: Model): {
@@ -154,6 +180,86 @@ const initial = createEmptyModel();
 const initialExec = computeExecutionState(initial);
 
 let activePlaybackToken = 0;
+
+/**
+ * 주어진 source 노드의 lag=0 outgoing edges에 대해 펄스를 spawn.
+ * lag=1 feedback 엣지는 제외 (방식 가). 출력 슬롯이 invalid면 skip.
+ * playback 중이면 spawn 자체를 막는다.
+ */
+function spawnOutgoingPulses(
+  model: Model,
+  executionState: ExecutionState,
+  sourceNodeId: NodeId,
+): void {
+  if (useModelStore.getState().playbackStep !== null) return;
+  for (const eid of model.edgeOrder) {
+    const e = model.edges[eid];
+    if (!e || e.from !== sourceNodeId) continue;
+    if ((e.lag ?? 0) !== 0) continue;
+    const slot = e.sourceSlotIndex ?? 0;
+    if (!executionState.validOutputs.has(outputKey(sourceNodeId, slot))) continue;
+    const sourceValue = executionState.values[sourceNodeId];
+    if (typeof sourceValue !== 'number') continue;
+    spawnPulse({
+      edgeId: eid,
+      sourceNodeId,
+      sourceSlotIndex: slot,
+      targetNodeId: e.to,
+      sourceValue,
+    });
+  }
+}
+
+/**
+ * 펄스 도착 처리.
+ * 1. target 재계산 (펄스의 source 값을 sourceValueOverrides로 박제)
+ * 2. flash 트리거
+ * 3. 결과값이 *바뀐 경우에만* outgoing edges로 펄스 전파
+ *
+ * playback 중에는 무시 (재생 모드와 충돌 방지).
+ */
+function handlePulseArrival(pulse: Pulse): void {
+  const { model, executionState, playbackStep } = useModelStore.getState();
+  if (playbackStep !== null) return;
+
+  // target 또는 source 노드가 사라졌다면 무시 (편집 중 race).
+  if (!model.nodes[pulse.targetNodeId] || !model.nodes[pulse.sourceNodeId]) return;
+
+  const result = recomputeNode(pulse.targetNodeId, executionState, model, {
+    shapeRegistry,
+    combinerRegistry,
+    functionRegistry,
+    sourceValueOverrides: { [pulse.sourceNodeId]: pulse.sourceValue },
+  });
+
+  const prevValue = executionState.values[pulse.targetNodeId];
+  const wasValid = executionState.validOutputs.has(outputKey(pulse.targetNodeId, 0));
+  const isValid = result.isValid;
+  const valueChanged =
+    result.newValue !== undefined && result.newValue !== prevValue;
+  const validityChanged = wasValid !== isValid;
+
+  useModelStore.setState((s) => {
+    const newValues: Record<NodeId, number> = { ...s.executionState.values };
+    if (result.newValue !== undefined) newValues[pulse.targetNodeId] = result.newValue;
+    return {
+      executionState: {
+        values: newValues,
+        validOutputs: result.validOutputs,
+      },
+    };
+  });
+
+  triggerNodeFlash(pulse.targetNodeId);
+
+  // 값이 실제 바뀐 경우만 하류 전파. validity만 바뀌었어도 전파 (출력이 켜졌다/꺼졌다는 변화).
+  if ((valueChanged || validityChanged) && result.newValue !== undefined) {
+    const latest = useModelStore.getState();
+    spawnOutgoingPulses(latest.model, latest.executionState, pulse.targetNodeId);
+  }
+}
+
+setArrivalHandler(handlePulseArrival);
 
 export const useModelStore = create<ModelStore>((set, get) => ({
   model: initial,
@@ -273,11 +379,43 @@ export const useModelStore = create<ModelStore>((set, get) => ({
     const before = get().model;
     const after = updateNodeOp(before, id, patch);
     if (after === before) return;
-    // 값에 영향을 주는 필드가 patch에 있을 때만 propagation 재실행.
-    // position·label만 바뀌었다면 시뮬레이션은 그대로다.
-    const exec = patchAffectsValues(patch) ? computeExecutionState(after) : null;
-    // 같은 노드에 대한 move-node·rename-node 등 연속 변경은 undo 한 칸으로 병합.
+
+    const affectsValues = patchAffectsValues(patch);
+    const simpleValue = patchIsSimpleValueChange(patch);
+    // 단순 값 변경(initialValue/value 단독)은 펄스 경로로 — executionState는 펄스 도달 시 점진 갱신.
+    // 구조적 변경(unit/combiner/function 등)은 전체 재계산.
     const shouldCoalesce = kind === 'move-node' || kind === 'rename-node';
+    const playbackActive = get().playbackStep !== null;
+
+    if (simpleValue && !playbackActive) {
+      const recomputed = computeExecutionState(after);
+      const nextNodeValue =
+        'value' in patch && typeof patch.value === 'number'
+          ? patch.value
+          : 'initialValue' in patch && typeof patch.initialValue === 'number'
+            ? patch.initialValue
+            : undefined;
+      set((s) => {
+        record(s, before, after, kind, label, { nodeId: id }, shouldCoalesce);
+        const newValues: Record<NodeId, number> = { ...s.executionState.values };
+        if (typeof nextNodeValue === 'number') newValues[id] = nextNodeValue;
+        const newValid = new Set(s.executionState.validOutputs);
+        newValid.add(outputKey(id, 0));
+        return {
+          model: after,
+          executionState: { values: newValues, validOutputs: newValid },
+          trajectory: recomputed.trajectory,
+          canUndo: s.log.canUndo(),
+          canRedo: s.log.canRedo(),
+        };
+      });
+      triggerNodeFlash(id);
+      const latest = get();
+      spawnOutgoingPulses(latest.model, latest.executionState, id);
+      return;
+    }
+
+    const exec = affectsValues ? computeExecutionState(after) : null;
     set((s) => {
       record(s, before, after, kind, label, { nodeId: id }, shouldCoalesce);
       return {
@@ -422,17 +560,34 @@ export const useModelStore = create<ModelStore>((set, get) => ({
     const before = get().model;
     const after = updateNodeOp(before, id, { initialValue: nextValue });
     if (after === before) return;
-    // *드래그 중* 갱신: 직전 op과 같은 노드 scrub이면 coalesce
-    const exec = computeExecutionState(after);
+    // 트래잭토리는 playback용으로 갱신해두되, executionState는 펄스 도착 시점에만 변화.
+    // 소스 노드 본인의 값은 즉시 갱신 (펄스의 출발 표시) — 하류는 펄스 도달 시 갱신.
+    const recomputed = computeExecutionState(after);
+    const playbackActive = get().playbackStep !== null;
     set((s) => {
       record(s, before, after, 'scrub-value', '값 변경', { nodeId: id }, true);
+      const nextValues: Record<NodeId, number> = playbackActive
+        ? s.executionState.values
+        : { ...s.executionState.values, [id]: nextValue };
+      const nextValid = playbackActive
+        ? s.executionState.validOutputs
+        : new Set(s.executionState.validOutputs);
+      if (!playbackActive) nextValid.add(outputKey(id, 0));
       return {
         model: after,
-        ...exec,
+        executionState: playbackActive
+          ? s.executionState
+          : { values: nextValues, validOutputs: nextValid },
+        trajectory: recomputed.trajectory,
         canUndo: s.log.canUndo(),
         canRedo: s.log.canRedo(),
       };
     });
+    if (!playbackActive) {
+      triggerNodeFlash(id);
+      const latest = get();
+      spawnOutgoingPulses(latest.model, latest.executionState, id);
+    }
   },
 
   play: () => {
@@ -443,6 +598,11 @@ export const useModelStore = create<ModelStore>((set, get) => ({
       window.setTimeout(() => {
         if (activePlaybackToken !== token) return;
         const isLast = i === trajectory.length - 1;
+        // step 경계에서 값이 바뀐 노드만 flash (방식 2 — 케이블 펄스 없이 노드만 깜빡임)
+        const prev = get().executionState;
+        for (const nid of Object.keys(s.values)) {
+          if (s.values[nid] !== prev.values[nid]) triggerNodeFlash(nid);
+        }
         set({ executionState: s, playbackStep: isLast ? null : i });
       }, i * STEP_TICK_MS);
     });

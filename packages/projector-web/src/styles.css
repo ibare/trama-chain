@@ -962,3 +962,31 @@
   opacity: 0.3;
   margin: 6px 2px;
 }
+
+/* Pulse propagation ----------------------------------------------------- */
+/* 노드 flash 오버레이 — 값 변경 / 펄스 도착 / playback step 경계에서 brief highlight.
+   key={flashId}로 매 트리거마다 remount되어 CSS 애니메이션이 재시작된다. */
+[data-trama-root] .trama-node-flash-overlay {
+  fill: var(--color-node-flash-fill);
+  stroke: var(--color-node-flash-border);
+  stroke-width: var(--spacing-stroke-node-default);
+  animation:
+    trama-node-flash var(--motion-duration-node-flash) var(--motion-easing-node-flash) forwards;
+}
+
+@keyframes trama-node-flash {
+  from { opacity: 1; }
+  to { opacity: 0; }
+}
+
+/* 펄스 — 케이블을 따라 흐르는 두 겹 원. PulseLayer가 매 프레임 cx/cy를 갱신. */
+[data-trama-root] .trama-pulse-halo {
+  fill: var(--color-pulse-halo-fill);
+  opacity: var(--physical-opacity-pulse-halo);
+  pointer-events: none;
+}
+
+[data-trama-root] .trama-pulse-core {
+  fill: var(--color-pulse-core-fill);
+  pointer-events: none;
+}

@@ -246,6 +246,18 @@ export function InverseUCurveEditor({ edge }: Props): JSX.Element | null {
         >
           {bMaxLbl.primary}
         </text>
+        {/* 피크 높이 눈금 — 위/아래 끝 라벨과 너무 가까우면 생략 */}
+        {Math.abs(peakPx.y - (PAD_T + 4)) > 14 &&
+          Math.abs(peakPx.y - (VIEW_H - PAD_B)) > 14 && (
+            <text
+              className="trama-curve-axis-label"
+              x={PAD_L - 6}
+              y={peakPx.y + 4}
+              textAnchor="end"
+            >
+              {peakBLbl.primary}
+            </text>
+          )}
         <text
           className="trama-curve-axis-name"
           x={4}
@@ -296,7 +308,7 @@ export function InverseUCurveEditor({ edge }: Props): JSX.Element | null {
           onPointerCancel={onUp}
         />
 
-        {/* 피크 좌표 라벨 */}
+        {/* 피크 x좌표 라벨 (y값은 y축 눈금으로 표시) */}
         <text
           className="trama-curve-handle-label"
           x={peakPx.x}
@@ -304,9 +316,7 @@ export function InverseUCurveEditor({ edge }: Props): JSX.Element | null {
           textAnchor="middle"
         >
           {peakALbl.primary}
-          {peakALbl.accessory ? ` ${peakALbl.accessory}` : ''} →{' '}
-          {peakBLbl.primary}
-          {peakBLbl.accessory ? ` ${peakBLbl.accessory}` : ''}
+          {peakALbl.accessory ? ` ${peakALbl.accessory}` : ''}
         </text>
       </svg>
     </div>

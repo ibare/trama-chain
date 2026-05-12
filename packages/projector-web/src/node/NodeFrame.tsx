@@ -1,5 +1,6 @@
 import { memo, useCallback, useEffect, useRef, type ReactNode } from 'react';
 import type { NodeId } from '@trama/core';
+import { tokens } from '@trama/tokens';
 import { useModelStore, useUIStore } from '../store/index.js';
 import {
   getIncidentEdgeHandles,
@@ -7,8 +8,10 @@ import {
   type EdgeHandle,
 } from '../canvas/drag-registry.js';
 import { getCurrentZoom } from '../canvas/viewport.js';
+import { useNodeFlashId } from '../pulse/use-node-flash.js';
 
 const DRAG_THRESHOLD_PX = 3;
+const CARD_CORNER = parseFloat(tokens.spacing.cardCornerRadius);
 
 interface Props {
   id: NodeId;
@@ -140,6 +143,8 @@ function NodeFrameImpl({
   const halfH = height / 2;
   const rootClass = `trama-node${className ? ` ${className}` : ''}`;
 
+  const flashId = useNodeFlashId(id);
+
   return (
     <g
       ref={outerGRef}
@@ -160,6 +165,19 @@ function NodeFrameImpl({
         onDoubleClick={onBodyDoubleClick}
       />
       {children}
+      {flashId > 0 && (
+        <rect
+          key={flashId}
+          className="trama-node-flash-overlay"
+          x={-halfW}
+          y={-halfH}
+          width={width}
+          height={height}
+          rx={CARD_CORNER}
+          ry={CARD_CORNER}
+          pointerEvents="none"
+        />
+      )}
     </g>
   );
 }

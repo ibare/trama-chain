@@ -18,6 +18,7 @@ import { type Point } from './geometry.js';
 import { registerEdgeHandle, type EdgeHandle } from '../canvas/drag-registry.js';
 import { completeEdgeDraft } from '../canvas/edge-draft-actions.js';
 import { registerTicker } from '../canvas/animation-loop.js';
+import { registerCable } from './cable-points-registry.js';
 import {
   cableEndTangent,
   cableMidpoint,
@@ -196,8 +197,13 @@ function EdgeViewImpl({
         shapeMarkerRef.current.setAttribute('transform', `translate(${m.x},${m.y})`);
       }
     };
-    return registerTicker(tick);
-  }, []);
+    const unregisterTicker = registerTicker(tick);
+    const unregisterCable = registerCable(edgeId, cable);
+    return () => {
+      unregisterTicker();
+      unregisterCable();
+    };
+  }, [edgeId]);
 
   // 노드 드래그 중 imperative 갱신을 위한 drag-registry 핸들. 여기선 endpoint ref만
   // 갱신하면 ticker가 다음 프레임에 알아서 케이블을 끌어간다.

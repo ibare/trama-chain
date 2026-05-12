@@ -3,6 +3,7 @@ import type { EdgeId, NodeId } from '@trama/core';
 import { useModelStore, useUIStore } from '../store/index.js';
 import { EdgeView } from '../edge/EdgeView.js';
 import { NodeView } from '../node/NodeView.js';
+import { PulseLayer } from '../pulse/PulseLayer.js';
 import { EdgeDraftView } from './EdgeDraftView.js';
 import { CanvasContextMenu } from './CanvasContextMenu.js';
 import { setViewport as setViewportSingleton } from './viewport.js';
@@ -322,6 +323,7 @@ export function Canvas(): JSX.Element {
         {nodeOrder.map((nid) => (
           <NodeView key={nid} id={nid} incomingCount={incomingCountByNode[nid] ?? 0} />
         ))}
+        <PulseLayer />
       </g>
       {/* 떠 있는 패널 — 모든 노드 위에 그려져 z-order 보장. 노드 그룹 안에서
           렌더하면 그 노드보다 뒤에 그려진 다른 노드에 의해 가려진다. */}
