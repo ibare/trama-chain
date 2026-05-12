@@ -1,8 +1,14 @@
 import { memo, useCallback, useEffect, useRef, useState } from 'react';
 import { tokens } from '@trama/tokens';
-import { isValueNode, normalize, type NodeId } from '@trama/core';
+import {
+  getFunctionSlotOccupancy,
+  isFunctionNode,
+  isValueNode,
+  normalize,
+  type NodeId,
+} from '@trama/core';
 import { useModelStore, useUIStore } from '../store/index.js';
-import { combinerRegistry } from '../store/registries.js';
+import { combinerRegistry, functionRegistry } from '../store/registries.js';
 import { formatNodeValue } from '../util/format.js';
 import { resolveNodeUnit } from '../util/unit-resolver.js';
 import { getNodeLayout, type PinLayout } from './box.js';
@@ -229,17 +235,53 @@ function ValueNodeViewImpl({ id, incomingCount }: Props): JSX.Element | null {
       const dropX = e.clientX;
       const dropY = e.clientY;
       const target = document.elementFromPoint(dropX, dropY);
+      const slotEl = target?.closest?.('[data-trama-slot-index]');
       const groupEl = target?.closest?.('[data-trama-node-id]');
       const targetId = groupEl?.getAttribute('data-trama-node-id');
       if (targetId && targetId !== id) {
         const lag: 0 | 1 = e.altKey ? 1 : 0;
+        const model = useModelStore.getState().model;
+        const targetNode = model.nodes[targetId];
+        // 함수 노드면 slotIndex가 필요하다. 슬롯 hit 영역 위에 정확히 떨어졌으면
+        // 그 슬롯을, 아니면 빈 슬롯 중 가장 앞쪽을 자동 선택.
+        let slotIndex: number | undefined;
+        if (targetNode && isFunctionNode(targetNode)) {
+          const def = functionRegistry.get(targetNode.functionKey);
+          if (!def) {
+            endEdgeDraft();
+            return;
+          }
+          const explicit = slotEl?.getAttribute('data-trama-slot-index');
+          const occupied = new Set(
+            getFunctionSlotOccupancy(model, targetId).map((o) => o.slotIndex),
+          );
+          if (explicit !== null && explicit !== undefined) {
+            const s = Number(explicit);
+            if (!occupied.has(s)) slotIndex = s;
+          }
+          if (slotIndex === undefined) {
+            for (let i = 0; i < def.slots.length; i++) {
+              if (!occupied.has(i)) {
+                slotIndex = i;
+                break;
+              }
+            }
+          }
+          if (slotIndex === undefined) {
+            endEdgeDraft();
+            return;
+          }
+        }
         const created = addEdge({
           from: id,
           to: targetId,
           shape: { kind: 'linear', params: { slope: 1, offset: 0 } },
           lag,
+          slotIndex,
         });
-        if (created) {
+        // 함수 노드로 들어가는 엣지는 사용자가 함수 형태를 다시 고를 일이 없으니
+        // function picker를 띄우지 않는다.
+        if (created && !(targetNode && isFunctionNode(targetNode))) {
           openFunctionPicker(created.id, { x: dropX, y: dropY });
         }
       }
@@ -275,7 +317,12 @@ function ValueNodeViewImpl({ id, incomingCount }: Props): JSX.Element | null {
 
   const isLow = norm < THRESH_LOW;
   const isFocal = node.isFocal;
-  const stateClass = isFocal ? 'is-focal' : isLow ? 'is-low' : 'is-calm';
+  // 컬러 분기: 사용자가 initialValue를 스크럽할 수 있는 노드(= lag=0 인입 엣지가
+  // 없음)는 입력 컬러, 상위 노드에 의해 매 step마다 덮어쓰이는 노드는 파생 컬러.
+  // isFocal 모델 플래그는 질문의 초점 노드 표시(스텝 오버레이)에만 쓰고,
+  // 컬러에는 더 이상 영향을 주지 않는다.
+  const isInputNode = !hasLag0Incoming;
+  const stateClass = isInputNode ? 'is-focal' : isLow ? 'is-low' : 'is-calm';
 
   let animClass = '';
   if (norm < THRESH_TIRED) animClass = 'is-tired';

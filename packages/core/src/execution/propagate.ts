@@ -95,14 +95,24 @@ export function propagateOneStep(
 
     const targetUnit = nodeOutputUnit(node, catalog);
 
+    // 함수 노드를 source로 두는 엣지는 raw passthrough — normalize/denormalize와
+    // shape 변환을 건너뛰고 source의 실제 값을 그대로 contribution으로 사용한다.
+    // 함수 출력은 단위가 없는 raw number이므로 정규화 의미가 없다(설계 전제).
+    let hasFunctionSource = false;
     const contributions: number[] = [];
     for (const edge of incoming) {
       const source = model.nodes[edge.from];
       if (!source) continue;
       if (!validNodes.has(edge.from)) continue; // 무효 source는 기여 없음
-      const sourceUnit = nodeOutputUnit(source, catalog);
       const sourceValue =
         next[edge.from] ?? (isValueNode(source) ? source.initialValue : 0);
+      if (isFunctionNode(source)) {
+        hasFunctionSource = true;
+        // edge.inverted는 0~1 정규화 공간 개념이라 raw에선 의미가 없다 — 무시.
+        contributions.push(sourceValue);
+        continue;
+      }
+      const sourceUnit = nodeOutputUnit(source, catalog);
       const normalizedIn = normalize(sourceValue, sourceUnit);
       const shape = options.shapeRegistry.get(edge.shape.kind);
       if (!shape) throw new MissingShapeError(edge.shape.kind);
@@ -115,7 +125,9 @@ export function propagateOneStep(
 
     if (contributions.length === 0) continue; // 모든 source 무효: 값 유지
     const combined = combiner.combine(contributions);
-    next[nid] = clampToUnit(combined, targetUnit);
+    // 함수 출력이 한 컨트리뷰션이라도 섞여 있으면 raw 통과 — target의 단위
+    // 클램프(예: cm의 0~250)에 짓이겨지지 않게 한다.
+    next[nid] = hasFunctionSource ? combined : clampToUnit(combined, targetUnit);
     validNodes.add(nid);
   }
 
@@ -162,9 +174,15 @@ function computeFunctionNode(
     return;
   }
 
-  // output 단위로 클램프(자유롭게 둘 수도 있지만 일관성을 위해 적용)
-  const outUnit = nodeOutputUnit(node, catalog);
-  next[node.id] = clampToUnit(out, outUnit);
+  // 함수 출력은 raw로 통과 — outputUnitId가 명시된 경우에만 그 단위로 클램프.
+  // 미지정(설계 기본)이면 raw 그대로 저장. 이 노드의 출력을 받는 엣지도
+  // propagateOneStep에서 정규화를 건너뛰도록 분기되어 있다.
+  if (node.outputUnitId) {
+    const outUnit = nodeOutputUnit(node, catalog);
+    next[node.id] = clampToUnit(out, outUnit);
+  } else {
+    next[node.id] = out;
+  }
   validNodes.add(node.id);
 }
 
@@ -185,6 +203,7 @@ export function applyFeedbackEdges(
   const validNodes = new Set(state.validNodes);
 
   const byTarget = new Map<string, number[]>();
+  const fnSourceTargets = new Set<string>();
   for (const edge of topology.feedbackEdges) {
     const target = model.nodes[edge.to];
     const source = model.nodes[edge.from];
@@ -196,6 +215,7 @@ export function applyFeedbackEdges(
     const list = byTarget.get(edge.to) ?? [];
     list.push(sourceValue);
     byTarget.set(edge.to, list);
+    if (isFunctionNode(source)) fnSourceTargets.add(edge.to);
   }
 
   for (const [tid, contribs] of byTarget) {
@@ -205,7 +225,9 @@ export function applyFeedbackEdges(
     if (!combiner) throw new MissingCombinerError(target.combiner);
     const baseValue = next[tid] ?? target.initialValue;
     const combined = combiner.combine([baseValue, ...contribs]);
-    next[tid] = clampToUnit(combined, nodeOutputUnit(target, catalog));
+    next[tid] = fnSourceTargets.has(tid)
+      ? combined
+      : clampToUnit(combined, nodeOutputUnit(target, catalog));
     validNodes.add(tid);
   }
 

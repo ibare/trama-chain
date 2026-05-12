@@ -164,7 +164,7 @@ describe('default function registry', () => {
     expect(s.validNodes.has('fn')).toBe(false);
   });
 
-  it('function output flows downstream into ValueNode', () => {
+  it('function output flows downstream into ValueNode (raw passthrough)', () => {
     let m = setupBinaryFn('multiply', 4, 5);
     m = addValueNode(m, {
       id: 'out',
@@ -182,10 +182,103 @@ describe('default function registry', () => {
       combinerRegistry: combiners,
       functionRegistry: functions,
     });
+    // 함수 출력은 raw 통과 — 'out'의 단위가 [0,200]임에도 클램프되지 않고 20.
     expect(s.values.fn).toBe(20);
-    // 'out'은 fn의 출력(20)을 받음 — fn의 outputUnit이 [-10000,10000]이고
-    // out의 unit이 [0,200]이므로 정규화→형변환의 결과는 100 근방(스케일링)이거나
-    // 그대로 통과. 단순히 validNodes 포함 확인.
+    expect(s.values.out).toBe(20);
     expect(s.validNodes.has('out')).toBe(true);
+  });
+
+  it('function output without outputUnitId is not clamped', () => {
+    // outputUnitId를 지정하지 않으면 함수 결과는 raw 그대로 저장된다.
+    let m = createEmptyModel();
+    m = addValueNode(m, {
+      id: 'a',
+      label: 'A',
+      ...numberUnit(-100, 100),
+      initialValue: 55,
+    });
+    m = addValueNode(m, {
+      id: 'b',
+      label: 'B',
+      ...numberUnit(-100, 100),
+      initialValue: 32,
+    });
+    m = addFunctionNode(m, {
+      id: 'fn',
+      label: 'F',
+      functionKey: 'multiply',
+      // outputUnitId 미지정 — 기존 코드라면 free 0~1로 클램프되어 1로 짓이겨짐.
+    });
+    m = addEdge(m, {
+      from: 'a',
+      to: 'fn',
+      shape: { kind: 'linear', params: { slope: 1, offset: 0 } },
+      slotIndex: 0,
+    });
+    m = addEdge(m, {
+      from: 'b',
+      to: 'fn',
+      shape: { kind: 'linear', params: { slope: 1, offset: 0 } },
+      slotIndex: 1,
+    });
+    const s = propagateOneStep(initializeFromInitialValues(m), m, {
+      shapeRegistry: shapes,
+      combinerRegistry: combiners,
+      functionRegistry: functions,
+    });
+    expect(s.values.fn).toBe(1760);
+  });
+
+  it('function output flowing into cm value node is not clamped to cm max', () => {
+    // 회귀 — 사용자 시나리오: 55*32=1760이 'cm' 단위의 defaultMax(250)에 짓이겨지지
+    // 않아야 한다.
+    let m = createEmptyModel();
+    m = addValueNode(m, {
+      id: 'w',
+      label: 'W',
+      unitId: 'cm',
+      initialValue: 55,
+    });
+    m = addValueNode(m, {
+      id: 'h',
+      label: 'H',
+      unitId: 'cm',
+      initialValue: 32,
+    });
+    m = addFunctionNode(m, {
+      id: 'fn',
+      label: 'F',
+      functionKey: 'multiply',
+    });
+    m = addValueNode(m, {
+      id: 'area',
+      label: 'Area',
+      unitId: 'cm',
+      initialValue: 0,
+    });
+    m = addEdge(m, {
+      from: 'w',
+      to: 'fn',
+      shape: { kind: 'linear', params: { slope: 1, offset: 0 } },
+      slotIndex: 0,
+    });
+    m = addEdge(m, {
+      from: 'h',
+      to: 'fn',
+      shape: { kind: 'linear', params: { slope: 1, offset: 0 } },
+      slotIndex: 1,
+    });
+    m = addEdge(m, {
+      from: 'fn',
+      to: 'area',
+      shape: { kind: 'linear', params: { slope: 1, offset: 0 } },
+    });
+    const s = propagateOneStep(initializeFromInitialValues(m), m, {
+      shapeRegistry: shapes,
+      combinerRegistry: combiners,
+      functionRegistry: functions,
+    });
+    expect(s.values.fn).toBe(1760);
+    expect(s.values.area).toBe(1760);
   });
 });

@@ -1,8 +1,10 @@
 import { memo, useCallback, useEffect, useRef } from 'react';
 import { tokens } from '@trama/tokens';
 import {
+  getFunctionSlotOccupancy,
   isFunctionNode,
   isNodeValid,
+  isValueNode,
   type NodeId,
 } from '@trama/core';
 import { useModelStore, useUIStore } from '../store/index.js';
@@ -142,20 +144,63 @@ function FunctionNodeViewImpl({ id }: Props): JSX.Element | null {
       const dropX = e.clientX;
       const dropY = e.clientY;
       const target = document.elementFromPoint(dropX, dropY);
+      const slotEl = target?.closest?.('[data-trama-slot-index]');
       const groupEl = target?.closest?.('[data-trama-node-id]');
       const targetId = groupEl?.getAttribute('data-trama-node-id');
       if (targetId && targetId !== id) {
         const lag: 0 | 1 = e.altKey ? 1 : 0;
-        addEdge({
+        const model = useModelStore.getState().model;
+        const targetNode = model.nodes[targetId];
+        let slotIndex: number | undefined;
+        if (targetNode && isFunctionNode(targetNode)) {
+          const def = functionRegistry.get(targetNode.functionKey);
+          if (!def) {
+            endEdgeDraft();
+            return;
+          }
+          const explicit = slotEl?.getAttribute('data-trama-slot-index');
+          const occupied = new Set(
+            getFunctionSlotOccupancy(model, targetId).map((o) => o.slotIndex),
+          );
+          if (explicit !== null && explicit !== undefined) {
+            const s = Number(explicit);
+            if (!occupied.has(s)) slotIndex = s;
+          }
+          if (slotIndex === undefined) {
+            for (let i = 0; i < def.slots.length; i++) {
+              if (!occupied.has(i)) {
+                slotIndex = i;
+                break;
+              }
+            }
+          }
+          if (slotIndex === undefined) {
+            endEdgeDraft();
+            return;
+          }
+        }
+        const created = addEdge({
           from: id,
           to: targetId,
           shape: { kind: 'linear', params: { slope: 1, offset: 0 } },
           lag,
+          slotIndex,
         });
+        // 함수 → 값 노드: 대상의 단위를 'raw'(suffix 없음, 넓은 범위)로 자동
+        // 변경. 함수가 산출한 값에 cm/kg 같은 임의의 단위를 강제하면 clamp 때문에
+        // 잘못된 값으로 보임. 정밀한 단위 추론은 추후 과제.
+        if (created && targetNode && isValueNode(targetNode) && targetNode.unitId !== 'raw') {
+          updateNode(
+            targetId,
+            { unitId: 'raw', unitOverride: undefined },
+            'update-node',
+            '단위 자동 설정',
+          );
+        }
       }
       endEdgeDraft();
     },
-    [addEdge, endEdgeDraft, id],
+    [addEdge, endEdgeDraft, id, updateNode],
   );
 
   if (!node || !isFunctionNode(node)) return null;
@@ -204,15 +249,20 @@ function FunctionNodeViewImpl({ id }: Props): JSX.Element | null {
           {node.label || def.labels.ko}
         </text>
 
-        {/* 좌측 핀 (입력 슬롯) — slotIndex 0..arity-1 */}
+        {/* 좌측 핀 (입력 슬롯) — slotIndex 0..arity-1.
+            각 슬롯에 hit 영역을 둬서 엣지 드롭 시 정확한 슬롯을 식별. */}
         <PinShape pin={layout.leftPin} stateClass={stateClass} />
         {layout.leftPin.sockets.map((s) => (
-          <SocketVisual
-            key={`in${s.slotIndex}`}
-            cx={s.x}
-            cy={s.y}
-            stateClass={stateClass}
-          />
+          <g key={`in${s.slotIndex}`}>
+            <SocketVisual cx={s.x} cy={s.y} stateClass={stateClass} />
+            <circle
+              className="trama-node-socket-hit"
+              data-trama-slot-index={s.slotIndex}
+              cx={s.x}
+              cy={s.y}
+              r={Math.max(SOCKET_SIZE, 12)}
+            />
+          </g>
         ))}
 
         {/* 우측 핀 (출력) — valid일 때만 보임 */}

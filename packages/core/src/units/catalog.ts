@@ -377,6 +377,17 @@ const FREE: UnitDef[] = [
     defaultStep: 0.01,
     hint: '단위 없이 0~1 정규화 척도로만 다룸',
   },
+  {
+    id: 'raw',
+    category: 'free',
+    kind: 'number',
+    label: { ko: '계산 결과 (단위 없음)' },
+    defaultMin: -1_000_000_000,
+    defaultMax: 1_000_000_000,
+    defaultInitial: 0,
+    defaultStep: 1,
+    hint: '함수 결과 등 단위가 정해지지 않은 값을 그대로 표기',
+  },
 ];
 
 const ALL: UnitDef[] = [
