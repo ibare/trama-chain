@@ -4,7 +4,6 @@ import {
   getFunctionSlotOccupancy,
   isFunctionNode,
   isValueNode,
-  normalize,
   type NodeId,
 } from '@trama/core';
 import { useModelStore, useUIStore } from '../store/index.js';
@@ -25,20 +24,11 @@ interface Props {
   incomingCount: number;
 }
 
-const THRESH_LOW = tokens.physical.thresholdNodeLow;
-const THRESH_TIRED = tokens.physical.thresholdNodeTired;
-const THRESH_ALIVE = tokens.physical.thresholdNodeAlive;
-const OPACITY_LOW = tokens.physical.opacityNodeLow;
-const OPACITY_HIGH = tokens.physical.opacityNodeHigh;
 const CARD_CORNER = parseFloat(tokens.spacing.cardCornerRadius);
 const PIN_RADIUS = parseFloat(tokens.spacing.pinRadius);
 const SOCKET_SIZE = parseFloat(tokens.spacing.socketSize);
 const SOCKET_DOT_SIZE = parseFloat(tokens.spacing.socketDotSize);
 const DRAG_THRESHOLD_PX = 3;
-
-function lerp(a: number, b: number, t: number): number {
-  return a + (b - a) * t;
-}
 
 function combinerSymbol(key: string): string {
   switch (key) {
@@ -286,17 +276,12 @@ function ValueNodeViewImpl({ id, incomingCount }: Props): JSX.Element | null {
   const layout = getNodeLayout(node, { incomingCount });
   const { halfW, halfH, width, height } = layout;
   const unit = resolveNodeUnit(node);
-  const norm = normalize(currentValue, unit);
-  const opacity = lerp(OPACITY_LOW, OPACITY_HIGH, norm);
 
-  const isLow = norm < THRESH_LOW;
-  const isFocal = node.isFocal;
+  // 입력성 노드(외부 입력이 없는 ValueNode)는 사용자가 의미를 직접 정한 값이라
+  // focal 톤으로 강조. 나머지는 차분한 기본 톤.
   const isInputNode = !hasLag0Incoming;
-  const stateClass = isInputNode ? 'is-focal' : isLow ? 'is-low' : 'is-calm';
-
-  let animClass = '';
-  if (norm < THRESH_TIRED) animClass = 'is-tired';
-  else if (norm > THRESH_ALIVE) animClass = 'is-alive';
+  const isFocal = node.isFocal;
+  const stateClass = isInputNode ? 'is-focal' : 'is-calm';
 
   const isSelected = selection.kind === 'node' && selection.id === id;
 
@@ -308,10 +293,9 @@ function ValueNodeViewImpl({ id, incomingCount }: Props): JSX.Element | null {
   return (
     <g
       ref={outerGRef}
-      className={`trama-node ${animClass}`}
+      className="trama-node"
       data-trama-node-id={id}
       transform={`translate(${pos.x} ${pos.y})`}
-      style={{ '--trama-node-opacity': opacity } as React.CSSProperties}
     >
       <g className="trama-node-inner">
         <rect

@@ -44,17 +44,14 @@
 /* Node ------------------------------------------------------------------- */
 [data-trama-root] .trama-node {
   cursor: grab;
-  opacity: var(--trama-node-opacity, 1);
   /* transform은 절대 transition 대상에 두지 않는다.
-     truth 위치를 보간하면 같은 좌표를 즉시 반영하는 엣지 path와 시각 분리가 발생.
-     opacity 등 transform과 무관한 속성만 보간. */
-  transition: opacity var(--motion-duration-scrub-response) var(--motion-easing-fade-natural);
+     truth 위치를 보간하면 같은 좌표를 즉시 반영하는 엣지 path와 시각 분리가 발생. */
   animation: trama-node-enter var(--motion-duration-pop-spring) var(--motion-easing-soft-spring) both;
 }
 
 @keyframes trama-node-enter {
   from { opacity: 0; }
-  to { opacity: var(--trama-node-opacity, 1); }
+  to { opacity: 1; }
 }
 
 [data-trama-root] .trama-node:active {
@@ -229,30 +226,6 @@
   color: var(--color-node-text-low);
   min-width: 36px;
   text-align: right;
-}
-
-/* Animations: 호흡, 기울임 -------------------------------------------------- */
-@keyframes trama-breath {
-  0%, 100% { transform: scale(1); }
-  50% { transform: scale(calc(1 + var(--physical-scale-breath-amplitude, 0.025))); }
-}
-
-@keyframes trama-tilt {
-  0%, 100% { transform: rotate(0) translate(0, 0); }
-  25% { transform: rotate(calc(var(--physical-angle-tilt-tired, 1.6) * 1deg)) translate(0.2px, 0.4px); }
-  75% { transform: rotate(calc(var(--physical-angle-tilt-tired, 1.6) * -1deg)) translate(-0.2px, -0.4px); }
-}
-
-[data-trama-root] .trama-node.is-alive .trama-node-inner {
-  transform-origin: center;
-  transform-box: fill-box;
-  animation: trama-breath var(--motion-duration-breath) var(--motion-easing-breath-curve) infinite;
-}
-
-[data-trama-root] .trama-node.is-tired .trama-node-inner {
-  transform-origin: center;
-  transform-box: fill-box;
-  animation: trama-tilt var(--motion-duration-tilt-soft) var(--motion-easing-fade-natural) infinite;
 }
 
 /* Edge ------------------------------------------------------------------- */
