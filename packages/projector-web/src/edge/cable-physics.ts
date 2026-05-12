@@ -35,7 +35,7 @@ export interface CableConfig {
 export const DEFAULT_CABLE_CONFIG: CableConfig = {
   gravity: 0.55,
   iterations: 5,
-  segments: 16,
+  segments: 24,
   slack: 1.04,
 };
 
