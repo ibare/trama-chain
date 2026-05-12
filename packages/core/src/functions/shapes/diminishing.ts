@@ -13,6 +13,16 @@ export const diminishingShape: ShapeDefinition<DiminishingParams> = {
   labels: { ko: '갈수록 둔하게', en: 'diminishing returns' },
   paramsSchema: params,
   defaultParams: { curvature: 0.5 },
+  paramFields: [
+    {
+      key: 'curvature',
+      labels: { ko: '곡률', en: 'curvature' },
+      min: 0.01,
+      max: 0.99,
+      step: 0.05,
+      hint: { ko: '클수록 빨리 둔해짐(평탄화)' },
+    },
+  ],
   compute: (x, p) => {
     const k = Math.max(0.01, Math.min(0.99, p.curvature));
     // power < 1이면 sqrt 류 곡선; 작을수록 빨리 둔해짐

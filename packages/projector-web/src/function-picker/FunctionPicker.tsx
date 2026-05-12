@@ -2,6 +2,7 @@ import { useCallback, useMemo } from 'react';
 import { useModelStore, useUIStore } from '../store/index.js';
 import { shapeRegistry } from '../store/registries.js';
 import { PiecewiseEditor } from './PiecewiseEditor.js';
+import { ShapeParamEditor } from './ShapeParamEditor.js';
 import { StochasticEditor } from './StochasticEditor.js';
 
 export function FunctionPicker(): JSX.Element | null {
@@ -25,11 +26,17 @@ export function FunctionPicker(): JSX.Element | null {
         'change-shape',
         '함수 변경',
       );
-      // piecewise/stochastic은 picker를 닫지 않고 인라인 에디터로 머무름.
-      if (key !== 'piecewise' && key !== 'stochastic') close();
+      // 인라인 편집 UI가 붙는 shape(piecewise·stochastic·paramFields 보유)은
+      // picker를 닫지 않고 그대로 편집할 수 있게 둔다.
+      const hasInlineEditor =
+        key === 'piecewise' || key === 'stochastic' || (def.paramFields?.length ?? 0) > 0;
+      if (!hasInlineEditor) close();
     },
     [close, edge, updateEdge],
   );
+
+  const currentDef = edge ? shapeRegistry.get(edge.shape.kind) : undefined;
+  const currentParamFields = currentDef?.paramFields ?? [];
 
   if (!picker || !edge) return null;
 
@@ -40,8 +47,10 @@ export function FunctionPicker(): JSX.Element | null {
       onPointerDown={(e) => e.stopPropagation()}
     >
       {shapes.map((s) => {
-        const path = s.previewPath(96, 36, s.defaultParams);
         const selected = edge.shape.kind === s.key;
+        // 선택된 카드는 현재 params로, 나머지는 default로 미리보기를 그린다.
+        const previewParams = selected ? edge.shape.params : s.defaultParams;
+        const path = s.previewPath(96, 36, previewParams);
         return (
           <div
             key={s.key}
@@ -57,6 +66,11 @@ export function FunctionPicker(): JSX.Element | null {
       })}
       {edge.shape.kind === 'piecewise' && <PiecewiseEditor edge={edge} />}
       {edge.shape.kind === 'stochastic' && <StochasticEditor edge={edge} />}
+      {edge.shape.kind !== 'piecewise' &&
+        edge.shape.kind !== 'stochastic' &&
+        currentParamFields.length > 0 && (
+          <ShapeParamEditor edge={edge} fields={currentParamFields} />
+        )}
     </div>
   );
 }

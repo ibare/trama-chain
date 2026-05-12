@@ -18,6 +18,16 @@ export const acceleratingShape: ShapeDefinition<AcceleratingParams> = {
     const power = 1 + k * 4; // 1~5
     return clamp01(Math.pow(clamp01(x), power));
   },
+  paramFields: [
+    {
+      key: 'curvature',
+      labels: { ko: '곡률', en: 'curvature' },
+      min: 0.01,
+      max: 0.99,
+      step: 0.05,
+      hint: { ko: '클수록 후반에 더 가파르게 솟음' },
+    },
+  ],
   previewPath: (w, h, p) => {
     const steps = 24;
     const pts: string[] = [];

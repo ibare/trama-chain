@@ -20,6 +20,31 @@ export const inverseUShape: ShapeDefinition<InverseUParams> = {
     const z = (x - p.peak) / sigma;
     return clamp01(p.height * Math.exp(-(z * z)));
   },
+  paramFields: [
+    {
+      key: 'peak',
+      labels: { ko: '적정점 위치 x', en: 'peak x' },
+      min: 0,
+      max: 1,
+      step: 0.05,
+      hint: { ko: '0~1 정규화 좌표상의 봉우리 위치' },
+    },
+    {
+      key: 'width',
+      labels: { ko: '폭', en: 'width' },
+      min: 0.05,
+      max: 1,
+      step: 0.05,
+      hint: { ko: '작을수록 뾰족, 크면 완만' },
+    },
+    {
+      key: 'height',
+      labels: { ko: '높이', en: 'height' },
+      min: 0,
+      max: 1,
+      step: 0.05,
+    },
+  ],
   previewPath: (w, h, p) => {
     const steps = 24;
     const pts: string[] = [];
