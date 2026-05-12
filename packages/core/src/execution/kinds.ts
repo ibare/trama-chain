@@ -18,6 +18,7 @@ import {
   MissingFunctionError,
   MissingShapeError,
 } from './errors.js';
+import type { ExpressionEvaluator } from './expression-evaluator.js';
 import { outputKey } from './state.js';
 
 /**
@@ -60,6 +61,7 @@ export interface PropagateContext {
   combinerRegistry: CombinerRegistry;
   functionRegistry: FunctionRegistry;
   nodeKindRegistry: NodeKindRegistry;
+  expressionEvaluator: ExpressionEvaluator;
   rng: Rng;
 }
 
@@ -330,12 +332,78 @@ const conditionalNodeDescriptor: NodeKindDescriptor<
   },
 };
 
+/**
+ * 식 노드 디스크립터.
+ *
+ * 동작:
+ *   1. `node.variables`가 곧 입력 슬롯 — 각 슬롯 인덱스에 들어온 값을 변수 이름에 바인딩.
+ *   2. 모든 변수가 채워져야 평가. 일부라도 비면 invalid.
+ *   3. 평가자는 외부 주입 (`ctx.expressionEvaluator`). 미주입이면 noop으로 undefined.
+ *   4. 결과는 raw — 단위 변환 없이 흘려보낸다 (FunctionNode와 동일).
+ */
+const expressionNodeDescriptor: NodeKindDescriptor<
+  Extract<Node, { kind: 'expression' }>
+> = {
+  kind: 'expression',
+  outputsRaw: true,
+  canBeFeedbackTarget: false,
+  initialValue: () => undefined,
+  initialValid: () => false,
+  outputUnit: () => FREE_FALLBACK,
+  propagate: (node, ctx) => {
+    const arity = node.variables.length;
+    if (arity === 0) {
+      // 변수가 없는 상수식 — 항상 같은 값으로 평가.
+      const out = ctx.expressionEvaluator.evaluate(node.latex, {});
+      if (typeof out === 'number' && Number.isFinite(out)) {
+        ctx.next[node.id] = out;
+        ctx.validOutputs.add(outputKey(node.id, 0));
+      } else {
+        ctx.validOutputs.delete(outputKey(node.id, 0));
+      }
+      return;
+    }
+
+    const bindings: Record<string, number> = {};
+    const filled = new Array<boolean>(arity).fill(false);
+
+    for (const edge of ctx.incoming) {
+      const slot = edge.slotIndex;
+      if (typeof slot !== 'number' || slot < 0 || slot >= arity) continue;
+      if (filled[slot]) continue;
+      const source = ctx.model.nodes[edge.from];
+      if (!source) continue;
+      if (!isEdgeSourceValid(ctx, edge)) continue;
+      const value =
+        ctx.next[edge.from] ?? (isValueNode(source) ? source.initialValue : 0);
+      const varName = node.variables[slot];
+      if (typeof varName !== 'string') continue;
+      bindings[varName] = value;
+      filled[slot] = true;
+    }
+
+    if (!filled.every((f) => f)) {
+      ctx.validOutputs.delete(outputKey(node.id, 0));
+      return;
+    }
+
+    const out = ctx.expressionEvaluator.evaluate(node.latex, bindings);
+    if (typeof out !== 'number' || !Number.isFinite(out)) {
+      ctx.validOutputs.delete(outputKey(node.id, 0));
+      return;
+    }
+    ctx.next[node.id] = out;
+    ctx.validOutputs.add(outputKey(node.id, 0));
+  },
+};
+
 export function createDefaultNodeKindRegistry(): NodeKindRegistry {
   return createNodeKindRegistry()
     .register(valueNodeDescriptor)
     .register(functionNodeDescriptor)
     .register(constantNodeDescriptor)
-    .register(conditionalNodeDescriptor);
+    .register(conditionalNodeDescriptor)
+    .register(expressionNodeDescriptor);
 }
 
 /**

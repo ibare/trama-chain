@@ -4,6 +4,7 @@ import type {
   ConstantNode,
   Edge,
   EdgeId,
+  ExpressionNode,
   FunctionNode,
   Model,
   Node,
@@ -128,6 +129,42 @@ export function addConstantNode(
     label: input.label,
     value: input.value,
     constantKey: input.constantKey,
+    position: input.position ?? null,
+    isFocal: input.isFocal ?? false,
+    description: input.description ?? null,
+  };
+  return touch(
+    {
+      ...model,
+      nodes: { ...model.nodes, [id]: node },
+      nodeOrder: [...model.nodeOrder, id],
+    },
+    now,
+  );
+}
+
+export interface AddExpressionNodeInput {
+  label: string;
+  latex: string;
+  variables?: string[];
+  position?: { x: number; y: number } | null;
+  isFocal?: boolean;
+  description?: string | null;
+  id?: NodeId;
+}
+
+export function addExpressionNode(
+  model: Model,
+  input: AddExpressionNodeInput,
+  now?: number,
+): Model {
+  const id = input.id ?? makeNodeId();
+  const node: ExpressionNode = {
+    kind: 'expression',
+    id,
+    label: input.label,
+    latex: input.latex,
+    variables: input.variables ?? [],
     position: input.position ?? null,
     isFocal: input.isFocal ?? false,
     description: input.description ?? null,

@@ -9,6 +9,10 @@ import {
   type NodeKindRegistry,
   type PropagateContext,
 } from './kinds.js';
+import {
+  noopExpressionEvaluator,
+  type ExpressionEvaluator,
+} from './expression-evaluator.js';
 import { defaultRng } from './rng.js';
 import { outputKey, type ExecutionState } from './state.js';
 import { buildTopology, type InstantaneousTopology } from './topology.js';
@@ -20,6 +24,8 @@ export interface RecomputeNodeOptions {
   nodeKindRegistry?: NodeKindRegistry;
   unitCatalog?: UnitCatalog;
   rng?: Rng;
+  /** LaTeX 식 평가자. 미지정이면 noop (식 노드 결과는 항상 undefined). */
+  expressionEvaluator?: ExpressionEvaluator;
   topology?: InstantaneousTopology;
   /**
    * 특정 source 노드의 값을 임시 대체. 펄스 도착 시 그 펄스가 운반한
@@ -102,6 +108,7 @@ export function recomputeNode(
     combinerRegistry: options.combinerRegistry,
     functionRegistry: options.functionRegistry,
     nodeKindRegistry,
+    expressionEvaluator: options.expressionEvaluator ?? noopExpressionEvaluator,
     rng: options.rng ?? defaultRng,
   };
 

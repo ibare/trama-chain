@@ -4,6 +4,8 @@ import { ValueNodeView } from './ValueNodeView.js';
 import { FunctionNodeView } from './FunctionNodeView.js';
 import { ConstantNodeView } from './ConstantNodeView.js';
 import { ConditionalNodeView } from './ConditionalNodeView.js';
+import { ExpressionNodeView } from './ExpressionNodeView.js';
+import { extractVariables } from '../expression/fizzex-evaluator.js';
 import { registerNodeKindUI } from './kind-catalog.js';
 
 /**
@@ -85,6 +87,32 @@ registerNodeKindUI({
         },
       };
     }),
+});
+
+registerNodeKindUI({
+  kind: 'expression',
+  menuSectionLabel: '식',
+  menuSectionOrder: 18,
+  View: ExpressionNodeView,
+  buildMenuItems: () => [
+    {
+      key: 'expression',
+      label: '식 노드',
+      symbol: 'fx',
+      onSelect: (canvasPos) => {
+        const addExpressionNode = useModelStore.getState().addExpressionNode;
+        const setEditingNode = useUIStore.getState().setEditingNode;
+        const latex = 'a + b';
+        const node = addExpressionNode({
+          label: '식',
+          latex,
+          variables: extractVariables(latex),
+          position: canvasPos,
+        });
+        setEditingNode(node.id);
+      },
+    },
+  ],
 });
 
 registerNodeKindUI({

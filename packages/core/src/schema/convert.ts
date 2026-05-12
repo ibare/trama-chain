@@ -2,6 +2,7 @@ import type {
   ConditionalNode,
   ConstantNode,
   Edge,
+  ExpressionNode,
   FunctionNode,
   Model,
   Node,
@@ -10,6 +11,7 @@ import type {
 import {
   isConditionalNode,
   isConstantNode,
+  isExpressionNode,
   isFunctionNode,
   isValueNode,
 } from '../model/index.js';
@@ -18,6 +20,7 @@ import type {
   TramaConstantNode,
   TramaDocument,
   TramaEdge,
+  TramaExpressionNode,
   TramaFunctionNode,
   TramaNode,
   TramaValueNode,
@@ -88,13 +91,25 @@ function nodeToDoc(n: Node): TramaNode {
     };
     return doc;
   }
-  // isConditionalNode
-  if (!isConditionalNode(n)) throw new Error(`Unknown node kind`);
-  const doc: TramaConditionalNode = {
-    kind: 'conditional',
+  if (isConditionalNode(n)) {
+    const doc: TramaConditionalNode = {
+      kind: 'conditional',
+      id: n.id,
+      label: n.label,
+      operator: n.operator,
+      position: n.position,
+      isFocal: n.isFocal,
+      description: n.description ?? null,
+    };
+    return doc;
+  }
+  if (!isExpressionNode(n)) throw new Error(`Unknown node kind`);
+  const doc: TramaExpressionNode = {
+    kind: 'expression',
     id: n.id,
     label: n.label,
-    operator: n.operator,
+    latex: n.latex,
+    variables: n.variables,
     position: n.position,
     isFocal: n.isFocal,
     description: n.description ?? null,
@@ -159,12 +174,24 @@ export function documentToModel(doc: TramaDocument): Model {
         description: n.description ?? null,
       };
       nodes[n.id] = node;
-    } else {
+    } else if (n.kind === 'conditional') {
       const node: ConditionalNode = {
         kind: 'conditional',
         id: n.id,
         label: n.label,
         operator: n.operator,
+        position: n.position,
+        isFocal: n.isFocal,
+        description: n.description ?? null,
+      };
+      nodes[n.id] = node;
+    } else {
+      const node: ExpressionNode = {
+        kind: 'expression',
+        id: n.id,
+        label: n.label,
+        latex: n.latex,
+        variables: n.variables,
         position: n.position,
         isFocal: n.isFocal,
         description: n.description ?? null,

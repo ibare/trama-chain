@@ -3,6 +3,7 @@ import type { Model } from '../model/index.js';
 import type { ShapeRegistry } from '../functions/index.js';
 import type { Rng } from '../functions/types.js';
 import type { FunctionRegistry } from '../node-functions/index.js';
+import type { ExpressionEvaluator } from './expression-evaluator.js';
 import { defaultRng } from './rng.js';
 import { applyFeedbackEdges, propagateOneStep } from './propagate.js';
 import { initializeFromInitialValues, type ExecutionState } from './state.js';
@@ -12,6 +13,8 @@ export interface ExecuteOptions {
   shapeRegistry: ShapeRegistry;
   combinerRegistry: CombinerRegistry;
   functionRegistry: FunctionRegistry;
+  /** LaTeX 식 평가자. 미지정이면 noop. */
+  expressionEvaluator?: ExpressionEvaluator;
   rng?: Rng;
   /** 매 step 직후 호출. UI 시각 흐름용. */
   onStep?: (state: ExecutionState, step: number) => void;
@@ -32,6 +35,7 @@ export function executeModel(model: Model, options: ExecuteOptions): ExecutionSt
     shapeRegistry: options.shapeRegistry,
     combinerRegistry: options.combinerRegistry,
     functionRegistry: options.functionRegistry,
+    expressionEvaluator: options.expressionEvaluator,
     rng,
     topology,
   };

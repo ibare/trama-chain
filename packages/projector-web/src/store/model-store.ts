@@ -4,6 +4,7 @@ import {
   addConditionalNode as addConditionalNodeOp,
   addConstantNode as addConstantNodeOp,
   addEdge as addEdgeOp,
+  addExpressionNode as addExpressionNodeOp,
   addFunctionNode as addFunctionNodeOp,
   addValueNode as addValueNodeOp,
   buildTopology,
@@ -30,6 +31,7 @@ import type {
   AddConditionalNodeInput,
   AddConstantNodeInput,
   AddEdgeInput,
+  AddExpressionNodeInput,
   AddFunctionNodeInput,
   AddValueNodeInput,
   Edge,
@@ -44,6 +46,7 @@ import type {
 } from '@trama/core';
 import { tokens } from '@trama/tokens';
 import { combinerRegistry, functionRegistry, shapeRegistry } from './registries.js';
+import { fizzexExpressionEvaluator } from '../expression/fizzex-evaluator.js';
 import {
   setArrivalHandler,
   spawnPulse,
@@ -84,6 +87,11 @@ export interface ModelStore {
   ) => Node;
   addConditionalNode: (
     input: AddConditionalNodeInput,
+    opKind?: OperationKind,
+    label?: string,
+  ) => Node;
+  addExpressionNode: (
+    input: AddExpressionNodeInput,
     opKind?: OperationKind,
     label?: string,
   ) => Node;
@@ -167,6 +175,7 @@ function computeExecutionState(model: Model): {
       shapeRegistry,
       combinerRegistry,
       functionRegistry,
+      expressionEvaluator: fizzexExpressionEvaluator,
     });
     return { executionState: traj[traj.length - 1]!, trajectory: traj };
   } catch {
@@ -229,6 +238,7 @@ function handlePulseArrival(pulse: Pulse): void {
     shapeRegistry,
     combinerRegistry,
     functionRegistry,
+    expressionEvaluator: fizzexExpressionEvaluator,
     sourceValueOverrides: { [pulse.sourceNodeId]: pulse.sourceValue },
   });
 
@@ -340,6 +350,24 @@ export const useModelStore = create<ModelStore>((set, get) => ({
   addConditionalNode: (input, opKind = 'add-node', label = '조건 노드 추가') => {
     const before = get().model;
     const after = addConditionalNodeOp(before, input);
+    const newId = after.nodeOrder[after.nodeOrder.length - 1]!;
+    const node = after.nodes[newId]!;
+    const exec = computeExecutionState(after);
+    set((s) => {
+      record(s, before, after, opKind, label, { nodeId: newId, node });
+      return {
+        model: after,
+        ...exec,
+        canUndo: s.log.canUndo(),
+        canRedo: s.log.canRedo(),
+      };
+    });
+    return node;
+  },
+
+  addExpressionNode: (input, opKind = 'add-node', label = '식 노드 추가') => {
+    const before = get().model;
+    const after = addExpressionNodeOp(before, input);
     const newId = after.nodeOrder[after.nodeOrder.length - 1]!;
     const node = after.nodes[newId]!;
     const exec = computeExecutionState(after);

@@ -18,6 +18,10 @@ import {
   type NodeKindRegistry,
   type PropagateContext,
 } from './kinds.js';
+import {
+  noopExpressionEvaluator,
+  type ExpressionEvaluator,
+} from './expression-evaluator.js';
 import { defaultRng } from './rng.js';
 import { outputKey, type ExecutionState } from './state.js';
 import { buildTopology, type InstantaneousTopology } from './topology.js';
@@ -31,6 +35,8 @@ export interface PropagateOptions {
   /** 단위 카탈로그. 미지정 시 기본 카탈로그. 알 수 없는 unitId는 free로 폴백. */
   unitCatalog?: UnitCatalog;
   rng?: Rng;
+  /** LaTeX 식 평가자. 미지정이면 noop (식 노드 출력은 항상 invalid). */
+  expressionEvaluator?: ExpressionEvaluator;
   /** 이미 계산된 위상을 재사용하려면 전달 */
   topology?: InstantaneousTopology;
 }
@@ -69,6 +75,8 @@ export function propagateOneStep(
       combinerRegistry: options.combinerRegistry,
       functionRegistry: options.functionRegistry,
       nodeKindRegistry,
+      expressionEvaluator:
+        options.expressionEvaluator ?? noopExpressionEvaluator,
       rng,
     };
     desc.propagate(node, ctx);

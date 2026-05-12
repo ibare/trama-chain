@@ -60,11 +60,23 @@ export const ConditionalNodeSchema = z.object({
   description: z.string().nullable().optional(),
 });
 
+export const ExpressionNodeSchema = z.object({
+  kind: z.literal('expression'),
+  id: z.string(),
+  label: z.string(),
+  latex: z.string(),
+  variables: z.array(z.string()),
+  position: z.object({ x: z.number(), y: z.number() }).nullable(),
+  isFocal: z.boolean(),
+  description: z.string().nullable().optional(),
+});
+
 export const NodeSchema = z.discriminatedUnion('kind', [
   ValueNodeSchema,
   FunctionNodeSchema,
   ConstantNodeSchema,
   ConditionalNodeSchema,
+  ExpressionNodeSchema,
 ]);
 
 export const EdgeSchema = z.object({
@@ -105,4 +117,5 @@ export type TramaValueNode = z.infer<typeof ValueNodeSchema>;
 export type TramaFunctionNode = z.infer<typeof FunctionNodeSchema>;
 export type TramaConstantNode = z.infer<typeof ConstantNodeSchema>;
 export type TramaConditionalNode = z.infer<typeof ConditionalNodeSchema>;
+export type TramaExpressionNode = z.infer<typeof ExpressionNodeSchema>;
 export type TramaEdge = z.infer<typeof EdgeSchema>;

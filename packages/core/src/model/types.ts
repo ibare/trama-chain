@@ -74,7 +74,30 @@ export interface ConditionalNode {
   description?: string | null;
 }
 
-export type Node = ValueNode | FunctionNode | ConstantNode | ConditionalNode;
+/**
+ * 식 노드 — LaTeX 수식을 받고 변수를 입력 슬롯으로 자동 노출.
+ * - `latex`: 원본 LaTeX 문자열 (fizzex parseLatex로 AST 변환).
+ * - `variables`: 식에서 추출한 변수 이름 배열. 슬롯 인덱스 = 배열 인덱스.
+ *   비결정성 회피를 위해 사용자가 변수 순서를 고정할 수 있게 저장.
+ * - 출력 단위는 raw (FunctionNode와 동일).
+ */
+export interface ExpressionNode {
+  kind: 'expression';
+  id: NodeId;
+  label: string;
+  latex: string;
+  variables: string[];
+  position: { x: number; y: number } | null;
+  isFocal: boolean;
+  description?: string | null;
+}
+
+export type Node =
+  | ValueNode
+  | FunctionNode
+  | ConstantNode
+  | ConditionalNode
+  | ExpressionNode;
 
 export function isValueNode(n: Node): n is ValueNode {
   return n.kind === 'value';
@@ -87,6 +110,9 @@ export function isConstantNode(n: Node): n is ConstantNode {
 }
 export function isConditionalNode(n: Node): n is ConditionalNode {
   return n.kind === 'conditional';
+}
+export function isExpressionNode(n: Node): n is ExpressionNode {
+  return n.kind === 'expression';
 }
 
 export interface Edge {

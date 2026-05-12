@@ -3,6 +3,7 @@ import type {
   TramaConstantNode,
   TramaDocument,
   TramaEdge,
+  TramaExpressionNode,
   TramaFunctionNode,
   TramaNode,
   TramaValueNode,
@@ -65,6 +66,17 @@ const CONDITIONAL_NODE_KEY_ORDER: (keyof TramaConditionalNode)[] = [
   'description',
 ];
 
+const EXPRESSION_NODE_KEY_ORDER: (keyof TramaExpressionNode)[] = [
+  'kind',
+  'id',
+  'label',
+  'latex',
+  'variables',
+  'position',
+  'isFocal',
+  'description',
+];
+
 const EDGE_KEY_ORDER: (keyof TramaEdge)[] = [
   'id',
   'from',
@@ -100,7 +112,8 @@ function orderNode(n: TramaNode): TramaNode {
   if (n.kind === 'value') return orderObject(n, VALUE_NODE_KEY_ORDER);
   if (n.kind === 'function') return orderObject(n, FUNCTION_NODE_KEY_ORDER);
   if (n.kind === 'constant') return orderObject(n, CONSTANT_NODE_KEY_ORDER);
-  return orderObject(n, CONDITIONAL_NODE_KEY_ORDER);
+  if (n.kind === 'conditional') return orderObject(n, CONDITIONAL_NODE_KEY_ORDER);
+  return orderObject(n, EXPRESSION_NODE_KEY_ORDER);
 }
 
 /** TramaDocument → 결정적인 JSON 문자열 (들여쓰기 2칸). */
