@@ -2,6 +2,7 @@ import type { CombinerRegistry } from '../combiners/index.js';
 import type { Model } from '../model/index.js';
 import type { ShapeRegistry } from '../functions/index.js';
 import type { Rng } from '../functions/types.js';
+import type { FunctionRegistry } from '../node-functions/index.js';
 import { defaultRng } from './rng.js';
 import { applyFeedbackEdges, propagateOneStep } from './propagate.js';
 import { initializeFromInitialValues, type ExecutionState } from './state.js';
@@ -10,6 +11,7 @@ import { buildTopology } from './topology.js';
 export interface ExecuteOptions {
   shapeRegistry: ShapeRegistry;
   combinerRegistry: CombinerRegistry;
+  functionRegistry: FunctionRegistry;
   rng?: Rng;
   /** 매 step 직후 호출. UI 시각 흐름용. */
   onStep?: (state: ExecutionState, step: number) => void;
@@ -29,6 +31,7 @@ export function executeModel(model: Model, options: ExecuteOptions): ExecutionSt
   const propOpts = {
     shapeRegistry: options.shapeRegistry,
     combinerRegistry: options.combinerRegistry,
+    functionRegistry: options.functionRegistry,
     rng,
     topology,
   };

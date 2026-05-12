@@ -8,6 +8,7 @@ import {
 } from '../src/model/index.js';
 import { createDefaultCombinerRegistry } from '../src/combiners/index.js';
 import { createDefaultShapeRegistry } from '../src/functions/index.js';
+import { createDefaultFunctionRegistry } from '../src/node-functions/index.js';
 import {
   InstantaneousCycleError,
   buildTopology,
@@ -19,6 +20,7 @@ import { mulberry32 } from '../src/execution/rng.js';
 
 const shapes = createDefaultShapeRegistry();
 const combiners = createDefaultCombinerRegistry();
+const functions = createDefaultFunctionRegistry();
 
 /**
  * 테스트용 ad-hoc number 단위 — number kind 베이스 카탈로그('count') 위에
@@ -80,6 +82,7 @@ describe('propagateOneStep', () => {
     const state = propagateOneStep(initializeFromInitialValues(m), m, {
       shapeRegistry: shapes,
       combinerRegistry: combiners,
+      functionRegistry: functions,
     });
     // 50/100 = 0.5 → linear(0.5) = 0.5 → denorm to [0,100] = 50
     expect(state.values.b).toBeCloseTo(50);
@@ -101,6 +104,7 @@ describe('propagateOneStep', () => {
     const state = propagateOneStep(initializeFromInitialValues(m), m, {
       shapeRegistry: shapes,
       combinerRegistry: combiners,
+      functionRegistry: functions,
     });
     // a contrib: norm 0.5 → linear → 0.5 → denorm [0,20] = 10
     // b contrib: norm 0.3 → linear → 0.3 → denorm [0,20] = 6
@@ -121,6 +125,7 @@ describe('propagateOneStep', () => {
     const state = propagateOneStep(initializeFromInitialValues(m), m, {
       shapeRegistry: shapes,
       combinerRegistry: combiners,
+      functionRegistry: functions,
     });
     // 0.8 → 1 - 0.8 = 0.2 → 2
     expect(state.values.b).toBeCloseTo(2);
@@ -158,7 +163,11 @@ describe('executeModel (N-step)', () => {
     });
     m = setExecution(m, { steps: 3 });
 
-    const traj = executeModel(m, { shapeRegistry: shapes, combinerRegistry: combiners });
+    const traj = executeModel(m, {
+      shapeRegistry: shapes,
+      combinerRegistry: combiners,
+      functionRegistry: functions,
+    });
     // traj[0] = initial, traj[1] propagation 후, ...
     expect(traj.length).toBeGreaterThanOrEqual(4);
     // 잔액이 시간이 갈수록 증가 (10% 복리)
@@ -173,11 +182,13 @@ describe('executeModel (N-step)', () => {
     const r1 = executeModel(m, {
       shapeRegistry: shapes,
       combinerRegistry: combiners,
+      functionRegistry: functions,
       rng: mulberry32(42),
     });
     const r2 = executeModel(m, {
       shapeRegistry: shapes,
       combinerRegistry: combiners,
+      functionRegistry: functions,
       rng: mulberry32(42),
     });
     const f1 = r1[r1.length - 1]!.values.balance;
@@ -187,6 +198,7 @@ describe('executeModel (N-step)', () => {
     const r3 = executeModel(m, {
       shapeRegistry: shapes,
       combinerRegistry: combiners,
+      functionRegistry: functions,
       rng: mulberry32(43),
     });
     const f3 = r3[r3.length - 1]!.values.balance;

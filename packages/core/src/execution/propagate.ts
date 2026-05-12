@@ -1,8 +1,9 @@
 import type { CombinerRegistry } from '../combiners/index.js';
-import type { Model, Node } from '../model/index.js';
-import { isValueNode } from '../model/index.js';
+import type { Model, Node, NodeId } from '../model/index.js';
+import { isFunctionNode, isValueNode } from '../model/index.js';
 import type { ShapeRegistry } from '../functions/index.js';
 import type { Rng } from '../functions/types.js';
+import type { FunctionRegistry } from '../node-functions/index.js';
 import {
   clamp01,
   clampToUnit,
@@ -13,7 +14,11 @@ import {
   type ResolvedUnit,
   type UnitCatalog,
 } from '../units/index.js';
-import { MissingCombinerError, MissingShapeError } from './errors.js';
+import {
+  MissingCombinerError,
+  MissingFunctionError,
+  MissingShapeError,
+} from './errors.js';
 import { defaultRng } from './rng.js';
 import type { ExecutionState } from './state.js';
 import { buildTopology, type InstantaneousTopology } from './topology.js';
@@ -21,6 +26,7 @@ import { buildTopology, type InstantaneousTopology } from './topology.js';
 export interface PropagateOptions {
   shapeRegistry: ShapeRegistry;
   combinerRegistry: CombinerRegistry;
+  functionRegistry: FunctionRegistry;
   /** 단위 카탈로그. 미지정 시 기본 카탈로그. 알 수 없는 unitId는 free로 폴백. */
   unitCatalog?: UnitCatalog;
   rng?: Rng;
@@ -38,19 +44,27 @@ const FREE_FALLBACK: ResolvedUnit = {
   step: 0.01,
 };
 
-function valueNodeUnit(node: Node, catalog: UnitCatalog): ResolvedUnit {
-  if (!isValueNode(node)) return FREE_FALLBACK;
-  const def = catalog.get(node.unitId);
+function nodeOutputUnit(node: Node, catalog: UnitCatalog): ResolvedUnit {
+  if (isValueNode(node)) {
+    const def = catalog.get(node.unitId);
+    if (!def) return FREE_FALLBACK;
+    return resolveUnit(def, node.unitOverride);
+  }
+  // FunctionNode: outputUnitId 사용. 미지정 시 free.
+  if (!node.outputUnitId) return FREE_FALLBACK;
+  const def = catalog.get(node.outputUnitId);
   if (!def) return FREE_FALLBACK;
-  return resolveUnit(def, node.unitOverride);
+  return resolveUnit(def, node.outputUnitOverride);
 }
 
 /**
  * 한 timestep 안에서 lag=0 엣지만 따라 전방 전파.
- * - 입력만 있는 노드(들어오는 lag=0 엣지 없음)는 state 값을 유지.
- * - 들어오는 lag=0 엣지가 있는 노드는 각 엣지의 출력을 combiner로 결합, unit으로 클램프.
+ * - ValueNode: incoming lag=0 엣지의 shape 변환 결과를 combiner로 결합·클램프.
+ * - FunctionNode: incoming 엣지를 slotIndex로 정렬, 모든 슬롯이 채워지고 source가
+ *   모두 valid이며 compute 결과가 finite하면 next에 기록·validNodes에 추가.
+ *   하나라도 만족 못 하면 validNodes에서 제거(downstream도 자연히 invalid).
  *
- * NOTE: FunctionNode 처리는 Phase 3에서 추가됨. 현재는 ValueNode만 갱신.
+ * 입력만 있는 ValueNode(들어오는 lag=0 엣지 없음)는 state 값을 유지.
  */
 export function propagateOneStep(
   state: ExecutionState,
@@ -66,25 +80,29 @@ export function propagateOneStep(
   for (const nid of topology.order) {
     const node = model.nodes[nid];
     if (!node) continue;
-    if (!isValueNode(node)) continue; // FunctionNode는 Phase 3에서
-
     const incoming = topology.incomingByTarget.get(nid) ?? [];
-    if (incoming.length === 0) {
-      // 입력 없음: 기존 값 유지
+
+    if (isFunctionNode(node)) {
+      computeFunctionNode(node, incoming, next, validNodes, model, catalog, options);
       continue;
     }
+
+    // ValueNode
+    if (incoming.length === 0) continue; // 입력 없음: 기존 값 유지
 
     const combiner = options.combinerRegistry.get(node.combiner);
     if (!combiner) throw new MissingCombinerError(node.combiner);
 
-    const targetUnit = valueNodeUnit(node, catalog);
+    const targetUnit = nodeOutputUnit(node, catalog);
 
     const contributions: number[] = [];
     for (const edge of incoming) {
       const source = model.nodes[edge.from];
-      if (!source || !isValueNode(source)) continue;
-      const sourceUnit = valueNodeUnit(source, catalog);
-      const sourceValue = next[edge.from] ?? source.initialValue;
+      if (!source) continue;
+      if (!validNodes.has(edge.from)) continue; // 무효 source는 기여 없음
+      const sourceUnit = nodeOutputUnit(source, catalog);
+      const sourceValue =
+        next[edge.from] ?? (isValueNode(source) ? source.initialValue : 0);
       const normalizedIn = normalize(sourceValue, sourceUnit);
       const shape = options.shapeRegistry.get(edge.shape.kind);
       if (!shape) throw new MissingShapeError(edge.shape.kind);
@@ -95,6 +113,7 @@ export function propagateOneStep(
       contributions.push(denormalize(out01, targetUnit));
     }
 
+    if (contributions.length === 0) continue; // 모든 source 무효: 값 유지
     const combined = combiner.combine(contributions);
     next[nid] = clampToUnit(combined, targetUnit);
     validNodes.add(nid);
@@ -103,9 +122,56 @@ export function propagateOneStep(
   return { values: next, validNodes };
 }
 
+function computeFunctionNode(
+  node: Extract<Node, { kind: 'function' }>,
+  incoming: ReadonlyArray<Model['edges'][string]>,
+  next: Record<NodeId, number>,
+  validNodes: Set<NodeId>,
+  model: Model,
+  catalog: UnitCatalog,
+  options: PropagateOptions,
+): void {
+  const def = options.functionRegistry.get(node.functionKey);
+  if (!def) throw new MissingFunctionError(node.functionKey);
+
+  const arity = def.slots.length;
+  const inputs: number[] = new Array(arity);
+  const filled = new Array<boolean>(arity).fill(false);
+
+  for (const edge of incoming) {
+    const slot = edge.slotIndex;
+    if (typeof slot !== 'number' || slot < 0 || slot >= arity) continue;
+    if (filled[slot]) continue; // 중복 엣지 — 첫 것 채택, 나머지 무시
+    const source = model.nodes[edge.from];
+    if (!source) continue;
+    if (!validNodes.has(edge.from)) continue;
+    const value =
+      next[edge.from] ?? (isValueNode(source) ? source.initialValue : 0);
+    inputs[slot] = value;
+    filled[slot] = true;
+  }
+
+  if (!filled.every((f) => f)) {
+    validNodes.delete(node.id);
+    return;
+  }
+
+  const out = def.compute(inputs);
+  if (!Number.isFinite(out)) {
+    validNodes.delete(node.id);
+    return;
+  }
+
+  // output 단위로 클램프(자유롭게 둘 수도 있지만 일관성을 위해 적용)
+  const outUnit = nodeOutputUnit(node, catalog);
+  next[node.id] = clampToUnit(out, outUnit);
+  validNodes.add(node.id);
+}
+
 /**
  * lag=1 엣지를 따라 source의 *현재* 값을 target의 다음 timestep 시작값으로 전달.
  * 단일 target에 여러 feedback이 모이면 노드의 combiner로 결합.
+ * FunctionNode는 feedback target이 될 수 없음(슬롯 기반이고 자체 누적 의미 없음).
  */
 export function applyFeedbackEdges(
   state: ExecutionState,
@@ -123,8 +189,10 @@ export function applyFeedbackEdges(
     const target = model.nodes[edge.to];
     const source = model.nodes[edge.from];
     if (!target || !source) continue;
-    if (!isValueNode(target) || !isValueNode(source)) continue;
-    const sourceValue = state.values[edge.from] ?? source.initialValue;
+    if (!isValueNode(target)) continue; // FunctionNode는 feedback target 아님
+    if (!validNodes.has(edge.from)) continue;
+    const sourceValue =
+      state.values[edge.from] ?? (isValueNode(source) ? source.initialValue : 0);
     const list = byTarget.get(edge.to) ?? [];
     list.push(sourceValue);
     byTarget.set(edge.to, list);
@@ -137,7 +205,7 @@ export function applyFeedbackEdges(
     if (!combiner) throw new MissingCombinerError(target.combiner);
     const baseValue = next[tid] ?? target.initialValue;
     const combined = combiner.combine([baseValue, ...contribs]);
-    next[tid] = clampToUnit(combined, valueNodeUnit(target, catalog));
+    next[tid] = clampToUnit(combined, nodeOutputUnit(target, catalog));
     validNodes.add(tid);
   }
 

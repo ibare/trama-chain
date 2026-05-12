@@ -1,14 +1,14 @@
 import { useNavigate } from 'react-router-dom';
 import { EmptyStatePrompt } from '../empty-state/EmptyStatePrompt.js';
 import { newModel, saveModel } from '../storage.js';
-import { addNode } from '@trama/core';
+import { addValueNode } from '@trama/core';
 
 export function NewRoute(): JSX.Element {
   const navigate = useNavigate();
 
   const onSubmit = (question: string) => {
     let m = newModel(question);
-    m = addNode(m, {
+    m = addValueNode(m, {
       label: '변수 1',
       unitId: 'rating-10',
       initialValue: 5,

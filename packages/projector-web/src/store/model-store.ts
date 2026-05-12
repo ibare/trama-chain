@@ -32,7 +32,7 @@ import type {
   OperationKind,
 } from '@trama/core';
 import { tokens } from '@trama/tokens';
-import { combinerRegistry, shapeRegistry } from './registries.js';
+import { combinerRegistry, functionRegistry, shapeRegistry } from './registries.js';
 
 const STEP_TICK_MS = parseFloat(tokens.motion.durationStepTick);
 
@@ -113,7 +113,11 @@ function computeExecutionState(model: Model): {
   trajectory: ExecutionState[];
 } {
   try {
-    const traj = executeModel(model, { shapeRegistry, combinerRegistry });
+    const traj = executeModel(model, {
+      shapeRegistry,
+      combinerRegistry,
+      functionRegistry,
+    });
     return { executionState: traj[traj.length - 1]!, trajectory: traj };
   } catch {
     // 사이클 등 에러 시 초기값으로 폴백
@@ -372,5 +376,9 @@ export function selectHasFeedback(s: Pick<ModelStore, 'model'>): boolean {
  */
 export function previewPropagation(model: Model): ExecutionState {
   const init = initializeFromInitialValues(model);
-  return propagateOneStep(init, model, { shapeRegistry, combinerRegistry });
+  return propagateOneStep(init, model, {
+    shapeRegistry,
+    combinerRegistry,
+    functionRegistry,
+  });
 }
