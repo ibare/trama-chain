@@ -1,6 +1,7 @@
 import { create } from 'zustand';
 import {
   OperationLog,
+  addConstantNode as addConstantNodeOp,
   addEdge as addEdgeOp,
   addFunctionNode as addFunctionNodeOp,
   addValueNode as addValueNodeOp,
@@ -22,6 +23,7 @@ import {
   updateNode as updateNodeOp,
 } from '@trama/core';
 import type {
+  AddConstantNodeInput,
   AddEdgeInput,
   AddFunctionNodeInput,
   AddValueNodeInput,
@@ -64,6 +66,11 @@ export interface ModelStore {
     opKind?: OperationKind,
     label?: string,
   ) => Node | null;
+  addConstantNode: (
+    input: AddConstantNodeInput,
+    opKind?: OperationKind,
+    label?: string,
+  ) => Node;
   updateNode: (id: NodeId, patch: NodePatch, kind?: OperationKind, label?: string) => void;
   removeNode: (id: NodeId) => void;
 
@@ -183,6 +190,24 @@ export const useModelStore = create<ModelStore>((set, get) => ({
   addNode: (input, opKind = 'add-node', label = '노드 추가') => {
     const before = get().model;
     const after = addValueNodeOp(before, input);
+    const newId = after.nodeOrder[after.nodeOrder.length - 1]!;
+    const node = after.nodes[newId]!;
+    const exec = computeExecutionState(after);
+    set((s) => {
+      record(s, before, after, opKind, label, { nodeId: newId, node });
+      return {
+        model: after,
+        ...exec,
+        canUndo: s.log.canUndo(),
+        canRedo: s.log.canRedo(),
+      };
+    });
+    return node;
+  },
+
+  addConstantNode: (input, opKind = 'add-node', label = '상수 노드 추가') => {
+    const before = get().model;
+    const after = addConstantNodeOp(before, input);
     const newId = after.nodeOrder[after.nodeOrder.length - 1]!;
     const node = after.nodes[newId]!;
     const exec = computeExecutionState(after);

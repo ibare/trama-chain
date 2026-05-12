@@ -1,7 +1,8 @@
 import { useModelStore, useUIStore } from '../store/index.js';
-import { functionRegistry } from '../store/registries.js';
+import { constantRegistry, functionRegistry } from '../store/registries.js';
 import { ValueNodeView } from './ValueNodeView.js';
 import { FunctionNodeView } from './FunctionNodeView.js';
+import { ConstantNodeView } from './ConstantNodeView.js';
 import { registerNodeKindUI } from './kind-catalog.js';
 
 /**
@@ -34,6 +35,33 @@ registerNodeKindUI({
       },
     },
   ],
+});
+
+registerNodeKindUI({
+  kind: 'constant',
+  menuSectionLabel: '상수',
+  menuSectionOrder: 15,
+  View: ConstantNodeView,
+  buildMenuItems: () =>
+    constantRegistry.list().map((def) => {
+      const isCustom = def.key === 'custom';
+      return {
+        key: `const-${def.key}`,
+        label: def.labels.ko,
+        symbol: def.symbol,
+        onSelect: (canvasPos) => {
+          const addConstantNode = useModelStore.getState().addConstantNode;
+          const setEditingNode = useUIStore.getState().setEditingNode;
+          const node = addConstantNode({
+            label: isCustom ? '상수' : def.symbol,
+            value: def.value,
+            constantKey: def.key,
+            position: canvasPos,
+          });
+          if (isCustom) setEditingNode(node.id);
+        },
+      };
+    }),
 });
 
 registerNodeKindUI({
