@@ -14,9 +14,19 @@ import { getNodeLayout } from '../node/box.js';
 import { layoutForFunctionDef } from '../node/function-box.js';
 import { getConditionalNodeLayout } from '../node/conditional-box.js';
 import { resolveNodeUnit } from '../util/unit-resolver.js';
-import { edgePath, type Point } from './geometry.js';
+import { type Point } from './geometry.js';
 import { registerEdgeHandle, type EdgeHandle } from '../canvas/drag-registry.js';
 import { completeEdgeDraft } from '../canvas/edge-draft-actions.js';
+import { registerTicker } from '../canvas/animation-loop.js';
+import {
+  cableEndTangent,
+  cableMidpoint,
+  cableToPoints,
+  createCable,
+  setCableEndpoints,
+  stepCable,
+  type Cable,
+} from './cable-physics.js';
 
 interface Props {
   edgeId: EdgeId;
@@ -76,10 +86,7 @@ function EdgeViewImpl({
     return undefined;
   }, [edge]);
 
-  // 현재 baseline 좌표·소켓 (드래그 오프셋 미포함). 매 render마다 갱신해
-  // imperative 핸들이 항상 최신 baseline을 보게 한다.
-  // ValueNode와 FunctionNode는 카드 폭이 달라(184 vs 144) 레이아웃 헬퍼가
-  // 다르다. 노드 종류에 맞는 헬퍼를 골라 정확한 소켓 좌표를 얻는다.
+  // 노드 종류에 맞는 끝점 좌표. baseStart/baseEnd가 변하면 케이블의 endpoint도 따라옴.
   const edgeSourceSlotIndex = edge?.sourceSlotIndex;
   const baseStart: Point = useMemo(() => {
     if (!fromNode) return { x: 0, y: 0 };
@@ -92,8 +99,6 @@ function EdgeViewImpl({
   const baseEnd: Point = useMemo(() => {
     if (!toNode) return { x: 0, y: 0 };
     const base = toNode.position ?? { x: 0, y: 0 };
-    // 함수 노드·조건 노드 target은 edge.slotIndex가 슬롯을 결정. 값 노드는
-    // incoming 순번(socketIndex)이 좌측 핀 소켓 위치를 결정.
     const effectiveSocket =
       isFunctionNode(toNode) || isConditionalNode(toNode)
         ? (typeof edgeSlotIndex === 'number' ? edgeSlotIndex : 0)
@@ -102,40 +107,87 @@ function EdgeViewImpl({
     return { x: base.x + socket.x, y: base.y + socket.y };
   }, [toNode, toIncomingCount, socketIndex, edgeSlotIndex]);
 
+  // 케이블 인스턴스 — 한 번 생성. baseStart/baseEnd는 첫 프레임 초기값으로만 사용하고
+  // 이후엔 liveEndpointsRef를 통해 매 프레임 갱신된다.
+  const cableRef = useRef<Cable | null>(null);
+  if (cableRef.current === null) {
+    cableRef.current = createCable(baseStart, baseEnd);
+  }
+
+  // 매 프레임 ticker가 읽는 endpoint 목표. React 재렌더(노드 이동 commit) 시 baseStart/End가
+  // 바뀌면 useEffect로 동기화, 노드 드래그 중엔 applyDrag이 직접 갱신한다.
+  const liveEndpointsRef = useRef({
+    start: { x: baseStart.x, y: baseStart.y },
+    end: { x: baseEnd.x, y: baseEnd.y },
+  });
+
+  // base가 바뀌면 ref도 갱신 (드래그가 끝나 model이 commit된 직후).
+  useEffect(() => {
+    liveEndpointsRef.current.start = { x: baseStart.x, y: baseStart.y };
+    liveEndpointsRef.current.end = { x: baseEnd.x, y: baseEnd.y };
+  }, [baseStart.x, baseStart.y, baseEnd.x, baseEnd.y]);
+
   const lag = edge?.lag ?? 0;
-  const { d, tip, tangent, mid } = useMemo(
-    () => edgePath(baseStart, baseEnd, { lag }),
-    [baseStart.x, baseStart.y, baseEnd.x, baseEnd.y, lag],
-  );
 
-  // imperative 핸들이 참조할 최신 상태. 매 render에서 갱신.
-  const stateRef = useRef({ baseStart, baseEnd, lag, fromId, toId });
-  stateRef.current = { baseStart, baseEnd, lag, fromId, toId };
+  // 첫 렌더용 초기 좌표 — 케이블 점 배열에서 직접 뽑는다.
+  const initialPoints = useMemo(() => cableToPoints(cableRef.current!), []);
+  const initialTangent = useMemo(() => cableEndTangent(cableRef.current!), []);
+  const initialMid = useMemo(() => cableMidpoint(cableRef.current!), []);
 
-  const pathRef = useRef<SVGPathElement | null>(null);
-  const hitPathRef = useRef<SVGPathElement | null>(null);
+  // imperative ref들. ticker가 매 프레임 attr을 갱신.
+  const pathRef = useRef<SVGPolylineElement | null>(null);
+  const hitPathRef = useRef<SVGPolylineElement | null>(null);
   const arrowRef = useRef<SVGPolygonElement | null>(null);
   const stepCountRef = useRef<SVGTextElement | null>(null);
+  const insertCircleRef = useRef<SVGCircleElement | null>(null);
+  const detachHitRef = useRef<SVGCircleElement | null>(null);
 
-  // 핸들 등록 — edge가 존재하고 fromId/toId가 확정될 때만.
+  // ticker 등록 — 매 프레임 물리 시뮬레이션 + DOM 갱신.
+  useEffect(() => {
+    const cable = cableRef.current;
+    if (!cable) return;
+    const tick = (): void => {
+      const live = liveEndpointsRef.current;
+      setCableEndpoints(cable, live.start, live.end);
+      stepCable(cable);
+
+      const pointsStr = cableToPoints(cable);
+      pathRef.current?.setAttribute('points', pointsStr);
+      hitPathRef.current?.setAttribute('points', pointsStr);
+
+      const { tip, tangent } = cableEndTangent(cable);
+      arrowRef.current?.setAttribute('points', computeArrowPoints(tip, tangent));
+      detachHitRef.current?.setAttribute('cx', String(tip.x));
+      detachHitRef.current?.setAttribute('cy', String(tip.y));
+
+      const mid = cableMidpoint(cable);
+      if (stepCountRef.current) {
+        stepCountRef.current.setAttribute('x', String(mid.x));
+        stepCountRef.current.setAttribute('y', String(mid.y - 14));
+      }
+      if (insertCircleRef.current) {
+        insertCircleRef.current.setAttribute('cx', String(mid.x));
+        insertCircleRef.current.setAttribute('cy', String(mid.y));
+      }
+    };
+    return registerTicker(tick);
+  }, []);
+
+  // 노드 드래그 중 imperative 갱신을 위한 drag-registry 핸들. 여기선 endpoint ref만
+  // 갱신하면 ticker가 다음 프레임에 알아서 케이블을 끌어간다.
+  const dragStateRef = useRef({ baseStart, baseEnd, fromId, toId });
+  dragStateRef.current = { baseStart, baseEnd, fromId, toId };
+
   useEffect(() => {
     if (!fromId || !toId) return;
     const handle: EdgeHandle = {
       applyDrag(draggedId, dx, dy) {
-        const s = stateRef.current;
-        const start = s.fromId === draggedId
-          ? { x: s.baseStart.x + dx, y: s.baseStart.y + dy }
-          : s.baseStart;
-        const end = s.toId === draggedId
-          ? { x: s.baseEnd.x + dx, y: s.baseEnd.y + dy }
-          : s.baseEnd;
-        const path = edgePath(start, end, { lag: s.lag });
-        pathRef.current?.setAttribute('d', path.d);
-        hitPathRef.current?.setAttribute('d', path.d);
-        arrowRef.current?.setAttribute('points', computeArrowPoints(path.tip, path.tangent));
-        if (stepCountRef.current) {
-          stepCountRef.current.setAttribute('x', String(path.mid.x));
-          stepCountRef.current.setAttribute('y', String(path.mid.y - 14));
+        const s = dragStateRef.current;
+        if (s.fromId === draggedId) {
+          liveEndpointsRef.current.start = { x: s.baseStart.x + dx, y: s.baseStart.y + dy };
+        }
+        if (s.toId === draggedId) {
+          liveEndpointsRef.current.end = { x: s.baseEnd.x + dx, y: s.baseEnd.y + dy };
         }
       },
     };
@@ -144,7 +196,6 @@ function EdgeViewImpl({
 
   if (!edge || !fromNode || !toNode) return null;
 
-  // FunctionNode source는 단위 정규화 의미가 없음 — strained 시각화는 0으로 처리.
   const norm = isValueNode(fromNode) ? normalize(srcValue, resolveNodeUnit(fromNode)) : 0.5;
   const isFeedback = edge.lag === 1;
   const isStrained = norm < STRAINED_LOW || norm > STRAINED_HIGH;
@@ -159,9 +210,11 @@ function EdgeViewImpl({
   const onTipPointerDown = (e: React.PointerEvent<SVGCircleElement>): void => {
     e.stopPropagation();
     (e.target as Element).setPointerCapture(e.pointerId);
+    const cable = cableRef.current!;
+    const { tip } = cableEndTangent(cable);
     startEdgeDraft({
       fromNodeId: edge.from,
-      startPoint: stateRef.current.baseStart,
+      startPoint: { x: cable.points[0]!.x, y: cable.points[0]!.y },
       pointer: { x: tip.x, y: tip.y },
       lag,
       sourceSlotIndex: edge.sourceSlotIndex,
@@ -180,70 +233,71 @@ function EdgeViewImpl({
       onPointerEnter={() => setHover(true)}
       onPointerLeave={() => setHover(false)}
     >
-      <path ref={pathRef} className={baseClasses.join(' ')} d={d} />
+      <polyline ref={pathRef} className={baseClasses.join(' ')} points={initialPoints} fill="none" />
       <polygon
         ref={arrowRef}
         className={arrowClass}
-        points={computeArrowPoints(tip, tangent)}
+        points={computeArrowPoints(initialTangent.tip, initialTangent.tangent)}
       />
       {isFeedback && (
         <text
           ref={stepCountRef}
           className="trama-step-count"
-          x={mid.x}
-          y={mid.y - 14}
+          x={initialMid.x}
+          y={initialMid.y - 14}
           style={{ pointerEvents: 'none' }}
         >
           t+1
         </text>
       )}
-      <path
+      <polyline
         ref={hitPathRef}
         className="trama-edge-hit"
-        d={d}
+        points={initialPoints}
+        fill="none"
         onClick={(e) => {
           e.stopPropagation();
           selectEdge(edge.id);
           openFunctionPicker(edge.id, { x: e.clientX, y: e.clientY });
         }}
       />
-      {/* 화살촉 끝의 detach 핸들 — pointerdown으로 잡아 떼면 edge draft가 detach 모드로 시작.
-          Canvas의 onPointerMove로 snap이 갱신되고, pointerup에서 completeEdgeDraft가
-          retarget(updateEdge) 또는 removeEdge로 마무리한다. */}
       <circle
+        ref={detachHitRef}
         className="trama-edge-detach-hit"
-        cx={tip.x}
-        cy={tip.y}
+        cx={initialTangent.tip.x}
+        cy={initialTangent.tip.y}
         r={9}
         onPointerDown={onTipPointerDown}
         onPointerUp={onTipPointerUp}
       />
       <circle
+        ref={insertCircleRef}
         className={`trama-insert-affordance${hover ? ' is-active' : ''}`}
-        cx={mid.x}
-        cy={mid.y}
+        cx={initialMid.x}
+        cy={initialMid.y}
         r={7}
         onClick={(e) => {
           e.stopPropagation();
+          const mid = cableMidpoint(cableRef.current!);
           startInsertNodeFromEdge(edge.id, mid);
         }}
       />
       {hover && (
         <g pointerEvents="none">
           <line
-            x1={mid.x - 3.5}
-            y1={mid.y}
-            x2={mid.x + 3.5}
-            y2={mid.y}
+            x1={initialMid.x - 3.5}
+            y1={initialMid.y}
+            x2={initialMid.x + 3.5}
+            y2={initialMid.y}
             stroke="white"
             strokeWidth={1.5}
             strokeLinecap="round"
           />
           <line
-            x1={mid.x}
-            y1={mid.y - 3.5}
-            x2={mid.x}
-            y2={mid.y + 3.5}
+            x1={initialMid.x}
+            y1={initialMid.y - 3.5}
+            x2={initialMid.x}
+            y2={initialMid.y + 3.5}
             stroke="white"
             strokeWidth={1.5}
             strokeLinecap="round"
