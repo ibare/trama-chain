@@ -9,7 +9,7 @@ import {
   type Node,
 } from '@trama/core';
 import { useModelStore, useUIStore } from '../store/index.js';
-import { functionRegistry } from '../store/registries.js';
+import { functionRegistry, shapeRegistry } from '../store/registries.js';
 import { getNodeLayout } from '../node/box.js';
 import { layoutForFunctionDef } from '../node/function-box.js';
 import { getConditionalNodeLayout } from '../node/conditional-box.js';
@@ -21,12 +21,29 @@ import { registerTicker } from '../canvas/animation-loop.js';
 import {
   cableEndTangent,
   cableMidpoint,
+  cablePointAt,
   cableToPoints,
   createCable,
   setCableEndpoints,
   stepCable,
   type Cable,
 } from './cable-physics.js';
+
+/** 케이블 위 shape 마커 위치 비율 — consumer 쪽으로 살짝 치우쳐 metaphor를 살림. */
+const SHAPE_MARKER_FRACTION = 0.65;
+
+/**
+ * 엣지가 identity 변환(`linear`, slope=1, offset=0)이 아니라 실제로 입력값을
+ * 가공하는가? raw vs shape 시각 구분의 단일 판정.
+ */
+function edgeAppliesShape(edge: {
+  shape: { kind: string; params: Record<string, unknown> };
+}): boolean {
+  if (edge.shape.kind !== 'linear') return true;
+  const slope = edge.shape.params.slope;
+  const offset = edge.shape.params.offset;
+  return slope !== 1 || offset !== 0;
+}
 
 interface Props {
   edgeId: EdgeId;
@@ -133,6 +150,10 @@ function EdgeViewImpl({
   const initialPoints = useMemo(() => cableToPoints(cableRef.current!), []);
   const initialTangent = useMemo(() => cableEndTangent(cableRef.current!), []);
   const initialMid = useMemo(() => cableMidpoint(cableRef.current!), []);
+  const initialMarker = useMemo(
+    () => cablePointAt(cableRef.current!, SHAPE_MARKER_FRACTION),
+    [],
+  );
 
   // imperative ref들. ticker가 매 프레임 attr을 갱신.
   const pathRef = useRef<SVGPolylineElement | null>(null);
@@ -141,6 +162,7 @@ function EdgeViewImpl({
   const stepCountRef = useRef<SVGTextElement | null>(null);
   const insertCircleRef = useRef<SVGCircleElement | null>(null);
   const detachHitRef = useRef<SVGCircleElement | null>(null);
+  const shapeMarkerRef = useRef<SVGGElement | null>(null);
 
   // ticker 등록 — 매 프레임 물리 시뮬레이션 + DOM 갱신.
   useEffect(() => {
@@ -168,6 +190,10 @@ function EdgeViewImpl({
       if (insertCircleRef.current) {
         insertCircleRef.current.setAttribute('cx', String(mid.x));
         insertCircleRef.current.setAttribute('cy', String(mid.y));
+      }
+      if (shapeMarkerRef.current) {
+        const m = cablePointAt(cable, SHAPE_MARKER_FRACTION);
+        shapeMarkerRef.current.setAttribute('transform', `translate(${m.x},${m.y})`);
       }
     };
     return registerTicker(tick);
@@ -206,6 +232,13 @@ function EdgeViewImpl({
 
   const arrowClass = `trama-arrow${isFeedback ? ' is-feedback' : ''}${isStrained ? ' is-strained' : ''}`;
   const groupCls = `trama-edge-group${morphing ? ' is-morphing' : ''}${isDetaching ? ' is-detaching' : ''}`;
+
+  // shape 마커 — 항상 그려두되 적용 여부에 따라 시각 무게를 다르게.
+  const shapeApplied = edgeAppliesShape(edge);
+  const shapeDef = shapeRegistry.get(edge.shape.kind);
+  const shapePreviewPath =
+    shapeApplied && shapeDef ? shapeDef.previewPath(12, 8, edge.shape.params as never) : null;
+  const markerClass = `trama-shape-marker${shapeApplied ? ' is-applied' : ''}`;
 
   const onTipPointerDown = (e: React.PointerEvent<SVGCircleElement>): void => {
     e.stopPropagation();
@@ -282,6 +315,36 @@ function EdgeViewImpl({
           startInsertNodeFromEdge(edge.id, mid);
         }}
       />
+      <g
+        ref={shapeMarkerRef}
+        className={markerClass}
+        transform={`translate(${initialMarker.x},${initialMarker.y})`}
+        onClick={(e) => {
+          e.stopPropagation();
+          selectEdge(edge.id);
+          openFunctionPicker(edge.id, { x: e.clientX, y: e.clientY });
+        }}
+      >
+        {/* hit-padding — 시각보다 큰 클릭 영역 */}
+        <circle r={11} className="trama-shape-marker-hit" />
+        {shapeApplied ? (
+          <>
+            <rect
+              x={-9}
+              y={-7}
+              width={18}
+              height={14}
+              rx={4}
+              className="trama-shape-marker-chip"
+            />
+            <g transform="translate(-6,-4)">
+              <path d={shapePreviewPath ?? ''} className="trama-shape-marker-curve" />
+            </g>
+          </>
+        ) : (
+          <circle r={2.5} className="trama-shape-marker-dot" />
+        )}
+      </g>
       {hover && (
         <g pointerEvents="none">
           <line

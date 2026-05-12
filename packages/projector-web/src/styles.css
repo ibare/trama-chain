@@ -343,6 +343,51 @@
   opacity: 0.85;
 }
 
+/* Shape marker — 엣지 위 변환 상태 표시. raw면 옅은 점, 적용되면 곡선 칩. */
+[data-trama-root] .trama-shape-marker {
+  cursor: pointer;
+  transition: opacity var(--motion-duration-fade-in) var(--motion-easing-fade-natural);
+}
+
+[data-trama-root] .trama-shape-marker-hit {
+  fill: transparent;
+  pointer-events: all;
+}
+
+[data-trama-root] .trama-shape-marker-dot {
+  fill: var(--color-edge-default);
+  opacity: 0.35;
+  pointer-events: none;
+}
+
+[data-trama-root] .trama-shape-marker.is-applied .trama-shape-marker-chip {
+  fill: var(--color-canvas-bg);
+  stroke: var(--color-edge-default);
+  stroke-width: 1.25;
+  pointer-events: none;
+}
+
+[data-trama-root] .trama-shape-marker.is-applied .trama-shape-marker-curve {
+  fill: none;
+  stroke: var(--color-edge-default);
+  stroke-width: 1.25;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+  pointer-events: none;
+}
+
+[data-trama-root] .trama-shape-marker:hover .trama-shape-marker-dot {
+  opacity: 0.7;
+}
+
+[data-trama-root] .trama-shape-marker.is-applied:hover .trama-shape-marker-chip {
+  stroke: var(--color-node-stroke-focal);
+}
+
+[data-trama-root] .trama-shape-marker.is-applied:hover .trama-shape-marker-curve {
+  stroke: var(--color-node-stroke-focal);
+}
+
 /* Floating panel — picker·inspector 공통 셸 ----------------------------- */
 [data-trama-root] .trama-floating-panel {
   position: absolute;

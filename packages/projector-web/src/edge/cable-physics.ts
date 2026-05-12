@@ -161,3 +161,12 @@ export function cableMidpoint(cable: Cable): { x: number; y: number } {
   const p = cable.points[Math.floor(n / 2)]!;
   return { x: p.x, y: p.y };
 }
+
+/** fraction ∈ [0,1] 위치의 케이블 점. 마커처럼 비대칭 위치에 부착할 때 사용. */
+export function cablePointAt(cable: Cable, fraction: number): { x: number; y: number } {
+  const n = cable.points.length;
+  const clamped = Math.max(0, Math.min(1, fraction));
+  const idx = Math.max(0, Math.min(n - 1, Math.round((n - 1) * clamped)));
+  const p = cable.points[idx]!;
+  return { x: p.x, y: p.y };
+}
