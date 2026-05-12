@@ -1,8 +1,22 @@
 import { useCallback, useMemo, useRef } from 'react';
-import type { Edge } from '@trama/core';
+import type { Edge, ResolvedUnit } from '@trama/core';
 import { useModelStore } from '../store/index.js';
 import { resolveNodeUnit } from '../util/unit-resolver.js';
 import { formatNodeValue } from '../util/format.js';
+
+/**
+ * value 노드가 아니어서 단위가 정의되지 않은 끝점의 폴백 도메인.
+ * [0,1] 정규화 좌표로 곡선을 그리고 축 라벨도 그대로 0/1로 표시.
+ */
+const FALLBACK_UNIT: ResolvedUnit = {
+  id: 'free',
+  kind: 'free',
+  suffix: '',
+  labels: [],
+  min: 0,
+  max: 1,
+  step: 0.01,
+};
 
 interface Props {
   edge: Edge;
@@ -44,14 +58,14 @@ export function InverseUCurveEditor({ edge }: Props): JSX.Element | null {
   const fromNode = model.nodes[edge.from];
   const toNode = model.nodes[edge.to];
 
-  // InverseU curve editor는 ValueNode↔ValueNode 엣지에서만 의미를 가진다.
-  // FunctionNode가 끼어 있으면 단위가 없어 도메인 라벨을 못 그리므로 폴백.
+  // 끝점이 value 노드가 아니면 단위가 없으므로 [0,1] 폴백으로 그린다.
+  // 사용자는 shape이 적용되는 *모양* 자체를 항상 편집할 수 있어야 한다.
   const aUnit = useMemo(
-    () => (fromNode && fromNode.kind === 'value' ? resolveNodeUnit(fromNode) : null),
+    () => (fromNode && fromNode.kind === 'value' ? resolveNodeUnit(fromNode) : FALLBACK_UNIT),
     [fromNode],
   );
   const bUnit = useMemo(
-    () => (toNode && toNode.kind === 'value' ? resolveNodeUnit(toNode) : null),
+    () => (toNode && toNode.kind === 'value' ? resolveNodeUnit(toNode) : FALLBACK_UNIT),
     [toNode],
   );
 
@@ -147,7 +161,7 @@ export function InverseUCurveEditor({ edge }: Props): JSX.Element | null {
     dragRef.current = null;
   };
 
-  if (!fromNode || !toNode || !aUnit || !bUnit) return null;
+  if (!fromNode || !toNode) return null;
 
   // 도메인 라벨 (축 끝점)
   const aMinLbl = formatNodeValue(aUnit.min, aUnit);

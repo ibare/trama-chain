@@ -35,6 +35,17 @@ export const FREE_FALLBACK: ResolvedUnit = {
 };
 
 /**
+ * 엣지의 shape이 사실상 항등 변환(linear, slope=1, offset=0)인지 판정.
+ * identity 엣지는 raw passthrough로 다루고 정규화·역정규화·클램프를 건너뛴다.
+ * "shape을 적용하지 않으면 raw"라는 의미 모델의 단일 진입점.
+ */
+export function isIdentityShape(edge: Edge): boolean {
+  if (edge.shape.kind !== 'linear') return false;
+  const p = edge.shape.params as { slope?: unknown; offset?: unknown };
+  return p.slope === 1 && p.offset === 0;
+}
+
+/**
  * 한 노드의 lag=0 전파 단계에서 디스크립터가 사용하는 컨텍스트.
  * next/validOutputs는 의도적으로 가변(mutate) — 한 step 내에서 디스크립터가
  * 직접 갱신해 다음 노드로 흘러간다.
@@ -137,10 +148,11 @@ const valueNodeDescriptor: NodeKindDescriptor<Extract<Node, { kind: 'value' }>> 
 
     const targetUnit = ctx.nodeKindRegistry.forNode(node)?.outputUnit(node, ctx.catalog) ?? FREE_FALLBACK;
 
-    // raw passthrough 소스(예: FunctionNode·ConstantNode)는 정규화·셰이프·역정규화·
-    // 타깃 단위 클램프를 모두 건너뛴다. 의미적으로 단위가 정의되지 않은 raw 수치이므로
-    // 타깃 단위 범위에 짓이겨지면 안 된다.
-    let hasRawSource = false;
+    // 의미 모델: source 종류와 무관하게 엣지의 shape이 *비-identity*면 적용한다.
+    // - raw-output source(Function/Constant/Conditional) + identity shape → raw passthrough (단위 없음).
+    // - raw-output source + 비-identity shape → 정규화 폴백으로 shape 적용 (FREE 단위는 [0,1] 클램프).
+    // - value source는 항상 normalize→shape→denormalize 파이프라인 (단위 변환·inverted 의미 보존).
+    let hasRawPassthrough = false;
     const contributions: number[] = [];
     for (const edge of incoming) {
       const source = ctx.model.nodes[edge.from];
@@ -149,11 +161,14 @@ const valueNodeDescriptor: NodeKindDescriptor<Extract<Node, { kind: 'value' }>> 
       const sourceValue =
         ctx.next[edge.from] ?? (isValueNode(source) ? source.initialValue : 0);
       const sourceDesc = ctx.nodeKindRegistry.forNode(source);
-      if (sourceDesc?.outputsRaw) {
-        hasRawSource = true;
+
+      // raw-output source + identity shape: 단위 정보가 없으니 값 그대로 흘림.
+      if (sourceDesc?.outputsRaw && isIdentityShape(edge)) {
+        hasRawPassthrough = true;
         contributions.push(sourceValue);
         continue;
       }
+
       const sourceUnit = sourceDesc?.outputUnit(source, ctx.catalog) ?? FREE_FALLBACK;
       const normalizedIn = normalize(sourceValue, sourceUnit);
       const shape = ctx.shapeRegistry.get(edge.shape.kind);
@@ -167,7 +182,8 @@ const valueNodeDescriptor: NodeKindDescriptor<Extract<Node, { kind: 'value' }>> 
 
     if (contributions.length === 0) return; // 모든 source 무효: 값 유지
     const combined = combiner.combine(contributions);
-    ctx.next[node.id] = hasRawSource ? combined : clampToUnit(combined, targetUnit);
+    // raw passthrough가 섞이면 target clamp 건너뜀(단위 미정의 의미 보존).
+    ctx.next[node.id] = hasRawPassthrough ? combined : clampToUnit(combined, targetUnit);
     ctx.validOutputs.add(outputKey(node.id, 0));
   },
 };
