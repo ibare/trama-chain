@@ -1,8 +1,9 @@
-import { memo, useCallback, useEffect, useRef, useState } from 'react';
+import { memo, useCallback, useEffect, useState } from 'react';
 import { tokens } from '@trama/tokens';
 import { isConstantNode, type NodeId } from '@trama/core';
 import { useModelStore, useUIStore } from '../store/index.js';
 import { NodeFrame } from './NodeFrame.js';
+import { completeEdgeDraft } from '../canvas/edge-draft-actions.js';
 
 interface Props {
   id: NodeId;
@@ -33,12 +34,10 @@ function formatConstantValue(v: number): string {
 function ConstantNodeViewImpl({ id }: Props): JSX.Element | null {
   const node = useModelStore((s) => s.model.nodes[id]);
   const updateNode = useModelStore((s) => s.updateNode);
-  const addEdge = useModelStore((s) => s.addEdge);
   const selection = useUIStore((s) => s.selection);
   const editingNodeId = useUIStore((s) => s.editingNodeId);
   const setEditingNode = useUIStore((s) => s.setEditingNode);
   const startEdgeDraft = useUIStore((s) => s.startEdgeDraft);
-  const endEdgeDraft = useUIStore((s) => s.endEdgeDraft);
 
   const pos = node?.position ?? { x: 200, y: 200 };
   const labelDraftSeed = node?.label ?? '';
@@ -54,65 +53,20 @@ function ConstantNodeViewImpl({ id }: Props): JSX.Element | null {
     setEditingNode(id);
   }, [id, setEditingNode]);
 
-  const handleDragRef = useRef<{ dragged: boolean } | null>(null);
-
   const onSocketPointerDown = useCallback(
     (e: React.PointerEvent<SVGCircleElement>) => {
       (e.target as Element).setPointerCapture(e.pointerId);
       const lag: 0 | 1 = e.altKey ? 1 : 0;
-      const startPoint = { x: pos.x, y: pos.y };
-      startEdgeDraft(id, startPoint, startPoint, lag);
-      handleDragRef.current = { dragged: false };
+      const startPoint = { x: pos.x + CARD_W / 2, y: pos.y };
+      startEdgeDraft({ fromNodeId: id, startPoint, pointer: startPoint, lag });
     },
     [id, pos.x, pos.y, startEdgeDraft],
   );
 
-  const onSocketPointerMove = useCallback(() => {
-    if (!handleDragRef.current) return;
-    handleDragRef.current.dragged = true;
+  const onSocketPointerUp = useCallback((e: React.PointerEvent<SVGCircleElement>) => {
+    (e.target as Element).releasePointerCapture?.(e.pointerId);
+    completeEdgeDraft({ dropScreen: { x: e.clientX, y: e.clientY } });
   }, []);
-
-  const onSocketPointerUp = useCallback(
-    (e: React.PointerEvent<SVGCircleElement>) => {
-      (e.target as Element).releasePointerCapture?.(e.pointerId);
-      handleDragRef.current = null;
-      const dropX = e.clientX;
-      const dropY = e.clientY;
-      const target = document.elementFromPoint(dropX, dropY);
-      const slotEl = target?.closest?.('[data-trama-slot-index]');
-      const groupEl = target?.closest?.('[data-trama-node-id]');
-      const targetId = groupEl?.getAttribute('data-trama-node-id');
-      if (targetId && targetId !== id) {
-        const lag: 0 | 1 = e.altKey ? 1 : 0;
-        const model = useModelStore.getState().model;
-        const targetNode = model.nodes[targetId];
-        // 함수 노드면 slotIndex 결정 (ValueNodeView와 동일 로직).
-        let slotIndex: number | undefined;
-        if (targetNode && targetNode.kind === 'function') {
-          const explicit = slotEl?.getAttribute('data-trama-slot-index');
-          // arity는 함수 정의에서 — registries는 ValueNodeView에서 import. 단순화를
-          // 위해 explicit 슬롯이 있으면 그것, 없으면 0으로. 슬롯 차있으면 store가 거부.
-          if (explicit !== null && explicit !== undefined) {
-            slotIndex = Number(explicit);
-          } else {
-            slotIndex = 0;
-          }
-        } else if (targetNode && targetNode.kind === 'conditional') {
-          const explicit = slotEl?.getAttribute('data-trama-slot-index');
-          slotIndex = explicit !== null && explicit !== undefined ? Number(explicit) : 0;
-        }
-        addEdge({
-          from: id,
-          to: targetId,
-          shape: { kind: 'linear', params: { slope: 1, offset: 0 } },
-          lag,
-          slotIndex,
-        });
-      }
-      endEdgeDraft();
-    },
-    [addEdge, endEdgeDraft, id],
-  );
 
   // 인라인 편집 — 임의 수면 value/label 모두, 카탈로그 상수면 label만.
   const [nameDraft, setNameDraft] = useState(labelDraftSeed);
@@ -262,7 +216,6 @@ function ConstantNodeViewImpl({ id }: Props): JSX.Element | null {
         cy={0}
         r={Math.max(SOCKET_SIZE, 12)}
         onPointerDown={onSocketPointerDown}
-        onPointerMove={onSocketPointerMove}
         onPointerUp={onSocketPointerUp}
       />
     </NodeFrame>

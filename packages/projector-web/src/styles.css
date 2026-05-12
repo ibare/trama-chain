@@ -286,6 +286,35 @@
   fill: var(--color-edge-strained);
 }
 
+/* 화살촉 끝 detach 핸들 — 화살표 위에 덮여 hover/grab 시작점 역할만. */
+[data-trama-root] .trama-edge-detach-hit {
+  fill: transparent;
+  cursor: grab;
+}
+[data-trama-root] .trama-edge-detach-hit:active {
+  cursor: grabbing;
+}
+
+/* detach 중인 원본 엣지는 흐릿하게 — 드래프트와 시각적으로 구분. */
+[data-trama-root] .trama-edge-group.is-detaching .trama-edge,
+[data-trama-root] .trama-edge-group.is-detaching .trama-arrow {
+  opacity: 0.25;
+}
+
+/* snap 대상 입력 소켓 위에 떠 있는 강조 링 — pointer-events:none으로 hit 간섭 없음. */
+[data-trama-root] .trama-snap-target-ring {
+  fill: none;
+  stroke: var(--color-edge-default);
+  stroke-width: 2;
+  opacity: 0.8;
+  animation: trama-snap-pulse 0.9s ease-in-out infinite;
+}
+
+@keyframes trama-snap-pulse {
+  0%, 100% { opacity: 0.55; }
+  50% { opacity: 0.95; }
+}
+
 /* Affordances ------------------------------------------------------------ */
 [data-trama-root] .trama-affordance {
   fill: var(--color-affordance-hint);

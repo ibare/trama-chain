@@ -6,14 +6,31 @@ export type Selection =
   | { kind: 'node'; id: NodeId }
   | { kind: 'edge'; id: EdgeId };
 
+export interface EdgeDraftSnap {
+  toNodeId: NodeId;
+  /** function·conditional 등 슬롯 의미가 있는 target에서만 정의됨. ValueNode면 undefined. */
+  slotIndex?: number;
+  /** 캔버스 좌표 — 소켓 중심 */
+  point: { x: number; y: number };
+}
+
 export interface EdgeDraft {
   fromNodeId: NodeId;
   /** 출발 소켓의 캔버스 좌표 (source 우측 핀 소켓) */
   startPoint: { x: number; y: number };
-  /** 캔버스 좌표계의 현재 포인터 위치 */
+  /** 캔버스 좌표계의 현재 포인터 위치 — 스냅이 잡혀 있어도 실제 커서는 여기에. */
   pointer: { x: number; y: number };
   /** Alt 키 등으로 사용자가 feedback 엣지를 그리겠다고 표시 */
   lag: 0 | 1;
+  /** 출력 노드가 다중 출력일 때 선택된 슬롯 (Conditional 참/거짓). */
+  sourceSlotIndex?: number;
+  /** 현재 5px 안에 잡힌 입력 소켓. null이면 미스냅 상태. */
+  snap: EdgeDraftSnap | null;
+  /**
+   * 기존 엣지의 target end를 잡아 떼어 옮기는 중인 경우, 그 엣지의 id.
+   * null이면 "처음부터 새 엣지를 그리는 중".
+   */
+  detachingEdgeId: EdgeId | null;
 }
 
 export interface InsertNodeFromEdgeIntent {
@@ -65,13 +82,19 @@ export interface UIStore {
   selectEdge: (id: EdgeId) => void;
   clearSelection: () => void;
 
-  startEdgeDraft: (
-    fromNodeId: NodeId,
-    startPoint: { x: number; y: number },
-    pointer: { x: number; y: number },
-    lag?: 0 | 1,
-  ) => void;
-  updateEdgeDraft: (pointer: { x: number; y: number }, lag?: 0 | 1) => void;
+  startEdgeDraft: (input: {
+    fromNodeId: NodeId;
+    startPoint: { x: number; y: number };
+    pointer: { x: number; y: number };
+    lag?: 0 | 1;
+    sourceSlotIndex?: number;
+    detachingEdgeId?: EdgeId;
+  }) => void;
+  updateEdgeDraft: (patch: {
+    pointer?: { x: number; y: number };
+    lag?: 0 | 1;
+    snap?: EdgeDraftSnap | null;
+  }) => void;
   endEdgeDraft: () => void;
 
   startInsertNodeFromEdge: (edgeId: EdgeId, position: { x: number; y: number }) => void;
@@ -107,12 +130,34 @@ export const useUIStore = create<UIStore>((set) => ({
   selectEdge: (id) => set({ selection: { kind: 'edge', id } }),
   clearSelection: () => set({ selection: { kind: 'none' } }),
 
-  startEdgeDraft: (fromNodeId, startPoint, pointer, lag = 0) =>
-    set({ edgeDraft: { fromNodeId, startPoint, pointer, lag } }),
-  updateEdgeDraft: (pointer, lag) =>
-    set((s) =>
-      s.edgeDraft ? { edgeDraft: { ...s.edgeDraft, pointer, lag: lag ?? s.edgeDraft.lag } } : {},
-    ),
+  startEdgeDraft: ({
+    fromNodeId,
+    startPoint,
+    pointer,
+    lag = 0,
+    sourceSlotIndex,
+    detachingEdgeId,
+  }) =>
+    set({
+      edgeDraft: {
+        fromNodeId,
+        startPoint,
+        pointer,
+        lag,
+        sourceSlotIndex,
+        snap: null,
+        detachingEdgeId: detachingEdgeId ?? null,
+      },
+    }),
+  updateEdgeDraft: (patch) =>
+    set((s) => {
+      if (!s.edgeDraft) return {};
+      const next = { ...s.edgeDraft };
+      if (patch.pointer) next.pointer = patch.pointer;
+      if (patch.lag !== undefined) next.lag = patch.lag;
+      if (patch.snap !== undefined) next.snap = patch.snap;
+      return { edgeDraft: next };
+    }),
   endEdgeDraft: () => set({ edgeDraft: null }),
 
   startInsertNodeFromEdge: (edgeId, position) =>

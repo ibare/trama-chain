@@ -1,14 +1,12 @@
-import { memo, useCallback, useRef } from 'react';
+import { memo, useCallback, useEffect } from 'react';
 import { tokens } from '@trama/tokens';
 import {
   isConditionalNode,
-  isFunctionNode,
   isOutputValid,
   type ConditionalOperator,
   type NodeId,
 } from '@trama/core';
 import { useModelStore, useUIStore } from '../store/index.js';
-import { functionRegistry } from '../store/registries.js';
 import {
   CONDITIONAL_CARD_H,
   CONDITIONAL_CARD_W,
@@ -16,6 +14,8 @@ import {
 } from './conditional-box.js';
 import { NodeFrame } from './NodeFrame.js';
 import { InteractiveArea } from './InteractiveArea.js';
+import { registerInputSocket } from '../canvas/socket-registry.js';
+import { completeEdgeDraft } from '../canvas/edge-draft-actions.js';
 
 interface Props {
   id: NodeId;
@@ -37,16 +37,30 @@ function ConditionalNodeViewImpl({ id }: Props): JSX.Element | null {
   const trueValid = useModelStore((s) => isOutputValid(s.executionState, id, 0));
   const falseValid = useModelStore((s) => isOutputValid(s.executionState, id, 1));
   const updateNode = useModelStore((s) => s.updateNode);
-  const addEdge = useModelStore((s) => s.addEdge);
   const selection = useUIStore((s) => s.selection);
   const startEdgeDraft = useUIStore((s) => s.startEdgeDraft);
-  const endEdgeDraft = useUIStore((s) => s.endEdgeDraft);
 
   const pos = node?.position ?? { x: 200, y: 200 };
   const layout = getConditionalNodeLayout();
   const { halfW, halfH } = layout;
 
-  const handleDragRef = useRef<{ dragged: boolean; sourceSlot?: number } | null>(null);
+  // 입력 슬롯 등록 — snap 후보가 된다. (A=0, B=1)
+  useEffect(() => {
+    const unA = registerInputSocket({
+      nodeId: id,
+      slotIndex: 0,
+      offset: { x: layout.inputSockets[0]!.x, y: layout.inputSockets[0]!.y },
+    });
+    const unB = registerInputSocket({
+      nodeId: id,
+      slotIndex: 1,
+      offset: { x: layout.inputSockets[1]!.x, y: layout.inputSockets[1]!.y },
+    });
+    return () => {
+      unA();
+      unB();
+    };
+  }, [id, layout.inputSockets]);
 
   const makeOutputHandlers = useCallback(
     (slotIndex: 0 | 1, valid: boolean) => ({
@@ -54,96 +68,24 @@ function ConditionalNodeViewImpl({ id }: Props): JSX.Element | null {
         if (!node || !valid) return;
         (e.target as Element).setPointerCapture(e.pointerId);
         const lag: 0 | 1 = e.altKey ? 1 : 0;
-        const startPoint = { x: pos.x, y: pos.y };
-        startEdgeDraft(id, startPoint, startPoint, lag);
-        handleDragRef.current = { dragged: false, sourceSlot: slotIndex };
-      },
-      onPointerMove: () => {
-        if (!handleDragRef.current) return;
-        handleDragRef.current.dragged = true;
+        const startPoint = {
+          x: pos.x + layout.outputSockets[slotIndex]!.x,
+          y: pos.y + layout.outputSockets[slotIndex]!.y,
+        };
+        startEdgeDraft({
+          fromNodeId: id,
+          startPoint,
+          pointer: startPoint,
+          lag,
+          sourceSlotIndex: slotIndex,
+        });
       },
       onPointerUp: (e: React.PointerEvent<SVGCircleElement>) => {
         (e.target as Element).releasePointerCapture?.(e.pointerId);
-        const captured = handleDragRef.current;
-        handleDragRef.current = null;
-        const dropX = e.clientX;
-        const dropY = e.clientY;
-        const target = document.elementFromPoint(dropX, dropY);
-        const slotEl = target?.closest?.('[data-trama-slot-index]');
-        const groupEl = target?.closest?.('[data-trama-node-id]');
-        const targetId = groupEl?.getAttribute('data-trama-node-id');
-        if (targetId && targetId !== id) {
-          const lag: 0 | 1 = e.altKey ? 1 : 0;
-          const model = useModelStore.getState().model;
-          const targetNode = model.nodes[targetId];
-          let resolvedSlot: number | undefined;
-          if (targetNode && isFunctionNode(targetNode)) {
-            const def = functionRegistry.get(targetNode.functionKey);
-            if (!def) {
-              endEdgeDraft();
-              return;
-            }
-            const explicit = slotEl?.getAttribute('data-trama-slot-index');
-            const occupied = new Set(
-              model.edgeOrder
-                .map((eid) => model.edges[eid])
-                .filter((edge) => edge && edge.to === targetId)
-                .map((edge) => edge!.slotIndex),
-            );
-            if (explicit !== null && explicit !== undefined) {
-              const s = Number(explicit);
-              if (!occupied.has(s)) resolvedSlot = s;
-            }
-            if (resolvedSlot === undefined) {
-              for (let i = 0; i < def.slots.length; i++) {
-                if (!occupied.has(i)) {
-                  resolvedSlot = i;
-                  break;
-                }
-              }
-            }
-            if (resolvedSlot === undefined) {
-              endEdgeDraft();
-              return;
-            }
-          } else if (targetNode && isConditionalNode(targetNode)) {
-            const explicit = slotEl?.getAttribute('data-trama-slot-index');
-            const occupied = new Set(
-              model.edgeOrder
-                .map((eid) => model.edges[eid])
-                .filter((edge) => edge && edge.to === targetId)
-                .map((edge) => edge!.slotIndex),
-            );
-            if (explicit !== null && explicit !== undefined) {
-              const s = Number(explicit);
-              if (!occupied.has(s) && s >= 0 && s <= 1) resolvedSlot = s;
-            }
-            if (resolvedSlot === undefined) {
-              for (let i = 0; i < 2; i++) {
-                if (!occupied.has(i)) {
-                  resolvedSlot = i;
-                  break;
-                }
-              }
-            }
-            if (resolvedSlot === undefined) {
-              endEdgeDraft();
-              return;
-            }
-          }
-          addEdge({
-            from: id,
-            to: targetId,
-            shape: { kind: 'linear', params: { slope: 1, offset: 0 } },
-            lag,
-            slotIndex: resolvedSlot,
-            sourceSlotIndex: captured?.sourceSlot ?? slotIndex,
-          });
-        }
-        endEdgeDraft();
+        completeEdgeDraft({ dropScreen: { x: e.clientX, y: e.clientY } });
       },
     }),
-    [addEdge, endEdgeDraft, id, node, pos.x, pos.y, startEdgeDraft],
+    [id, layout.outputSockets, node, pos.x, pos.y, startEdgeDraft],
   );
 
   const onOperatorClick = useCallback(() => {
@@ -266,7 +208,6 @@ function ConditionalNodeViewImpl({ id }: Props): JSX.Element | null {
               cy={s.y}
               r={Math.max(SOCKET_SIZE, 12)}
               onPointerDown={handlers.onPointerDown}
-              onPointerMove={handlers.onPointerMove}
               onPointerUp={handlers.onPointerUp}
             />
           </g>

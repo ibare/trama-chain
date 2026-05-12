@@ -1,20 +1,16 @@
-import { memo, useCallback, useEffect, useRef, useState } from 'react';
+import { memo, useCallback, useEffect, useState } from 'react';
 import { tokens } from '@trama/tokens';
-import {
-  getFunctionSlotOccupancy,
-  isConditionalNode,
-  isFunctionNode,
-  isValueNode,
-  type NodeId,
-} from '@trama/core';
+import { isValueNode, type NodeId } from '@trama/core';
 import { useModelStore, useUIStore } from '../store/index.js';
-import { combinerRegistry, functionRegistry } from '../store/registries.js';
+import { combinerRegistry } from '../store/registries.js';
 import { formatNodeValue } from '../util/format.js';
 import { resolveNodeUnit } from '../util/unit-resolver.js';
 import { getNodeLayout, type PinLayout } from './box.js';
 import { NodeBorderTrack } from './NodeBorderTrack.js';
 import { NodeFrame } from './NodeFrame.js';
 import { InteractiveArea } from './InteractiveArea.js';
+import { registerInputSocket } from '../canvas/socket-registry.js';
+import { completeEdgeDraft } from '../canvas/edge-draft-actions.js';
 
 interface Props {
   id: NodeId;
@@ -50,15 +46,12 @@ function ValueNodeViewImpl({ id, incomingCount }: Props): JSX.Element | null {
   });
 
   const updateNode = useModelStore((s) => s.updateNode);
-  const addEdge = useModelStore((s) => s.addEdge);
   const playbackStep = useModelStore((s) => s.playbackStep);
   const trajectoryLength = useModelStore((s) => s.trajectory.length);
   const selectNode = useUIStore((s) => s.selectNode);
   const editingNodeId = useUIStore((s) => s.editingNodeId);
   const setEditingNode = useUIStore((s) => s.setEditingNode);
   const startEdgeDraft = useUIStore((s) => s.startEdgeDraft);
-  const endEdgeDraft = useUIStore((s) => s.endEdgeDraft);
-  const openFunctionPicker = useUIStore((s) => s.openFunctionPicker);
   const openUnitInspector = useUIStore((s) => s.openUnitInspector);
 
   // lag=0 인입 엣지가 하나라도 있으면 매 step마다 propagation이 값을 덮어쓰므로
@@ -81,7 +74,17 @@ function ValueNodeViewImpl({ id, incomingCount }: Props): JSX.Element | null {
     setEditingNode(id);
   }, [id, setEditingNode]);
 
-  const handleDragRef = useRef<{ dragged: boolean } | null>(null);
+  // 좌측 핀(입력) snap 후보 등록. ValueNode는 slot 개념이 없고 combiner로 묶이므로
+  // slotIndex 없이 등록한다. 좌측 핀 중심은 항상 (-halfW, 0)로 incomingCount와 무관.
+  useEffect(() => {
+    if (!node || !isValueNode(node)) return;
+    const layoutNow = getNodeLayout(node, { incomingCount });
+    const unreg = registerInputSocket({
+      nodeId: id,
+      offset: { x: layoutNow.leftPin.cx, y: layoutNow.leftPin.cy },
+    });
+    return unreg;
+  }, [id, incomingCount, node]);
 
   const onSocketPointerDown = useCallback(
     (e: React.PointerEvent<SVGCircleElement>) => {
@@ -93,101 +96,15 @@ function ValueNodeViewImpl({ id, incomingCount }: Props): JSX.Element | null {
       const startPoint = out
         ? { x: pos.x + out.x, y: pos.y + out.y }
         : { x: pos.x, y: pos.y };
-      startEdgeDraft(id, startPoint, startPoint, lag);
-      handleDragRef.current = { dragged: false };
+      startEdgeDraft({ fromNodeId: id, startPoint, pointer: startPoint, lag });
     },
     [id, incomingCount, node, pos.x, pos.y, startEdgeDraft],
   );
 
-  const onSocketPointerMove = useCallback(() => {
-    if (!handleDragRef.current) return;
-    handleDragRef.current.dragged = true;
+  const onSocketPointerUp = useCallback((e: React.PointerEvent<SVGCircleElement>) => {
+    (e.target as Element).releasePointerCapture?.(e.pointerId);
+    completeEdgeDraft({ dropScreen: { x: e.clientX, y: e.clientY } });
   }, []);
-
-  const onSocketPointerUp = useCallback(
-    (e: React.PointerEvent<SVGCircleElement>) => {
-      (e.target as Element).releasePointerCapture?.(e.pointerId);
-      handleDragRef.current = null;
-      const dropX = e.clientX;
-      const dropY = e.clientY;
-      const target = document.elementFromPoint(dropX, dropY);
-      const slotEl = target?.closest?.('[data-trama-slot-index]');
-      const groupEl = target?.closest?.('[data-trama-node-id]');
-      const targetId = groupEl?.getAttribute('data-trama-node-id');
-      if (targetId && targetId !== id) {
-        const lag: 0 | 1 = e.altKey ? 1 : 0;
-        const model = useModelStore.getState().model;
-        const targetNode = model.nodes[targetId];
-        let slotIndex: number | undefined;
-        if (targetNode && isFunctionNode(targetNode)) {
-          const def = functionRegistry.get(targetNode.functionKey);
-          if (!def) {
-            endEdgeDraft();
-            return;
-          }
-          const explicit = slotEl?.getAttribute('data-trama-slot-index');
-          const occupied = new Set(
-            getFunctionSlotOccupancy(model, targetId).map((o) => o.slotIndex),
-          );
-          if (explicit !== null && explicit !== undefined) {
-            const s = Number(explicit);
-            if (!occupied.has(s)) slotIndex = s;
-          }
-          if (slotIndex === undefined) {
-            for (let i = 0; i < def.slots.length; i++) {
-              if (!occupied.has(i)) {
-                slotIndex = i;
-                break;
-              }
-            }
-          }
-          if (slotIndex === undefined) {
-            endEdgeDraft();
-            return;
-          }
-        } else if (targetNode && isConditionalNode(targetNode)) {
-          const explicit = slotEl?.getAttribute('data-trama-slot-index');
-          const occupied = new Set(
-            model.edgeOrder
-              .map((eid) => model.edges[eid])
-              .filter((edge) => edge && edge.to === targetId)
-              .map((edge) => edge!.slotIndex),
-          );
-          if (explicit !== null && explicit !== undefined) {
-            const s = Number(explicit);
-            if (!occupied.has(s) && s >= 0 && s <= 1) slotIndex = s;
-          }
-          if (slotIndex === undefined) {
-            for (let i = 0; i < 2; i++) {
-              if (!occupied.has(i)) {
-                slotIndex = i;
-                break;
-              }
-            }
-          }
-          if (slotIndex === undefined) {
-            endEdgeDraft();
-            return;
-          }
-        }
-        const created = addEdge({
-          from: id,
-          to: targetId,
-          shape: { kind: 'linear', params: { slope: 1, offset: 0 } },
-          lag,
-          slotIndex,
-        });
-        if (
-          created &&
-          !(targetNode && (isFunctionNode(targetNode) || isConditionalNode(targetNode)))
-        ) {
-          openFunctionPicker(created.id, { x: dropX, y: dropY });
-        }
-      }
-      endEdgeDraft();
-    },
-    [addEdge, endEdgeDraft, id, openFunctionPicker],
-  );
 
   const [nameDraft, setNameDraft] = useState(labelDraftSeed);
   useEffect(() => {
@@ -330,7 +247,6 @@ function ValueNodeViewImpl({ id, incomingCount }: Props): JSX.Element | null {
             cy={layout.rightPin.sockets[0].y}
             r={Math.max(SOCKET_SIZE, 12)}
             onPointerDown={onSocketPointerDown}
-            onPointerMove={onSocketPointerMove}
             onPointerUp={onSocketPointerUp}
           />
         </>

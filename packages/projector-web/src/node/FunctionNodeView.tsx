@@ -1,17 +1,12 @@
-import { memo, useCallback, useRef } from 'react';
+import { memo, useCallback, useEffect } from 'react';
 import { tokens } from '@trama/tokens';
-import {
-  getFunctionSlotOccupancy,
-  isConditionalNode,
-  isFunctionNode,
-  isNodeValid,
-  isValueNode,
-  type NodeId,
-} from '@trama/core';
+import { isFunctionNode, isNodeValid, type NodeId } from '@trama/core';
 import { useModelStore, useUIStore } from '../store/index.js';
 import { functionRegistry } from '../store/registries.js';
 import { layoutForFunctionDef, type FunctionPinLayout } from './function-box.js';
 import { NodeFrame } from './NodeFrame.js';
+import { registerInputSocket } from '../canvas/socket-registry.js';
+import { completeEdgeDraft } from '../canvas/edge-draft-actions.js';
 
 interface Props {
   id: NodeId;
@@ -25,122 +20,49 @@ const CARD_CORNER = parseFloat(tokens.spacing.cardCornerRadius);
 function FunctionNodeViewImpl({ id }: Props): JSX.Element | null {
   const node = useModelStore((s) => s.model.nodes[id]);
   const isValid = useModelStore((s) => isNodeValid(s.executionState, id));
-  const updateNode = useModelStore((s) => s.updateNode);
-  const addEdge = useModelStore((s) => s.addEdge);
   const selection = useUIStore((s) => s.selection);
   const startEdgeDraft = useUIStore((s) => s.startEdgeDraft);
-  const endEdgeDraft = useUIStore((s) => s.endEdgeDraft);
 
   const pos = node?.position ?? { x: 200, y: 200 };
+  const functionKey = node && isFunctionNode(node) ? node.functionKey : null;
 
-  const handleDragRef = useRef<{ dragged: boolean } | null>(null);
+  // 입력 슬롯 등록 — snap 후보.
+  useEffect(() => {
+    if (functionKey === null) return;
+    const def = functionRegistry.get(functionKey);
+    if (!def) return;
+    const layout = layoutForFunctionDef(def);
+    const unregs = layout.inputSockets.map((s) =>
+      registerInputSocket({
+        nodeId: id,
+        slotIndex: s.slotIndex,
+        offset: { x: s.x, y: s.y },
+      }),
+    );
+    return () => unregs.forEach((u) => u());
+  }, [id, functionKey]);
 
   const onSocketPointerDown = useCallback(
     (e: React.PointerEvent<SVGCircleElement>) => {
-      if (!node || !isValid) return;
+      if (!node || !isFunctionNode(node) || !isValid) return;
+      const def = functionRegistry.get(node.functionKey);
+      if (!def) return;
+      const layout = layoutForFunctionDef(def);
       (e.target as Element).setPointerCapture(e.pointerId);
       const lag: 0 | 1 = e.altKey ? 1 : 0;
-      const startPoint = { x: pos.x, y: pos.y };
-      startEdgeDraft(id, startPoint, startPoint, lag);
-      handleDragRef.current = { dragged: false };
+      const startPoint = {
+        x: pos.x + layout.outputSocket.x,
+        y: pos.y + layout.outputSocket.y,
+      };
+      startEdgeDraft({ fromNodeId: id, startPoint, pointer: startPoint, lag });
     },
     [id, isValid, node, pos.x, pos.y, startEdgeDraft],
   );
 
-  const onSocketPointerMove = useCallback(() => {
-    if (!handleDragRef.current) return;
-    handleDragRef.current.dragged = true;
+  const onSocketPointerUp = useCallback((e: React.PointerEvent<SVGCircleElement>) => {
+    (e.target as Element).releasePointerCapture?.(e.pointerId);
+    completeEdgeDraft({ dropScreen: { x: e.clientX, y: e.clientY } });
   }, []);
-
-  const onSocketPointerUp = useCallback(
-    (e: React.PointerEvent<SVGCircleElement>) => {
-      (e.target as Element).releasePointerCapture?.(e.pointerId);
-      handleDragRef.current = null;
-      const dropX = e.clientX;
-      const dropY = e.clientY;
-      const target = document.elementFromPoint(dropX, dropY);
-      const slotEl = target?.closest?.('[data-trama-slot-index]');
-      const groupEl = target?.closest?.('[data-trama-node-id]');
-      const targetId = groupEl?.getAttribute('data-trama-node-id');
-      if (targetId && targetId !== id) {
-        const lag: 0 | 1 = e.altKey ? 1 : 0;
-        const model = useModelStore.getState().model;
-        const targetNode = model.nodes[targetId];
-        let slotIndex: number | undefined;
-        if (targetNode && isFunctionNode(targetNode)) {
-          const def = functionRegistry.get(targetNode.functionKey);
-          if (!def) {
-            endEdgeDraft();
-            return;
-          }
-          const explicit = slotEl?.getAttribute('data-trama-slot-index');
-          const occupied = new Set(
-            getFunctionSlotOccupancy(model, targetId).map((o) => o.slotIndex),
-          );
-          if (explicit !== null && explicit !== undefined) {
-            const s = Number(explicit);
-            if (!occupied.has(s)) slotIndex = s;
-          }
-          if (slotIndex === undefined) {
-            for (let i = 0; i < def.slots.length; i++) {
-              if (!occupied.has(i)) {
-                slotIndex = i;
-                break;
-              }
-            }
-          }
-          if (slotIndex === undefined) {
-            endEdgeDraft();
-            return;
-          }
-        } else if (targetNode && isConditionalNode(targetNode)) {
-          const explicit = slotEl?.getAttribute('data-trama-slot-index');
-          const occupied = new Set(
-            model.edgeOrder
-              .map((eid) => model.edges[eid])
-              .filter((edge) => edge && edge.to === targetId)
-              .map((edge) => edge!.slotIndex),
-          );
-          if (explicit !== null && explicit !== undefined) {
-            const s = Number(explicit);
-            if (!occupied.has(s) && s >= 0 && s <= 1) slotIndex = s;
-          }
-          if (slotIndex === undefined) {
-            for (let i = 0; i < 2; i++) {
-              if (!occupied.has(i)) {
-                slotIndex = i;
-                break;
-              }
-            }
-          }
-          if (slotIndex === undefined) {
-            endEdgeDraft();
-            return;
-          }
-        }
-        const created = addEdge({
-          from: id,
-          to: targetId,
-          shape: { kind: 'linear', params: { slope: 1, offset: 0 } },
-          lag,
-          slotIndex,
-        });
-        // 함수 → 값 노드: 대상의 단위를 'raw'(suffix 없음, 넓은 범위)로 자동
-        // 변경. 함수가 산출한 값에 cm/kg 같은 임의의 단위를 강제하면 clamp 때문에
-        // 잘못된 값으로 보임. 정밀한 단위 추론은 추후 과제.
-        if (created && targetNode && isValueNode(targetNode) && targetNode.unitId !== 'raw') {
-          updateNode(
-            targetId,
-            { unitId: 'raw', unitOverride: undefined },
-            'update-node',
-            '단위 자동 설정',
-          );
-        }
-      }
-      endEdgeDraft();
-    },
-    [addEdge, endEdgeDraft, id, updateNode],
-  );
 
   if (!node || !isFunctionNode(node)) return null;
   const def = functionRegistry.get(node.functionKey);
@@ -206,7 +128,6 @@ function FunctionNodeViewImpl({ id }: Props): JSX.Element | null {
             cy={layout.outputSocket.y}
             r={Math.max(SOCKET_SIZE, 12)}
             onPointerDown={onSocketPointerDown}
-            onPointerMove={onSocketPointerMove}
             onPointerUp={onSocketPointerUp}
           />
         </>

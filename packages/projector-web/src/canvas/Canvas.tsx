@@ -6,11 +6,15 @@ import { NodeView } from '../node/NodeView.js';
 import { EdgeDraftView } from './EdgeDraftView.js';
 import { CanvasContextMenu } from './CanvasContextMenu.js';
 import { setViewport as setViewportSingleton } from './viewport.js';
+import { findNearestInputSocket } from './socket-registry.js';
+import { isConditionalNode, isFunctionNode } from '@trama/core';
 
 const ZOOM_MIN = 0.2;
 const ZOOM_MAX = 4;
 const ZOOM_WHEEL_INTENSITY = 0.0015;
 const PAN_THRESHOLD_PX = 3;
+/** 스냅 적용 반경 — screen pixel 기준. canvas 거리 × zoom 으로 비교한다. */
+const SNAP_RADIUS_PX = 12;
 
 export function Canvas(): JSX.Element {
   // 좁은 셀렉터 — Canvas 자체는 topology(노드·엣지 목록) 변경에만 리렌더된다.
@@ -157,7 +161,58 @@ export function Canvas(): JSX.Element {
       if (!edgeDraft) return;
       const pos = toCanvasCoords(e.clientX, e.clientY);
       const lag: 0 | 1 = e.altKey ? 1 : 0;
-      updateEdgeDraft(pos, lag);
+      // 스냅: 가장 가까운 입력 소켓을 찾고 screen 거리가 임계치 이내면 스냅.
+      const model = useModelStore.getState().model;
+      const positions: Record<string, { x: number; y: number } | undefined> = {};
+      for (const nid of Object.keys(model.nodes)) {
+        const p = model.nodes[nid]?.position;
+        if (p) positions[nid] = p;
+      }
+      const fromId = edgeDraft.fromNodeId;
+      const detachingId = edgeDraft.detachingEdgeId;
+      const occupiedKey = (toId: string, slot: number | undefined) =>
+        slot === undefined ? `${toId}` : `${toId}:${slot}`;
+      // 점유 중인 슬롯 set 계산 — 단, detach 중인 엣지 자기 자신은 제외 (원위치 허용).
+      const occupiedFn = new Set<string>();
+      const occupiedCond = new Set<string>();
+      for (const eid of model.edgeOrder) {
+        const e2 = model.edges[eid];
+        if (!e2) continue;
+        if (eid === detachingId) continue;
+        const tgt = model.nodes[e2.to];
+        if (tgt && isFunctionNode(tgt)) {
+          occupiedFn.add(occupiedKey(e2.to, e2.slotIndex));
+        } else if (tgt && isConditionalNode(tgt)) {
+          occupiedCond.add(occupiedKey(e2.to, e2.slotIndex));
+        }
+      }
+      const nearest = findNearestInputSocket(pos, positions, (entry) => {
+        // 자기 자신으로 돌아가는 엣지는 막는다.
+        if (entry.nodeId === fromId) return false;
+        const tgt = model.nodes[entry.nodeId];
+        if (!tgt) return false;
+        if (isFunctionNode(tgt)) {
+          return !occupiedFn.has(occupiedKey(entry.nodeId, entry.slotIndex));
+        }
+        if (isConditionalNode(tgt)) {
+          return !occupiedCond.has(occupiedKey(entry.nodeId, entry.slotIndex));
+        }
+        // ValueNode는 multi-incoming 가능 — 항상 후보.
+        return true;
+      });
+      let snap: typeof edgeDraft.snap = null;
+      if (nearest) {
+        const zoom = viewportRef.current.zoom;
+        const screenDist = nearest.distance * zoom;
+        if (screenDist <= SNAP_RADIUS_PX) {
+          snap = {
+            toNodeId: nearest.entry.nodeId,
+            slotIndex: nearest.entry.slotIndex,
+            point: nearest.point,
+          };
+        }
+      }
+      updateEdgeDraft({ pointer: pos, lag, snap });
     },
     [edgeDraft, toCanvasCoords, updateEdgeDraft],
   );

@@ -16,6 +16,7 @@ import { getConditionalNodeLayout } from '../node/conditional-box.js';
 import { resolveNodeUnit } from '../util/unit-resolver.js';
 import { edgePath, type Point } from './geometry.js';
 import { registerEdgeHandle, type EdgeHandle } from '../canvas/drag-registry.js';
+import { completeEdgeDraft } from '../canvas/edge-draft-actions.js';
 
 interface Props {
   edgeId: EdgeId;
@@ -59,6 +60,8 @@ function EdgeViewImpl({
   const openFunctionPicker = useUIStore((s) => s.openFunctionPicker);
   const startInsertNodeFromEdge = useUIStore((s) => s.startInsertNodeFromEdge);
   const selectEdge = useUIStore((s) => s.selectEdge);
+  const startEdgeDraft = useUIStore((s) => s.startEdgeDraft);
+  const isDetaching = useUIStore((s) => s.edgeDraft?.detachingEdgeId === edgeId);
   const [hover, setHover] = useState(false);
 
   const [morphing, setMorphing] = useState(false);
@@ -151,7 +154,25 @@ function EdgeViewImpl({
   if (introducing) baseClasses.push('is-introducing');
 
   const arrowClass = `trama-arrow${isFeedback ? ' is-feedback' : ''}${isStrained ? ' is-strained' : ''}`;
-  const groupCls = `trama-edge-group${morphing ? ' is-morphing' : ''}`;
+  const groupCls = `trama-edge-group${morphing ? ' is-morphing' : ''}${isDetaching ? ' is-detaching' : ''}`;
+
+  const onTipPointerDown = (e: React.PointerEvent<SVGCircleElement>): void => {
+    e.stopPropagation();
+    (e.target as Element).setPointerCapture(e.pointerId);
+    startEdgeDraft({
+      fromNodeId: edge.from,
+      startPoint: stateRef.current.baseStart,
+      pointer: { x: tip.x, y: tip.y },
+      lag,
+      sourceSlotIndex: edge.sourceSlotIndex,
+      detachingEdgeId: edge.id,
+    });
+  };
+
+  const onTipPointerUp = (e: React.PointerEvent<SVGCircleElement>): void => {
+    (e.target as Element).releasePointerCapture?.(e.pointerId);
+    completeEdgeDraft({ dropScreen: { x: e.clientX, y: e.clientY } });
+  };
 
   return (
     <g
@@ -185,6 +206,17 @@ function EdgeViewImpl({
           selectEdge(edge.id);
           openFunctionPicker(edge.id, { x: e.clientX, y: e.clientY });
         }}
+      />
+      {/* 화살촉 끝의 detach 핸들 — pointerdown으로 잡아 떼면 edge draft가 detach 모드로 시작.
+          Canvas의 onPointerMove로 snap이 갱신되고, pointerup에서 completeEdgeDraft가
+          retarget(updateEdge) 또는 removeEdge로 마무리한다. */}
+      <circle
+        className="trama-edge-detach-hit"
+        cx={tip.x}
+        cy={tip.y}
+        r={9}
+        onPointerDown={onTipPointerDown}
+        onPointerUp={onTipPointerUp}
       />
       <circle
         className={`trama-insert-affordance${hover ? ' is-active' : ''}`}
