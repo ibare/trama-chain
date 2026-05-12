@@ -11,7 +11,7 @@ import { combinerRegistry, functionRegistry } from '../store/registries.js';
 import { formatNodeValue } from '../util/format.js';
 import { resolveNodeUnit } from '../util/unit-resolver.js';
 import { getNodeLayout, type PinLayout } from './box.js';
-import { NodeMicroSlider } from './NodeMicroSlider.js';
+import { NodeBorderTrack } from './NodeBorderTrack.js';
 import {
   getIncidentEdgeHandles,
   registerNodeEl,
@@ -57,7 +57,6 @@ function ValueNodeViewImpl({ id, incomingCount }: Props): JSX.Element | null {
   const addEdge = useModelStore((s) => s.addEdge);
   const playbackStep = useModelStore((s) => s.playbackStep);
   const trajectoryLength = useModelStore((s) => s.trajectory.length);
-  const selection = useUIStore((s) => s.selection);
   const selectNode = useUIStore((s) => s.selectNode);
   const editingNodeId = useUIStore((s) => s.editingNodeId);
   const setEditingNode = useUIStore((s) => s.setEditingNode);
@@ -283,8 +282,6 @@ function ValueNodeViewImpl({ id, incomingCount }: Props): JSX.Element | null {
   const isFocal = node.isFocal;
   const stateClass = isInputNode ? 'is-focal' : 'is-calm';
 
-  const isSelected = selection.kind === 'node' && selection.id === id;
-
   const formatted = formatNodeValue(currentValue, unit);
   const combiner = combinerRegistry.get(node.combiner);
   const combinerLabel = combiner?.labels.ko ?? node.combiner;
@@ -403,10 +400,10 @@ function ValueNodeViewImpl({ id, incomingCount }: Props): JSX.Element | null {
             />
           </>
         )}
+        {isInputNode && editingNodeId !== id && (
+          <NodeBorderTrack node={node} halfH={halfH} halfW={halfW} />
+        )}
       </g>
-      {isSelected && editingNodeId !== id && !hasLag0Incoming && (
-        <NodeMicroSlider node={node} halfH={halfH} halfW={halfW} />
-      )}
     </g>
   );
 }
