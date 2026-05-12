@@ -48,10 +48,23 @@ export const ConstantNodeSchema = z.object({
   description: z.string().nullable().optional(),
 });
 
+export const ConditionalOperatorSchema = z.enum(['>', '==', '!=']);
+
+export const ConditionalNodeSchema = z.object({
+  kind: z.literal('conditional'),
+  id: z.string(),
+  label: z.string(),
+  operator: ConditionalOperatorSchema,
+  position: z.object({ x: z.number(), y: z.number() }).nullable(),
+  isFocal: z.boolean(),
+  description: z.string().nullable().optional(),
+});
+
 export const NodeSchema = z.discriminatedUnion('kind', [
   ValueNodeSchema,
   FunctionNodeSchema,
   ConstantNodeSchema,
+  ConditionalNodeSchema,
 ]);
 
 export const EdgeSchema = z.object({
@@ -65,6 +78,8 @@ export const EdgeSchema = z.object({
   inverted: z.boolean(),
   lag: z.union([z.literal(0), z.literal(1)]),
   slotIndex: z.number().int().min(0).optional(),
+  /** source가 다출력 노드(예: ConditionalNode)일 때 어느 출력 슬롯에서 시작했는지. */
+  sourceSlotIndex: z.number().int().min(0).optional(),
   description: z.string().nullable().optional(),
 });
 
@@ -89,4 +104,5 @@ export type TramaNode = z.infer<typeof NodeSchema>;
 export type TramaValueNode = z.infer<typeof ValueNodeSchema>;
 export type TramaFunctionNode = z.infer<typeof FunctionNodeSchema>;
 export type TramaConstantNode = z.infer<typeof ConstantNodeSchema>;
+export type TramaConditionalNode = z.infer<typeof ConditionalNodeSchema>;
 export type TramaEdge = z.infer<typeof EdgeSchema>;

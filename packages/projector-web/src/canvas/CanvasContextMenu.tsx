@@ -1,6 +1,6 @@
 import { useEffect, useRef } from 'react';
 import { useUIStore } from '../store/index.js';
-import { listNodeKindUIs } from '../node/kind-catalog.js';
+import { listNodeKindUIs, type NodeMenuItem } from '../node/kind-catalog.js';
 import '../node/register-default-kinds.js';
 
 const MENU_WIDTH = 520;
@@ -36,10 +36,24 @@ export function CanvasContextMenu(): JSX.Element | null {
 
   if (!state) return null;
 
-  const sections = listNodeKindUIs().map((desc) => ({
-    label: desc.menuSectionLabel,
-    items: desc.buildMenuItems(),
-  }));
+  // 같은 menuSectionLabel을 쓰는 종류들은 한 섹션에 합친다.
+  // 섹션 순서는 그 라벨로 처음 등장한 디스크립터의 menuSectionOrder로 결정.
+  const sectionMap = new Map<string, { order: number; items: NodeMenuItem[] }>();
+  for (const desc of listNodeKindUIs()) {
+    const existing = sectionMap.get(desc.menuSectionLabel);
+    const items = desc.buildMenuItems();
+    if (existing) {
+      existing.items = [...existing.items, ...items];
+    } else {
+      sectionMap.set(desc.menuSectionLabel, {
+        order: desc.menuSectionOrder,
+        items,
+      });
+    }
+  }
+  const sections = Array.from(sectionMap.entries())
+    .sort(([, a], [, b]) => a.order - b.order)
+    .map(([label, v]) => ({ label, items: v.items }));
 
   // 화면 경계 클램프 — 정확한 메뉴 높이는 렌더 후 측정 가능하지만 v1엔 근사.
   // 그리드 폭 520px 기준, 한 행에 약 5개 chip이 들어간다고 가정.

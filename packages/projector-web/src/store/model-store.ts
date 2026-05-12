@@ -1,6 +1,7 @@
 import { create } from 'zustand';
 import {
   OperationLog,
+  addConditionalNode as addConditionalNodeOp,
   addConstantNode as addConstantNodeOp,
   addEdge as addEdgeOp,
   addFunctionNode as addFunctionNodeOp,
@@ -11,6 +12,7 @@ import {
   getFunctionSlotOccupancy,
   hasFeedbackEdges,
   initializeFromInitialValues,
+  isConditionalNode,
   isFunctionNode,
   modelToDocument,
   propagateOneStep,
@@ -23,6 +25,7 @@ import {
   updateNode as updateNodeOp,
 } from '@trama/core';
 import type {
+  AddConditionalNodeInput,
   AddConstantNodeInput,
   AddEdgeInput,
   AddFunctionNodeInput,
@@ -68,6 +71,11 @@ export interface ModelStore {
   ) => Node | null;
   addConstantNode: (
     input: AddConstantNodeInput,
+    opKind?: OperationKind,
+    label?: string,
+  ) => Node;
+  addConditionalNode: (
+    input: AddConditionalNodeInput,
     opKind?: OperationKind,
     label?: string,
   ) => Node;
@@ -223,6 +231,24 @@ export const useModelStore = create<ModelStore>((set, get) => ({
     return node;
   },
 
+  addConditionalNode: (input, opKind = 'add-node', label = '조건 노드 추가') => {
+    const before = get().model;
+    const after = addConditionalNodeOp(before, input);
+    const newId = after.nodeOrder[after.nodeOrder.length - 1]!;
+    const node = after.nodes[newId]!;
+    const exec = computeExecutionState(after);
+    set((s) => {
+      record(s, before, after, opKind, label, { nodeId: newId, node });
+      return {
+        model: after,
+        ...exec,
+        canUndo: s.log.canUndo(),
+        canRedo: s.log.canRedo(),
+      };
+    });
+    return node;
+  },
+
   addFunctionNode: (input, opKind = 'add-node', label = '함수 노드 추가') => {
     // functionKey가 레지스트리에 없으면 추가 거부.
     if (!functionRegistry.has(input.functionKey)) return null;
@@ -291,6 +317,15 @@ export const useModelStore = create<ModelStore>((set, get) => ({
       if (typeof slot !== 'number' || slot < 0 || slot >= arity) return null;
       const occupied = getFunctionSlotOccupancy(before, input.to);
       if (occupied.some((o) => o.slotIndex === slot)) return null;
+    }
+    // ConditionalNode 입력은 슬롯 0(A), 1(B) 두 칸. 각 슬롯에 하나씩.
+    if (targetNode && isConditionalNode(targetNode)) {
+      const slot = input.slotIndex;
+      if (typeof slot !== 'number' || slot < 0 || slot > 1) return null;
+      const occupied = before.edgeOrder
+        .map((eid) => before.edges[eid])
+        .filter((e) => e && e.to === input.to);
+      if (occupied.some((e) => e!.slotIndex === slot)) return null;
     }
     // 사이클 사전 검사: lag=0이면 instantaneous DAG가 유지되는지 확인
     const candidate = addEdgeOp(before, input);

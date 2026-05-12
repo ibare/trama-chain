@@ -1,4 +1,6 @@
 import type {
+  ConditionalNode,
+  ConditionalOperator,
   ConstantNode,
   Edge,
   EdgeId,
@@ -140,6 +142,40 @@ export function addConstantNode(
   );
 }
 
+export interface AddConditionalNodeInput {
+  label: string;
+  operator?: ConditionalOperator;
+  position?: { x: number; y: number } | null;
+  isFocal?: boolean;
+  description?: string | null;
+  id?: NodeId;
+}
+
+export function addConditionalNode(
+  model: Model,
+  input: AddConditionalNodeInput,
+  now?: number,
+): Model {
+  const id = input.id ?? makeNodeId();
+  const node: ConditionalNode = {
+    kind: 'conditional',
+    id,
+    label: input.label,
+    operator: input.operator ?? '>',
+    position: input.position ?? null,
+    isFocal: input.isFocal ?? false,
+    description: input.description ?? null,
+  };
+  return touch(
+    {
+      ...model,
+      nodes: { ...model.nodes, [id]: node },
+      nodeOrder: [...model.nodeOrder, id],
+    },
+    now,
+  );
+}
+
 /** distributive union patch — ValueNode 필드와 FunctionNode 필드를 동시에 받을 수 있게. */
 export type NodePatch = Node extends infer N
   ? N extends Node
@@ -192,6 +228,7 @@ export interface AddEdgeInput {
   inverted?: boolean;
   lag?: Edge['lag'];
   slotIndex?: number;
+  sourceSlotIndex?: number;
   description?: string | null;
   id?: EdgeId;
 }
@@ -206,6 +243,7 @@ export function addEdge(model: Model, input: AddEdgeInput, now?: number): Model 
     inverted: input.inverted ?? false,
     lag: input.lag ?? 0,
     slotIndex: input.slotIndex,
+    sourceSlotIndex: input.sourceSlotIndex,
     description: input.description ?? null,
   };
   return touch(

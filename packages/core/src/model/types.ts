@@ -53,7 +53,28 @@ export interface ConstantNode {
   description?: string | null;
 }
 
-export type Node = ValueNode | FunctionNode | ConstantNode;
+/**
+ * 비교 연산자. A·B 두 입력에 대해 어느 식으로 비교할지.
+ */
+export type ConditionalOperator = '>' | '==' | '!=';
+
+/**
+ * 조건 노드 — A·B 두 입력을 비교해 A의 값을 참/거짓 두 출력 슬롯 중 하나로 라우팅.
+ * - slot 0(A) / slot 1(B) 입력. 둘 다 연결돼야 valid.
+ * - 출력 슬롯 0(참) / 1(거짓). 한 시점에 하나만 valid이며 값은 둘 다 A의 값.
+ * - boolean을 만들지 않는다 — 분기 라우터 의미.
+ */
+export interface ConditionalNode {
+  kind: 'conditional';
+  id: NodeId;
+  label: string;
+  operator: ConditionalOperator;
+  position: { x: number; y: number } | null;
+  isFocal: boolean;
+  description?: string | null;
+}
+
+export type Node = ValueNode | FunctionNode | ConstantNode | ConditionalNode;
 
 export function isValueNode(n: Node): n is ValueNode {
   return n.kind === 'value';
@@ -63,6 +84,9 @@ export function isFunctionNode(n: Node): n is FunctionNode {
 }
 export function isConstantNode(n: Node): n is ConstantNode {
   return n.kind === 'constant';
+}
+export function isConditionalNode(n: Node): n is ConditionalNode {
+  return n.kind === 'conditional';
 }
 
 export interface Edge {
@@ -75,6 +99,11 @@ export interface Edge {
   lag: EdgeLag;
   /** target이 FunctionNode일 때 슬롯 인덱스(0-based). ValueNode target에선 무시. */
   slotIndex?: number;
+  /**
+   * source가 다출력 노드(예: ConditionalNode — 0=참, 1=거짓)일 때 어느 출력에서 시작한
+   * 엣지인지. 단일 출력 노드(value·function·constant)에선 무시되고 0으로 취급.
+   */
+  sourceSlotIndex?: number;
   description?: string | null;
 }
 

@@ -190,6 +190,9 @@ function ConstantNodeViewImpl({ id }: Props): JSX.Element | null {
           } else {
             slotIndex = 0;
           }
+        } else if (targetNode && targetNode.kind === 'conditional') {
+          const explicit = slotEl?.getAttribute('data-trama-slot-index');
+          slotIndex = explicit !== null && explicit !== undefined ? Number(explicit) : 0;
         }
         addEdge({
           from: id,

@@ -3,6 +3,7 @@ import { constantRegistry, functionRegistry } from '../store/registries.js';
 import { ValueNodeView } from './ValueNodeView.js';
 import { FunctionNodeView } from './FunctionNodeView.js';
 import { ConstantNodeView } from './ConstantNodeView.js';
+import { ConditionalNodeView } from './ConditionalNodeView.js';
 import { registerNodeKindUI } from './kind-catalog.js';
 
 /**
@@ -15,7 +16,7 @@ import { registerNodeKindUI } from './kind-catalog.js';
 
 registerNodeKindUI({
   kind: 'value',
-  menuSectionLabel: '변수',
+  menuSectionLabel: '노드',
   menuSectionOrder: 10,
   View: ValueNodeView,
   buildMenuItems: () => [
@@ -32,6 +33,28 @@ registerNodeKindUI({
           position: canvasPos,
         });
         setEditingNode(node.id);
+      },
+    },
+  ],
+});
+
+registerNodeKindUI({
+  kind: 'conditional',
+  menuSectionLabel: '노드',
+  menuSectionOrder: 11,
+  View: ConditionalNodeView,
+  buildMenuItems: () => [
+    {
+      key: 'conditional',
+      label: '조건 노드',
+      symbol: 'If',
+      onSelect: (canvasPos) => {
+        const addConditionalNode = useModelStore.getState().addConditionalNode;
+        addConditionalNode({
+          label: '조건',
+          operator: '>',
+          position: canvasPos,
+        });
       },
     },
   ],

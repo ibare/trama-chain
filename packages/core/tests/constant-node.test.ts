@@ -11,6 +11,7 @@ import { createDefaultShapeRegistry } from '../src/functions/index.js';
 import { createDefaultFunctionRegistry } from '../src/node-functions/index.js';
 import {
   initializeFromInitialValues,
+  isOutputValid,
   propagateOneStep,
 } from '../src/execution/index.js';
 import {
@@ -30,7 +31,7 @@ describe('ConstantNode', () => {
     m = addConstantNode(m, { id: 'pi', label: 'π', value: Math.PI, constantKey: 'pi' });
     const s = initializeFromInitialValues(m);
     expect(s.values.pi).toBe(Math.PI);
-    expect(s.validNodes.has('pi')).toBe(true);
+    expect(isOutputValid(s, 'pi')).toBe(true);
   });
 
   it('상수→함수 슬롯으로 흐른다 (½ · b · h)', () => {

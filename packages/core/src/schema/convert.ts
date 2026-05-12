@@ -1,4 +1,5 @@
 import type {
+  ConditionalNode,
   ConstantNode,
   Edge,
   FunctionNode,
@@ -6,8 +7,14 @@ import type {
   Node,
   ValueNode,
 } from '../model/index.js';
-import { isFunctionNode, isValueNode } from '../model/index.js';
+import {
+  isConditionalNode,
+  isConstantNode,
+  isFunctionNode,
+  isValueNode,
+} from '../model/index.js';
 import type {
+  TramaConditionalNode,
   TramaConstantNode,
   TramaDocument,
   TramaEdge,
@@ -68,13 +75,26 @@ function nodeToDoc(n: Node): TramaNode {
     };
     return doc;
   }
-  // isConstantNode
-  const doc: TramaConstantNode = {
-    kind: 'constant',
+  if (isConstantNode(n)) {
+    const doc: TramaConstantNode = {
+      kind: 'constant',
+      id: n.id,
+      label: n.label,
+      value: n.value,
+      constantKey: n.constantKey,
+      position: n.position,
+      isFocal: n.isFocal,
+      description: n.description ?? null,
+    };
+    return doc;
+  }
+  // isConditionalNode
+  if (!isConditionalNode(n)) throw new Error(`Unknown node kind`);
+  const doc: TramaConditionalNode = {
+    kind: 'conditional',
     id: n.id,
     label: n.label,
-    value: n.value,
-    constantKey: n.constantKey,
+    operator: n.operator,
     position: n.position,
     isFocal: n.isFocal,
     description: n.description ?? null,
@@ -91,6 +111,7 @@ function edgeToDoc(e: Edge): TramaEdge {
     inverted: e.inverted,
     lag: e.lag,
     slotIndex: e.slotIndex,
+    sourceSlotIndex: e.sourceSlotIndex,
     description: e.description ?? null,
   };
 }
@@ -126,13 +147,24 @@ export function documentToModel(doc: TramaDocument): Model {
         description: n.description ?? null,
       };
       nodes[n.id] = node;
-    } else {
+    } else if (n.kind === 'constant') {
       const node: ConstantNode = {
         kind: 'constant',
         id: n.id,
         label: n.label,
         value: n.value,
         constantKey: n.constantKey,
+        position: n.position,
+        isFocal: n.isFocal,
+        description: n.description ?? null,
+      };
+      nodes[n.id] = node;
+    } else {
+      const node: ConditionalNode = {
+        kind: 'conditional',
+        id: n.id,
+        label: n.label,
+        operator: n.operator,
         position: n.position,
         isFocal: n.isFocal,
         description: n.description ?? null,
@@ -152,6 +184,7 @@ export function documentToModel(doc: TramaDocument): Model {
       inverted: e.inverted,
       lag: e.lag,
       slotIndex: e.slotIndex,
+      sourceSlotIndex: e.sourceSlotIndex,
       description: e.description ?? null,
     };
     edgeOrder.push(e.id);

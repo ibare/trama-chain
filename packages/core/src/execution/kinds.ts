@@ -18,6 +18,7 @@ import {
   MissingFunctionError,
   MissingShapeError,
 } from './errors.js';
+import { outputKey } from './state.js';
 
 /**
  * 단위가 명시되지 않은 노드(예: outputUnitId 없는 FunctionNode)의 폴백.
@@ -35,14 +36,14 @@ export const FREE_FALLBACK: ResolvedUnit = {
 
 /**
  * 한 노드의 lag=0 전파 단계에서 디스크립터가 사용하는 컨텍스트.
- * next/validNodes는 의도적으로 가변(mutate) — 한 step 내에서 디스크립터가
+ * next/validOutputs는 의도적으로 가변(mutate) — 한 step 내에서 디스크립터가
  * 직접 갱신해 다음 노드로 흘러간다.
  */
 export interface PropagateContext {
   model: Model;
   incoming: ReadonlyArray<Edge>;
   next: Record<NodeId, number>;
-  validNodes: Set<NodeId>;
+  validOutputs: Set<string>;
   catalog: UnitCatalog;
   shapeRegistry: ShapeRegistry;
   combinerRegistry: CombinerRegistry;
@@ -60,7 +61,7 @@ export interface NodeKindDescriptor<N extends Node = Node> {
   kind: N['kind'];
   /** 초기 state.values에 기록할 값. undefined면 미기록(propagate 단계에서 채움). */
   initialValue(node: N): number | undefined;
-  /** 초기 validNodes 포함 여부 — 출력 핀이 노출되고 하류가 이 값을 쓸 수 있는지. */
+  /** 초기 validOutputs(슬롯 0)에 포함시킬지. 단출력 노드 전제. */
   initialValid(node: N): boolean;
   /** 이 노드의 출력 단위. raw 통과(outputsRaw=true)여도 시각화·클램프 폴백용으로 의미가 있다. */
   outputUnit(node: N, catalog: UnitCatalog): ResolvedUnit;
@@ -73,7 +74,7 @@ export interface NodeKindDescriptor<N extends Node = Node> {
   /** lag=1 feedback 엣지의 target이 될 수 있는지. */
   canBeFeedbackTarget: boolean;
   /**
-   * lag=0 전파. incoming을 보고 next[node.id]를 갱신·validNodes를 조정.
+   * lag=0 전파. incoming을 보고 next[node.id]·validOutputs를 갱신.
    * incoming이 비어 있고 디스크립터가 외부 입력이 없는 종류면 기존 값을 유지하는 것이 일반적.
    */
   propagate(node: N, ctx: PropagateContext): void;
@@ -104,6 +105,12 @@ export type NodeKindRegistry = NodeKindRegistryImpl;
 
 export function createNodeKindRegistry(): NodeKindRegistry {
   return new NodeKindRegistryImpl();
+}
+
+/** edge의 source가 가리키는 출력 슬롯이 현재 valid한지. */
+function isEdgeSourceValid(ctx: PropagateContext, edge: Edge): boolean {
+  const slot = edge.sourceSlotIndex ?? 0;
+  return ctx.validOutputs.has(outputKey(edge.from, slot));
 }
 
 // ---------------------------------------------------------------------------
@@ -138,7 +145,7 @@ const valueNodeDescriptor: NodeKindDescriptor<Extract<Node, { kind: 'value' }>> 
     for (const edge of incoming) {
       const source = ctx.model.nodes[edge.from];
       if (!source) continue;
-      if (!ctx.validNodes.has(edge.from)) continue;
+      if (!isEdgeSourceValid(ctx, edge)) continue;
       const sourceValue =
         ctx.next[edge.from] ?? (isValueNode(source) ? source.initialValue : 0);
       const sourceDesc = ctx.nodeKindRegistry.forNode(source);
@@ -161,7 +168,7 @@ const valueNodeDescriptor: NodeKindDescriptor<Extract<Node, { kind: 'value' }>> 
     if (contributions.length === 0) return; // 모든 source 무효: 값 유지
     const combined = combiner.combine(contributions);
     ctx.next[node.id] = hasRawSource ? combined : clampToUnit(combined, targetUnit);
-    ctx.validNodes.add(node.id);
+    ctx.validOutputs.add(outputKey(node.id, 0));
   },
 };
 
@@ -191,7 +198,7 @@ const functionNodeDescriptor: NodeKindDescriptor<Extract<Node, { kind: 'function
       if (filled[slot]) continue;
       const source = ctx.model.nodes[edge.from];
       if (!source) continue;
-      if (!ctx.validNodes.has(edge.from)) continue;
+      if (!isEdgeSourceValid(ctx, edge)) continue;
       const value =
         ctx.next[edge.from] ?? (isValueNode(source) ? source.initialValue : 0);
       inputs[slot] = value;
@@ -199,13 +206,13 @@ const functionNodeDescriptor: NodeKindDescriptor<Extract<Node, { kind: 'function
     }
 
     if (!filled.every((f) => f)) {
-      ctx.validNodes.delete(node.id);
+      ctx.validOutputs.delete(outputKey(node.id, 0));
       return;
     }
 
     const out = def.compute(inputs);
     if (!Number.isFinite(out)) {
-      ctx.validNodes.delete(node.id);
+      ctx.validOutputs.delete(outputKey(node.id, 0));
       return;
     }
 
@@ -216,7 +223,7 @@ const functionNodeDescriptor: NodeKindDescriptor<Extract<Node, { kind: 'function
     } else {
       ctx.next[node.id] = out;
     }
-    ctx.validNodes.add(node.id);
+    ctx.validOutputs.add(outputKey(node.id, 0));
   },
 };
 
@@ -231,7 +238,79 @@ const constantNodeDescriptor: NodeKindDescriptor<Extract<Node, { kind: 'constant
   // 슬롯/엣지를 통한 입력이 있더라도 무시하고 자기 value를 유지한다.
   propagate: (node, ctx) => {
     ctx.next[node.id] = node.value;
-    ctx.validNodes.add(node.id);
+    ctx.validOutputs.add(outputKey(node.id, 0));
+  },
+};
+
+/**
+ * 조건 노드 디스크립터.
+ *
+ * 동작:
+ *   1. slot 0(A), slot 1(B) 입력 모두 채워지고 source가 valid해야 함.
+ *   2. `node.operator`로 A·B 비교 (단위 무시, 값만).
+ *   3. 결과에 따라 출력 슬롯 0(참) 또는 1(거짓) 중 하나만 valid로 표시.
+ *   4. 값은 두 슬롯 모두 A의 값 — 하나의 `next[node.id]`에 저장하고 슬롯 게이팅은 validOutputs로.
+ *
+ * 둘 중 하나라도 미연결/무효면 두 출력 모두 invalid.
+ */
+const conditionalNodeDescriptor: NodeKindDescriptor<
+  Extract<Node, { kind: 'conditional' }>
+> = {
+  kind: 'conditional',
+  outputsRaw: true,
+  canBeFeedbackTarget: false,
+  initialValue: () => undefined,
+  initialValid: () => false,
+  outputUnit: () => FREE_FALLBACK,
+  propagate: (node, ctx) => {
+    const inputs: (number | undefined)[] = [undefined, undefined];
+    const filled = [false, false];
+
+    for (const edge of ctx.incoming) {
+      const slot = edge.slotIndex;
+      if (typeof slot !== 'number' || slot < 0 || slot > 1) continue;
+      if (filled[slot]) continue;
+      const source = ctx.model.nodes[edge.from];
+      if (!source) continue;
+      if (!isEdgeSourceValid(ctx, edge)) continue;
+      const value =
+        ctx.next[edge.from] ?? (isValueNode(source) ? source.initialValue : 0);
+      inputs[slot] = value;
+      filled[slot] = true;
+    }
+
+    if (!filled[0] || !filled[1]) {
+      ctx.validOutputs.delete(outputKey(node.id, 0));
+      ctx.validOutputs.delete(outputKey(node.id, 1));
+      return;
+    }
+
+    const a = inputs[0] as number;
+    const b = inputs[1] as number;
+    let cond: boolean;
+    switch (node.operator) {
+      case '>':
+        cond = a > b;
+        break;
+      case '==':
+        cond = a === b;
+        break;
+      case '!=':
+        cond = a !== b;
+        break;
+      default:
+        cond = false;
+    }
+
+    // 두 출력 모두 A의 값. 활성 슬롯만 validOutputs에 등록.
+    ctx.next[node.id] = a;
+    if (cond) {
+      ctx.validOutputs.add(outputKey(node.id, 0));
+      ctx.validOutputs.delete(outputKey(node.id, 1));
+    } else {
+      ctx.validOutputs.delete(outputKey(node.id, 0));
+      ctx.validOutputs.add(outputKey(node.id, 1));
+    }
   },
 };
 
@@ -239,7 +318,8 @@ export function createDefaultNodeKindRegistry(): NodeKindRegistry {
   return createNodeKindRegistry()
     .register(valueNodeDescriptor)
     .register(functionNodeDescriptor)
-    .register(constantNodeDescriptor);
+    .register(constantNodeDescriptor)
+    .register(conditionalNodeDescriptor);
 }
 
 /**
@@ -277,4 +357,3 @@ export function canBeFeedbackTarget(
 ): boolean {
   return registry.forNode(node)?.canBeFeedbackTarget ?? false;
 }
-

@@ -10,6 +10,7 @@ import { createDefaultShapeRegistry } from '../src/functions/index.js';
 import { createDefaultFunctionRegistry } from '../src/node-functions/index.js';
 import {
   initializeFromInitialValues,
+  isOutputValid,
   propagateOneStep,
 } from '../src/execution/index.js';
 
@@ -75,7 +76,7 @@ describe('default function registry', () => {
       functionRegistry: functions,
     });
     expect(s.values.fn).toBe(42);
-    expect(s.validNodes.has('fn')).toBe(true);
+    expect(isOutputValid(s, 'fn')).toBe(true);
   });
 
   it('add: a + b', () => {
@@ -115,7 +116,7 @@ describe('default function registry', () => {
       combinerRegistry: combiners,
       functionRegistry: functions,
     });
-    expect(s.validNodes.has('fn')).toBe(false);
+    expect(isOutputValid(s, 'fn')).toBe(false);
   });
 
   it('min / max', () => {
@@ -161,7 +162,7 @@ describe('default function registry', () => {
       combinerRegistry: combiners,
       functionRegistry: functions,
     });
-    expect(s.validNodes.has('fn')).toBe(false);
+    expect(isOutputValid(s, 'fn')).toBe(false);
   });
 
   it('function output flows downstream into ValueNode (raw passthrough)', () => {
@@ -185,7 +186,7 @@ describe('default function registry', () => {
     // 함수 출력은 raw 통과 — 'out'의 단위가 [0,200]임에도 클램프되지 않고 20.
     expect(s.values.fn).toBe(20);
     expect(s.values.out).toBe(20);
-    expect(s.validNodes.has('out')).toBe(true);
+    expect(isOutputValid(s, 'out')).toBe(true);
   });
 
   it('function output without outputUnitId is not clamped', () => {

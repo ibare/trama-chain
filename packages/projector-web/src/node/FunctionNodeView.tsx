@@ -2,6 +2,7 @@ import { memo, useCallback, useEffect, useRef } from 'react';
 import { tokens } from '@trama/tokens';
 import {
   getFunctionSlotOccupancy,
+  isConditionalNode,
   isFunctionNode,
   isNodeValid,
   isValueNode,
@@ -173,6 +174,30 @@ function FunctionNodeViewImpl({ id }: Props): JSX.Element | null {
           }
           if (slotIndex === undefined) {
             for (let i = 0; i < def.slots.length; i++) {
+              if (!occupied.has(i)) {
+                slotIndex = i;
+                break;
+              }
+            }
+          }
+          if (slotIndex === undefined) {
+            endEdgeDraft();
+            return;
+          }
+        } else if (targetNode && isConditionalNode(targetNode)) {
+          const explicit = slotEl?.getAttribute('data-trama-slot-index');
+          const occupied = new Set(
+            model.edgeOrder
+              .map((eid) => model.edges[eid])
+              .filter((edge) => edge && edge.to === targetId)
+              .map((edge) => edge!.slotIndex),
+          );
+          if (explicit !== null && explicit !== undefined) {
+            const s = Number(explicit);
+            if (!occupied.has(s) && s >= 0 && s <= 1) slotIndex = s;
+          }
+          if (slotIndex === undefined) {
+            for (let i = 0; i < 2; i++) {
               if (!occupied.has(i)) {
                 slotIndex = i;
                 break;

@@ -1,10 +1,18 @@
 import { memo, useEffect, useMemo, useRef, useState } from 'react';
 import { tokens } from '@trama/tokens';
-import { isFunctionNode, isValueNode, normalize, type EdgeId, type Node } from '@trama/core';
+import {
+  isConditionalNode,
+  isFunctionNode,
+  isValueNode,
+  normalize,
+  type EdgeId,
+  type Node,
+} from '@trama/core';
 import { useModelStore, useUIStore } from '../store/index.js';
 import { functionRegistry } from '../store/registries.js';
 import { getNodeLayout } from '../node/box.js';
 import { layoutForFunctionDef } from '../node/function-box.js';
+import { getConditionalNodeLayout } from '../node/conditional-box.js';
 import { resolveNodeUnit } from '../util/unit-resolver.js';
 import { edgePath, type Point } from './geometry.js';
 import { registerEdgeHandle, type EdgeHandle } from '../canvas/drag-registry.js';
@@ -69,22 +77,24 @@ function EdgeViewImpl({
   // imperative 핸들이 항상 최신 baseline을 보게 한다.
   // ValueNode와 FunctionNode는 카드 폭이 달라(184 vs 144) 레이아웃 헬퍼가
   // 다르다. 노드 종류에 맞는 헬퍼를 골라 정확한 소켓 좌표를 얻는다.
+  const edgeSourceSlotIndex = edge?.sourceSlotIndex;
   const baseStart: Point = useMemo(() => {
     if (!fromNode) return { x: 0, y: 0 };
     const base = fromNode.position ?? { x: 0, y: 0 };
-    const socket = rightOutputSocket(fromNode, fromIncomingCount);
+    const socket = rightOutputSocket(fromNode, fromIncomingCount, edgeSourceSlotIndex);
     return { x: base.x + socket.x, y: base.y + socket.y };
-  }, [fromNode, fromIncomingCount]);
+  }, [fromNode, fromIncomingCount, edgeSourceSlotIndex]);
 
   const edgeSlotIndex = edge?.slotIndex;
   const baseEnd: Point = useMemo(() => {
     if (!toNode) return { x: 0, y: 0 };
     const base = toNode.position ?? { x: 0, y: 0 };
-    // 함수 노드 target은 edge.slotIndex가 슬롯을 결정. 값 노드는 incoming 순번
-    // (socketIndex)이 좌측 핀 소켓 위치를 결정.
-    const effectiveSocket = isFunctionNode(toNode)
-      ? (typeof edgeSlotIndex === 'number' ? edgeSlotIndex : 0)
-      : socketIndex;
+    // 함수 노드·조건 노드 target은 edge.slotIndex가 슬롯을 결정. 값 노드는
+    // incoming 순번(socketIndex)이 좌측 핀 소켓 위치를 결정.
+    const effectiveSocket =
+      isFunctionNode(toNode) || isConditionalNode(toNode)
+        ? (typeof edgeSlotIndex === 'number' ? edgeSlotIndex : 0)
+        : socketIndex;
     const socket = leftInputSocket(toNode, toIncomingCount, effectiveSocket);
     return { x: base.x + socket.x, y: base.y + socket.y };
   }, [toNode, toIncomingCount, socketIndex, edgeSlotIndex]);
@@ -215,12 +225,22 @@ function EdgeViewImpl({
 export const EdgeView = memo(EdgeViewImpl);
 
 /** 노드 종류에 맞는 우측(출력) 소켓 좌표 — 노드 중심 기준. */
-function rightOutputSocket(node: Node, fromIncomingCount: number): Point {
+function rightOutputSocket(
+  node: Node,
+  fromIncomingCount: number,
+  sourceSlotIndex?: number,
+): Point {
   if (isFunctionNode(node)) {
     const def = functionRegistry.get(node.functionKey);
     if (!def) return { x: 0, y: 0 };
     const layout = layoutForFunctionDef(def);
     return { x: layout.outputSocket.x, y: layout.outputSocket.y };
+  }
+  if (isConditionalNode(node)) {
+    const layout = getConditionalNodeLayout();
+    const idx = sourceSlotIndex === 1 ? 1 : 0;
+    const s = layout.outputSockets[idx]!;
+    return { x: s.x, y: s.y };
   }
   const layout = getNodeLayout(node, { incomingCount: fromIncomingCount });
   return layout.rightPin.sockets[0] ?? { x: 0, y: 0 };
@@ -235,6 +255,12 @@ function leftInputSocket(node: Node, toIncomingCount: number, socketIndex: numbe
     const idx = Math.max(0, socketIndex);
     const s = layout.inputSockets[idx] ?? layout.inputSockets[0];
     return s ? { x: s.x, y: s.y } : { x: 0, y: 0 };
+  }
+  if (isConditionalNode(node)) {
+    const layout = getConditionalNodeLayout();
+    const idx = socketIndex === 1 ? 1 : 0;
+    const s = layout.inputSockets[idx]!;
+    return { x: s.x, y: s.y };
   }
   const layout = getNodeLayout(node, { incomingCount: toIncomingCount });
   return (

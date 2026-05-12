@@ -761,6 +761,27 @@
   pointer-events: none;
 }
 
+/* Conditional node ------------------------------------------------------- */
+[data-trama-root] .trama-conditional-slot-label {
+  font-size: 12px;
+  font-weight: 600;
+  fill: var(--color-node-text-primary);
+  pointer-events: none;
+  user-select: none;
+}
+/* invalid한 출력 슬롯은 흐리게 — 핀·소켓·라벨 전반의 opacity. */
+[data-trama-root] .trama-conditional-node .is-inactive-output {
+  opacity: 0.38;
+}
+/* operator hit-area — 평소엔 투명, hover 시 어렴풋한 강조로 클릭 affordance. */
+[data-trama-root] .trama-conditional-operator-hit {
+  fill: transparent;
+  cursor: pointer;
+}
+[data-trama-root] .trama-conditional-operator-hit:hover {
+  fill: var(--color-node-fill-low);
+}
+
 /* Canvas context menu ---------------------------------------------------- */
 .trama-context-menu {
   background: var(--color-canvas-bg);

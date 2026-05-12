@@ -19,7 +19,7 @@ import {
   type PropagateContext,
 } from './kinds.js';
 import { defaultRng } from './rng.js';
-import type { ExecutionState } from './state.js';
+import { outputKey, type ExecutionState } from './state.js';
 import { buildTopology, type InstantaneousTopology } from './topology.js';
 
 export interface PropagateOptions {
@@ -51,7 +51,7 @@ export function propagateOneStep(
   const catalog = options.unitCatalog ?? defaultUnitCatalog;
   const nodeKindRegistry = options.nodeKindRegistry ?? defaultNodeKindRegistry;
   const next: Record<string, number> = { ...state.values };
-  const validNodes = new Set(state.validNodes);
+  const validOutputs = new Set(state.validOutputs);
 
   for (const nid of topology.order) {
     const node = model.nodes[nid];
@@ -63,7 +63,7 @@ export function propagateOneStep(
       model,
       incoming,
       next,
-      validNodes,
+      validOutputs,
       catalog,
       shapeRegistry: options.shapeRegistry,
       combinerRegistry: options.combinerRegistry,
@@ -74,7 +74,7 @@ export function propagateOneStep(
     desc.propagate(node, ctx);
   }
 
-  return { values: next, validNodes };
+  return { values: next, validOutputs };
 }
 
 /**
@@ -97,7 +97,7 @@ export function applyFeedbackEdges(
   const catalog = options.unitCatalog ?? defaultUnitCatalog;
   const nodeKindRegistry = options.nodeKindRegistry ?? defaultNodeKindRegistry;
   const next: Record<string, number> = { ...state.values };
-  const validNodes = new Set(state.validNodes);
+  const validOutputs = new Set(state.validOutputs);
 
   const byTarget = new Map<string, number[]>();
   const rawSourceTargets = new Set<string>();
@@ -106,7 +106,8 @@ export function applyFeedbackEdges(
     const source = model.nodes[edge.from];
     if (!target || !source) continue;
     if (!canBeFeedbackTarget(target, nodeKindRegistry)) continue;
-    if (!validNodes.has(edge.from)) continue;
+    const srcSlot = edge.sourceSlotIndex ?? 0;
+    if (!validOutputs.has(outputKey(edge.from, srcSlot))) continue;
     const sourceValue =
       state.values[edge.from] ?? (isValueNode(source) ? source.initialValue : 0);
     const list = byTarget.get(edge.to) ?? [];
@@ -125,8 +126,8 @@ export function applyFeedbackEdges(
     next[tid] = rawSourceTargets.has(tid)
       ? combined
       : clampToUnit(combined, getNodeOutputUnit(target, catalog, nodeKindRegistry));
-    validNodes.add(tid);
+    validOutputs.add(outputKey(tid, 0));
   }
 
-  return { values: next, validNodes };
+  return { values: next, validOutputs };
 }

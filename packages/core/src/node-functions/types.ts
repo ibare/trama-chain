@@ -55,7 +55,7 @@ export interface FunctionDefinition {
   outputAnchor?: SocketAnchor;
   /**
    * 슬롯 순서대로 raw 입력값을 받아 raw 출력. 정규화 거치지 않음.
-   * - 도메인 외 결과는 NaN/Infinity 가능 — propagate가 validNodes에서 제외.
+   * - 도메인 외 결과는 NaN/Infinity 가능 — propagate가 validOutputs에서 제외.
    */
   compute: (inputs: number[]) => number;
   /**
