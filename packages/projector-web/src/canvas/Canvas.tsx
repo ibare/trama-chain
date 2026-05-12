@@ -1,8 +1,9 @@
-import { useCallback, useEffect, useMemo, useRef } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import type { EdgeId, NodeId } from '@trama/core';
 import { useModelStore, useUIStore } from '../store/index.js';
 import { EdgeView } from '../edge/EdgeView.js';
 import { NodeView } from '../node/NodeView.js';
+import { UnitInspectorLayer } from '../node/UnitInspectorLayer.js';
 import { EdgeDraftView } from './EdgeDraftView.js';
 
 export function Canvas(): JSX.Element {
@@ -24,6 +25,25 @@ export function Canvas(): JSX.Element {
   const endEdgeDraft = useUIStore((s) => s.endEdgeDraft);
 
   const svgRef = useRef<SVGSVGElement | null>(null);
+  const unitInspectorNodeId = useUIStore((s) => s.unitInspector?.nodeId ?? null);
+
+  // SVG의 실제 가시 크기 — 패널 배치 helper의 bounds로 쓰임. 리사이즈에 반응.
+  const [svgSize, setSvgSize] = useState<{ width: number; height: number }>({
+    width: typeof window !== 'undefined' ? window.innerWidth : 1024,
+    height: typeof window !== 'undefined' ? window.innerHeight : 768,
+  });
+  useEffect(() => {
+    const el = svgRef.current;
+    if (!el) return undefined;
+    const update = () => {
+      const rect = el.getBoundingClientRect();
+      setSvgSize({ width: rect.width, height: rect.height });
+    };
+    update();
+    const ro = new ResizeObserver(update);
+    ro.observe(el);
+    return () => ro.disconnect();
+  }, []);
 
   const toCanvasCoords = useCallback((clientX: number, clientY: number) => {
     const svg = svgRef.current;
@@ -158,6 +178,11 @@ export function Canvas(): JSX.Element {
       {nodeOrder.map((nid) => (
         <NodeView key={nid} id={nid} incomingCount={incomingCountByNode[nid] ?? 0} />
       ))}
+      {/* 떠 있는 패널 — 모든 노드 위에 그려져 z-order 보장. 노드 그룹 안에서
+          렌더하면 그 노드보다 뒤에 그려진 다른 노드에 의해 가려진다. */}
+      {unitInspectorNodeId && (
+        <UnitInspectorLayer nodeId={unitInspectorNodeId} bounds={svgSize} />
+      )}
     </svg>
   );
 }

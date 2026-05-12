@@ -7,7 +7,6 @@ import { formatNodeValue } from '../util/format.js';
 import { resolveNodeUnit } from '../util/unit-resolver.js';
 import { getNodeLayout, type PinLayout } from './box.js';
 import { NodeMicroSlider } from './NodeMicroSlider.js';
-import { UnitInspector } from './UnitInspector.js';
 import {
   getIncidentEdgeHandles,
   registerNodeEl,
@@ -68,7 +67,6 @@ function NodeViewImpl({ id, incomingCount }: Props): JSX.Element | null {
   const startEdgeDraft = useUIStore((s) => s.startEdgeDraft);
   const endEdgeDraft = useUIStore((s) => s.endEdgeDraft);
   const openFunctionPicker = useUIStore((s) => s.openFunctionPicker);
-  const unitInspectorNodeId = useUIStore((s) => s.unitInspector?.nodeId ?? null);
   const openUnitInspector = useUIStore((s) => s.openUnitInspector);
 
   // lag=0 인입 엣지가 하나라도 있으면 매 step마다 propagation이 값을 덮어쓰므로
@@ -402,9 +400,6 @@ function NodeViewImpl({ id, incomingCount }: Props): JSX.Element | null {
       </g>
       {isSelected && editingNodeId !== id && !hasLag0Incoming && (
         <NodeMicroSlider node={node} halfH={halfH} halfW={halfW} />
-      )}
-      {unitInspectorNodeId === id && (
-        <UnitInspector node={node} halfW={halfW} halfH={halfH} />
       )}
     </g>
   );

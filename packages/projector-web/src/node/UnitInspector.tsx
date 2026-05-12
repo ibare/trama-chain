@@ -11,13 +11,13 @@ import { resolveNodeUnit } from '../util/unit-resolver.js';
 
 interface Props {
   node: Node;
-  halfW: number;
-  halfH: number;
+  /** 패널 좌상단 좌표 (SVG/캔버스 좌표계 기준). 외부에서 placePanel로 산출. */
+  x: number;
+  y: number;
 }
 
-const PANEL_WIDTH = 288;
-const PANEL_HEIGHT = 340;
-const GAP = 14;
+export const UNIT_INSPECTOR_PANEL_WIDTH = 288;
+export const UNIT_INSPECTOR_PANEL_HEIGHT = 340;
 
 /**
  * 노드 옆에 떠 있는 단위·범위 편집 패널.
@@ -27,7 +27,7 @@ const GAP = 14;
  * - 범위 편집: 같은 unitId 안의 min/max/step만 override하면 initialValue는 새
  *   범위로 클램프만.
  */
-export function UnitInspector({ node, halfW, halfH }: Props): JSX.Element {
+export function UnitInspector({ node, x, y }: Props): JSX.Element {
   const updateNode = useModelStore((s) => s.updateNode);
   const closeInspector = useUIStore((s) => s.closeUnitInspector);
 
@@ -110,10 +110,10 @@ export function UnitInspector({ node, halfW, halfH }: Props): JSX.Element {
 
   return (
     <foreignObject
-      x={halfW + GAP}
-      y={-halfH}
-      width={PANEL_WIDTH}
-      height={PANEL_HEIGHT}
+      x={x}
+      y={y}
+      width={UNIT_INSPECTOR_PANEL_WIDTH}
+      height={UNIT_INSPECTOR_PANEL_HEIGHT}
     >
       <div
         className="trama-unit-inspector"
