@@ -1,5 +1,5 @@
 import { tokens } from '@trama/tokens';
-import { isValueNode, type Node } from '@trama/core';
+import { isExpressionNode, isValueNode, type Node } from '@trama/core';
 
 const CARD_W = 240;
 const BASE_H = 124;
@@ -120,6 +120,9 @@ export interface NodeLayout {
   /** 스킨이 적용된 노드의 silhouette outline. NodeFrame이 평소 invisible로 두고
    *  선택 시 stroke를 입혀 시각화한다. 스킨이 없으면 null. */
   skinBorder: SkinBorderShape | null;
+  /** 식 노드의 fizzex 캔버스 본문 영역(노드 중심 기준). 측정 전이면 fallback
+   *  좌표. ExpressionNode가 아니면 null. */
+  expressionBody: { x: number; y: number; w: number; h: number } | null;
 }
 
 function buildPin(cx: number, cy: number, nSockets: number): PinLayout {
@@ -144,13 +147,35 @@ function buildPin(cx: number, cy: number, nSockets: number): PinLayout {
   };
 }
 
+/** 식 노드 폭 견적용 — 변수 라벨 평균 글자 폭(px). 정확한 측정은 과함. */
+const EXPR_VAR_CHAR_W = 8;
+/** 식 노드 좌측 변수 라벨 영역과 본문 사이 갭. */
+const EXPR_VAR_GUTTER_PAD = 12;
+/** 식 본문(canvas) 최소 폭 — 빈 식이나 단일 변수도 라벨 슬롯이 들어가야 함. */
+const EXPR_MIN_BODY_W = 168;
+/** 식 본문 최소 높이. */
+const EXPR_MIN_BODY_H = 56;
+/** 식 노드 좌·우 안쪽 패딩 (소켓과 본문 사이 여백). */
+const EXPR_LEFT_INSET = 18;
+const EXPR_RIGHT_INSET = 24;
+/** 라벨 슬롯 — 노드 라벨이 그려지는 상단 띠. */
+const EXPR_LABEL_SLOT_H = 36;
+/** 식 본문 아래 여백. */
+const EXPR_BOTTOM_PADDING = 16;
+
 /**
  * 노드 카드의 모든 절대 좌표(노드 중심 기준)를 반환한다.
  * 카드 폭은 고정, 높이는 (1) combiner 칩 유무 (2) 좌측 핀 소켓 수에 따라 자동 확장.
+ *
+ * ExpressionNode는 fizzex가 측정한 size(opts.expressionSize)에 따라 폭·높이가
+ * 동적 결정된다. 측정 전이면 기본값으로 fallback.
  */
 export function getNodeLayout(
   node: Node,
-  opts: { incomingCount: number },
+  opts: {
+    incomingCount: number;
+    expressionSize?: { width: number; height: number };
+  },
 ): NodeLayout {
   // 스킨이 켜진 ValueNode는 본문이 스킨으로 통째 대체되므로 카드/콤바이너/슬라이더
   // 트랙용 좌표가 필요 없다. 캡슐 크기만큼만 노드 영역을 잡고 좌·우 핀은
@@ -178,8 +203,64 @@ export function getNodeLayout(
         leftPin,
         rightPin,
         skinBorder: { cx: 0, cy: spec.circleCy, r: spec.circleR },
+        expressionBody: null,
       };
     }
+  }
+
+  // ExpressionNode — fizzex 측정 폭·높이에 따라 노드 bbox 동적 결정.
+  // 변수 슬롯이 좌측 거터를 차지하고, 본문(canvas)은 거터 우측에서 시작한다.
+  if (isExpressionNode(node)) {
+    const measured = opts.expressionSize;
+    const fizW = measured ? Math.ceil(measured.width) : CARD_W - 60;
+    const fizH = measured ? Math.ceil(measured.height) : 60;
+
+    const variables = node.variables;
+    const inSockets = Math.max(1, variables.length);
+    const varGutterW =
+      variables.length > 0
+        ? Math.max(...variables.map((v) => v.length * EXPR_VAR_CHAR_W)) +
+          EXPR_VAR_GUTTER_PAD
+        : 0;
+
+    const bodyW = Math.max(EXPR_MIN_BODY_W, fizW);
+    const width =
+      EXPR_LEFT_INSET + varGutterW + bodyW + EXPR_RIGHT_INSET;
+
+    const bodyH = Math.max(EXPR_MIN_BODY_H, fizH);
+    const baseH = EXPR_LABEL_SLOT_H + bodyH + EXPR_BOTTOM_PADDING;
+
+    const inMinH =
+      PIN_PAD * 2 + inSockets * SOCKET_SIZE + Math.max(0, inSockets - 1) * PIN_SOCKET_GAP;
+    const pinDemand = Math.max(PIN_W, inMinH) + 12;
+    const height = Math.max(baseH, pinDemand);
+
+    const halfW = width / 2;
+    const halfH = height / 2;
+    const cardTop = -halfH;
+    const labelY = cardTop + NAME_FROM_TOP;
+    const bodyX = -halfW + EXPR_LEFT_INSET + varGutterW;
+    const bodyY = cardTop + EXPR_LABEL_SLOT_H;
+
+    const leftPin = buildPin(-halfW, 0, inSockets);
+    const rightPin = buildPin(halfW, 0, 1);
+
+    return {
+      width,
+      height,
+      halfW,
+      halfH,
+      textX: -halfW + EXPR_LEFT_INSET,
+      labelY,
+      valueY: bodyY,
+      trackY: halfH,
+      combinerCenterY: null,
+      hasCombiner: false,
+      leftPin,
+      rightPin,
+      skinBorder: null,
+      expressionBody: { x: bodyX, y: bodyY, w: bodyW, h: bodyH },
+    };
   }
 
   const incomingCount = Math.max(0, opts.incomingCount);
@@ -217,5 +298,6 @@ export function getNodeLayout(
     leftPin,
     rightPin,
     skinBorder: null,
+    expressionBody: null,
   };
 }

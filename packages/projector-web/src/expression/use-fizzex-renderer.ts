@@ -3,6 +3,11 @@ import { DOMRendererView } from 'fizzex';
 
 type FizzexConfig = NonNullable<ConstructorParameters<typeof DOMRendererView>[1]>;
 
+export interface FizzexMeasure {
+  width: number;
+  height: number;
+}
+
 /**
  * fizzex DOMRendererView 인스턴스를 호스트 div의 마운트 라이프타임에 묶는 훅.
  *
@@ -26,12 +31,22 @@ type FizzexConfig = NonNullable<ConstructorParameters<typeof DOMRendererView>[1]
 export function useFizzexRenderer(
   latex: string,
   config: FizzexConfig,
+  onMeasure?: (size: FizzexMeasure) => void,
 ): (el: HTMLDivElement | null) => void {
   const viewRef = useRef<DOMRendererView | null>(null);
   const latexRef = useRef(latex);
   const configRef = useRef(config);
+  const onMeasureRef = useRef(onMeasure);
   latexRef.current = latex;
   configRef.current = config;
+  onMeasureRef.current = onMeasure;
+
+  const reportMeasure = (view: DOMRendererView): void => {
+    const cb = onMeasureRef.current;
+    if (!cb) return;
+    const s = view.getSize();
+    cb({ width: s.width, height: s.height });
+  };
 
   const hostRef = useCallback((el: HTMLDivElement | null) => {
     if (viewRef.current) {
@@ -42,10 +57,14 @@ export function useFizzexRenderer(
     const view = new DOMRendererView(el, configRef.current);
     view.render(latexRef.current || ' ');
     viewRef.current = view;
+    reportMeasure(view);
   }, []);
 
   useEffect(() => {
-    viewRef.current?.render(latex || ' ');
+    const view = viewRef.current;
+    if (!view) return;
+    view.render(latex || ' ');
+    reportMeasure(view);
   }, [latex]);
 
   return hostRef;

@@ -7,7 +7,10 @@ import {
   type NodeId,
 } from '@trama/core';
 import { useModelStore, useUIStore } from '../store/index.js';
-import { useFizzexRenderer } from '../expression/use-fizzex-renderer.js';
+import {
+  useFizzexRenderer,
+  type FizzexMeasure,
+} from '../expression/use-fizzex-renderer.js';
 import { NodeFrame } from './NodeFrame.js';
 import { Socket } from './Socket.js';
 import {
@@ -56,11 +59,25 @@ function ExpressionNodeViewImpl({ id }: Props): JSX.Element | null {
   const latex = node && isExpressionNode(node) ? node.latex : '';
   const variables = node && isExpressionNode(node) ? node.variables : [];
 
+  // fizzex가 측정한 식의 픽셀 폭·높이. 측정 전이면 null — getNodeLayout이
+  // fallback 크기 사용. 측정 후 setState로 리렌더되며 노드 bbox가 적정 크기로 펴짐.
+  const [measured, setMeasured] = useState<FizzexMeasure | null>(null);
+  const onMeasure = useCallback((size: FizzexMeasure) => {
+    setMeasured((prev) => {
+      if (prev && prev.width === size.width && prev.height === size.height) return prev;
+      return size;
+    });
+  }, []);
+
   // 입력 슬롯 등록 — 변수 갯수만큼. 좌표는 공통 box.ts 레이아웃을 그대로 사용해
   // EdgeView가 부르는 좌표와 어긋나지 않게 단일 출처로 둔다.
+  // measured 변경 시 노드 폭이 변하므로 좌측 핀 x좌표도 따라 움직여 재등록 필요.
   useEffect(() => {
     if (!node || !isExpressionNode(node)) return;
-    const layoutNow = getNodeLayout(node, { incomingCount: node.variables.length });
+    const layoutNow = getNodeLayout(node, {
+      incomingCount: node.variables.length,
+      expressionSize: measured ?? undefined,
+    });
     const unregs: Array<() => void> = [];
     layoutNow.leftPin.sockets.forEach((s, i) => {
       if (i >= node.variables.length) return;
@@ -73,7 +90,7 @@ function ExpressionNodeViewImpl({ id }: Props): JSX.Element | null {
       );
     });
     return () => unregs.forEach((u) => u());
-  }, [id, node]);
+  }, [id, node, measured]);
 
   const canStartDrag = useCallback(
     () => editingNodeId !== id,
@@ -89,14 +106,17 @@ function ExpressionNodeViewImpl({ id }: Props): JSX.Element | null {
       if (!isValid || !node) return;
       (e.target as Element).setPointerCapture(e.pointerId);
       const lag: 0 | 1 = e.altKey ? 1 : 0;
-      const layoutNow = getNodeLayout(node, { incomingCount: variables.length });
+      const layoutNow = getNodeLayout(node, {
+        incomingCount: variables.length,
+        expressionSize: measured ?? undefined,
+      });
       const out = layoutNow.rightPin.sockets[0];
       const startPoint = out
         ? { x: pos.x + out.x, y: pos.y + out.y }
         : { x: pos.x, y: pos.y };
       startEdgeDraft({ fromNodeId: id, startPoint, pointer: startPoint, lag });
     },
-    [id, isValid, node, pos.x, pos.y, startEdgeDraft, variables.length],
+    [id, isValid, measured, node, pos.x, pos.y, startEdgeDraft, variables.length],
   );
 
   const onSocketPointerUp = useCallback(
@@ -128,26 +148,38 @@ function ExpressionNodeViewImpl({ id }: Props): JSX.Element | null {
 
   // fizzex Canvas 렌더러를 host div의 마운트 라이프타임에 묶는다.
   // 편집/뷰 토글로 div가 remount되어도 callback ref가 새 view를 부착·재렌더.
-  const rendererHostRef = useFizzexRenderer(latex, {
-    baseFontSize: 22,
-    color: tokens.color.nodeTextPrimary,
-    padding: 0,
-    displayMode: 'inline',
-  });
+  // render 후 getSize()를 onMeasure로 흘려보내 노드 폭·높이를 식에 맞춰 펴낸다.
+  const rendererHostRef = useFizzexRenderer(
+    latex,
+    {
+      baseFontSize: 22,
+      color: tokens.color.nodeTextPrimary,
+      padding: 0,
+      displayMode: 'inline',
+    },
+    onMeasure,
+  );
 
   if (!node || !isExpressionNode(node)) return null;
 
-  const layout = getNodeLayout(node, { incomingCount: variables.length });
+  const layout = getNodeLayout(node, {
+    incomingCount: variables.length,
+    expressionSize: measured ?? undefined,
+  });
   const { width, height, halfW, halfH, textX, labelY } = layout;
   const isSelected = selection.kind === 'node' && selection.id === id;
   const stateClass = isValid ? 'is-calm' : 'is-low';
   const isEditing = editingNodeId === id;
 
-  // 수식 본체 영역 — 라벨 아래부터 카드 하단 여백까지. 좌우는 textX 정렬.
-  const bodyX = textX;
-  const bodyW = width - (textX - -halfW) * 2;
-  const bodyY = labelY + 4;
-  const bodyH = halfH - bodyY - 10;
+  // 수식 본체 영역 — box.ts가 변수 거터·좌우 인셋을 반영해 계산해준다.
+  // 측정 전이거나 fallback이면 expressionBody가 null이 될 수 없도록 box.ts에서
+  // 기본값을 계산 — 항상 존재.
+  const body = layout.expressionBody ?? {
+    x: textX,
+    y: labelY + 4,
+    w: width - (textX - -halfW) * 2,
+    h: halfH - (labelY + 4) - 10,
+  };
   const outSocket = layout.rightPin.sockets[0] ?? { x: halfW, y: 0 };
 
   return (
@@ -177,7 +209,7 @@ function ExpressionNodeViewImpl({ id }: Props): JSX.Element | null {
       </text>
 
       {isEditing ? (
-        <foreignObject x={bodyX} y={bodyY} width={bodyW} height={bodyH}>
+        <foreignObject x={body.x} y={body.y} width={body.w} height={body.h}>
           <textarea
             className="trama-expression-editor"
             value={latexDraft}
@@ -196,7 +228,7 @@ function ExpressionNodeViewImpl({ id }: Props): JSX.Element | null {
           />
         </foreignObject>
       ) : (
-        <foreignObject x={bodyX} y={bodyY} width={bodyW} height={bodyH}>
+        <foreignObject x={body.x} y={body.y} width={body.w} height={body.h}>
           <div ref={rendererHostRef} className="trama-expression-canvas" />
         </foreignObject>
       )}
