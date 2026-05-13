@@ -54,7 +54,7 @@ export function completeEdgeDraft(opts?: { dropScreen?: { x: number; y: number }
     const created = modelStore.addEdge({
       from: fromNodeId,
       to: snap.toNodeId,
-      shape: { kind: 'linear', params: { slope: 1, offset: 0 } },
+      shape: { kind: 'none', params: {} },
       lag,
       slotIndex: snap.slotIndex,
       sourceSlotIndex,

@@ -41,7 +41,7 @@ export function InsertNodeHandler(): null {
     addEdge({
       from: node.id,
       to: original.to,
-      shape: { kind: 'linear', params: { slope: 1, offset: 0 } },
+      shape: { kind: 'none', params: {} },
       inverted: false,
       lag: original.lag,
     });

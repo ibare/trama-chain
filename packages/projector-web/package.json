@@ -17,11 +17,12 @@
     "build": "tsc -p tsconfig.json"
   },
   "dependencies": {
+    "@radix-ui/react-tabs": "^1.1.13",
     "@trama/core": "workspace:*",
     "@trama/tokens": "workspace:*",
     "fizzex": "file:../../../fizzex",
-    "zustand": "5.0.1",
-    "zod": "3.23.8"
+    "zod": "3.23.8",
+    "zustand": "5.0.1"
   },
   "peerDependencies": {
     "react": "^18.3.0 || ^19.0.0",

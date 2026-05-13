@@ -31,11 +31,15 @@ export const FREE_FALLBACK: ResolvedUnit = {
 };
 
 /**
- * 엣지의 shape이 사실상 항등 변환(linear, slope=1, offset=0)인지 판정.
+ * 엣지의 shape이 사실상 항등 변환인지 판정. 두 경우:
+ *  - kind='none'                : 사용자가 변환을 선택하지 않은 상태
+ *  - kind='linear', slope=1, offset=0 : explicit identity linear
+ *
  * identity 엣지는 raw passthrough로 다루고 정규화·역정규화·클램프를 건너뛴다.
  * "shape을 적용하지 않으면 raw"라는 의미 모델의 단일 진입점.
  */
 export function isIdentityShape(edge: Edge): boolean {
+  if (edge.shape.kind === 'none') return true;
   if (edge.shape.kind !== 'linear') return false;
   const p = edge.shape.params as { slope?: unknown; offset?: unknown };
   return p.slope === 1 && p.offset === 0;

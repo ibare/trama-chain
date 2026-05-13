@@ -1,11 +1,12 @@
-import { useCallback, useMemo } from 'react';
+import * as Tabs from '@radix-ui/react-tabs';
+import { useCallback, useMemo, useState } from 'react';
 import { useModelStore, useUIStore } from '../store/index.js';
 import { shapeRegistry } from '../store/registries.js';
 import { FloatingPanel } from '../util/FloatingPanel.js';
-import { InverseUCurveEditor } from './InverseUCurveEditor.js';
-import { PiecewiseEditor } from './PiecewiseEditor.js';
 import { ShapeParamEditor } from './ShapeParamEditor.js';
-import { StochasticEditor } from './StochasticEditor.js';
+import { SHAPE_CATEGORIES, findCategoryOfShape } from './categories.js';
+import { getShapeEditor } from './editor-registry.js';
+import './register-default-editors.js';
 
 export function FunctionPicker(): JSX.Element | null {
   const picker = useUIStore((s) => s.functionPicker);
@@ -14,8 +15,6 @@ export function FunctionPicker(): JSX.Element | null {
   const model = useModelStore((s) => s.model);
 
   const edge = picker ? model.edges[picker.edgeId] : null;
-
-  const shapes = useMemo(() => shapeRegistry.list(), []);
 
   const selectShape = useCallback(
     (key: string) => {
@@ -28,37 +27,55 @@ export function FunctionPicker(): JSX.Element | null {
         'change-shape',
         '함수 변경',
       );
-      // 인라인 편집 UI가 붙는 shape(piecewise·stochastic·paramFields 보유)은
-      // picker를 닫지 않고 그대로 편집할 수 있게 둔다.
-      const hasInlineEditor =
-        key === 'piecewise' || key === 'stochastic' || (def.paramFields?.length ?? 0) > 0;
+      const hasInlineEditor = !!getShapeEditor(key) || (def.paramFields?.length ?? 0) > 0;
       if (!hasInlineEditor) close();
     },
     [close, edge, updateEdge],
   );
 
-  // "변환 없음" 선택 = identity linear(slope=1, offset=0). 값을 그대로 흘려보냄.
-  const selectRaw = useCallback(() => {
+  // "선택 해제" → 'none' kind sentinel로 되돌림. 변환 없이 값이 그대로 흐름.
+  const clearShape = useCallback(() => {
     if (!edge) return;
     updateEdge(
       edge.id,
-      { shape: { kind: 'linear', params: { slope: 1, offset: 0 } } },
+      { shape: { kind: 'none', params: {} } },
       'change-shape',
       '변환 없음',
     );
-    close();
-  }, [close, edge, updateEdge]);
+  }, [edge, updateEdge]);
+
+  // 현재 shape의 defaultParams로 통째 복원.
+  const resetToDefault = useCallback(() => {
+    if (!edge) return;
+    const def = shapeRegistry.get(edge.shape.kind);
+    if (!def) return;
+    updateEdge(
+      edge.id,
+      {
+        shape: {
+          kind: edge.shape.kind,
+          params: { ...(def.defaultParams as Record<string, unknown>) },
+        },
+      },
+      'change-shape',
+      '기본값으로',
+    );
+  }, [edge, updateEdge]);
+
+  // picker 열린 그 시점의 카테고리를 기본 탭으로. 이후엔 사용자 선택을 따라간다.
+  const initialTab = useMemo(() => {
+    const kind = edge?.shape.kind;
+    const cat = kind ? findCategoryOfShape(kind) : null;
+    return cat?.id ?? SHAPE_CATEGORIES[0]!.id;
+  }, [edge?.shape.kind]);
+  const [activeTab, setActiveTab] = useState<string>(initialTab);
 
   if (!picker || !edge) return null;
 
-  // 현재 엣지가 identity(=RAW)인지. linear slope=1 offset=0이면 변환이 없는 상태.
-  const isRaw =
-    edge.shape.kind === 'linear' &&
-    edge.shape.params.slope === 1 &&
-    edge.shape.params.offset === 0;
-
+  const isNone = edge.shape.kind === 'none';
   const currentDef = shapeRegistry.get(edge.shape.kind);
-  const currentParamFields = currentDef?.paramFields ?? [];
+  const Editor = getShapeEditor(edge.shape.kind);
+  const fallbackFields = currentDef?.paramFields ?? [];
 
   return (
     <FloatingPanel
@@ -67,58 +84,67 @@ export function FunctionPicker(): JSX.Element | null {
       placement={{ kind: 'below-center', offsetY: 12 }}
       className="trama-picker"
     >
-      {/* 변환 없음 = identity. input과 output이 같은 레벨임을 가운데 평탄선으로 표현. */}
-      <div
-        key="raw"
-        className={`trama-picker-card${isRaw ? ' is-selected' : ''}`}
-        onClick={selectRaw}
-      >
-        <svg className="trama-picker-preview" viewBox="0 0 96 36" preserveAspectRatio="none">
-          <line
-            className="trama-picker-preview-baseline"
-            x1={0}
-            y1={36}
-            x2={96}
-            y2={36}
-          />
-          <line className="trama-picker-preview-stroke" x1={0} y1={18} x2={96} y2={18} />
-        </svg>
-        <div className="trama-picker-card-label">변환 없음</div>
-      </div>
-      {shapes.map((s) => {
-        const selected = !isRaw && edge.shape.kind === s.key;
-        const previewParams = selected ? edge.shape.params : s.defaultParams;
-        const path = s.previewPath(96, 36, previewParams);
-        return (
-          <div
-            key={s.key}
-            className={`trama-picker-card${selected ? ' is-selected' : ''}`}
-            onClick={() => selectShape(s.key)}
-          >
-            <svg className="trama-picker-preview" viewBox="0 0 96 36" preserveAspectRatio="none">
-              <line
-                className="trama-picker-preview-baseline"
-                x1={0}
-                y1={36}
-                x2={96}
-                y2={36}
-              />
-              <path className="trama-picker-preview-fill" d={`${path} L 96 36 L 0 36 Z`} />
-              <path className="trama-picker-preview-stroke" d={path} />
-            </svg>
-            <div className="trama-picker-card-label">{s.labels.ko}</div>
-          </div>
-        );
-      })}
-      {edge.shape.kind === 'piecewise' && <PiecewiseEditor edge={edge} />}
-      {edge.shape.kind === 'stochastic' && <StochasticEditor edge={edge} />}
-      {edge.shape.kind === 'inverseU' && <InverseUCurveEditor edge={edge} />}
-      {edge.shape.kind !== 'piecewise' &&
-        edge.shape.kind !== 'stochastic' &&
-        edge.shape.kind !== 'inverseU' &&
-        currentParamFields.length > 0 && (
-          <ShapeParamEditor edge={edge} fields={currentParamFields} />
-        )}
+      {!isNone && (
+        <div className="trama-picker-toolbar">
+          <button type="button" className="trama-picker-btn" onClick={resetToDefault}>
+            기본값
+          </button>
+          <button type="button" className="trama-picker-btn" onClick={clearShape}>
+            선택 해제
+          </button>
+        </div>
+      )}
+      <Tabs.Root value={activeTab} onValueChange={setActiveTab} className="trama-picker-tabs">
+        <Tabs.List className="trama-picker-tab-list" aria-label="변환 카테고리">
+          {SHAPE_CATEGORIES.map((cat) => (
+            <Tabs.Trigger key={cat.id} value={cat.id} className="trama-picker-tab">
+              {cat.labels.ko}
+            </Tabs.Trigger>
+          ))}
+        </Tabs.List>
+        {SHAPE_CATEGORIES.map((cat) => (
+          <Tabs.Content key={cat.id} value={cat.id} className="trama-picker-tab-panel">
+            {cat.shapeKeys.map((key) => {
+              const def = shapeRegistry.get(key);
+              if (!def) return null;
+              const selected = edge.shape.kind === key;
+              const previewParams = selected ? edge.shape.params : def.defaultParams;
+              const path = def.previewPath(96, 36, previewParams);
+              return (
+                <div
+                  key={key}
+                  className={`trama-picker-card${selected ? ' is-selected' : ''}`}
+                  onClick={() => selectShape(key)}
+                >
+                  <svg
+                    className="trama-picker-preview"
+                    viewBox="0 0 96 36"
+                    preserveAspectRatio="none"
+                  >
+                    <line
+                      className="trama-picker-preview-baseline"
+                      x1={0}
+                      y1={36}
+                      x2={96}
+                      y2={36}
+                    />
+                    <path className="trama-picker-preview-fill" d={`${path} L 96 36 L 0 36 Z`} />
+                    <path className="trama-picker-preview-stroke" d={path} />
+                  </svg>
+                  <div className="trama-picker-card-label">{def.labels.ko}</div>
+                </div>
+              );
+            })}
+          </Tabs.Content>
+        ))}
+      </Tabs.Root>
+      {/* 'none' kind는 편집기 숨김 — 사용자가 explicit shape을 선택하기 전까지
+          곡선 그래프를 띄우지 않는다. */}
+      {!isNone && Editor ? (
+        <Editor edge={edge} />
+      ) : !isNone && fallbackFields.length > 0 ? (
+        <ShapeParamEditor edge={edge} fields={fallbackFields} />
+      ) : null}
     </FloatingPanel>
   );
 }

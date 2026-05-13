@@ -26,6 +26,7 @@ describe('ShapeRegistry', () => {
 
   it('default registry contains all v1 starting shapes', () => {
     const r = createDefaultShapeRegistry();
+    expect(r.has('none')).toBe(true);
     expect(r.has('linear')).toBe(true);
     expect(r.has('inverseU')).toBe(true);
     expect(r.has('threshold')).toBe(true);
@@ -33,7 +34,17 @@ describe('ShapeRegistry', () => {
     expect(r.has('accelerating')).toBe(true);
     expect(r.has('piecewise')).toBe(true);
     expect(r.has('stochastic')).toBe(true);
-    expect(r.list()).toHaveLength(7);
+    expect(r.has('sigmoid')).toBe(true);
+    expect(r.has('log')).toBe(true);
+    expect(r.has('step')).toBe(true);
+    expect(r.has('decay')).toBe(true);
+    expect(r.has('inverse')).toBe(true);
+    expect(r.has('inverseThreshold')).toBe(true);
+    expect(r.has('valley')).toBe(true);
+    expect(r.has('sin')).toBe(true);
+    expect(r.has('uniform')).toBe(true);
+    expect(r.has('gaussian')).toBe(true);
+    expect(r.list()).toHaveLength(18);
   });
 
   it('supports runtime extension', () => {
