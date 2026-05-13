@@ -1,4 +1,5 @@
 import { useCallback } from 'react';
+import * as Form from '@radix-ui/react-form';
 import type { Edge, ShapeParamField } from '@trama/core';
 import { useModelStore } from '../store/index.js';
 
@@ -11,6 +12,9 @@ interface Props {
  * shape definition의 paramFields를 읽어 number 입력들을 자동 생성한다.
  * 입력값은 즉시 edge.shape.params에 반영. preview 카드와 캔버스 결과가
  * 같이 갱신된다.
+ *
+ * radix-form 기반 — Form.Field/Label/Control로 label-input association,
+ * server validation 채널, aria 자동 부여.
  */
 export function ShapeParamEditor({ edge, fields }: Props): JSX.Element {
   const updateEdge = useModelStore((s) => s.updateEdge);
@@ -31,23 +35,33 @@ export function ShapeParamEditor({ edge, fields }: Props): JSX.Element {
   );
 
   return (
-    <div className="trama-shape-editor" style={{ gridColumn: '1 / -1' }}>
+    <Form.Root
+      className="trama-shape-editor"
+      onSubmit={(e) => e.preventDefault()}
+      style={{ gridColumn: '1 / -1' }}
+    >
       {fields.map((f) => {
         const current = typeof params[f.key] === 'number' ? (params[f.key] as number) : 0;
         return (
-          <label key={f.key} title={f.hint?.ko ?? ''}>
-            <span>{f.labels.ko}</span>
-            <input
+          <Form.Field
+            key={f.key}
+            name={f.key}
+            className="trama-shape-editor-row"
+            title={f.hint?.ko ?? ''}
+          >
+            <Form.Label className="trama-shape-editor-label">{f.labels.ko}</Form.Label>
+            <Form.Control
               type="number"
               value={current}
               min={f.min}
               max={f.max}
               step={f.step ?? 0.01}
-              onChange={(e) => setField(f.key, e.target.value)}
+              className="trama-shape-editor-input"
+              onChange={(e) => setField(f.key, e.currentTarget.value)}
             />
-          </label>
+          </Form.Field>
         );
       })}
-    </div>
+    </Form.Root>
   );
 }

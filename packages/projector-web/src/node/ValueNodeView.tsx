@@ -1,4 +1,5 @@
 import { memo, Suspense, useCallback, useEffect, useState } from 'react';
+import * as Form from '@radix-ui/react-form';
 import { tokens } from '@trama/tokens';
 import { isValueNode, type NodeId } from '@trama/core';
 import { useModelStore, useUIStore } from '../store/index.js';
@@ -217,18 +218,22 @@ function ValueNodeViewImpl({ id, incomingCount }: Props): JSX.Element | null {
               width={width - (layout.textX - -halfW) * 2}
               height={26}
             >
-              <input
-                className="trama-node-name-input"
-                value={nameDraft}
-                autoFocus
-                onChange={(e) => setNameDraft(e.target.value)}
-                onBlur={commitName}
-                onKeyDown={(e) => {
-                  if (e.key === 'Enter') commitName();
-                  if (e.key === 'Escape') setEditingNode(null);
-                }}
-                onPointerDown={(e) => e.stopPropagation()}
-              />
+              <Form.Root onSubmit={(e) => e.preventDefault()}>
+                <Form.Field name="label">
+                  <Form.Control
+                    className="trama-node-name-input"
+                    value={nameDraft}
+                    autoFocus
+                    onChange={(e) => setNameDraft(e.currentTarget.value)}
+                    onBlur={commitName}
+                    onKeyDown={(e) => {
+                      if (e.key === 'Enter') commitName();
+                      if (e.key === 'Escape') setEditingNode(null);
+                    }}
+                    onPointerDown={(e) => e.stopPropagation()}
+                  />
+                </Form.Field>
+              </Form.Root>
             </foreignObject>
           ) : (
             <text

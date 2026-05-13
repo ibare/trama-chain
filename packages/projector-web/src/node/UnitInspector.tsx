@@ -1,7 +1,7 @@
 import * as Popover from '@radix-ui/react-popover';
 import * as ToggleGroup from '@radix-ui/react-toggle-group';
 import * as Separator from '@radix-ui/react-separator';
-import * as Label from '@radix-ui/react-label';
+import * as Form from '@radix-ui/react-form';
 import { useCallback, useMemo, useState } from 'react';
 import {
   categoryLabels,
@@ -225,10 +225,14 @@ export function UnitInspector({ node }: Props): JSX.Element {
       {showRangeEditor && (
         <>
           <Separator.Root className="trama-unit-inspector-sep" decorative orientation="horizontal" />
-          <div className="trama-unit-inspector-range">
-            <RangeField label="최소" value={unit.min} step={unit.step} onCommit={(v) => setRange({ min: v })} />
-            <RangeField label="최대" value={unit.max} step={unit.step} onCommit={(v) => setRange({ max: v })} />
+          <Form.Root
+            className="trama-unit-inspector-range"
+            onSubmit={(e) => e.preventDefault()}
+          >
+            <RangeField name="min" label="최소" value={unit.min} step={unit.step} onCommit={(v) => setRange({ min: v })} />
+            <RangeField name="max" label="최대" value={unit.max} step={unit.step} onCommit={(v) => setRange({ max: v })} />
             <RangeField
+              name="step"
               label="스텝"
               value={unit.step}
               step={unit.step / 10}
@@ -237,7 +241,7 @@ export function UnitInspector({ node }: Props): JSX.Element {
                 if (v > 0) setRange({ step: v });
               }}
             />
-          </div>
+          </Form.Root>
         </>
       )}
 
@@ -251,6 +255,7 @@ export function UnitInspector({ node }: Props): JSX.Element {
 }
 
 interface RangeFieldProps {
+  name: string;
   label: string;
   value: number;
   step: number;
@@ -258,21 +263,21 @@ interface RangeFieldProps {
   onCommit: (v: number) => void;
 }
 
-function RangeField({ label, value, step, min, onCommit }: RangeFieldProps): JSX.Element {
+function RangeField({ name, label, value, step, min, onCommit }: RangeFieldProps): JSX.Element {
   return (
-    <Label.Root className="trama-unit-inspector-range-row">
-      <span className="trama-unit-inspector-range-label">{label}</span>
-      <input
+    <Form.Field name={name} className="trama-unit-inspector-range-row">
+      <Form.Label className="trama-unit-inspector-range-label">{label}</Form.Label>
+      <Form.Control
         type="number"
         value={value}
         step={step}
         min={min}
         className="trama-unit-inspector-range-input"
         onChange={(e) => {
-          const v = parseFloat(e.target.value);
+          const v = parseFloat(e.currentTarget.value);
           if (Number.isFinite(v)) onCommit(v);
         }}
       />
-    </Label.Root>
+    </Form.Field>
   );
 }

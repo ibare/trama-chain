@@ -1,4 +1,5 @@
 import { memo, useCallback, useEffect, useState } from 'react';
+import * as Form from '@radix-ui/react-form';
 import { tokens } from '@trama/tokens';
 import { isConstantNode, type NodeId } from '@trama/core';
 import { useModelStore, useUIStore } from '../store/index.js';
@@ -134,39 +135,46 @@ function ConstantNodeViewImpl({ id }: Props): JSX.Element | null {
 
       {isEditing ? (
         <foreignObject x={textX} y={cardTop + 14} width={CARD_W - SIDE_INSET * 2} height={CARD_H - 28}>
-          <div className="trama-constant-editor">
-            <input
-              className="trama-node-name-input"
-              value={nameDraft}
-              autoFocus
-              onChange={(e) => setNameDraft(e.target.value)}
-              onKeyDown={(e) => {
-                if (e.key === 'Enter' && !isCustom) commitEdit();
-                if (e.key === 'Escape') setEditingNode(null);
-              }}
-              onBlur={() => {
-                if (!isCustom) commitEdit();
-              }}
-              onPointerDown={(e) => e.stopPropagation()}
-              placeholder="라벨"
-            />
-            {isCustom && (
-              <input
+          <Form.Root
+            className="trama-constant-editor"
+            onSubmit={(e) => e.preventDefault()}
+          >
+            <Form.Field name="label">
+              <Form.Control
                 className="trama-node-name-input"
-                value={valueDraft}
-                type="number"
-                step="any"
-                onChange={(e) => setValueDraft(e.target.value)}
+                value={nameDraft}
+                autoFocus
+                onChange={(e) => setNameDraft(e.currentTarget.value)}
                 onKeyDown={(e) => {
-                  if (e.key === 'Enter') commitEdit();
+                  if (e.key === 'Enter' && !isCustom) commitEdit();
                   if (e.key === 'Escape') setEditingNode(null);
                 }}
-                onBlur={commitEdit}
+                onBlur={() => {
+                  if (!isCustom) commitEdit();
+                }}
                 onPointerDown={(e) => e.stopPropagation()}
-                placeholder="수치"
+                placeholder="라벨"
               />
+            </Form.Field>
+            {isCustom && (
+              <Form.Field name="value">
+                <Form.Control
+                  className="trama-node-name-input"
+                  value={valueDraft}
+                  type="number"
+                  step="any"
+                  onChange={(e) => setValueDraft(e.currentTarget.value)}
+                  onKeyDown={(e) => {
+                    if (e.key === 'Enter') commitEdit();
+                    if (e.key === 'Escape') setEditingNode(null);
+                  }}
+                  onBlur={commitEdit}
+                  onPointerDown={(e) => e.stopPropagation()}
+                  placeholder="수치"
+                />
+              </Form.Field>
             )}
-          </div>
+          </Form.Root>
         </foreignObject>
       ) : (
         <>

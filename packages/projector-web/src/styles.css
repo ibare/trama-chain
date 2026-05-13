@@ -658,6 +658,10 @@
   box-shadow: 0 2px 8px rgba(0, 0, 0, 0.06);
 }
 
+[data-trama-root] .trama-exec-field {
+  display: contents;
+}
+
 [data-trama-root] .trama-exec-control input[type="number"] {
   width: 64px;
   font-family: inherit;
@@ -782,7 +786,7 @@
   width: 100%;
 }
 
-[data-trama-root] .trama-shape-editor label {
+[data-trama-root] .trama-shape-editor-row {
   display: flex;
   align-items: center;
   justify-content: space-between;
@@ -791,7 +795,12 @@
   gap: 8px;
 }
 
-[data-trama-root] .trama-shape-editor input {
+[data-trama-root] .trama-shape-editor-label {
+  font-size: var(--typography-text-picker-label);
+  color: var(--color-node-text-low);
+}
+
+[data-trama-root] .trama-shape-editor-input {
   font-family: inherit;
   font-size: var(--typography-text-picker-label);
   background: transparent;

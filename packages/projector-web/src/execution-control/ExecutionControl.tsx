@@ -1,4 +1,5 @@
 import { useCallback } from 'react';
+import * as Form from '@radix-ui/react-form';
 import { hasFeedbackEdges } from '@trama/core';
 import { useModelStore } from '../store/index.js';
 
@@ -23,19 +24,27 @@ export function ExecutionControl(): JSX.Element | null {
   if (!visible) return null;
 
   return (
-    <div className="trama-exec-control" onPointerDown={(e) => e.stopPropagation()}>
-      <input
-        type="number"
-        min={1}
-        value={model.execution.steps}
-        onChange={(e) => onStepsChange(parseInt(e.target.value, 10))}
-      />
-      <input
-        type="text"
-        placeholder="단위"
-        value={model.execution.stepUnit ?? ''}
-        onChange={(e) => setExecution({ stepUnit: e.target.value || null })}
-      />
+    <Form.Root
+      className="trama-exec-control"
+      onPointerDown={(e) => e.stopPropagation()}
+      onSubmit={(e) => e.preventDefault()}
+    >
+      <Form.Field name="steps" className="trama-exec-field">
+        <Form.Control
+          type="number"
+          min={1}
+          value={model.execution.steps}
+          onChange={(e) => onStepsChange(parseInt(e.currentTarget.value, 10))}
+        />
+      </Form.Field>
+      <Form.Field name="stepUnit" className="trama-exec-field">
+        <Form.Control
+          type="text"
+          placeholder="단위"
+          value={model.execution.stepUnit ?? ''}
+          onChange={(e) => setExecution({ stepUnit: e.currentTarget.value || null })}
+        />
+      </Form.Field>
       <button type="button" onClick={play} title="step별 재생">
         ▶ 재생
       </button>
@@ -47,6 +56,6 @@ export function ExecutionControl(): JSX.Element | null {
           {playbackStep + 1} / {trajectoryLength}
         </span>
       )}
-    </div>
+    </Form.Root>
   );
 }

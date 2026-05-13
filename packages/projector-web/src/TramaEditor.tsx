@@ -1,4 +1,5 @@
 import { useEffect, useRef, useState } from 'react';
+import * as Form from '@radix-ui/react-form';
 import {
   TramaParseError,
   documentToModel,
@@ -74,22 +75,28 @@ export function TramaEditor({ initialJson, onChange, options }: Props): JSX.Elem
           {model.question}
         </div>
       ) : editingQuestion ? (
-        <div className="trama-question" style={{ pointerEvents: 'auto' }}>
-          <input
-            autoFocus
-            className="trama-node-name-input"
-            defaultValue={model.question ?? ''}
-            onBlur={(e) => {
-              setQuestion(e.target.value.trim() || null);
-              setEditingQuestion(false);
-            }}
-            onKeyDown={(e) => {
-              if (e.key === 'Enter') (e.target as HTMLInputElement).blur();
-              if (e.key === 'Escape') setEditingQuestion(false);
-            }}
-            style={{ width: 'min(520px, 60vw)' }}
-          />
-        </div>
+        <Form.Root
+          className="trama-question"
+          style={{ pointerEvents: 'auto' }}
+          onSubmit={(e) => e.preventDefault()}
+        >
+          <Form.Field name="question">
+            <Form.Control
+              autoFocus
+              className="trama-node-name-input"
+              defaultValue={model.question ?? ''}
+              onBlur={(e) => {
+                setQuestion(e.currentTarget.value.trim() || null);
+                setEditingQuestion(false);
+              }}
+              onKeyDown={(e) => {
+                if (e.key === 'Enter') (e.currentTarget as HTMLInputElement).blur();
+                if (e.key === 'Escape') setEditingQuestion(false);
+              }}
+              style={{ width: 'min(520px, 60vw)' }}
+            />
+          </Form.Field>
+        </Form.Root>
       ) : null}
 
       <Canvas />

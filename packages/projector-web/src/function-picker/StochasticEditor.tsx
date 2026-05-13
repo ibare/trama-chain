@@ -1,4 +1,5 @@
 import { useCallback } from 'react';
+import * as Form from '@radix-ui/react-form';
 import type { Edge } from '@trama/core';
 import { useModelStore } from '../store/index.js';
 import {
@@ -139,48 +140,56 @@ export function StochasticEditor({ edge }: Props): JSX.Element {
           );
         }}
       </CurveEditorFrame>
-      <div className="trama-shape-editor" style={{ gridColumn: '1 / -1' }}>
-        <label>
-          당첨 확률
-          <input
+      <Form.Root
+        className="trama-shape-editor"
+        onSubmit={(e) => e.preventDefault()}
+        style={{ gridColumn: '1 / -1' }}
+      >
+        <Form.Field name="winProbability" className="trama-shape-editor-row">
+          <Form.Label className="trama-shape-editor-label">당첨 확률</Form.Label>
+          <Form.Control
             type="number"
             step={0.01}
             min={0}
             max={1}
             value={winProbability}
-            onChange={(e) => commit({ winProbability: clamp01(parseFloat(e.target.value)) })}
+            className="trama-shape-editor-input"
+            onChange={(e) => commit({ winProbability: clamp01(parseFloat(e.currentTarget.value)) })}
           />
-        </label>
-        <label>
-          당첨 배수
-          <input
+        </Form.Field>
+        <Form.Field name="winMultiplier" className="trama-shape-editor-row">
+          <Form.Label className="trama-shape-editor-label">당첨 배수</Form.Label>
+          <Form.Control
             type="number"
             step={0.1}
             value={winMultiplier}
-            onChange={(e) => commit({ winMultiplier: parseFloat(e.target.value) })}
+            className="trama-shape-editor-input"
+            onChange={(e) => commit({ winMultiplier: parseFloat(e.currentTarget.value) })}
           />
-        </label>
-        <label>
-          탈락 배수
-          <input
+        </Form.Field>
+        <Form.Field name="loseMultiplier" className="trama-shape-editor-row">
+          <Form.Label className="trama-shape-editor-label">탈락 배수</Form.Label>
+          <Form.Control
             type="number"
             step={0.1}
             value={loseMultiplier}
-            onChange={(e) => commit({ loseMultiplier: parseFloat(e.target.value) })}
+            className="trama-shape-editor-input"
+            onChange={(e) => commit({ loseMultiplier: parseFloat(e.currentTarget.value) })}
           />
-        </label>
-        <label>
-          기준점
-          <input
+        </Form.Field>
+        <Form.Field name="bias" className="trama-shape-editor-row">
+          <Form.Label className="trama-shape-editor-label">기준점</Form.Label>
+          <Form.Control
             type="number"
             step={0.05}
             min={0}
             max={1}
             value={bias}
-            onChange={(e) => commit({ bias: clamp01(parseFloat(e.target.value)) })}
+            className="trama-shape-editor-input"
+            onChange={(e) => commit({ bias: clamp01(parseFloat(e.currentTarget.value)) })}
           />
-        </label>
-      </div>
+        </Form.Field>
+      </Form.Root>
     </>
   );
 }
