@@ -18,10 +18,3 @@ export class MissingCombinerError extends Error {
     this.name = 'MissingCombinerError';
   }
 }
-
-export class MissingFunctionError extends Error {
-  constructor(public readonly key: string) {
-    super(`Function "${key}" not registered`);
-    this.name = 'MissingFunctionError';
-  }
-}

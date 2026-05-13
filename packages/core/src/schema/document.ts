@@ -24,18 +24,6 @@ export const ValueNodeSchema = z.object({
   description: z.string().nullable().optional(),
 });
 
-export const FunctionNodeSchema = z.object({
-  kind: z.literal('function'),
-  id: z.string(),
-  label: z.string(),
-  functionKey: z.string(),
-  outputUnitId: z.string().optional(),
-  outputUnitOverride: UnitOverrideSchema.optional(),
-  position: z.object({ x: z.number(), y: z.number() }).nullable(),
-  isFocal: z.boolean(),
-  description: z.string().nullable().optional(),
-});
-
 export const ConstantNodeSchema = z.object({
   kind: z.literal('constant'),
   id: z.string(),
@@ -66,6 +54,7 @@ export const ExpressionNodeSchema = z.object({
   label: z.string(),
   latex: z.string(),
   variables: z.array(z.string()),
+  preset: z.object({ key: z.string() }).optional(),
   position: z.object({ x: z.number(), y: z.number() }).nullable(),
   isFocal: z.boolean(),
   description: z.string().nullable().optional(),
@@ -73,7 +62,6 @@ export const ExpressionNodeSchema = z.object({
 
 export const NodeSchema = z.discriminatedUnion('kind', [
   ValueNodeSchema,
-  FunctionNodeSchema,
   ConstantNodeSchema,
   ConditionalNodeSchema,
   ExpressionNodeSchema,
@@ -114,7 +102,6 @@ export const TramaDocumentSchema = z.object({
 export type TramaDocument = z.infer<typeof TramaDocumentSchema>;
 export type TramaNode = z.infer<typeof NodeSchema>;
 export type TramaValueNode = z.infer<typeof ValueNodeSchema>;
-export type TramaFunctionNode = z.infer<typeof FunctionNodeSchema>;
 export type TramaConstantNode = z.infer<typeof ConstantNodeSchema>;
 export type TramaConditionalNode = z.infer<typeof ConditionalNodeSchema>;
 export type TramaExpressionNode = z.infer<typeof ExpressionNodeSchema>;

@@ -3,7 +3,6 @@ import type { Model } from '../model/index.js';
 import { isValueNode } from '../model/index.js';
 import type { ShapeRegistry } from '../functions/index.js';
 import type { Rng } from '../functions/types.js';
-import type { FunctionRegistry } from '../node-functions/index.js';
 import {
   clampToUnit,
   defaultUnitCatalog,
@@ -29,8 +28,7 @@ import { buildTopology, type InstantaneousTopology } from './topology.js';
 export interface PropagateOptions {
   shapeRegistry: ShapeRegistry;
   combinerRegistry: CombinerRegistry;
-  functionRegistry: FunctionRegistry;
-  /** 노드 종류 디스크립터 레지스트리. 미지정 시 기본 (value + function). */
+  /** 노드 종류 디스크립터 레지스트리. 미지정 시 기본 (value·constant·conditional·expression). */
   nodeKindRegistry?: NodeKindRegistry;
   /** 단위 카탈로그. 미지정 시 기본 카탈로그. 알 수 없는 unitId는 free로 폴백. */
   unitCatalog?: UnitCatalog;
@@ -73,7 +71,6 @@ export function propagateOneStep(
       catalog,
       shapeRegistry: options.shapeRegistry,
       combinerRegistry: options.combinerRegistry,
-      functionRegistry: options.functionRegistry,
       nodeKindRegistry,
       expressionEvaluator:
         options.expressionEvaluator ?? noopExpressionEvaluator,

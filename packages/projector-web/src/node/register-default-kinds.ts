@@ -1,7 +1,6 @@
 import { useModelStore, useUIStore } from '../store/index.js';
-import { constantRegistry, functionRegistry } from '../store/registries.js';
+import { constantRegistry } from '../store/registries.js';
 import { ValueNodeView } from './ValueNodeView.js';
-import { FunctionNodeView } from './FunctionNodeView.js';
 import { ConstantNodeView } from './ConstantNodeView.js';
 import { ConditionalNodeView } from './ConditionalNodeView.js';
 import { ExpressionNodeView } from './ExpressionNodeView.js';
@@ -9,8 +8,7 @@ import { extractVariables } from '../expression/fizzex-evaluator.js';
 import { registerNodeKindUI } from './kind-catalog.js';
 
 /**
- * 기본 노드 종류(value·function) UI 디스크립터 등록.
- * Phase 5에서 ConstantNode가 더해지면 이 파일에 한 줄을 추가하면 된다.
+ * 기본 노드 종류(value·constant·conditional·expression) UI 디스크립터 등록.
  *
  * Side-effect import: NodeView·CanvasContextMenu가 카탈로그를 조회하기 전에
  * 등록이 끝나도록, 모듈 최상위에서 즉시 register 호출.
@@ -65,7 +63,7 @@ registerNodeKindUI({
 registerNodeKindUI({
   kind: 'constant',
   menuSectionLabel: '상수',
-  menuSectionOrder: 15,
+  menuSectionOrder: 18,
   View: ConstantNodeView,
   buildMenuItems: () =>
     constantRegistry.list().map((def) => {
@@ -89,49 +87,55 @@ registerNodeKindUI({
     }),
 });
 
+/**
+ * 식 패널의 프리셋. 곱셈·덧셈 같은 연산자도 식 노드의 포장 — `preset.key`가
+ * 들어 있으면 시스템 포장이고, 사용자가 본문을 편집하는 순간 `preset`이 제거되어
+ * 자유식으로 전환된다. 상수 패널의 카탈로그와 동일한 UX 결.
+ *
+ * 마지막 항목인 'custom'은 자유식 — 빈 본문에서 시작해 사용자가 입력.
+ */
+interface ExpressionPreset {
+  key: string;
+  label: string;
+  symbol: string;
+  latex: string;
+}
+
+const EXPRESSION_PRESETS: ExpressionPreset[] = [
+  { key: 'multiply', label: '곱셈', symbol: '×', latex: 'a \\times b' },
+  { key: 'add', label: '덧셈', symbol: '+', latex: 'a + b' },
+  { key: 'subtract', label: '뺄셈', symbol: '−', latex: 'a - b' },
+  { key: 'divide', label: '나눗셈', symbol: '÷', latex: '\\frac{a}{b}' },
+  { key: 'min', label: '최솟값', symbol: 'min', latex: '\\min(a, b)' },
+  { key: 'max', label: '최댓값', symbol: 'max', latex: '\\max(a, b)' },
+  { key: 'custom', label: '사용자 자유 식', symbol: 'fx', latex: '' },
+];
+
 registerNodeKindUI({
   kind: 'expression',
   menuSectionLabel: '식',
-  menuSectionOrder: 18,
+  menuSectionOrder: 15,
   View: ExpressionNodeView,
-  buildMenuItems: () => [
-    {
-      key: 'expression',
-      label: '식 노드',
-      symbol: 'fx',
-      onSelect: (canvasPos) => {
-        const addExpressionNode = useModelStore.getState().addExpressionNode;
-        const setEditingNode = useUIStore.getState().setEditingNode;
-        const latex = 'a + b';
-        const node = addExpressionNode({
-          label: '식',
-          latex,
-          variables: extractVariables(latex),
-          position: canvasPos,
-        });
-        setEditingNode(node.id);
-      },
-    },
-  ],
-});
-
-registerNodeKindUI({
-  kind: 'function',
-  menuSectionLabel: '함수',
-  menuSectionOrder: 20,
-  View: FunctionNodeView,
   buildMenuItems: () =>
-    functionRegistry.list().map((def) => ({
-      key: `fn-${def.key}`,
-      label: def.labels.ko,
-      symbol: def.symbol,
-      onSelect: (canvasPos) => {
-        const addFunctionNode = useModelStore.getState().addFunctionNode;
-        addFunctionNode({
-          label: def.labels.ko,
-          functionKey: def.key,
-          position: canvasPos,
-        });
-      },
-    })),
+    EXPRESSION_PRESETS.map((preset) => {
+      const isCustom = preset.key === 'custom';
+      return {
+        key: `expr-${preset.key}`,
+        label: preset.label,
+        symbol: preset.symbol,
+        onSelect: (canvasPos) => {
+          const addExpressionNode = useModelStore.getState().addExpressionNode;
+          const setEditingNode = useUIStore.getState().setEditingNode;
+          const latex = isCustom ? 'a + b' : preset.latex;
+          const node = addExpressionNode({
+            label: preset.label,
+            latex,
+            variables: extractVariables(latex),
+            preset: isCustom ? undefined : { key: preset.key },
+            position: canvasPos,
+          });
+          if (isCustom) setEditingNode(node.id);
+        },
+      };
+    }),
 });

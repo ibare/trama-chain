@@ -2,7 +2,6 @@ import type { CombinerRegistry } from '../combiners/index.js';
 import type { ShapeRegistry } from '../functions/index.js';
 import type { Rng } from '../functions/types.js';
 import type { Model, NodeId } from '../model/index.js';
-import type { FunctionRegistry } from '../node-functions/index.js';
 import { defaultUnitCatalog, type UnitCatalog } from '../units/index.js';
 import {
   defaultNodeKindRegistry,
@@ -20,7 +19,6 @@ import { buildTopology, type InstantaneousTopology } from './topology.js';
 export interface RecomputeNodeOptions {
   shapeRegistry: ShapeRegistry;
   combinerRegistry: CombinerRegistry;
-  functionRegistry: FunctionRegistry;
   nodeKindRegistry?: NodeKindRegistry;
   unitCatalog?: UnitCatalog;
   rng?: Rng;
@@ -106,7 +104,6 @@ export function recomputeNode(
     catalog: options.unitCatalog ?? defaultUnitCatalog,
     shapeRegistry: options.shapeRegistry,
     combinerRegistry: options.combinerRegistry,
-    functionRegistry: options.functionRegistry,
     nodeKindRegistry,
     expressionEvaluator: options.expressionEvaluator ?? noopExpressionEvaluator,
     rng: options.rng ?? defaultRng,

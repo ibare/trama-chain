@@ -8,7 +8,7 @@ import { EdgeDraftView } from './EdgeDraftView.js';
 import { CanvasContextMenu } from './CanvasContextMenu.js';
 import { setViewport as setViewportSingleton } from './viewport.js';
 import { findNearestInputSocket } from './socket-registry.js';
-import { isConditionalNode, isFunctionNode } from '@trama/core';
+import { isConditionalNode, isExpressionNode } from '@trama/core';
 
 const ZOOM_MIN = 0.2;
 const ZOOM_MAX = 4;
@@ -174,15 +174,15 @@ export function Canvas(): JSX.Element {
       const occupiedKey = (toId: string, slot: number | undefined) =>
         slot === undefined ? `${toId}` : `${toId}:${slot}`;
       // 점유 중인 슬롯 set 계산 — 단, detach 중인 엣지 자기 자신은 제외 (원위치 허용).
-      const occupiedFn = new Set<string>();
+      const occupiedExpr = new Set<string>();
       const occupiedCond = new Set<string>();
       for (const eid of model.edgeOrder) {
         const e2 = model.edges[eid];
         if (!e2) continue;
         if (eid === detachingId) continue;
         const tgt = model.nodes[e2.to];
-        if (tgt && isFunctionNode(tgt)) {
-          occupiedFn.add(occupiedKey(e2.to, e2.slotIndex));
+        if (tgt && isExpressionNode(tgt)) {
+          occupiedExpr.add(occupiedKey(e2.to, e2.slotIndex));
         } else if (tgt && isConditionalNode(tgt)) {
           occupiedCond.add(occupiedKey(e2.to, e2.slotIndex));
         }
@@ -192,8 +192,8 @@ export function Canvas(): JSX.Element {
         if (entry.nodeId === fromId) return false;
         const tgt = model.nodes[entry.nodeId];
         if (!tgt) return false;
-        if (isFunctionNode(tgt)) {
-          return !occupiedFn.has(occupiedKey(entry.nodeId, entry.slotIndex));
+        if (isExpressionNode(tgt)) {
+          return !occupiedExpr.has(occupiedKey(entry.nodeId, entry.slotIndex));
         }
         if (isConditionalNode(tgt)) {
           return !occupiedCond.has(occupiedKey(entry.nodeId, entry.slotIndex));

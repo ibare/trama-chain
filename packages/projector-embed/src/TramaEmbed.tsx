@@ -15,7 +15,7 @@ import {
   type ResolvedUnit,
   type ValueNode,
 } from '@trama/core';
-import { combinerRegistry, functionRegistry, shapeRegistry } from './registries.js';
+import { combinerRegistry, shapeRegistry } from './registries.js';
 import { computeBounds, staticEdgePath } from './geometry.js';
 import { getNodeLayout, type PinLayout } from './layout.js';
 import { formatNodeValue } from './format.js';
@@ -78,7 +78,6 @@ export function TramaEmbed({ json, height = 360, showQuestion = true }: Props): 
       const next = propagateOneStep(initial, model, {
         shapeRegistry,
         combinerRegistry,
-        functionRegistry,
       });
       return { ok: true as const, model, values: next.values };
     } catch (e) {
@@ -176,7 +175,7 @@ export function TramaEmbed({ json, height = 360, showQuestion = true }: Props): 
         })}
         {model.nodeOrder.map((nid) => {
           const node = model.nodes[nid];
-          if (!node || !isValueNode(node)) return null; // FunctionNode 렌더링은 Phase 5
+          if (!node || !isValueNode(node)) return null; // embed는 ValueNode만 렌더
           const layout = layouts[nid]!;
           const v = values[nid] ?? node.initialValue;
           return <StaticNode key={nid} node={node} layout={layout} currentValue={v} />;

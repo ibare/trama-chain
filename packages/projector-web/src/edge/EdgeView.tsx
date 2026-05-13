@@ -2,16 +2,14 @@ import { memo, useEffect, useMemo, useRef, useState } from 'react';
 import { tokens } from '@trama/tokens';
 import {
   isConditionalNode,
-  isFunctionNode,
   isValueNode,
   normalize,
   type EdgeId,
   type Node,
 } from '@trama/core';
 import { useModelStore, useUIStore } from '../store/index.js';
-import { functionRegistry, shapeRegistry } from '../store/registries.js';
+import { shapeRegistry } from '../store/registries.js';
 import { getNodeLayout } from '../node/box.js';
-import { layoutForFunctionDef } from '../node/function-box.js';
 import { getConditionalNodeLayout } from '../node/conditional-box.js';
 import { resolveNodeUnit } from '../util/unit-resolver.js';
 import { type Point } from './geometry.js';
@@ -117,10 +115,9 @@ function EdgeViewImpl({
   const baseEnd: Point = useMemo(() => {
     if (!toNode) return { x: 0, y: 0 };
     const base = toNode.position ?? { x: 0, y: 0 };
-    const effectiveSocket =
-      isFunctionNode(toNode) || isConditionalNode(toNode)
-        ? (typeof edgeSlotIndex === 'number' ? edgeSlotIndex : 0)
-        : socketIndex;
+    const effectiveSocket = isConditionalNode(toNode)
+      ? (typeof edgeSlotIndex === 'number' ? edgeSlotIndex : 0)
+      : socketIndex;
     const socket = leftInputSocket(toNode, toIncomingCount, effectiveSocket);
     return { x: base.x + socket.x, y: base.y + socket.y };
   }, [toNode, toIncomingCount, socketIndex, edgeSlotIndex]);
@@ -385,12 +382,6 @@ function rightOutputSocket(
   fromIncomingCount: number,
   sourceSlotIndex?: number,
 ): Point {
-  if (isFunctionNode(node)) {
-    const def = functionRegistry.get(node.functionKey);
-    if (!def) return { x: 0, y: 0 };
-    const layout = layoutForFunctionDef(def);
-    return { x: layout.outputSocket.x, y: layout.outputSocket.y };
-  }
   if (isConditionalNode(node)) {
     const layout = getConditionalNodeLayout();
     const idx = sourceSlotIndex === 1 ? 1 : 0;
@@ -403,14 +394,6 @@ function rightOutputSocket(
 
 /** 노드 종류에 맞는 좌측(입력) 소켓 좌표 — 노드 중심 기준. */
 function leftInputSocket(node: Node, toIncomingCount: number, socketIndex: number): Point {
-  if (isFunctionNode(node)) {
-    const def = functionRegistry.get(node.functionKey);
-    if (!def) return { x: 0, y: 0 };
-    const layout = layoutForFunctionDef(def);
-    const idx = Math.max(0, socketIndex);
-    const s = layout.inputSockets[idx] ?? layout.inputSockets[0];
-    return s ? { x: s.x, y: s.y } : { x: 0, y: 0 };
-  }
   if (isConditionalNode(node)) {
     const layout = getConditionalNodeLayout();
     const idx = socketIndex === 1 ? 1 : 0;

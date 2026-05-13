@@ -5,13 +5,11 @@ import type {
   Edge,
   EdgeId,
   ExpressionNode,
-  FunctionNode,
   Model,
   Node,
   NodeId,
   ValueNode,
 } from './types.js';
-import { isFunctionNode } from './types.js';
 import { makeEdgeId, makeModelId, makeNodeId } from './ids.js';
 
 export function createEmptyModel(now: number = Date.now()): Model {
@@ -69,44 +67,6 @@ export function addValueNode(model: Model, input: AddValueNodeInput, now?: numbe
   );
 }
 
-export interface AddFunctionNodeInput {
-  label: string;
-  functionKey: string;
-  outputUnitId?: string;
-  outputUnitOverride?: FunctionNode['outputUnitOverride'];
-  position?: { x: number; y: number } | null;
-  isFocal?: boolean;
-  description?: string | null;
-  id?: NodeId;
-}
-
-export function addFunctionNode(
-  model: Model,
-  input: AddFunctionNodeInput,
-  now?: number,
-): Model {
-  const id = input.id ?? makeNodeId();
-  const node: FunctionNode = {
-    kind: 'function',
-    id,
-    label: input.label,
-    functionKey: input.functionKey,
-    outputUnitId: input.outputUnitId,
-    outputUnitOverride: input.outputUnitOverride,
-    position: input.position ?? null,
-    isFocal: input.isFocal ?? false,
-    description: input.description ?? null,
-  };
-  return touch(
-    {
-      ...model,
-      nodes: { ...model.nodes, [id]: node },
-      nodeOrder: [...model.nodeOrder, id],
-    },
-    now,
-  );
-}
-
 export interface AddConstantNodeInput {
   label: string;
   value: number;
@@ -147,6 +107,7 @@ export interface AddExpressionNodeInput {
   label: string;
   latex: string;
   variables?: string[];
+  preset?: { key: string };
   position?: { x: number; y: number } | null;
   isFocal?: boolean;
   description?: string | null;
@@ -165,6 +126,7 @@ export function addExpressionNode(
     label: input.label,
     latex: input.latex,
     variables: input.variables ?? [],
+    preset: input.preset,
     position: input.position ?? null,
     isFocal: input.isFocal ?? false,
     description: input.description ?? null,
@@ -213,7 +175,7 @@ export function addConditionalNode(
   );
 }
 
-/** distributive union patch — ValueNode 필드와 FunctionNode 필드를 동시에 받을 수 있게. */
+/** distributive union patch — 노드 종류별 필드를 동시에 받을 수 있게. */
 export type NodePatch = Node extends infer N
   ? N extends Node
     ? Partial<Omit<N, 'id' | 'kind'>>
@@ -341,21 +303,3 @@ export function hasFeedbackEdges(model: Model): boolean {
   return false;
 }
 
-/**
- * FunctionNode의 채워진 슬롯 집합을 반환. UI/검증용.
- */
-export function getFunctionSlotOccupancy(
-  model: Model,
-  nodeId: NodeId,
-): { slotIndex: number; edgeId: EdgeId }[] {
-  const node = model.nodes[nodeId];
-  if (!node || !isFunctionNode(node)) return [];
-  const occupied: { slotIndex: number; edgeId: EdgeId }[] = [];
-  for (const eid of model.edgeOrder) {
-    const e = model.edges[eid];
-    if (!e || e.to !== nodeId) continue;
-    if (typeof e.slotIndex !== 'number') continue;
-    occupied.push({ slotIndex: e.slotIndex, edgeId: eid });
-  }
-  return occupied.sort((a, b) => a.slotIndex - b.slotIndex);
-}

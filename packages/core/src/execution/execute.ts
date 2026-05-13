@@ -2,7 +2,6 @@ import type { CombinerRegistry } from '../combiners/index.js';
 import type { Model } from '../model/index.js';
 import type { ShapeRegistry } from '../functions/index.js';
 import type { Rng } from '../functions/types.js';
-import type { FunctionRegistry } from '../node-functions/index.js';
 import type { ExpressionEvaluator } from './expression-evaluator.js';
 import { defaultRng } from './rng.js';
 import { applyFeedbackEdges, propagateOneStep } from './propagate.js';
@@ -12,7 +11,6 @@ import { buildTopology } from './topology.js';
 export interface ExecuteOptions {
   shapeRegistry: ShapeRegistry;
   combinerRegistry: CombinerRegistry;
-  functionRegistry: FunctionRegistry;
   /** LaTeX 식 평가자. 미지정이면 noop. */
   expressionEvaluator?: ExpressionEvaluator;
   rng?: Rng;
@@ -34,7 +32,6 @@ export function executeModel(model: Model, options: ExecuteOptions): ExecutionSt
   const propOpts = {
     shapeRegistry: options.shapeRegistry,
     combinerRegistry: options.combinerRegistry,
-    functionRegistry: options.functionRegistry,
     expressionEvaluator: options.expressionEvaluator,
     rng,
     topology,

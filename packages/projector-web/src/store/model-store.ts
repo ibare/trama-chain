@@ -5,16 +5,14 @@ import {
   addConstantNode as addConstantNodeOp,
   addEdge as addEdgeOp,
   addExpressionNode as addExpressionNodeOp,
-  addFunctionNode as addFunctionNodeOp,
   addValueNode as addValueNodeOp,
   buildTopology,
   createEmptyModel,
   executeModel,
-  getFunctionSlotOccupancy,
   hasFeedbackEdges,
   initializeFromInitialValues,
   isConditionalNode,
-  isFunctionNode,
+  isExpressionNode,
   modelToDocument,
   outputKey,
   propagateOneStep,
@@ -32,7 +30,6 @@ import type {
   AddConstantNodeInput,
   AddEdgeInput,
   AddExpressionNodeInput,
-  AddFunctionNodeInput,
   AddValueNodeInput,
   Edge,
   EdgeId,
@@ -45,7 +42,7 @@ import type {
   OperationKind,
 } from '@trama/core';
 import { tokens } from '@trama/tokens';
-import { combinerRegistry, functionRegistry, shapeRegistry } from './registries.js';
+import { combinerRegistry, shapeRegistry } from './registries.js';
 import { fizzexExpressionEvaluator } from '../expression/fizzex-evaluator.js';
 import {
   setArrivalHandler,
@@ -75,11 +72,6 @@ export interface ModelStore {
   exportToJson: () => string;
 
   addNode: (input: AddValueNodeInput, opKind?: OperationKind, label?: string) => Node;
-  addFunctionNode: (
-    input: AddFunctionNodeInput,
-    opKind?: OperationKind,
-    label?: string,
-  ) => Node | null;
   addConstantNode: (
     input: AddConstantNodeInput,
     opKind?: OperationKind,
@@ -143,9 +135,8 @@ function patchAffectsValues(patch: NodePatch): boolean {
     'unitOverride' in p ||
     'combiner' in p ||
     'isFocal' in p ||
-    'functionKey' in p ||
-    'outputUnitId' in p ||
-    'outputUnitOverride' in p ||
+    'latex' in p ||
+    'variables' in p ||
     'operator' in p
   );
 }
@@ -174,7 +165,6 @@ function computeExecutionState(model: Model): {
     const traj = executeModel(model, {
       shapeRegistry,
       combinerRegistry,
-      functionRegistry,
       expressionEvaluator: fizzexExpressionEvaluator,
     });
     return { executionState: traj[traj.length - 1]!, trajectory: traj };
@@ -237,7 +227,6 @@ function handlePulseArrival(pulse: Pulse): void {
   const result = recomputeNode(pulse.targetNodeId, executionState, model, {
     shapeRegistry,
     combinerRegistry,
-    functionRegistry,
     expressionEvaluator: fizzexExpressionEvaluator,
     sourceValueOverrides: { [pulse.sourceNodeId]: pulse.sourceValue },
   });
@@ -383,26 +372,6 @@ export const useModelStore = create<ModelStore>((set, get) => ({
     return node;
   },
 
-  addFunctionNode: (input, opKind = 'add-node', label = '함수 노드 추가') => {
-    // functionKey가 레지스트리에 없으면 추가 거부.
-    if (!functionRegistry.has(input.functionKey)) return null;
-    const before = get().model;
-    const after = addFunctionNodeOp(before, input);
-    const newId = after.nodeOrder[after.nodeOrder.length - 1]!;
-    const node = after.nodes[newId]!;
-    const exec = computeExecutionState(after);
-    set((s) => {
-      record(s, before, after, opKind, label, { nodeId: newId, node });
-      return {
-        model: after,
-        ...exec,
-        canUndo: s.log.canUndo(),
-        canRedo: s.log.canRedo(),
-      };
-    });
-    return node;
-  },
-
   updateNode: (id, patch, kind = 'update-node', label = '노드 수정') => {
     const before = get().model;
     const after = updateNodeOp(before, id, patch);
@@ -473,16 +442,16 @@ export const useModelStore = create<ModelStore>((set, get) => ({
 
   addEdge: (input) => {
     const before = get().model;
-    // 슬롯 검증: target이 FunctionNode면 slotIndex가 유효하고 비어 있어야.
+    // 슬롯 검증: target이 ExpressionNode면 slotIndex가 variables 범위 안이고 비어 있어야.
     const targetNode = before.nodes[input.to];
-    if (targetNode && isFunctionNode(targetNode)) {
-      const def = functionRegistry.get(targetNode.functionKey);
-      if (!def) return null;
-      const arity = def.slots.length;
+    if (targetNode && isExpressionNode(targetNode)) {
+      const arity = targetNode.variables.length;
       const slot = input.slotIndex;
       if (typeof slot !== 'number' || slot < 0 || slot >= arity) return null;
-      const occupied = getFunctionSlotOccupancy(before, input.to);
-      if (occupied.some((o) => o.slotIndex === slot)) return null;
+      const occupied = before.edgeOrder
+        .map((eid) => before.edges[eid])
+        .filter((e) => e && e.to === input.to);
+      if (occupied.some((e) => e!.slotIndex === slot)) return null;
     }
     // ConditionalNode 입력은 슬롯 0(A), 1(B) 두 칸. 각 슬롯에 하나씩.
     if (targetNode && isConditionalNode(targetNode)) {
@@ -667,6 +636,5 @@ export function previewPropagation(model: Model): ExecutionState {
   return propagateOneStep(init, model, {
     shapeRegistry,
     combinerRegistry,
-    functionRegistry,
   });
 }

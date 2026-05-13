@@ -11,7 +11,6 @@ import {
 } from '../src/index.js';
 import { createDefaultCombinerRegistry } from '../src/combiners/index.js';
 import { createDefaultShapeRegistry } from '../src/functions/index.js';
-import { createDefaultFunctionRegistry } from '../src/node-functions/index.js';
 import {
   initializeFromInitialValues,
   isOutputValid,
@@ -21,7 +20,6 @@ import {
 
 const shapes = createDefaultShapeRegistry();
 const combiners = createDefaultCombinerRegistry();
-const functions = createDefaultFunctionRegistry();
 
 function setupAB(a: number, b: number, operator: '>' | '==' | '!=' = '>') {
   let m = createEmptyModel();
@@ -61,7 +59,6 @@ describe('ConditionalNode propagation', () => {
     const s = propagateOneStep(initializeFromInitialValues(m), m, {
       shapeRegistry: shapes,
       combinerRegistry: combiners,
-      functionRegistry: functions,
     });
     expect(s.values.c).toBe(7);
     expect(isOutputValid(s, 'c', 0)).toBe(true);
@@ -73,7 +70,6 @@ describe('ConditionalNode propagation', () => {
     const s = propagateOneStep(initializeFromInitialValues(m), m, {
       shapeRegistry: shapes,
       combinerRegistry: combiners,
-      functionRegistry: functions,
     });
     expect(s.values.c).toBe(2);
     expect(isOutputValid(s, 'c', 0)).toBe(false);
@@ -85,7 +81,6 @@ describe('ConditionalNode propagation', () => {
     const s = propagateOneStep(initializeFromInitialValues(m), m, {
       shapeRegistry: shapes,
       combinerRegistry: combiners,
-      functionRegistry: functions,
     });
     expect(isOutputValid(s, 'c', 0)).toBe(true);
     expect(isOutputValid(s, 'c', 1)).toBe(false);
@@ -96,7 +91,6 @@ describe('ConditionalNode propagation', () => {
     const s = propagateOneStep(initializeFromInitialValues(m), m, {
       shapeRegistry: shapes,
       combinerRegistry: combiners,
-      functionRegistry: functions,
     });
     expect(isOutputValid(s, 'c', 0)).toBe(true);
     expect(isOutputValid(s, 'c', 1)).toBe(false);
@@ -121,7 +115,6 @@ describe('ConditionalNode propagation', () => {
     const s = propagateOneStep(initializeFromInitialValues(m), m, {
       shapeRegistry: shapes,
       combinerRegistry: combiners,
-      functionRegistry: functions,
     });
     expect(isOutputValid(s, 'c', 0)).toBe(false);
     expect(isOutputValid(s, 'c', 1)).toBe(false);
@@ -156,7 +149,6 @@ describe('ConditionalNode propagation', () => {
     const s = propagateOneStep(initializeFromInitialValues(m), m, {
       shapeRegistry: shapes,
       combinerRegistry: combiners,
-      functionRegistry: functions,
     });
     // 참 슬롯이 valid → tOut에 A(=7)이 흐른다.
     expect(s.values.tOut).toBe(7);

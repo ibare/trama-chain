@@ -4,7 +4,6 @@ import type {
   TramaDocument,
   TramaEdge,
   TramaExpressionNode,
-  TramaFunctionNode,
   TramaNode,
   TramaValueNode,
 } from './document.js';
@@ -29,18 +28,6 @@ const VALUE_NODE_KEY_ORDER: (keyof TramaValueNode)[] = [
   'initialValue',
   'position',
   'combiner',
-  'isFocal',
-  'description',
-];
-
-const FUNCTION_NODE_KEY_ORDER: (keyof TramaFunctionNode)[] = [
-  'kind',
-  'id',
-  'label',
-  'functionKey',
-  'outputUnitId',
-  'outputUnitOverride',
-  'position',
   'isFocal',
   'description',
 ];
@@ -72,6 +59,7 @@ const EXPRESSION_NODE_KEY_ORDER: (keyof TramaExpressionNode)[] = [
   'label',
   'latex',
   'variables',
+  'preset',
   'position',
   'isFocal',
   'description',
@@ -110,7 +98,6 @@ function orderObject<T extends object>(obj: T, order: readonly (keyof T)[]): T {
 
 function orderNode(n: TramaNode): TramaNode {
   if (n.kind === 'value') return orderObject(n, VALUE_NODE_KEY_ORDER);
-  if (n.kind === 'function') return orderObject(n, FUNCTION_NODE_KEY_ORDER);
   if (n.kind === 'constant') return orderObject(n, CONSTANT_NODE_KEY_ORDER);
   if (n.kind === 'conditional') return orderObject(n, CONDITIONAL_NODE_KEY_ORDER);
   return orderObject(n, EXPRESSION_NODE_KEY_ORDER);

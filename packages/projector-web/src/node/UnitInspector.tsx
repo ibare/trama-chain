@@ -10,7 +10,7 @@ import { useModelStore, useUIStore } from '../store/index.js';
 import { resolveNodeUnit } from '../util/unit-resolver.js';
 
 interface Props {
-  /** UnitInspector는 ValueNode 전용. FunctionNode는 별도 FunctionInspector. */
+  /** UnitInspector는 ValueNode 전용. 식·상수·조건 노드는 단위가 없다(raw). */
   node: ValueNode;
 }
 

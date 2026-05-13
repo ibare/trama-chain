@@ -1,4 +1,4 @@
-import { isFunctionNode, isValueNode } from '@trama/core';
+import { isValueNode } from '@trama/core';
 import { useModelStore, useUIStore } from '../store/index.js';
 
 /**
@@ -64,9 +64,8 @@ export function completeEdgeDraft(opts?: { dropScreen?: { x: number; y: number }
     if (created && opts?.dropScreen) {
       const fromNode = model.nodes[fromNodeId];
       const fromIsValue = fromNode && isValueNode(fromNode);
-      const targetIsFunctionLike =
-        targetNode && (isFunctionNode(targetNode) || targetNode.kind === 'conditional');
-      if (fromIsValue && !targetIsFunctionLike) {
+      const targetIsBranching = targetNode && targetNode.kind === 'conditional';
+      if (fromIsValue && !targetIsBranching) {
         ui.openFunctionPicker(created.id, opts.dropScreen);
       }
     }

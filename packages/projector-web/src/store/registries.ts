@@ -1,11 +1,9 @@
 import {
   CombinerRegistry,
   ConstantRegistry,
-  FunctionRegistry,
   ShapeRegistry,
   createDefaultCombinerRegistry,
   createDefaultConstantRegistry,
-  createDefaultFunctionRegistry,
   createDefaultShapeRegistry,
 } from '@trama/core';
 
@@ -15,5 +13,4 @@ import {
  */
 export const shapeRegistry: ShapeRegistry = createDefaultShapeRegistry();
 export const combinerRegistry: CombinerRegistry = createDefaultCombinerRegistry();
-export const functionRegistry: FunctionRegistry = createDefaultFunctionRegistry();
 export const constantRegistry: ConstantRegistry = createDefaultConstantRegistry();

@@ -3,7 +3,6 @@ import type { ShapeRegistry } from '../functions/index.js';
 import type { Rng } from '../functions/types.js';
 import type { Edge, Model, Node, NodeId } from '../model/index.js';
 import { isValueNode } from '../model/index.js';
-import type { FunctionRegistry } from '../node-functions/index.js';
 import {
   clamp01,
   clampToUnit,
@@ -13,16 +12,12 @@ import {
   type ResolvedUnit,
   type UnitCatalog,
 } from '../units/index.js';
-import {
-  MissingCombinerError,
-  MissingFunctionError,
-  MissingShapeError,
-} from './errors.js';
+import { MissingCombinerError, MissingShapeError } from './errors.js';
 import type { ExpressionEvaluator } from './expression-evaluator.js';
 import { outputKey } from './state.js';
 
 /**
- * 단위가 명시되지 않은 노드(예: outputUnitId 없는 FunctionNode)의 폴백.
+ * 단위가 명시되지 않은 raw 출력 노드(상수·조건·식)의 폴백.
  * 값은 raw로 흐르고, 시각화 단계에서 자동 단위 추론이 동작한다.
  */
 export const FREE_FALLBACK: ResolvedUnit = {
@@ -59,7 +54,6 @@ export interface PropagateContext {
   catalog: UnitCatalog;
   shapeRegistry: ShapeRegistry;
   combinerRegistry: CombinerRegistry;
-  functionRegistry: FunctionRegistry;
   nodeKindRegistry: NodeKindRegistry;
   expressionEvaluator: ExpressionEvaluator;
   rng: Rng;
@@ -190,61 +184,6 @@ const valueNodeDescriptor: NodeKindDescriptor<Extract<Node, { kind: 'value' }>> 
   },
 };
 
-const functionNodeDescriptor: NodeKindDescriptor<Extract<Node, { kind: 'function' }>> = {
-  kind: 'function',
-  outputsRaw: true,
-  canBeFeedbackTarget: false,
-  initialValue: () => undefined,
-  initialValid: () => false,
-  outputUnit: (node, catalog) => {
-    if (!node.outputUnitId) return FREE_FALLBACK;
-    const def = catalog.get(node.outputUnitId);
-    if (!def) return FREE_FALLBACK;
-    return resolveUnit(def, node.outputUnitOverride);
-  },
-  propagate: (node, ctx) => {
-    const def = ctx.functionRegistry.get(node.functionKey);
-    if (!def) throw new MissingFunctionError(node.functionKey);
-
-    const arity = def.slots.length;
-    const inputs: number[] = new Array(arity);
-    const filled = new Array<boolean>(arity).fill(false);
-
-    for (const edge of ctx.incoming) {
-      const slot = edge.slotIndex;
-      if (typeof slot !== 'number' || slot < 0 || slot >= arity) continue;
-      if (filled[slot]) continue;
-      const source = ctx.model.nodes[edge.from];
-      if (!source) continue;
-      if (!isEdgeSourceValid(ctx, edge)) continue;
-      const value =
-        ctx.next[edge.from] ?? (isValueNode(source) ? source.initialValue : 0);
-      inputs[slot] = value;
-      filled[slot] = true;
-    }
-
-    if (!filled.every((f) => f)) {
-      ctx.validOutputs.delete(outputKey(node.id, 0));
-      return;
-    }
-
-    const out = def.compute(inputs);
-    if (!Number.isFinite(out)) {
-      ctx.validOutputs.delete(outputKey(node.id, 0));
-      return;
-    }
-
-    // outputUnitId가 명시된 경우에만 그 단위로 클램프. 미지정이면 raw 그대로.
-    if (node.outputUnitId) {
-      const outUnit = functionNodeDescriptor.outputUnit(node, ctx.catalog);
-      ctx.next[node.id] = clampToUnit(out, outUnit);
-    } else {
-      ctx.next[node.id] = out;
-    }
-    ctx.validOutputs.add(outputKey(node.id, 0));
-  },
-};
-
 const constantNodeDescriptor: NodeKindDescriptor<Extract<Node, { kind: 'constant' }>> = {
   kind: 'constant',
   outputsRaw: true,
@@ -339,7 +278,7 @@ const conditionalNodeDescriptor: NodeKindDescriptor<
  *   1. `node.variables`가 곧 입력 슬롯 — 각 슬롯 인덱스에 들어온 값을 변수 이름에 바인딩.
  *   2. 모든 변수가 채워져야 평가. 일부라도 비면 invalid.
  *   3. 평가자는 외부 주입 (`ctx.expressionEvaluator`). 미주입이면 noop으로 undefined.
- *   4. 결과는 raw — 단위 변환 없이 흘려보낸다 (FunctionNode와 동일).
+ *   4. 결과는 raw — 단위 변환 없이 흘려보낸다.
  */
 const expressionNodeDescriptor: NodeKindDescriptor<
   Extract<Node, { kind: 'expression' }>
@@ -400,7 +339,6 @@ const expressionNodeDescriptor: NodeKindDescriptor<
 export function createDefaultNodeKindRegistry(): NodeKindRegistry {
   return createNodeKindRegistry()
     .register(valueNodeDescriptor)
-    .register(functionNodeDescriptor)
     .register(constantNodeDescriptor)
     .register(conditionalNodeDescriptor)
     .register(expressionNodeDescriptor);

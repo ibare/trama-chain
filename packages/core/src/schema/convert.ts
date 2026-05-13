@@ -3,7 +3,6 @@ import type {
   ConstantNode,
   Edge,
   ExpressionNode,
-  FunctionNode,
   Model,
   Node,
   ValueNode,
@@ -12,7 +11,6 @@ import {
   isConditionalNode,
   isConstantNode,
   isExpressionNode,
-  isFunctionNode,
   isValueNode,
 } from '../model/index.js';
 import type {
@@ -21,7 +19,6 @@ import type {
   TramaDocument,
   TramaEdge,
   TramaExpressionNode,
-  TramaFunctionNode,
   TramaNode,
   TramaValueNode,
 } from './document.js';
@@ -64,20 +61,6 @@ function nodeToDoc(n: Node): TramaNode {
     };
     return doc;
   }
-  if (isFunctionNode(n)) {
-    const doc: TramaFunctionNode = {
-      kind: 'function',
-      id: n.id,
-      label: n.label,
-      functionKey: n.functionKey,
-      outputUnitId: n.outputUnitId,
-      outputUnitOverride: n.outputUnitOverride,
-      position: n.position,
-      isFocal: n.isFocal,
-      description: n.description ?? null,
-    };
-    return doc;
-  }
   if (isConstantNode(n)) {
     const doc: TramaConstantNode = {
       kind: 'constant',
@@ -110,6 +93,7 @@ function nodeToDoc(n: Node): TramaNode {
     label: n.label,
     latex: n.latex,
     variables: n.variables,
+    preset: n.preset,
     position: n.position,
     isFocal: n.isFocal,
     description: n.description ?? null,
@@ -149,19 +133,6 @@ export function documentToModel(doc: TramaDocument): Model {
         description: n.description ?? null,
       };
       nodes[n.id] = node;
-    } else if (n.kind === 'function') {
-      const node: FunctionNode = {
-        kind: 'function',
-        id: n.id,
-        label: n.label,
-        functionKey: n.functionKey,
-        outputUnitId: n.outputUnitId,
-        outputUnitOverride: n.outputUnitOverride,
-        position: n.position,
-        isFocal: n.isFocal,
-        description: n.description ?? null,
-      };
-      nodes[n.id] = node;
     } else if (n.kind === 'constant') {
       const node: ConstantNode = {
         kind: 'constant',
@@ -192,6 +163,7 @@ export function documentToModel(doc: TramaDocument): Model {
         label: n.label,
         latex: n.latex,
         variables: n.variables,
+        preset: n.preset,
         position: n.position,
         isFocal: n.isFocal,
         description: n.description ?? null,

@@ -22,20 +22,6 @@ export interface ValueNode {
   description?: string | null;
 }
 
-export interface FunctionNode {
-  kind: 'function';
-  id: NodeId;
-  label: string;
-  /** FunctionRegistry 키 (예: 'multiply', 'add'). */
-  functionKey: string;
-  /** 출력 단위. 함수가 자동 도출하지 못하거나 사용자가 덮어쓸 때 채움. */
-  outputUnitId?: string;
-  outputUnitOverride?: UnitOverride;
-  position: { x: number; y: number } | null;
-  isFocal: boolean;
-  description?: string | null;
-}
-
 /**
  * 상수 노드 — 사용자/카탈로그가 부여한 고정 수치.
  * - `value`: 실행 시 항상 사용되는 수치 (π·g 등 카탈로그 값 또는 사용자 임의 수).
@@ -79,7 +65,9 @@ export interface ConditionalNode {
  * - `latex`: 원본 LaTeX 문자열 (fizzex parseLatex로 AST 변환).
  * - `variables`: 식에서 추출한 변수 이름 배열. 슬롯 인덱스 = 배열 인덱스.
  *   비결정성 회피를 위해 사용자가 변수 순서를 고정할 수 있게 저장.
- * - 출력 단위는 raw (FunctionNode와 동일).
+ * - `preset`: 시스템이 포장 추가한 식(곱셈/덧셈 등)의 식별 키. 사용자가 본문을
+ *   편집하면 자유식으로 전환되며 해당 필드는 제거된다. 없으면 자유식.
+ * - 출력 단위는 raw.
  */
 export interface ExpressionNode {
   kind: 'expression';
@@ -87,6 +75,7 @@ export interface ExpressionNode {
   label: string;
   latex: string;
   variables: string[];
+  preset?: { key: string };
   position: { x: number; y: number } | null;
   isFocal: boolean;
   description?: string | null;
@@ -94,16 +83,12 @@ export interface ExpressionNode {
 
 export type Node =
   | ValueNode
-  | FunctionNode
   | ConstantNode
   | ConditionalNode
   | ExpressionNode;
 
 export function isValueNode(n: Node): n is ValueNode {
   return n.kind === 'value';
-}
-export function isFunctionNode(n: Node): n is FunctionNode {
-  return n.kind === 'function';
 }
 export function isConstantNode(n: Node): n is ConstantNode {
   return n.kind === 'constant';
@@ -123,7 +108,7 @@ export interface Edge {
   inverted: boolean;
   /** 0: same-timestep instantaneous. 1: feedback to next timestep. */
   lag: EdgeLag;
-  /** target이 FunctionNode일 때 슬롯 인덱스(0-based). ValueNode target에선 무시. */
+  /** target이 다입력 노드(ExpressionNode·ConditionalNode)일 때 슬롯 인덱스(0-based). ValueNode target에선 무시. */
   slotIndex?: number;
   /**
    * source가 다출력 노드(예: ConditionalNode — 0=참, 1=거짓)일 때 어느 출력에서 시작한
