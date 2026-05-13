@@ -56,6 +56,9 @@ export function propagateOneStep(
   const nodeKindRegistry = options.nodeKindRegistry ?? defaultNodeKindRegistry;
   const next: Record<string, number> = { ...state.values };
   const validOutputs = new Set(state.validOutputs);
+  const invalidReasons: ExecutionState['invalidReasons'] = {
+    ...state.invalidReasons,
+  };
 
   for (const nid of topology.order) {
     const node = model.nodes[nid];
@@ -68,6 +71,7 @@ export function propagateOneStep(
       incoming,
       next,
       validOutputs,
+      invalidReasons,
       catalog,
       shapeRegistry: options.shapeRegistry,
       combinerRegistry: options.combinerRegistry,
@@ -79,7 +83,7 @@ export function propagateOneStep(
     desc.propagate(node, ctx);
   }
 
-  return { values: next, validOutputs };
+  return { values: next, validOutputs, invalidReasons };
 }
 
 /**
@@ -134,5 +138,5 @@ export function applyFeedbackEdges(
     validOutputs.add(outputKey(tid, 0));
   }
 
-  return { values: next, validOutputs };
+  return { values: next, validOutputs, invalidReasons: { ...state.invalidReasons } };
 }

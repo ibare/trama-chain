@@ -1,8 +1,12 @@
 import { memo, useCallback, useEffect, useState } from 'react';
 import { tokens } from '@trama/tokens';
-import { isExpressionNode, isNodeValid, type NodeId } from '@trama/core';
+import {
+  isExpressionNode,
+  isNodeValid,
+  type EvalDiagnosis,
+  type NodeId,
+} from '@trama/core';
 import { useModelStore, useUIStore } from '../store/index.js';
-import { extractVariables } from '../expression/fizzex-evaluator.js';
 import { useFizzexRenderer } from '../expression/use-fizzex-renderer.js';
 import { NodeFrame } from './NodeFrame.js';
 import { Socket } from './Socket.js';
@@ -21,9 +25,25 @@ interface Props {
 const SOCKET_SIZE = parseFloat(tokens.spacing.socketSize);
 const CARD_CORNER = parseFloat(tokens.spacing.cardCornerRadius);
 
+function formatInvalidReason(d: EvalDiagnosis & { ok: false }): string {
+  switch (d.status) {
+    case 'unbound':
+      return d.reason ?? (d.variable ? `미연결 변수: ${d.variable}` : '미연결 입력');
+    case 'domain':
+      return d.reason ?? '정의역 벗어남';
+    case 'divergent':
+      return d.reason ?? '결과가 유한하지 않음';
+    case 'unsupported':
+      return d.reason ?? (d.nodeType ? `미지원 노드: ${d.nodeType}` : '식 해석 실패');
+    default:
+      return '평가 실패';
+  }
+}
+
 function ExpressionNodeViewImpl({ id }: Props): JSX.Element | null {
   const node = useModelStore((s) => s.model.nodes[id]);
   const isValid = useModelStore((s) => isNodeValid(s.executionState, id));
+  const invalidReason = useModelStore((s) => s.executionState.invalidReasons[id]);
   const updateNode = useModelStore((s) => s.updateNode);
   const selection = useUIStore((s) => s.selection);
   const editingNodeId = useUIStore((s) => s.editingNodeId);
@@ -100,8 +120,8 @@ function ExpressionNodeViewImpl({ id }: Props): JSX.Element | null {
     }
     const v = latexDraft.trim();
     if (v && v !== node.latex) {
-      const vars = extractVariables(v);
-      updateNode(id, { latex: v, variables: vars }, 'update-node', '식 편집');
+      // variables는 model-store.updateNode가 fizzex.analyze 로 자동 동기화.
+      updateNode(id, { latex: v }, 'update-node', '식 편집');
     }
     setEditingNode(null);
   }, [id, latexDraft, node, setEditingNode, updateNode]);
@@ -140,6 +160,9 @@ function ExpressionNodeViewImpl({ id }: Props): JSX.Element | null {
       canStartDrag={canStartDrag}
       onBodyDoubleClick={onBodyDoubleClick}
     >
+      {!isValid && invalidReason ? (
+        <title>{formatInvalidReason(invalidReason)}</title>
+      ) : null}
       <rect
         className={`trama-node-body ${stateClass}${isSelected ? ' is-selected' : ''}`}
         x={-halfW}

@@ -15,4 +15,10 @@ export interface ConstantDefinition {
   description?: { ko: string; en: string };
   /** 카테고리 — UI에서 묶음 표시용. 예: "math", "physics". */
   category: 'math' | 'physics' | 'custom';
+  /**
+   * fizzex 평가기의 정규화 변수명. 식 노드가 분석한 `constants` 슬롯과
+   * 매칭되어 자동 연결 후보로 사용된다. 예: PI → 'π', E → 'e'.
+   * 매칭 대상이 없는 사용자 상수(예: 임의 수, 도메인 상수)는 생략.
+   */
+  fizzexName?: string;
 }

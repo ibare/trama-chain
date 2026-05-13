@@ -245,6 +245,7 @@ function handlePulseArrival(pulse: Pulse): void {
       executionState: {
         values: newValues,
         validOutputs: result.validOutputs,
+        invalidReasons: s.executionState.invalidReasons,
       },
     };
   });
@@ -372,8 +373,24 @@ export const useModelStore = create<ModelStore>((set, get) => ({
     return node;
   },
 
-  updateNode: (id, patch, kind = 'update-node', label = '노드 수정') => {
+  updateNode: (id, rawPatch, kind = 'update-node', label = '노드 수정') => {
     const before = get().model;
+    // 식 노드의 latex가 바뀌면 variables(슬롯 목록)도 fizzex 분석으로 동기화.
+    // 자유변수 + 등장 상수 union을 슬롯으로 노출한다 (상수도 ConstantNode 엣지 경유 정책).
+    const node = before.nodes[id];
+    const patch: NodePatch =
+      node &&
+      isExpressionNode(node) &&
+      typeof (rawPatch as { latex?: unknown }).latex === 'string'
+        ? (() => {
+            const nextLatex = (rawPatch as { latex: string }).latex;
+            const analysis = fizzexExpressionEvaluator.analyze(nextLatex);
+            return {
+              ...rawPatch,
+              variables: [...analysis.required, ...analysis.constants],
+            };
+          })()
+        : rawPatch;
     const after = updateNodeOp(before, id, patch);
     if (after === before) return;
 
@@ -400,7 +417,11 @@ export const useModelStore = create<ModelStore>((set, get) => ({
         newValid.add(outputKey(id, 0));
         return {
           model: after,
-          executionState: { values: newValues, validOutputs: newValid },
+          executionState: {
+            values: newValues,
+            validOutputs: newValid,
+            invalidReasons: s.executionState.invalidReasons,
+          },
           trajectory: recomputed.trajectory,
           canUndo: s.log.canUndo(),
           canRedo: s.log.canRedo(),
@@ -574,7 +595,11 @@ export const useModelStore = create<ModelStore>((set, get) => ({
         model: after,
         executionState: playbackActive
           ? s.executionState
-          : { values: nextValues, validOutputs: nextValid },
+          : {
+              values: nextValues,
+              validOutputs: nextValid,
+              invalidReasons: s.executionState.invalidReasons,
+            },
         trajectory: recomputed.trajectory,
         canUndo: s.log.canUndo(),
         canRedo: s.log.canRedo(),

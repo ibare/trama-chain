@@ -11,6 +11,7 @@ const PI: ConstantDefinition = {
     en: 'Ratio of a circle’s circumference to its diameter',
   },
   category: 'math',
+  fizzexName: 'π',
 };
 
 const E: ConstantDefinition = {
@@ -23,6 +24,7 @@ const E: ConstantDefinition = {
     en: 'Base of the natural logarithm',
   },
   category: 'math',
+  fizzexName: 'e',
 };
 
 const ONE_HALF: ConstantDefinition = {

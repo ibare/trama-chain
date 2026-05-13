@@ -1,4 +1,5 @@
 import type { Model, NodeId } from '../model/index.js';
+import type { EvalDiagnosis } from './expression-evaluator.js';
 import { defaultNodeKindRegistry, type NodeKindRegistry } from './kinds.js';
 
 /**
@@ -8,10 +9,15 @@ import { defaultNodeKindRegistry, type NodeKindRegistry } from './kinds.js';
  * `validOutputs`는 "출력 슬롯 단위"로 유효성을 표현한다. 키 형식 `${nodeId}:${slot}`.
  * 단출력 노드(value·function·constant)는 슬롯 0만 사용. 다출력 노드(조건 노드는
  * 0=참, 1=거짓)는 한 시점에 일부 슬롯만 valid로 표시한다.
+ *
+ * `invalidReasons`는 노드별 마지막 실패 사유. 평가가 성공한 step에서는 키가
+ * 삭제된다. UI 가 invalid 배지/툴팁에 노출하는 용도이며 propagate 결정에는
+ * 영향이 없다.
  */
 export interface ExecutionState {
   values: Record<NodeId, number>;
   validOutputs: Set<string>;
+  invalidReasons: Record<NodeId, EvalDiagnosis & { ok: false }>;
 }
 
 /** 출력 유효성 집합용 키 생성. */
@@ -34,7 +40,7 @@ export function initializeFromInitialValues(
     if (typeof v === 'number') values[nid] = v;
     if (desc.initialValid(node)) validOutputs.add(outputKey(nid, 0));
   }
-  return { values, validOutputs };
+  return { values, validOutputs, invalidReasons: {} };
 }
 
 export function getNodeValue(state: ExecutionState, id: NodeId): number {

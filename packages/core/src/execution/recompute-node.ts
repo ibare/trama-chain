@@ -85,6 +85,9 @@ export function recomputeNode(
   // 작업용 카피. 디스크립터가 mutate해도 caller의 state는 건드리지 않음.
   const workingValues: Record<NodeId, number> = { ...state.values };
   const workingValid = new Set(state.validOutputs);
+  const workingInvalidReasons: ExecutionState['invalidReasons'] = {
+    ...state.invalidReasons,
+  };
 
   // 펄스 snapshot override 적용 (source 노드들의 출력을 임시 치환).
   if (options.sourceValueOverrides) {
@@ -101,6 +104,7 @@ export function recomputeNode(
     incoming,
     next: workingValues,
     validOutputs: workingValid,
+    invalidReasons: workingInvalidReasons,
     catalog: options.unitCatalog ?? defaultUnitCatalog,
     shapeRegistry: options.shapeRegistry,
     combinerRegistry: options.combinerRegistry,

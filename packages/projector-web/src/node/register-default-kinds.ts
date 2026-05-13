@@ -4,7 +4,7 @@ import { ValueNodeView } from './ValueNodeView.js';
 import { ConstantNodeView } from './ConstantNodeView.js';
 import { ConditionalNodeView } from './ConditionalNodeView.js';
 import { ExpressionNodeView } from './ExpressionNodeView.js';
-import { extractVariables } from '../expression/fizzex-evaluator.js';
+import { fizzexExpressionEvaluator } from '../expression/fizzex-evaluator.js';
 import { registerNodeKindUI } from './kind-catalog.js';
 
 /**
@@ -127,10 +127,11 @@ registerNodeKindUI({
           const addExpressionNode = useModelStore.getState().addExpressionNode;
           const setEditingNode = useUIStore.getState().setEditingNode;
           const latex = isCustom ? 'a + b' : preset.latex;
+          const analysis = fizzexExpressionEvaluator.analyze(latex);
           const node = addExpressionNode({
             label: preset.label,
             latex,
-            variables: extractVariables(latex),
+            variables: [...analysis.required, ...analysis.constants],
             preset: isCustom ? undefined : { key: preset.key },
             position: canvasPos,
           });
