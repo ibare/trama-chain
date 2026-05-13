@@ -7,8 +7,12 @@ import { registerSkin } from './registry.js';
 
 registerSkin({
   key: 'thermometer-mercury',
-  labels: { ko: '아날로그 온도계' },
-  appliesTo: (unit) => unit.id === 'celsius',
+  labels: { ko: '상온 온도계' },
+  domain: {
+    unit: 'celsius',
+    range: { min: -50, max: 50, step: 1 },
+    intent: '일상 생활에서 느끼는 온도 — 영하 50도부터 영상 50도까지',
+  },
   load: () =>
     import('./skins/thermometer-mercury.js').then((m) => ({ Skin: m.ThermometerMercury })),
 });

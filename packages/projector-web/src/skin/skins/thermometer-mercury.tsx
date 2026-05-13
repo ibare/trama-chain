@@ -66,6 +66,26 @@ export function ThermometerMercury({
   const f = formatNodeValue(value, unit);
   const valueLabel = `${f.primary}${unit.kind === 'number' ? '°' : ''}`;
 
+  // 값 기반 색 매핑. ratio가 아니라 *온도 절댓값*이 색을 결정한다 — surfaceY와 무관하게
+  // 0°C는 항상 흰에 가까운 옅은 청, 30°C 이상은 점점 붉은색. 캡슐 inner 영역에 절대
+  // 좌표(userSpaceOnUse)로 그라데이션을 깔고, mercury rect는 그 위 일부만 차지하므로
+  // 값에 해당하는 색이 그 y에 그대로 보인다.
+  // 상온 온도계 도메인 (−50..50 °C)에 맞춘 stop. 다른 도메인의 thermometer 스킨은
+  // 자기 영역에 맞춰 색 매핑을 따로 정의.
+  const colorStops: ReadonlyArray<{ v: number; c: string }> = [
+    { v: -50, c: '#234d9a' },
+    { v: -30, c: '#4f81c9' },
+    { v: -10, c: '#9ec3e6' },
+    { v: 0, c: '#e9f0f5' },
+    { v: 15, c: '#ead09a' },
+    { v: 25, c: '#e69869' },
+    { v: 30, c: '#df6e3f' },
+    { v: 40, c: '#c84830' },
+    { v: 50, c: '#962a1d' },
+  ];
+  const offsetOf = (v: number): number =>
+    Math.max(0, Math.min(1, (v - unit.min) / range));
+
   // 말풍선 — 캡슐 좌측 *바깥*, 수은 표면 높이에 정렬. 자체가 슬라이더 핸들.
   const bubbleW = 60;
   const bubbleH = 30;
@@ -131,12 +151,20 @@ export function ThermometerMercury({
       {/* visuals — drag-hit이 통과하도록 wrapper 전체 pointer-events 차단 */}
       <g pointerEvents="none">
         <defs>
-          <linearGradient id={`merc-${uid}`} x1="0" y1="1" x2="0" y2="0">
-            <stop offset="0" stopColor="#7cc4d6" />
-            <stop offset="0.32" stopColor="#cfdb95" />
-            <stop offset="0.58" stopColor="#e3a05c" />
-            <stop offset="0.82" stopColor="#dc5b3c" />
-            <stop offset="1" stopColor="#b53626" />
+          {/* userSpaceOnUse — 그라데이션이 캡슐 inner 영역의 절대 y 좌표에 묶인다.
+              y1=bottom(=unit.min), y2=top(=unit.max). stop offset은 0..1로 정규화된
+              값 위치라서 mercury rect의 크기와 무관하게 같은 온도값은 같은 색. */}
+          <linearGradient
+            id={`merc-${uid}`}
+            gradientUnits="userSpaceOnUse"
+            x1={0}
+            y1={innerTop + innerH}
+            x2={0}
+            y2={innerTop}
+          >
+            {colorStops.map((s) => (
+              <stop key={s.v} offset={offsetOf(s.v)} stopColor={s.c} />
+            ))}
           </linearGradient>
           <clipPath id={`tube-${uid}`}>
             <rect

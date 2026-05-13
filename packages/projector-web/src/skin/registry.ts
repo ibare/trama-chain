@@ -18,7 +18,7 @@ export function listAllSkins(): SkinDefinition[] {
 }
 
 export function listSkinsForUnit(unit: ResolvedUnit): SkinDefinition[] {
-  return Array.from(map.values()).filter((s) => s.appliesTo(unit));
+  return Array.from(map.values()).filter((s) => s.domain.unit === unit.id);
 }
 
 /**

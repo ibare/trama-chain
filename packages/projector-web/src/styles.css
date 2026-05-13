@@ -874,7 +874,7 @@
 
 [data-trama-root] .trama-unit-inspector-skin-list {
   display: flex;
-  flex-wrap: wrap;
+  flex-direction: column;
   gap: 4px;
 }
 
@@ -882,11 +882,26 @@
   background: var(--color-node-fill-calm);
   border: 1px solid transparent;
   border-radius: var(--spacing-radius-card);
-  padding: 4px 10px;
+  padding: 6px 10px;
   font-family: inherit;
   font-size: var(--typography-text-picker-label);
   color: var(--color-node-text-primary);
   cursor: pointer;
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 2px;
+  text-align: left;
+}
+
+[data-trama-root] .trama-unit-inspector-skin-label {
+  font-weight: 600;
+}
+
+[data-trama-root] .trama-unit-inspector-skin-intent {
+  font-size: 11px;
+  color: var(--color-node-text-low);
+  line-height: 1.3;
 }
 
 [data-trama-root] .trama-unit-inspector-skin:hover {

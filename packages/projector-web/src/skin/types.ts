@@ -2,6 +2,27 @@ import type { ComponentType } from 'react';
 import type { ResolvedUnit, ValueNode } from '@trama/core';
 
 /**
+ * 스킨이 다루는 단위 도메인 영역 선언.
+ *
+ * 스킨은 "특정 단위에 대응하는 표현"이 아니라 **그 단위 안에서 특정 영역을 전문으로
+ * 다루는** 도메인 전문가다. 같은 단위(예: celsius)에도 영역이 다른 여러 스킨이 공존한다:
+ *   - 상온 온도계: −50..50 °C, 일상 체감
+ *   - 조리 온도계: 0..200 °C, 끓는점·살균점 중심
+ *   - 절대온도 디스플레이: −273..0 °C, 과학 이정표
+ *
+ * 사용자가 단위에 스킨을 적용하면 노드의 unitOverride.min/max/step이 이 range로
+ * **역제안된다** — 임의 입력 대신 도메인 전문성을 따른다.
+ */
+export interface SkinDomain {
+  /** 적용 가능한 단위 id (단위 카탈로그와 정확히 일치). */
+  unit: string;
+  /** 이 스킨이 권장하는 노드 unit.min/max/step. 적용 시 자동 적용. */
+  range: { min: number; max: number; step: number };
+  /** 도메인 의도. 사용자가 스킨 카드를 볼 때 보이는 한 줄 설명. */
+  intent: string;
+}
+
+/**
  * 스킨 컴포넌트가 받는 props.
  *
  * 스킨은 노드 본문(label/value/combiner chip)을 대체하는 SVG group을 그린다.
@@ -38,10 +59,10 @@ export interface SkinDefinition {
   key: string;
   labels: { ko: string };
   /**
-   * 어느 단위에 적용 가능한지. ResolvedUnit 기준으로 자유 판정.
-   * 단위 카탈로그를 건드리지 않고 스킨이 자기 적용성을 선언하는 방식.
+   * 도메인 영역 선언. `domain.unit`이 노드의 단위 id와 정확히 매치되면 적용 후보.
+   * 영역 적합성은 사용자가 스킨 카드를 골라서 결정한다.
    */
-  appliesTo: (unit: ResolvedUnit) => boolean;
+  domain: SkinDomain;
   /** dynamic import — vite가 자동으로 별도 chunk로 분리한다. */
   load: () => Promise<{ Skin: SkinComponent }>;
 }
