@@ -82,6 +82,10 @@ function evaluateNode(node: MathNode, vars: Record<string, number>): number {
       const v = vars[node.name];
       return typeof v === 'number' ? v : Number.NaN;
     }
+    case 'row':
+      // fizzex가 frac.numerator/power.exponent 등을 [RowNode{children:[...]}]로 감싸기 때문에
+      // row 자체를 evaluateNode로 만나는 경로가 있다. children을 그대로 평가.
+      return evaluateRow(node.children, vars);
     case 'paren':
       return evaluateRow(node.content, vars);
     case 'abs':
@@ -229,7 +233,9 @@ function parseCached(latex: string): RootNode | null {
   if (cache.has(latex)) return cache.get(latex) ?? null;
   try {
     const result = parseLatex(latex);
-    if (result.hasErrors) {
+    // hasErrors여도 AST 자체는 만들어졌으면 평가 시도 — fizzex는 tolerant라
+    // 사소한 경고로 hasErrors가 켜질 수 있는데, 평가는 가능한 경우가 많다.
+    if (!result.ast || result.ast.children.length === 0) {
       cache.set(latex, null);
       return null;
     }
