@@ -1,3 +1,7 @@
+import * as Popover from '@radix-ui/react-popover';
+import * as ToggleGroup from '@radix-ui/react-toggle-group';
+import * as Separator from '@radix-ui/react-separator';
+import * as Label from '@radix-ui/react-label';
 import { useCallback, useMemo, useState } from 'react';
 import {
   categoryLabels,
@@ -6,10 +10,11 @@ import {
   type UnitDef,
   type ValueNode,
 } from '@trama/core';
-import { useModelStore, useUIStore } from '../store/index.js';
+import { useModelStore } from '../store/index.js';
 import { resolveNodeUnit } from '../util/unit-resolver.js';
 import { listSkinsForUnit } from '../skin/registry.js';
 import type { SkinDefinition } from '../skin/types.js';
+import { TramaCarousel } from '../util/TramaCarousel.js';
 import '../skin/register-default-skins.js';
 
 interface Props {
@@ -17,20 +22,16 @@ interface Props {
   node: ValueNode;
 }
 
-export const UNIT_INSPECTOR_PANEL_WIDTH = 288;
-export const UNIT_INSPECTOR_PANEL_HEIGHT = 340;
-
 /**
  * 노드 옆에 떠 있는 단위·범위 편집 패널.
  *
- * - 단위 변경: 카탈로그에서 다른 unitId를 고르면 override 비우고 initialValue도
- *   카탈로그 defaultInitial로 리셋(의미가 달라졌으므로 비례 변환은 의미 없음).
- * - 범위 편집: 같은 unitId 안의 min/max/step만 override하면 initialValue는 새
- *   범위로 클램프만.
+ * - 각 섹션(카테고리·단위·스킨)은 TramaCarousel로 좌우 페이징. 한 줄에 모두 보이지
+ *   않으면 prev/next 버튼으로 다음 페이지로 넘어간다. 패널 높이는 컨텐츠가 결정.
+ * - ToggleGroup `type="single"` + `onValueChange`에서 빈 값 무시 → 라디오 동작
+ *   (재클릭으로 해제되지 않음). 해제는 명시적 "해제" 버튼으로 통일.
  */
 export function UnitInspector({ node }: Props): JSX.Element {
   const updateNode = useModelStore((s) => s.updateNode);
-  const closeInspector = useUIStore((s) => s.closeUnitInspector);
 
   const currentDef = defaultUnitCatalog.get(node.unitId);
   const unit = resolveNodeUnit(node);
@@ -45,20 +46,18 @@ export function UnitInspector({ node }: Props): JSX.Element {
     currentDef?.category ?? 'rating',
   );
 
-  const unitsInCategory = useMemo<readonly UnitDef[]>(() => {
-    return defaultUnitCatalog.byCategory().get(selectedCategory) ?? [];
-  }, [selectedCategory]);
+  const unitsInCategory = useMemo<readonly UnitDef[]>(
+    () => defaultUnitCatalog.byCategory().get(selectedCategory) ?? [],
+    [selectedCategory],
+  );
 
   const onPickUnit = useCallback(
-    (def: UnitDef) => {
-      if (def.id === node.unitId) return;
+    (id: string) => {
+      const def = defaultUnitCatalog.get(id);
+      if (!def || def.id === node.unitId) return;
       updateNode(
         node.id,
-        {
-          unitId: def.id,
-          unitOverride: undefined,
-          initialValue: def.defaultInitial,
-        },
+        { unitId: def.id, unitOverride: undefined, initialValue: def.defaultInitial },
         'update-node',
         '단위 변경',
       );
@@ -70,7 +69,6 @@ export function UnitInspector({ node }: Props): JSX.Element {
     (patch: { min?: number; max?: number; step?: number }) => {
       if (!currentDef) return;
       const nextOverride = { ...(node.unitOverride ?? {}), ...patch };
-      // 비어 있으면 undefined로 정규화 (기본값과 같아지면 override 제거).
       const allDefault =
         (nextOverride.min ?? currentDef.defaultMin) === currentDef.defaultMin &&
         (nextOverride.max ?? currentDef.defaultMax) === currentDef.defaultMax &&
@@ -78,7 +76,6 @@ export function UnitInspector({ node }: Props): JSX.Element {
         nextOverride.suffix === undefined &&
         nextOverride.labels === undefined;
       const finalOverride = allDefault ? undefined : nextOverride;
-      // initialValue 새 범위로 클램프
       const newMin = nextOverride.min ?? currentDef.defaultMin;
       const newMax = nextOverride.max ?? currentDef.defaultMax;
       const newInitial = Math.max(newMin, Math.min(node.initialValue, newMax));
@@ -103,7 +100,6 @@ export function UnitInspector({ node }: Props): JSX.Element {
   }, [currentDef, node.id, updateNode]);
 
   // 스킨이 적용된 동안엔 range editor를 숨긴다 — 스킨이 도메인 권위로 범위를 결정.
-  // 사용자가 범위를 다시 만지려면 스킨을 해제하거나 다른 영역의 스킨을 골라야 한다.
   const showRangeEditor =
     (unit.kind === 'number' || unit.kind === 'scale') && !node.skin;
 
@@ -114,15 +110,9 @@ export function UnitInspector({ node }: Props): JSX.Element {
   const currentSkinKey = node.skin?.kind ?? null;
 
   const onPickSkin = useCallback(
-    (def: SkinDefinition) => {
-      // 같은 스킨을 다시 누르면 해제 (toggle). shape picker의 "선택 해제"와 같은 결.
-      // 해제 시 unitOverride는 그대로 둔다 — 사용자가 명시적 "리셋"으로 단위 default로 돌아감.
-      if (currentSkinKey === def.key) {
-        updateNode(node.id, { skin: undefined }, 'update-node', '스킨 해제');
-        return;
-      }
-      // 스킨이 도메인 전문가 — 적용과 동시에 노드 unit 범위를 스킨이 권장하는 영역으로
-      // *역제안*한다. 사용자가 임의 입력할 이유를 없앤다. initialValue는 새 범위로 클램프.
+    (key: string) => {
+      const def = skinCandidates.find((d) => d.key === key);
+      if (!def) return;
       const r = def.domain.range;
       const newInitial = Math.max(r.min, Math.min(node.initialValue, r.max));
       updateNode(
@@ -136,121 +126,119 @@ export function UnitInspector({ node }: Props): JSX.Element {
         '스킨 적용',
       );
     },
-    [currentSkinKey, node.id, node.initialValue, updateNode],
+    [node.id, node.initialValue, skinCandidates, updateNode],
   );
+
+  const onClearSkin = useCallback(() => {
+    updateNode(node.id, { skin: undefined }, 'update-node', '스킨 해제');
+  }, [node.id, updateNode]);
 
   return (
     <>
-        <header className="trama-unit-inspector-header">
-          <span>단위</span>
-          <button
-            type="button"
-            className="trama-unit-inspector-close"
-            onClick={closeInspector}
-            aria-label="닫기"
-          >
-            ×
-          </button>
-        </header>
+      <header className="trama-unit-inspector-header">
+        <span>단위</span>
+        <Popover.Close className="trama-unit-inspector-close" aria-label="닫기">
+          ×
+        </Popover.Close>
+      </header>
 
-        <div className="trama-unit-inspector-categories">
+      <ToggleGroup.Root
+        type="single"
+        value={selectedCategory}
+        onValueChange={(v) => v && setSelectedCategory(v as UnitCategory)}
+        aria-label="단위 카테고리"
+        className="trama-unit-inspector-categories"
+      >
+        <TramaCarousel ariaLabel="단위 카테고리 페이지">
           {categories.map((c) => (
-            <button
-              key={c}
-              type="button"
-              className={`trama-unit-inspector-chip${
-                selectedCategory === c ? ' is-active' : ''
-              }`}
-              onClick={() => setSelectedCategory(c)}
-            >
+            <ToggleGroup.Item key={c} value={c} className="trama-unit-inspector-chip">
               {categoryLabels[c]}
-            </button>
+            </ToggleGroup.Item>
           ))}
-        </div>
+        </TramaCarousel>
+      </ToggleGroup.Root>
 
-        <div className="trama-unit-inspector-units">
+      <Separator.Root className="trama-unit-inspector-sep" decorative orientation="horizontal" />
+
+      <ToggleGroup.Root
+        type="single"
+        value={node.unitId}
+        onValueChange={(v) => v && onPickUnit(v)}
+        aria-label="단위 종류"
+        className="trama-unit-inspector-units"
+      >
+        <TramaCarousel ariaLabel="단위 종류 페이지">
           {unitsInCategory.map((d) => (
-            <button
+            <ToggleGroup.Item
               key={d.id}
-              type="button"
-              className={`trama-unit-inspector-unit${
-                node.unitId === d.id ? ' is-active' : ''
-              }`}
-              onClick={() => onPickUnit(d)}
+              value={d.id}
+              className="trama-unit-inspector-unit"
               title={d.hint ?? ''}
             >
               {d.label.ko}
-            </button>
+            </ToggleGroup.Item>
           ))}
-        </div>
-
-        {showRangeEditor && (
-          <div className="trama-unit-inspector-range">
-            <label>
-              <span>최소</span>
-              <input
-                type="number"
-                value={unit.min}
-                step={unit.step}
-                onChange={(e) => {
-                  const v = parseFloat(e.target.value);
-                  if (Number.isFinite(v)) setRange({ min: v });
-                }}
-              />
-            </label>
-            <label>
-              <span>최대</span>
-              <input
-                type="number"
-                value={unit.max}
-                step={unit.step}
-                onChange={(e) => {
-                  const v = parseFloat(e.target.value);
-                  if (Number.isFinite(v)) setRange({ max: v });
-                }}
-              />
-            </label>
-            <label>
-              <span>스텝</span>
-              <input
-                type="number"
-                value={unit.step}
-                step={unit.step / 10}
-                min={0}
-                onChange={(e) => {
-                  const v = parseFloat(e.target.value);
-                  if (Number.isFinite(v) && v > 0) setRange({ step: v });
-                }}
-              />
-            </label>
-          </div>
-        )}
+        </TramaCarousel>
+      </ToggleGroup.Root>
 
       {skinCandidates.length > 0 && (
-        <div className="trama-unit-inspector-skins">
-          <div className="trama-unit-inspector-section-label">스킨</div>
-          <div className="trama-unit-inspector-skin-list">
-            {skinCandidates.map((s) => {
-              const active = currentSkinKey === s.key;
-              return (
+        <>
+          <Separator.Root className="trama-unit-inspector-sep" decorative orientation="horizontal" />
+          <div className="trama-unit-inspector-skins">
+            <div className="trama-unit-inspector-section-row">
+              <span className="trama-unit-inspector-section-label">스킨</span>
+              {currentSkinKey && (
                 <button
-                  key={s.key}
                   type="button"
-                  className={`trama-unit-inspector-skin${active ? ' is-active' : ''}`}
-                  onClick={() => onPickSkin(s)}
-                  title={active ? '다시 누르면 해제' : s.domain.intent}
+                  className="trama-unit-inspector-clear"
+                  onClick={onClearSkin}
                 >
-                  <span className="trama-unit-inspector-skin-label">
-                    {s.labels.ko}
-                  </span>
-                  <span className="trama-unit-inspector-skin-intent">
-                    {s.domain.intent}
-                  </span>
+                  해제
                 </button>
-              );
-            })}
+              )}
+            </div>
+            <ToggleGroup.Root
+              type="single"
+              value={currentSkinKey ?? ''}
+              onValueChange={(v) => v && onPickSkin(v)}
+              aria-label="스킨"
+              className="trama-unit-inspector-skin-list"
+            >
+              <TramaCarousel ariaLabel="스킨 페이지">
+                {skinCandidates.map((s) => (
+                  <ToggleGroup.Item
+                    key={s.key}
+                    value={s.key}
+                    className="trama-unit-inspector-skin"
+                    title={s.domain.intent}
+                  >
+                    <span className="trama-unit-inspector-skin-label">{s.labels.ko}</span>
+                    <span className="trama-unit-inspector-skin-intent">{s.domain.intent}</span>
+                  </ToggleGroup.Item>
+                ))}
+              </TramaCarousel>
+            </ToggleGroup.Root>
           </div>
-        </div>
+        </>
+      )}
+
+      {showRangeEditor && (
+        <>
+          <Separator.Root className="trama-unit-inspector-sep" decorative orientation="horizontal" />
+          <div className="trama-unit-inspector-range">
+            <RangeField label="최소" value={unit.min} step={unit.step} onCommit={(v) => setRange({ min: v })} />
+            <RangeField label="최대" value={unit.max} step={unit.step} onCommit={(v) => setRange({ max: v })} />
+            <RangeField
+              label="스텝"
+              value={unit.step}
+              step={unit.step / 10}
+              min={0}
+              onCommit={(v) => {
+                if (v > 0) setRange({ step: v });
+              }}
+            />
+          </div>
+        </>
       )}
 
       <footer className="trama-unit-inspector-footer">
@@ -259,5 +247,32 @@ export function UnitInspector({ node }: Props): JSX.Element {
         </button>
       </footer>
     </>
+  );
+}
+
+interface RangeFieldProps {
+  label: string;
+  value: number;
+  step: number;
+  min?: number;
+  onCommit: (v: number) => void;
+}
+
+function RangeField({ label, value, step, min, onCommit }: RangeFieldProps): JSX.Element {
+  return (
+    <Label.Root className="trama-unit-inspector-range-row">
+      <span className="trama-unit-inspector-range-label">{label}</span>
+      <input
+        type="number"
+        value={value}
+        step={step}
+        min={min}
+        className="trama-unit-inspector-range-input"
+        onChange={(e) => {
+          const v = parseFloat(e.target.value);
+          if (Number.isFinite(v)) onCommit(v);
+        }}
+      />
+    </Label.Root>
   );
 }

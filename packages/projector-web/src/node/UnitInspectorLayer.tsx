@@ -2,12 +2,8 @@ import { useMemo, useSyncExternalStore } from 'react';
 import { isValueNode } from '@trama/core';
 import { useModelStore, useUIStore } from '../store/index.js';
 import { getNodeLayout } from './box.js';
-import {
-  UNIT_INSPECTOR_PANEL_HEIGHT,
-  UNIT_INSPECTOR_PANEL_WIDTH,
-  UnitInspector,
-} from './UnitInspector.js';
-import { FloatingPanel } from '../util/FloatingPanel.js';
+import { UnitInspector } from './UnitInspector.js';
+import { TramaPopover } from '../util/TramaPopover.js';
 import { getViewport, subscribeViewport } from '../canvas/viewport.js';
 
 /**
@@ -45,14 +41,16 @@ export function UnitInspectorLayer(): JSX.Element | null {
   if (!isValueNode(node)) return null;
 
   return (
-    <FloatingPanel
+    <TramaPopover
+      open
+      onOpenChange={(o) => {
+        if (!o) closeInspector();
+      }}
       anchor={anchor}
-      onClose={closeInspector}
       placement={{ kind: 'side', gap: { x: 14, y: 0 } }}
-      size={{ width: UNIT_INSPECTOR_PANEL_WIDTH, height: UNIT_INSPECTOR_PANEL_HEIGHT }}
       className="trama-unit-inspector"
     >
       <UnitInspector node={node} />
-    </FloatingPanel>
+    </TramaPopover>
   );
 }

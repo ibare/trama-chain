@@ -1,8 +1,10 @@
 import * as Tabs from '@radix-ui/react-tabs';
+import * as ToggleGroup from '@radix-ui/react-toggle-group';
 import { useCallback, useMemo, useState } from 'react';
 import { useModelStore, useUIStore } from '../store/index.js';
 import { shapeRegistry } from '../store/registries.js';
-import { FloatingPanel } from '../util/FloatingPanel.js';
+import { TramaPopover } from '../util/TramaPopover.js';
+import { TramaCarousel } from '../util/TramaCarousel.js';
 import { ShapeParamEditor } from './ShapeParamEditor.js';
 import { SHAPE_CATEGORIES, findCategoryOfShape } from './categories.js';
 import { getShapeEditor } from './editor-registry.js';
@@ -78,9 +80,12 @@ export function FunctionPicker(): JSX.Element | null {
   const fallbackFields = currentDef?.paramFields ?? [];
 
   return (
-    <FloatingPanel
+    <TramaPopover
+      open
+      onOpenChange={(o) => {
+        if (!o) close();
+      }}
       anchor={picker.anchor}
-      onClose={close}
       placement={{ kind: 'below-center', offsetY: 12 }}
       className="trama-picker"
     >
@@ -94,7 +99,12 @@ export function FunctionPicker(): JSX.Element | null {
           </button>
         </div>
       )}
-      <Tabs.Root value={activeTab} onValueChange={setActiveTab} className="trama-picker-tabs">
+      <Tabs.Root
+        value={activeTab}
+        onValueChange={(v) => v && setActiveTab(v)}
+        className="trama-picker-tabs"
+        activationMode="manual"
+      >
         <Tabs.List className="trama-picker-tab-list" aria-label="변환 카테고리">
           {SHAPE_CATEGORIES.map((cat) => (
             <Tabs.Trigger key={cat.id} value={cat.id} className="trama-picker-tab">
@@ -104,37 +114,49 @@ export function FunctionPicker(): JSX.Element | null {
         </Tabs.List>
         {SHAPE_CATEGORIES.map((cat) => (
           <Tabs.Content key={cat.id} value={cat.id} className="trama-picker-tab-panel">
-            {cat.shapeKeys.map((key) => {
-              const def = shapeRegistry.get(key);
-              if (!def) return null;
-              const selected = edge.shape.kind === key;
-              const previewParams = selected ? edge.shape.params : def.defaultParams;
-              const path = def.previewPath(96, 36, previewParams);
-              return (
-                <div
-                  key={key}
-                  className={`trama-picker-card${selected ? ' is-selected' : ''}`}
-                  onClick={() => selectShape(key)}
-                >
-                  <svg
-                    className="trama-picker-preview"
-                    viewBox="0 0 96 36"
-                    preserveAspectRatio="none"
-                  >
-                    <line
-                      className="trama-picker-preview-baseline"
-                      x1={0}
-                      y1={36}
-                      x2={96}
-                      y2={36}
-                    />
-                    <path className="trama-picker-preview-fill" d={`${path} L 96 36 L 0 36 Z`} />
-                    <path className="trama-picker-preview-stroke" d={path} />
-                  </svg>
-                  <div className="trama-picker-card-label">{def.labels.ko}</div>
-                </div>
-              );
-            })}
+            <ToggleGroup.Root
+              type="single"
+              value={cat.shapeKeys.includes(edge.shape.kind) ? edge.shape.kind : ''}
+              onValueChange={(v) => v && selectShape(v)}
+              aria-label={`${cat.labels.ko} 변환`}
+            >
+              <TramaCarousel ariaLabel="변환 페이지">
+                {cat.shapeKeys.map((key) => {
+                  const def = shapeRegistry.get(key);
+                  if (!def) return null;
+                  const selected = edge.shape.kind === key;
+                  const previewParams = selected ? edge.shape.params : def.defaultParams;
+                  const path = def.previewPath(96, 36, previewParams);
+                  return (
+                    <ToggleGroup.Item
+                      key={key}
+                      value={key}
+                      className="trama-picker-card"
+                    >
+                      <svg
+                        className="trama-picker-preview"
+                        viewBox="0 0 96 36"
+                        preserveAspectRatio="none"
+                      >
+                        <line
+                          className="trama-picker-preview-baseline"
+                          x1={0}
+                          y1={36}
+                          x2={96}
+                          y2={36}
+                        />
+                        <path
+                          className="trama-picker-preview-fill"
+                          d={`${path} L 96 36 L 0 36 Z`}
+                        />
+                        <path className="trama-picker-preview-stroke" d={path} />
+                      </svg>
+                      <div className="trama-picker-card-label">{def.labels.ko}</div>
+                    </ToggleGroup.Item>
+                  );
+                })}
+              </TramaCarousel>
+            </ToggleGroup.Root>
           </Tabs.Content>
         ))}
       </Tabs.Root>
@@ -145,6 +167,6 @@ export function FunctionPicker(): JSX.Element | null {
       ) : !isNone && fallbackFields.length > 0 ? (
         <ShapeParamEditor edge={edge} fields={fallbackFields} />
       ) : null}
-    </FloatingPanel>
+    </TramaPopover>
   );
 }
