@@ -230,7 +230,7 @@
 /* Edge ------------------------------------------------------------------- */
 [data-trama-root] .trama-edge {
   fill: none;
-  stroke: var(--color-edge-default);
+  stroke: var(--slot-color, var(--color-edge-default));
   stroke-width: var(--spacing-stroke-edge-default);
   stroke-linecap: round;
   pointer-events: stroke;
@@ -292,7 +292,7 @@
 
 /* 화살표 마커 */
 [data-trama-root] .trama-arrow {
-  fill: var(--color-edge-default);
+  fill: var(--slot-color, var(--color-edge-default));
 }
 [data-trama-root] .trama-arrow.is-feedback {
   fill: var(--color-edge-feedback);

@@ -18,6 +18,7 @@ import { Socket } from './Socket.js';
 import { useInputConnectionMask, useOutputConnected } from './use-socket-connections.js';
 import { registerInputSocket } from '../canvas/socket-registry.js';
 import { completeEdgeDraft } from '../canvas/edge-draft-actions.js';
+import { slotColor } from './slot-palette.js';
 
 interface Props {
   id: NodeId;
@@ -166,26 +167,35 @@ function ConditionalNodeViewImpl({ id }: Props): JSX.Element | null {
       </text>
 
       {/* 입력 슬롯 라벨 + 핀 + 소켓 (TL=A, BL=B). 라벨은 핀 안쪽으로 충분히 inset. */}
-      {inputSlots.map((s) => (
-        <g key={`in${s.slot}`}>
-          <text
-            className="trama-conditional-slot-label"
-            x={s.x + SLOT_LABEL_INSET}
-            y={s.y + 4}
-            textAnchor="start"
-          >
-            {s.label}
-          </text>
-          <Socket cx={s.x} cy={s.y} connected={(inputMask & (1 << s.slot)) !== 0} />
-          <circle
-            className="trama-node-socket-hit"
-            data-trama-slot-index={s.slot}
-            cx={s.x}
-            cy={s.y}
-            r={Math.max(SOCKET_SIZE, 12)}
-          />
-        </g>
-      ))}
+      {inputSlots.map((s) => {
+        const color = slotColor(s.slot, inputSlots.length);
+        return (
+          <g key={`in${s.slot}`}>
+            <text
+              className="trama-conditional-slot-label"
+              x={s.x + SLOT_LABEL_INSET}
+              y={s.y + 4}
+              textAnchor="start"
+              style={color ? { fill: color } : undefined}
+            >
+              {s.label}
+            </text>
+            <Socket
+              cx={s.x}
+              cy={s.y}
+              connected={(inputMask & (1 << s.slot)) !== 0}
+              color={color}
+            />
+            <circle
+              className="trama-node-socket-hit"
+              data-trama-slot-index={s.slot}
+              cx={s.x}
+              cy={s.y}
+              r={Math.max(SOCKET_SIZE, 12)}
+            />
+          </g>
+        );
+      })}
 
       {/* 출력 슬롯 (TR=참, BR=거짓) — 두 슬롯 모두 항상 노출, valid 여부는 상태 클래스로. */}
       {outputSlots.map((s) => {

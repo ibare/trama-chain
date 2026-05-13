@@ -20,6 +20,7 @@ import {
 import { registerInputSocket } from '../canvas/socket-registry.js';
 import { completeEdgeDraft } from '../canvas/edge-draft-actions.js';
 import { getNodeLayout } from './box.js';
+import { slotColor } from './slot-palette.js';
 
 interface Props {
   id: NodeId;
@@ -238,9 +239,10 @@ function ExpressionNodeViewImpl({ id }: Props): JSX.Element | null {
         const s = layout.leftPin.sockets[i];
         if (!s) return null;
         const connected = (inputMask & (1 << i)) !== 0;
+        const color = slotColor(i, variables.length);
         return (
           <g key={`in-${i}`}>
-            <Socket cx={s.x} cy={s.y} connected={connected} />
+            <Socket cx={s.x} cy={s.y} connected={connected} color={color} />
             <circle
               className="trama-node-socket-hit"
               data-trama-slot-index={i}
@@ -253,6 +255,7 @@ function ExpressionNodeViewImpl({ id }: Props): JSX.Element | null {
               x={s.x + 14}
               y={s.y + 4}
               textAnchor="start"
+              style={color ? { fill: color } : undefined}
             >
               {name}
             </text>

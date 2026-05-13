@@ -13,6 +13,7 @@ import { InteractiveArea } from './InteractiveArea.js';
 import { Socket } from './Socket.js';
 import { useOutputConnected } from './use-socket-connections.js';
 import { registerInputSocket } from '../canvas/socket-registry.js';
+import { slotColor } from './slot-palette.js';
 import { completeEdgeDraft } from '../canvas/edge-draft-actions.js';
 import { getLazySkin } from '../skin/registry.js';
 import '../skin/register-default-skins.js';
@@ -290,7 +291,13 @@ function ValueNodeViewImpl({ id, incomingCount }: Props): JSX.Element | null {
 
       {/* 좌측 소켓은 incomingCount만큼 connected, 그 외(0 입력시 fallback 1개)는 비어있음. */}
       {layout.leftPin.sockets.map((s, i) => (
-        <Socket key={`l${i}`} cx={s.x} cy={s.y} connected={i < incomingCount} />
+        <Socket
+          key={`l${i}`}
+          cx={s.x}
+          cy={s.y}
+          connected={i < incomingCount}
+          color={slotColor(i, incomingCount)}
+        />
       ))}
 
       {layout.rightPin.sockets[0] && (

@@ -12,6 +12,7 @@ import { useModelStore, useUIStore } from '../store/index.js';
 import { shapeRegistry } from '../store/registries.js';
 import { getNodeLayout } from '../node/box.js';
 import { getConditionalNodeLayout } from '../node/conditional-box.js';
+import { slotColor } from '../node/slot-palette.js';
 import { resolveNodeUnit } from '../util/unit-resolver.js';
 import { type Point } from './geometry.js';
 import { registerEdgeHandle, type EdgeHandle } from '../canvas/drag-registry.js';
@@ -113,18 +114,19 @@ function EdgeViewImpl({
   }, [fromNode, fromIncomingCount, edgeSourceSlotIndex]);
 
   const edgeSlotIndex = edge?.slotIndex;
+  // 슬롯 인식 노드(조건·식)는 model에 저장된 edge.slotIndex가 진실. 그 외(ValueNode
+  // 다입력)는 핀 안 시각 순서로 socketIndex(엣지 생성 순) 사용.
+  const effectiveSocket = toNode
+    ? isConditionalNode(toNode) || isExpressionNode(toNode)
+      ? (typeof edgeSlotIndex === 'number' ? edgeSlotIndex : 0)
+      : socketIndex
+    : 0;
   const baseEnd: Point = useMemo(() => {
     if (!toNode) return { x: 0, y: 0 };
     const base = toNode.position ?? { x: 0, y: 0 };
-    // 슬롯 인식 노드(조건·식)는 model에 저장된 edge.slotIndex가 진실. 그 외(ValueNode
-    // 다입력)는 핀 안 시각 순서로 socketIndex(엣지 생성 순) 사용.
-    const slotAware = isConditionalNode(toNode) || isExpressionNode(toNode);
-    const effectiveSocket = slotAware
-      ? (typeof edgeSlotIndex === 'number' ? edgeSlotIndex : 0)
-      : socketIndex;
     const socket = leftInputSocket(toNode, toIncomingCount, effectiveSocket);
     return { x: base.x + socket.x, y: base.y + socket.y };
-  }, [toNode, toIncomingCount, socketIndex, edgeSlotIndex]);
+  }, [toNode, toIncomingCount, effectiveSocket]);
 
   // 케이블 인스턴스 — 한 번 생성. baseStart/baseEnd는 첫 프레임 초기값으로만 사용하고
   // 이후엔 liveEndpointsRef를 통해 매 프레임 갱신된다.
@@ -240,6 +242,13 @@ function EdgeViewImpl({
   const arrowClass = `trama-arrow${isFeedback ? ' is-feedback' : ''}${isStrained ? ' is-strained' : ''}`;
   const groupCls = `trama-edge-group${morphing ? ' is-morphing' : ''}${isDetaching ? ' is-detaching' : ''}`;
 
+  // 멀티슬롯 노드에 연결된 엣지에 슬롯 식별색을 CSS 변수로 부여.
+  // feedback·strained는 styles.css 우선순위로 이 색을 덮어 시맨틱 상태가 우선됨.
+  const edgeSlotColor = slotColor(effectiveSocket, toIncomingCount);
+  const groupStyle = edgeSlotColor
+    ? ({ '--slot-color': edgeSlotColor } as React.CSSProperties)
+    : undefined;
+
   // shape 마커 — 항상 그려두되 적용 여부에 따라 시각 무게를 다르게.
   const shapeApplied = edgeAppliesShape(edge);
   const shapeDef = shapeRegistry.get(edge.shape.kind);
@@ -270,6 +279,7 @@ function EdgeViewImpl({
   return (
     <g
       className={groupCls}
+      style={groupStyle}
       onPointerEnter={() => setHover(true)}
       onPointerLeave={() => setHover(false)}
     >
