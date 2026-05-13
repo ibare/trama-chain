@@ -161,10 +161,12 @@ function evaluateRow(children: MathNode[], vars: Record<string, number>): number
         }
         tokens.push({ kind: 'op', op });
         expectValue = true;
-      } else if (op === '*' || op === '\\cdot' || op === '\\times' || op === '·') {
+      } else if (op === '×' || op === '·' || op === '*' || op === '\\cdot' || op === '\\times') {
+        // fizzex는 ASCII '*'와 '\times'를 모두 '×'로 정규화해 emit.
+        // '\cdot'은 '·'로 정규화. 호환을 위해 원본 문자열도 함께 인식.
         tokens.push({ kind: 'op', op: '*' });
         expectValue = true;
-      } else if (op === '/' || op === '\\div' || op === '÷') {
+      } else if (op === '÷' || op === '/' || op === '\\div') {
         tokens.push({ kind: 'op', op: '/' });
         expectValue = true;
       } else {
@@ -233,9 +235,7 @@ function parseCached(latex: string): RootNode | null {
   if (cache.has(latex)) return cache.get(latex) ?? null;
   try {
     const result = parseLatex(latex);
-    // hasErrors여도 AST 자체는 만들어졌으면 평가 시도 — fizzex는 tolerant라
-    // 사소한 경고로 hasErrors가 켜질 수 있는데, 평가는 가능한 경우가 많다.
-    if (!result.ast || result.ast.children.length === 0) {
+    if (result.hasErrors || !result.ast || result.ast.children.length === 0) {
       cache.set(latex, null);
       return null;
     }
