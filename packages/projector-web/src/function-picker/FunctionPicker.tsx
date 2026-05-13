@@ -37,22 +37,22 @@ export function FunctionPicker(): JSX.Element | null {
     [close, edge, updateEdge],
   );
 
-  // 변환 제거 = identity linear(slope=1, offset=0)로 복원. 엣지가 raw로 흘러간다.
-  const removeShape = useCallback(() => {
+  // "변환 없음" 선택 = identity linear(slope=1, offset=0). 값을 그대로 흘려보냄.
+  const selectRaw = useCallback(() => {
     if (!edge) return;
     updateEdge(
       edge.id,
       { shape: { kind: 'linear', params: { slope: 1, offset: 0 } } },
       'change-shape',
-      '변환 제거',
+      '변환 없음',
     );
     close();
   }, [close, edge, updateEdge]);
 
   if (!picker || !edge) return null;
 
-  // 현재 변환이 실제로 값을 가공하는가? identity(linear slope=1 offset=0)면 제거할 게 없다.
-  const isIdentity =
+  // 현재 엣지가 identity(=RAW)인지. linear slope=1 offset=0이면 변환이 없는 상태.
+  const isRaw =
     edge.shape.kind === 'linear' &&
     edge.shape.params.slope === 1 &&
     edge.shape.params.offset === 0;
@@ -67,8 +67,26 @@ export function FunctionPicker(): JSX.Element | null {
       placement={{ kind: 'below-center', offsetY: 12 }}
       className="trama-picker"
     >
+      {/* 변환 없음 = identity. input과 output이 같은 레벨임을 가운데 평탄선으로 표현. */}
+      <div
+        key="raw"
+        className={`trama-picker-card${isRaw ? ' is-selected' : ''}`}
+        onClick={selectRaw}
+      >
+        <svg className="trama-picker-preview" viewBox="0 0 96 36" preserveAspectRatio="none">
+          <line
+            className="trama-picker-preview-baseline"
+            x1={0}
+            y1={36}
+            x2={96}
+            y2={36}
+          />
+          <line className="trama-picker-preview-stroke" x1={0} y1={18} x2={96} y2={18} />
+        </svg>
+        <div className="trama-picker-card-label">변환 없음</div>
+      </div>
       {shapes.map((s) => {
-        const selected = edge.shape.kind === s.key;
+        const selected = !isRaw && edge.shape.kind === s.key;
         const previewParams = selected ? edge.shape.params : s.defaultParams;
         const path = s.previewPath(96, 36, previewParams);
         return (
@@ -92,14 +110,6 @@ export function FunctionPicker(): JSX.Element | null {
           </div>
         );
       })}
-      <button
-        type="button"
-        className="trama-picker-remove"
-        onClick={removeShape}
-        disabled={isIdentity}
-      >
-        변환 제거
-      </button>
       {edge.shape.kind === 'piecewise' && <PiecewiseEditor edge={edge} />}
       {edge.shape.kind === 'stochastic' && <StochasticEditor edge={edge} />}
       {edge.shape.kind === 'inverseU' && <InverseUCurveEditor edge={edge} />}

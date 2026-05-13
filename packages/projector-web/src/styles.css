@@ -482,30 +482,6 @@
   fill: var(--color-pulse-core-fill);
   opacity: 0.18;
 }
-[data-trama-root] .trama-picker-remove {
-  grid-column: 1 / -1;
-  margin-top: 4px;
-  padding: 6px 10px;
-  font-family: inherit;
-  font-size: 11px;
-  color: var(--color-text-hint);
-  background: transparent;
-  border: 1px dashed var(--color-node-stroke-calm);
-  border-radius: var(--spacing-radius-card);
-  cursor: pointer;
-  transition:
-    color var(--motion-duration-fade-in) var(--motion-easing-fade-natural),
-    border-color var(--motion-duration-fade-in) var(--motion-easing-fade-natural);
-}
-[data-trama-root] .trama-picker-remove:hover:not(:disabled) {
-  color: var(--color-node-text-primary);
-  border-color: var(--color-node-stroke-focal);
-}
-[data-trama-root] .trama-picker-remove:disabled {
-  opacity: 0.35;
-  cursor: not-allowed;
-}
-
 /* Expression node — fizzex Canvas 임베드 + LaTeX 편집기. */
 [data-trama-root] .trama-expression-canvas {
   width: 100%;
