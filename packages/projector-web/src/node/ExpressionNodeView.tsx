@@ -1,9 +1,9 @@
-import { memo, useCallback, useEffect, useRef, useState } from 'react';
+import { memo, useCallback, useEffect, useState } from 'react';
 import { tokens } from '@trama/tokens';
 import { isExpressionNode, isNodeValid, type NodeId } from '@trama/core';
-import { DOMRendererView } from 'fizzex';
 import { useModelStore, useUIStore } from '../store/index.js';
 import { extractVariables } from '../expression/fizzex-evaluator.js';
+import { useFizzexRenderer } from '../expression/use-fizzex-renderer.js';
 import { NodeFrame } from './NodeFrame.js';
 import { Socket } from './Socket.js';
 import {
@@ -111,28 +111,14 @@ function ExpressionNodeViewImpl({ id }: Props): JSX.Element | null {
     setEditingNode(null);
   }, [id, latexDraft, node, setEditingNode, updateNode]);
 
-  // fizzex Canvas 렌더러 — foreignObject 안의 div에 캡슐화.
-  const rendererHostRef = useRef<HTMLDivElement | null>(null);
-  const rendererRef = useRef<DOMRendererView | null>(null);
-  useEffect(() => {
-    const host = rendererHostRef.current;
-    if (!host) return;
-    const view = new DOMRendererView(host, {
-      baseFontSize: 22,
-      color: tokens.color.nodeTextPrimary,
-      padding: 0,
-      displayMode: 'inline',
-    });
-    rendererRef.current = view;
-    return () => {
-      view.destroy();
-      rendererRef.current = null;
-    };
-  }, []);
-  useEffect(() => {
-    if (!rendererRef.current) return;
-    rendererRef.current.render(latex || ' ');
-  }, [latex]);
+  // fizzex Canvas 렌더러를 host div의 마운트 라이프타임에 묶는다.
+  // 편집/뷰 토글로 div가 remount되어도 callback ref가 새 view를 부착·재렌더.
+  const rendererHostRef = useFizzexRenderer(latex, {
+    baseFontSize: 22,
+    color: tokens.color.nodeTextPrimary,
+    padding: 0,
+    displayMode: 'inline',
+  });
 
   if (!node || !isExpressionNode(node)) return null;
 
