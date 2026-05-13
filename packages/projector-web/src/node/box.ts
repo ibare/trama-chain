@@ -42,6 +42,38 @@ const SKIN_LAYOUTS: Record<string, SkinLayoutSpec> = {
     circleCy: 12,
     labelSlotH: 24,
   },
+  // 극저온 — 캡슐 메타포 그대로, 색만 다른 자매 스킨.
+  'thermometer-cryogenic': {
+    width: 220,
+    height: 244,
+    circleR: 110,
+    circleCy: 12,
+    labelSlotH: 24,
+  },
+  // 체온계 — LCD 패널 + 가로 색 밴드. 종횡비 살짝 가로형.
+  'thermometer-body': {
+    width: 220,
+    height: 220,
+    circleR: 110,
+    circleCy: 12,
+    labelSlotH: 24,
+  },
+  // 흑체복사 가마 — 컴팩트 원. 보더 자체가 발광.
+  'thermometer-kiln': {
+    width: 200,
+    height: 220,
+    circleR: 96,
+    circleCy: 12,
+    labelSlotH: 24,
+  },
+  // 오븐 다이얼 — 회전 게이지. 정사각형 가까운 비율.
+  'thermometer-oven': {
+    width: 260,
+    height: 260,
+    circleR: 124,
+    circleCy: 12,
+    labelSlotH: 24,
+  },
 };
 const COMBINER_ADD_H = 44;
 const NAME_FROM_TOP = 28;

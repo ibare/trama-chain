@@ -16,3 +16,51 @@ registerSkin({
   load: () =>
     import('./skins/thermometer-mercury.js').then((m) => ({ Skin: m.ThermometerMercury })),
 });
+
+registerSkin({
+  key: 'thermometer-body',
+  labels: { ko: '체온계' },
+  domain: {
+    unit: 'celsius',
+    range: { min: 35, max: 42, step: 0.1 },
+    intent: '체온 — 정상·미열·발열 단계가 색으로 즉시 읽힌다',
+  },
+  load: () =>
+    import('./skins/thermometer-body.js').then((m) => ({ Skin: m.ThermometerBody })),
+});
+
+registerSkin({
+  key: 'thermometer-oven',
+  labels: { ko: '오븐 온도계' },
+  domain: {
+    unit: 'celsius',
+    range: { min: 50, max: 300, step: 5 },
+    intent: '베이킹·로스팅 — 다이얼이 회전하며 요리법 임계를 가리킨다',
+  },
+  load: () =>
+    import('./skins/thermometer-oven.js').then((m) => ({ Skin: m.ThermometerOven })),
+});
+
+registerSkin({
+  key: 'thermometer-kiln',
+  labels: { ko: '흑체복사 가마' },
+  domain: {
+    unit: 'celsius',
+    range: { min: 500, max: 1500, step: 10 },
+    intent: '도자기 가마·금속 단조 — 색이 곧 온도, 노드가 달궈진다',
+  },
+  load: () =>
+    import('./skins/thermometer-kiln.js').then((m) => ({ Skin: m.ThermometerKiln })),
+});
+
+registerSkin({
+  key: 'thermometer-cryogenic',
+  labels: { ko: '극저온 온도계' },
+  domain: {
+    unit: 'celsius',
+    range: { min: -273, max: -100, step: 1 },
+    intent: '극저온 — 액체질소·액체헬륨·절대영도 임계가 트랙에 새겨진다',
+  },
+  load: () =>
+    import('./skins/thermometer-cryogenic.js').then((m) => ({ Skin: m.ThermometerCryogenic })),
+});
