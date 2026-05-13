@@ -2,6 +2,7 @@ import { memo, useEffect, useMemo, useRef, useState } from 'react';
 import { tokens } from '@trama/tokens';
 import {
   isConditionalNode,
+  isExpressionNode,
   isValueNode,
   normalize,
   type EdgeId,
@@ -115,7 +116,10 @@ function EdgeViewImpl({
   const baseEnd: Point = useMemo(() => {
     if (!toNode) return { x: 0, y: 0 };
     const base = toNode.position ?? { x: 0, y: 0 };
-    const effectiveSocket = isConditionalNode(toNode)
+    // 슬롯 인식 노드(조건·식)는 model에 저장된 edge.slotIndex가 진실. 그 외(ValueNode
+    // 다입력)는 핀 안 시각 순서로 socketIndex(엣지 생성 순) 사용.
+    const slotAware = isConditionalNode(toNode) || isExpressionNode(toNode);
+    const effectiveSocket = slotAware
       ? (typeof edgeSlotIndex === 'number' ? edgeSlotIndex : 0)
       : socketIndex;
     const socket = leftInputSocket(toNode, toIncomingCount, effectiveSocket);

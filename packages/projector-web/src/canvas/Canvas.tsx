@@ -24,6 +24,7 @@ export function Canvas(): JSX.Element {
   const nodeOrder = useModelStore((s) => s.model.nodeOrder);
   const edgeOrder = useModelStore((s) => s.model.edgeOrder);
   const edges = useModelStore((s) => s.model.edges);
+  const nodes = useModelStore((s) => s.model.nodes);
   const nodeCount = nodeOrder.length;
 
   const addNode = useModelStore((s) => s.addNode);
@@ -74,12 +75,18 @@ export function Canvas(): JSX.Element {
     return map;
   }, [edgeOrder, edges]);
 
-  // 노드별 incomingCount (자식 prop으로 전달). 토폴로지가 동일하면 안정.
-  const incomingCountByNode = useMemo(() => {
+  // 노드별 "좌측 핀 슬롯 수" — EdgeView·NodeView가 같은 레이아웃을 그리도록 단일
+  // 출처. ExpressionNode는 변수 개수가 슬롯 수의 진실(연결되지 않은 빈 슬롯도
+  // 보여야 한다). 그 외는 연결된 엣지 수 그대로(ValueNode 다입력 시각화).
+  const slotCountByNode = useMemo(() => {
     const m: Record<NodeId, number> = {};
-    for (const nid of nodeOrder) m[nid] = incomingMap[nid]?.length ?? 0;
+    for (const nid of nodeOrder) {
+      const node = nodes[nid];
+      const connected = incomingMap[nid]?.length ?? 0;
+      m[nid] = node && isExpressionNode(node) ? node.variables.length : connected;
+    }
     return m;
-  }, [nodeOrder, incomingMap]);
+  }, [nodeOrder, nodes, incomingMap]);
 
   // 빈 영역 드래그로 패닝. 좌클릭만, 노드/엣지/배경 외 요소는 통과.
   const panRef = useRef<{
@@ -306,8 +313,8 @@ export function Canvas(): JSX.Element {
         {edgeOrder.map((eid) => {
           const e = edges[eid];
           if (!e) return null;
-          const fromIncoming = incomingCountByNode[e.from] ?? 0;
-          const toIncoming = incomingCountByNode[e.to] ?? 0;
+          const fromIncoming = slotCountByNode[e.from] ?? 0;
+          const toIncoming = slotCountByNode[e.to] ?? 0;
           const socketIndex = (incomingMap[e.to] ?? []).indexOf(eid);
           return (
             <EdgeView
@@ -321,7 +328,7 @@ export function Canvas(): JSX.Element {
         })}
         {edgeDraft && <EdgeDraftView />}
         {nodeOrder.map((nid) => (
-          <NodeView key={nid} id={nid} incomingCount={incomingCountByNode[nid] ?? 0} />
+          <NodeView key={nid} id={nid} incomingCount={slotCountByNode[nid] ?? 0} />
         ))}
         <PulseLayer />
       </g>
