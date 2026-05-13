@@ -12,25 +12,14 @@ import {
 } from './use-socket-connections.js';
 import { registerInputSocket } from '../canvas/socket-registry.js';
 import { completeEdgeDraft } from '../canvas/edge-draft-actions.js';
+import { getNodeLayout } from './box.js';
 
 interface Props {
   id: NodeId;
 }
 
-const CARD_W = 260;
-const CARD_H = 120;
-const SIDE_INSET = 22;
-const LABEL_Y_FROM_TOP = 22;
 const SOCKET_SIZE = parseFloat(tokens.spacing.socketSize);
 const CARD_CORNER = parseFloat(tokens.spacing.cardCornerRadius);
-
-/** 좌측 핀 N개를 노드 높이 안에 균등 분산. */
-function leftPinY(idx: number, n: number): number {
-  if (n <= 1) return 0;
-  const span = Math.min(CARD_H - 36, (n - 1) * 24);
-  const top = -span / 2;
-  return top + (idx * span) / (n - 1);
-}
 
 function ExpressionNodeViewImpl({ id }: Props): JSX.Element | null {
   const node = useModelStore((s) => s.model.nodes[id]);
@@ -47,20 +36,22 @@ function ExpressionNodeViewImpl({ id }: Props): JSX.Element | null {
   const latex = node && isExpressionNode(node) ? node.latex : '';
   const variables = node && isExpressionNode(node) ? node.variables : [];
 
-  // 입력 슬롯 등록 — 변수 갯수만큼.
+  // 입력 슬롯 등록 — 변수 갯수만큼. 좌표는 공통 box.ts 레이아웃을 그대로 사용해
+  // EdgeView가 부르는 좌표와 어긋나지 않게 단일 출처로 둔다.
   useEffect(() => {
     if (!node || !isExpressionNode(node)) return;
-    const n = node.variables.length;
+    const layoutNow = getNodeLayout(node, { incomingCount: node.variables.length });
     const unregs: Array<() => void> = [];
-    for (let i = 0; i < n; i++) {
+    layoutNow.leftPin.sockets.forEach((s, i) => {
+      if (i >= node.variables.length) return;
       unregs.push(
         registerInputSocket({
           nodeId: id,
           slotIndex: i,
-          offset: { x: -CARD_W / 2, y: leftPinY(i, n) },
+          offset: { x: s.x, y: s.y },
         }),
       );
-    }
+    });
     return () => unregs.forEach((u) => u());
   }, [id, node]);
 
@@ -75,13 +66,17 @@ function ExpressionNodeViewImpl({ id }: Props): JSX.Element | null {
 
   const onSocketPointerDown = useCallback(
     (e: React.PointerEvent<SVGCircleElement>) => {
-      if (!isValid) return;
+      if (!isValid || !node) return;
       (e.target as Element).setPointerCapture(e.pointerId);
       const lag: 0 | 1 = e.altKey ? 1 : 0;
-      const startPoint = { x: pos.x + CARD_W / 2, y: pos.y };
+      const layoutNow = getNodeLayout(node, { incomingCount: variables.length });
+      const out = layoutNow.rightPin.sockets[0];
+      const startPoint = out
+        ? { x: pos.x + out.x, y: pos.y + out.y }
+        : { x: pos.x, y: pos.y };
       startEdgeDraft({ fromNodeId: id, startPoint, pointer: startPoint, lag });
     },
-    [id, isValid, pos.x, pos.y, startEdgeDraft],
+    [id, isValid, node, pos.x, pos.y, startEdgeDraft, variables.length],
   );
 
   const onSocketPointerUp = useCallback(
@@ -122,24 +117,25 @@ function ExpressionNodeViewImpl({ id }: Props): JSX.Element | null {
 
   if (!node || !isExpressionNode(node)) return null;
 
-  const halfW = CARD_W / 2;
-  const halfH = CARD_H / 2;
+  const layout = getNodeLayout(node, { incomingCount: variables.length });
+  const { width, height, halfW, halfH, textX, labelY } = layout;
   const isSelected = selection.kind === 'node' && selection.id === id;
   const stateClass = isValid ? 'is-calm' : 'is-low';
   const isEditing = editingNodeId === id;
 
-  // 수식 본체 영역 — 좌측 핀과 우측 출력 핀을 피해서 가운데.
-  const bodyX = -halfW + SIDE_INSET;
-  const bodyW = CARD_W - SIDE_INSET * 2;
-  const bodyY = -halfH + LABEL_Y_FROM_TOP + 4;
-  const bodyH = CARD_H - LABEL_Y_FROM_TOP - 14;
+  // 수식 본체 영역 — 라벨 아래부터 카드 하단 여백까지. 좌우는 textX 정렬.
+  const bodyX = textX;
+  const bodyW = width - (textX - -halfW) * 2;
+  const bodyY = labelY + 4;
+  const bodyH = halfH - bodyY - 10;
+  const outSocket = layout.rightPin.sockets[0] ?? { x: halfW, y: 0 };
 
   return (
     <NodeFrame
       id={id}
       pos={pos}
-      width={CARD_W}
-      height={CARD_H}
+      width={width}
+      height={height}
       className={`trama-expression-node${isValid ? '' : ' is-invalid'}`}
       canStartDrag={canStartDrag}
       onBodyDoubleClick={onBodyDoubleClick}
@@ -148,17 +144,12 @@ function ExpressionNodeViewImpl({ id }: Props): JSX.Element | null {
         className={`trama-node-body ${stateClass}${isSelected ? ' is-selected' : ''}`}
         x={-halfW}
         y={-halfH}
-        width={CARD_W}
-        height={CARD_H}
+        width={width}
+        height={height}
         rx={CARD_CORNER}
         ry={CARD_CORNER}
       />
-      <text
-        className="trama-node-label"
-        x={-halfW + SIDE_INSET}
-        y={-halfH + LABEL_Y_FROM_TOP}
-        textAnchor="start"
-      >
+      <text className="trama-node-label" x={textX} y={labelY} textAnchor="start">
         {node.label}
       </text>
 
@@ -189,22 +180,23 @@ function ExpressionNodeViewImpl({ id }: Props): JSX.Element | null {
 
       {/* 좌측 입력 슬롯 — 변수마다 1핀. 슬롯 인덱스 = variables 배열 인덱스. */}
       {variables.map((name, i) => {
-        const y = leftPinY(i, variables.length);
+        const s = layout.leftPin.sockets[i];
+        if (!s) return null;
         const connected = (inputMask & (1 << i)) !== 0;
         return (
           <g key={`in-${i}`}>
-            <Socket cx={-halfW} cy={y} connected={connected} />
+            <Socket cx={s.x} cy={s.y} connected={connected} />
             <circle
               className="trama-node-socket-hit"
               data-trama-slot-index={i}
-              cx={-halfW}
-              cy={y}
+              cx={s.x}
+              cy={s.y}
               r={Math.max(SOCKET_SIZE, 12)}
             />
             <text
               className="trama-expression-var"
-              x={-halfW + 14}
-              y={y + 4}
+              x={s.x + 14}
+              y={s.y + 4}
               textAnchor="start"
             >
               {name}
@@ -216,11 +208,11 @@ function ExpressionNodeViewImpl({ id }: Props): JSX.Element | null {
       {/* 우측 출력 — valid일 때만 */}
       {isValid && (
         <>
-          <Socket cx={halfW} cy={0} connected={outputConnected} />
+          <Socket cx={outSocket.x} cy={outSocket.y} connected={outputConnected} />
           <circle
             className="trama-node-socket-hit"
-            cx={halfW}
-            cy={0}
+            cx={outSocket.x}
+            cy={outSocket.y}
             r={Math.max(SOCKET_SIZE, 12)}
             onPointerDown={onSocketPointerDown}
             onPointerUp={onSocketPointerUp}
