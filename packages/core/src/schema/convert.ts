@@ -58,6 +58,7 @@ function nodeToDoc(n: Node): TramaNode {
       combiner: n.combiner,
       isFocal: n.isFocal,
       description: n.description ?? null,
+      skin: n.skin,
     };
     return doc;
   }
@@ -131,6 +132,7 @@ export function documentToModel(doc: TramaDocument): Model {
         combiner: n.combiner,
         isFocal: n.isFocal,
         description: n.description ?? null,
+        skin: n.skin,
       };
       nodes[n.id] = node;
     } else if (n.kind === 'constant') {

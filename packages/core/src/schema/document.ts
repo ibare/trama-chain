@@ -10,6 +10,14 @@ export const UnitOverrideSchema = z
   })
   .strict();
 
+/** core는 kind/params의 의미를 검증하지 않는다 — projector가 자체 레지스트리로 해석. */
+export const NodeSkinSchema = z
+  .object({
+    kind: z.string(),
+    params: z.record(z.any()),
+  })
+  .strict();
+
 export const ValueNodeSchema = z.object({
   kind: z.literal('value'),
   id: z.string(),
@@ -22,6 +30,7 @@ export const ValueNodeSchema = z.object({
   combiner: z.string(),
   isFocal: z.boolean(),
   description: z.string().nullable().optional(),
+  skin: NodeSkinSchema.optional(),
 });
 
 export const ConstantNodeSchema = z.object({

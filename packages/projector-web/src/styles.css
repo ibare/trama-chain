@@ -858,6 +858,46 @@
   border-color: var(--color-node-stroke-focal);
 }
 
+[data-trama-root] .trama-unit-inspector-skins {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  padding-top: 6px;
+  border-top: 1px dashed var(--color-node-stroke-calm);
+}
+
+[data-trama-root] .trama-unit-inspector-section-label {
+  font-size: var(--typography-text-picker-label);
+  color: var(--color-node-text-low);
+  letter-spacing: 0.04em;
+}
+
+[data-trama-root] .trama-unit-inspector-skin-list {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px;
+}
+
+[data-trama-root] .trama-unit-inspector-skin {
+  background: var(--color-node-fill-calm);
+  border: 1px solid transparent;
+  border-radius: var(--spacing-radius-card);
+  padding: 4px 10px;
+  font-family: inherit;
+  font-size: var(--typography-text-picker-label);
+  color: var(--color-node-text-primary);
+  cursor: pointer;
+}
+
+[data-trama-root] .trama-unit-inspector-skin:hover {
+  border-color: var(--color-node-stroke-calm);
+}
+
+[data-trama-root] .trama-unit-inspector-skin.is-active {
+  border-color: var(--color-node-stroke-focal);
+  color: var(--color-node-stroke-focal);
+}
+
 [data-trama-root] .trama-unit-inspector-range {
   display: flex;
   flex-direction: column;
@@ -1196,4 +1236,68 @@
 [data-trama-root] .trama-pulse-core {
   fill: var(--color-pulse-core-fill);
   pointer-events: none;
+}
+
+/* Skins ----------------------------------------------------------------- */
+/* 노드 시각 스킨. ValueNodeView가 node.skin이 있을 때 본문(label/value/combiner)
+   대신 스킨 컴포넌트를 SVG group으로 렌더한다. 스킨은 자체 표현(말풍선·곡선
+   surface 등)을 책임지고, 소켓·NodeFrame·NodeBorderTrack은 그대로 유지된다. */
+
+/* 모든 스킨에 공통으로 씌우는 silhouette outline. 평소 invisible, 노드가 선택됐을 때
+   stroke로 시각화 — 사용자가 "안 보이던 원형 보더가 보인다"는 단일 진실의 선택 시각. */
+[data-trama-root] .trama-skin-border {
+  fill: none;
+  stroke: transparent;
+  stroke-width: 1.6;
+  transition: stroke 0.18s ease;
+}
+
+[data-trama-root] .trama-skin-border.is-selected {
+  stroke: var(--color-node-selected-outline, #6aa9ff);
+}
+
+[data-trama-root] .trama-skin-thermometer-name {
+  font-size: calc(var(--typography-text-node-label) * 16px);
+  fill: var(--color-node-text-primary);
+  font-weight: 600;
+}
+
+[data-trama-root] .trama-skin-thermometer-name-hit {
+  cursor: pointer;
+}
+
+[data-trama-root] .trama-skin-thermometer-tube {
+  fill: rgba(220, 226, 220, 0.6);
+}
+
+[data-trama-root] .trama-skin-thermometer-surface {
+  stroke: rgba(255, 255, 255, 0.55);
+  stroke-width: 1.5;
+  fill: none;
+}
+
+[data-trama-root] .trama-skin-thermometer-ticks line {
+  stroke: rgba(255, 255, 255, 0.85);
+  stroke-width: 1.5;
+  stroke-linecap: round;
+}
+
+[data-trama-root] .trama-skin-thermometer-shine {
+  fill: rgba(255, 255, 255, 0.45);
+}
+
+[data-trama-root] .trama-skin-thermometer-bubble-bg {
+  fill: #2b2a28;
+}
+
+[data-trama-root] .trama-skin-thermometer-bubble-text {
+  fill: #ffffff;
+  font-size: 13px;
+  font-weight: 700;
+  letter-spacing: 0.02em;
+  pointer-events: none;
+}
+
+[data-trama-root] .trama-skin-thermometer-bubble.is-disabled {
+  opacity: 0.6;
 }

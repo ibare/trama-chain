@@ -8,6 +8,9 @@ import {
 } from '@trama/core';
 import { useModelStore, useUIStore } from '../store/index.js';
 import { resolveNodeUnit } from '../util/unit-resolver.js';
+import { listSkinsForUnit } from '../skin/registry.js';
+import type { SkinDefinition } from '../skin/types.js';
+import '../skin/register-default-skins.js';
 
 interface Props {
   /** UnitInspector는 ValueNode 전용. 식·상수·조건 노드는 단위가 없다(raw). */
@@ -101,6 +104,29 @@ export function UnitInspector({ node }: Props): JSX.Element {
 
   const showRangeEditor = unit.kind === 'number' || unit.kind === 'scale';
 
+  const skinCandidates = useMemo<SkinDefinition[]>(
+    () => listSkinsForUnit(unit),
+    [unit],
+  );
+  const currentSkinKey = node.skin?.kind ?? null;
+
+  const onPickSkin = useCallback(
+    (def: SkinDefinition) => {
+      // 같은 스킨을 다시 누르면 해제 (toggle). shape picker의 "선택 해제"와 같은 결.
+      if (currentSkinKey === def.key) {
+        updateNode(node.id, { skin: undefined }, 'update-node', '스킨 해제');
+        return;
+      }
+      updateNode(
+        node.id,
+        { skin: { kind: def.key, params: {} } },
+        'update-node',
+        '스킨 적용',
+      );
+    },
+    [currentSkinKey, node.id, updateNode],
+  );
+
   return (
     <>
         <header className="trama-unit-inspector-header">
@@ -187,6 +213,28 @@ export function UnitInspector({ node }: Props): JSX.Element {
             </label>
           </div>
         )}
+
+      {skinCandidates.length > 0 && (
+        <div className="trama-unit-inspector-skins">
+          <div className="trama-unit-inspector-section-label">스킨</div>
+          <div className="trama-unit-inspector-skin-list">
+            {skinCandidates.map((s) => {
+              const active = currentSkinKey === s.key;
+              return (
+                <button
+                  key={s.key}
+                  type="button"
+                  className={`trama-unit-inspector-skin${active ? ' is-active' : ''}`}
+                  onClick={() => onPickSkin(s)}
+                  title={active ? '다시 누르면 해제' : '스킨 적용'}
+                >
+                  {s.labels.ko}
+                </button>
+              );
+            })}
+          </div>
+        </div>
+      )}
 
       <footer className="trama-unit-inspector-footer">
         <button type="button" className="trama-unit-inspector-reset" onClick={onReset}>

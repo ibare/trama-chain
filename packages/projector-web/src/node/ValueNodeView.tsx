@@ -1,4 +1,4 @@
-import { memo, useCallback, useEffect, useState } from 'react';
+import { memo, Suspense, useCallback, useEffect, useState } from 'react';
 import { tokens } from '@trama/tokens';
 import { isValueNode, type NodeId } from '@trama/core';
 import { useModelStore, useUIStore } from '../store/index.js';
@@ -13,6 +13,8 @@ import { Socket } from './Socket.js';
 import { useOutputConnected } from './use-socket-connections.js';
 import { registerInputSocket } from '../canvas/socket-registry.js';
 import { completeEdgeDraft } from '../canvas/edge-draft-actions.js';
+import { getLazySkin } from '../skin/registry.js';
+import '../skin/register-default-skins.js';
 
 interface Props {
   id: NodeId;
@@ -46,6 +48,7 @@ function ValueNodeViewImpl({ id, incomingCount }: Props): JSX.Element | null {
   });
 
   const updateNode = useModelStore((s) => s.updateNode);
+  const scrubInitialValue = useModelStore((s) => s.scrubInitialValue);
   const outputConnected = useOutputConnected(id);
   const playbackStep = useModelStore((s) => s.playbackStep);
   const trajectoryLength = useModelStore((s) => s.trajectory.length);
@@ -143,6 +146,20 @@ function ValueNodeViewImpl({ id, incomingCount }: Props): JSX.Element | null {
   const combinerLabel = combiner?.labels.ko ?? node.combiner;
   const combinerSym = combinerSymbol(node.combiner);
 
+  const SkinLazy = node.skin ? getLazySkin(node.skin.kind) : null;
+  const hasSkin = SkinLazy !== null;
+  // 스킨 본체가 값 표시 + 슬라이더 핸들을 통합 표현한다. 외부 입력이 있으면
+  // 직접 조작이 의미 없으므로 onScrub을 넘기지 않아 핸들이 비활성화된다.
+  const skinScrub = hasSkin && !hasLag0Incoming
+    ? (v: number) => scrubInitialValue(id, v)
+    : undefined;
+  // 라벨 영역 클릭 = 선택 + 단위/스킨 인스펙터 진입. 스킨이 라벨 InteractiveArea를
+  // 통해 호출한다.
+  const onSkinLabelClick = useCallback(() => {
+    selectNode(id);
+    openUnitInspector(id);
+  }, [id, openUnitInspector, selectNode]);
+
   return (
     <NodeFrame
       id={id}
@@ -152,68 +169,112 @@ function ValueNodeViewImpl({ id, incomingCount }: Props): JSX.Element | null {
       canStartDrag={canStartDrag}
       onBodyDoubleClick={onBodyDoubleClick}
     >
-      <rect
-        className={`trama-node-body ${stateClass}${isSelected ? ' is-selected' : ''}`}
-        x={-halfW}
-        y={-halfH}
-        width={width}
-        height={height}
-        rx={CARD_CORNER}
-        ry={CARD_CORNER}
-      />
-      {editingNodeId === id ? (
-        <foreignObject
-          x={layout.textX}
-          y={layout.labelY - 14}
-          width={width - (layout.textX - -halfW) * 2}
-          height={26}
-        >
-          <input
-            className="trama-node-name-input"
-            value={nameDraft}
-            autoFocus
-            onChange={(e) => setNameDraft(e.target.value)}
-            onBlur={commitName}
-            onKeyDown={(e) => {
-              if (e.key === 'Enter') commitName();
-              if (e.key === 'Escape') setEditingNode(null);
-            }}
-            onPointerDown={(e) => e.stopPropagation()}
-          />
-        </foreignObject>
+      {hasSkin && SkinLazy ? (
+        // 스킨 모드: 카드 배경·라벨·값·combiner·슬라이더 트랙 모두 그리지 않는다.
+        // 노드 영역 자체가 스킨의 시각 형상이고, NodeFrame이 잡은 drag-hit가
+        // 본문 영역을 점유한다.
+        <>
+          <Suspense fallback={null}>
+            <SkinLazy
+              node={node}
+              value={currentValue}
+              unit={unit}
+              halfW={halfW}
+              halfH={halfH}
+              onScrub={skinScrub}
+              disabled={hasLag0Incoming}
+              onLabelClick={onSkinLabelClick}
+            />
+          </Suspense>
+          {/* 공통 원형 보더 — 평소 invisible, 선택 시 stroke로 시각화.
+              엣지 앵커가 정렬되는 silhouette이고, 사용자가 노드 선택 상태를
+              인지하는 단일 진실. 모든 스킨에 동일 추상으로 적용된다. */}
+          {layout.skinBorder && (
+            <circle
+              className={`trama-skin-border${isSelected ? ' is-selected' : ''}`}
+              cx={layout.skinBorder.cx}
+              cy={layout.skinBorder.cy}
+              r={layout.skinBorder.r}
+              pointerEvents="none"
+            />
+          )}
+        </>
       ) : (
-        <text className="trama-node-label" x={layout.textX} y={layout.labelY} textAnchor="start">
-          {node.label}
-        </text>
-      )}
+        <>
+          <rect
+            className={`trama-node-body ${stateClass}${isSelected ? ' is-selected' : ''}`}
+            x={-halfW}
+            y={-halfH}
+            width={width}
+            height={height}
+            rx={CARD_CORNER}
+            ry={CARD_CORNER}
+          />
+          {editingNodeId === id ? (
+            <foreignObject
+              x={layout.textX}
+              y={layout.labelY - 14}
+              width={width - (layout.textX - -halfW) * 2}
+              height={26}
+            >
+              <input
+                className="trama-node-name-input"
+                value={nameDraft}
+                autoFocus
+                onChange={(e) => setNameDraft(e.target.value)}
+                onBlur={commitName}
+                onKeyDown={(e) => {
+                  if (e.key === 'Enter') commitName();
+                  if (e.key === 'Escape') setEditingNode(null);
+                }}
+                onPointerDown={(e) => e.stopPropagation()}
+              />
+            </foreignObject>
+          ) : (
+            <text
+              className="trama-node-label"
+              x={layout.textX}
+              y={layout.labelY}
+              textAnchor="start"
+            >
+              {node.label}
+            </text>
+          )}
 
-      <text className="trama-node-value" x={layout.textX} y={layout.valueY} textAnchor="start">
-        {formatted.primary}
-        {formatted.accessory && (
-          <tspan className="trama-node-unit" dx="6">
-            {formatted.accessory}
-          </tspan>
-        )}
-      </text>
-      {/* 값+단위 영역을 InteractiveArea로 — 클릭 시 단위 인스펙터, 선택은 직접 처리. */}
-      <InteractiveArea
-        x={layout.textX}
-        y={layout.valueY - 32}
-        width={width - 36}
-        height={44}
-        hitClassName="trama-node-value-hit"
-        onClick={() => {
-          selectNode(id);
-          openUnitInspector(id);
-        }}
-      />
+          <text
+            className="trama-node-value"
+            x={layout.textX}
+            y={layout.valueY}
+            textAnchor="start"
+          >
+            {formatted.primary}
+            {formatted.accessory && (
+              <tspan className="trama-node-unit" dx="6">
+                {formatted.accessory}
+              </tspan>
+            )}
+          </text>
+          {/* 값+단위 영역을 InteractiveArea로 — 클릭 시 단위 인스펙터, 선택은 직접 처리. */}
+          <InteractiveArea
+            x={layout.textX}
+            y={layout.valueY - 32}
+            width={width - 36}
+            height={44}
+            hitClassName="trama-node-value-hit"
+            onClick={() => {
+              selectNode(id);
+              openUnitInspector(id);
+            }}
+          />
 
-      {layout.hasCombiner && layout.combinerCenterY !== null && (
-        <CombinerChip
-          symbol={combinerSym}
-          label={combinerLabel}
-          cy={layout.combinerCenterY}
-        />
+          {layout.hasCombiner && layout.combinerCenterY !== null && (
+            <CombinerChip
+              symbol={combinerSym}
+              label={combinerLabel}
+              cy={layout.combinerCenterY}
+            />
+          )}
+        </>
       )}
 
       {isFocal && playbackStep !== null && (
@@ -244,7 +305,7 @@ function ValueNodeViewImpl({ id, incomingCount }: Props): JSX.Element | null {
           />
         </>
       )}
-      {isInputNode && editingNodeId !== id && (
+      {isInputNode && editingNodeId !== id && !hasSkin && (
         <NodeBorderTrack
           node={node}
           halfW={halfW}

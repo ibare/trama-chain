@@ -6,6 +6,17 @@ export type EdgeId = string;
 
 export type EdgeLag = 0 | 1;
 
+/**
+ * 노드 시각 스킨 — 추상 기본 형태를 도메인 친화 형상으로 대체한다.
+ * core는 kind/params의 의미를 해석하지 않으며, projector가 자체 레지스트리에서
+ * kind를 해석해 컴포넌트를 (lazy) 로드한다. 모델 값은 항상 스칼라로 유지되고
+ * 스킨은 표면 표현만 담당한다.
+ */
+export interface NodeSkin {
+  kind: string;
+  params: Record<string, unknown>;
+}
+
 export interface ValueNode {
   kind: 'value';
   id: NodeId;
@@ -20,6 +31,8 @@ export interface ValueNode {
   combiner: string;
   isFocal: boolean;
   description?: string | null;
+  /** 시각 스킨. 비어 있으면 추상 기본 형태로 그려진다. */
+  skin?: NodeSkin;
 }
 
 /**
