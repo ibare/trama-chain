@@ -1,6 +1,6 @@
 import { useCallback, useRef, useState } from 'react';
 import type { Edge } from '@trama/core';
-import { useModelStore } from '../store/index.js';
+import { useTrama } from '../store/index.js';
 import {
   CurveEditorFrame,
   CurveHandle,
@@ -41,7 +41,8 @@ const DEFAULTS = {
  *  - Shift 누르면 0.05 스냅.
  */
 export function PiecewiseEditor({ edge }: Props): JSX.Element | null {
-  const updateEdge = useModelStore((s) => s.updateEdge);
+  const { modelStore } = useTrama();
+  const updateEdge = modelStore((s) => s.updateEdge);
   const reset = useShapeReset(edge, DEFAULTS as unknown as Record<string, unknown>);
 
   const rawPoints = (edge.shape.params.points as Pt[] | undefined) ?? [];

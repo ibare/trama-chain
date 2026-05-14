@@ -74,17 +74,3 @@ export function createSocketRegistry(): SocketRegistry {
   };
 }
 
-const defaultRegistry = createSocketRegistry();
-
-/** 호환 shim — Stage B 후반에 제거. */
-export function registerInputSocket(entry: InputSocketEntry): () => void {
-  return defaultRegistry.register(entry);
-}
-
-export function findNearestInputSocket(
-  canvasPoint: { x: number; y: number },
-  nodePositions: Record<NodeId, { x: number; y: number } | undefined>,
-  filter?: (entry: InputSocketEntry) => boolean,
-): SnapCandidate | null {
-  return defaultRegistry.findNearest(canvasPoint, nodePositions, filter);
-}

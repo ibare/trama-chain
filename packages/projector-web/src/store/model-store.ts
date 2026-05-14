@@ -635,36 +635,6 @@ export function createModelStore({
   return store;
 }
 
-/**
- * 호환 shim — Stage B 후반에 제거. 새 코드는 useTrama().modelStore 사용.
- * 기본 shim은 default pulse-registry / node-flash-registry에 wire-up되어
- * "compat shim 환경"에서만 의미가 있다.
- */
-import { setArrivalHandler as defaultSetArrivalHandler, spawnPulse } from '../pulse/pulse-registry.js';
-import { triggerNodeFlash } from '../pulse/node-flash-registry.js';
-
-const compatPulseRegistry: PulseRegistry = {
-  setArrivalHandler: defaultSetArrivalHandler,
-  spawn: spawnPulse,
-  pulseProgress: () => 0,
-  getActive: () => [],
-  subscribeList: () => () => {},
-  subscribeTick: () => () => {},
-  clearAll: () => {},
-  dispose: () => {},
-};
-
-const compatNodeFlashRegistry: NodeFlashRegistry = {
-  trigger: triggerNodeFlash,
-  getFlashId: () => 0,
-  subscribe: () => () => {},
-};
-
-export const useModelStore: ModelStoreInstance = createModelStore({
-  pulseRegistry: compatPulseRegistry,
-  nodeFlashRegistry: compatNodeFlashRegistry,
-});
-
 /** feedback 엣지 유무는 N-step 컨트롤 표시 결정에 사용. */
 export function selectHasFeedback(s: Pick<ModelStore, 'model'>): boolean {
   return hasFeedbackEdges(s.model);

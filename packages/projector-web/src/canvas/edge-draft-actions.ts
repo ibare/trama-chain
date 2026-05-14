@@ -1,5 +1,5 @@
 import { isValueNode } from '@trama/core';
-import { useModelStore, useUIStore } from '../store/index.js';
+import type { TramaInstance } from '../store/trama-instance.js';
 
 /**
  * 진행 중인 edge draft를 완료한다.
@@ -14,13 +14,16 @@ import { useModelStore, useUIStore } from '../store/index.js';
  *
  * 어떤 경로든 마지막에 `endEdgeDraft()`.
  */
-export function completeEdgeDraft(opts?: { dropScreen?: { x: number; y: number } }): void {
-  const ui = useUIStore.getState();
+export function completeEdgeDraft(
+  instance: TramaInstance,
+  opts?: { dropScreen?: { x: number; y: number } },
+): void {
+  const ui = instance.uiStore.getState();
   const draft = ui.edgeDraft;
   if (!draft) return;
 
   const { fromNodeId, lag, sourceSlotIndex, snap, detachingEdgeId } = draft;
-  const modelStore = useModelStore.getState();
+  const modelStore = instance.modelStore.getState();
   const model = modelStore.model;
 
   if (detachingEdgeId) {

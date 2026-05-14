@@ -1,8 +1,7 @@
 import { useCallback, useRef } from 'react';
 import type { ValueNode } from '@trama/core';
-import { useModelStore } from '../store/index.js';
+import { useTrama } from '../store/index.js';
 import { resolveNodeUnit } from '../util/unit-resolver.js';
-import { getCurrentZoom } from '../canvas/viewport.js';
 
 interface Props {
   node: ValueNode;
@@ -41,7 +40,8 @@ function snap(v: number, step: number): number {
 }
 
 export function NodeBorderTrack({ node, halfW, trackY }: Props): JSX.Element | null {
-  const scrubInitialValue = useModelStore((s) => s.scrubInitialValue);
+  const { modelStore, viewport } = useTrama();
+  const scrubInitialValue = modelStore((s) => s.scrubInitialValue);
   const unit = resolveNodeUnit(node);
   const { min, max, step } = boundsForSlider(unit);
   const range = max - min;
@@ -79,10 +79,10 @@ export function NodeBorderTrack({ node, halfW, trackY }: Props): JSX.Element | n
       dragRef.current = {
         startClientX: e.clientX,
         startValue: value,
-        zoom: getCurrentZoom(),
+        zoom: viewport.getCurrentZoom(),
       };
     },
-    [value],
+    [value, viewport],
   );
 
   const onPointerMove = useCallback(

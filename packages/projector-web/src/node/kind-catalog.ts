@@ -1,5 +1,6 @@
 import type { FC } from 'react';
 import type { Node, NodeId } from '@trama/core';
+import type { TramaInstance } from '../store/trama-instance.js';
 
 /**
  * 컨텍스트 메뉴에 노출될 단일 항목.
@@ -30,7 +31,7 @@ export interface NodeKindUIDescriptor {
   /** 섹션 표시 순서 (오름차순). */
   menuSectionOrder: number;
   /** 메뉴 아이템들. 함수처럼 동적 목록이면 매번 갱신해 반환. */
-  buildMenuItems(): NodeMenuItem[];
+  buildMenuItems(instance: TramaInstance): NodeMenuItem[];
   /** 캔버스 노드 컴포넌트. dispatcher가 kind 매칭으로 이 컴포넌트를 렌더한다. */
   View: FC<NodeViewProps>;
 }

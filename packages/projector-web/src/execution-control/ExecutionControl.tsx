@@ -1,15 +1,16 @@
 import { useCallback } from 'react';
 import * as Form from '@radix-ui/react-form';
 import { hasFeedbackEdges } from '@trama/core';
-import { useModelStore } from '../store/index.js';
+import { useTrama } from '../store/index.js';
 
 export function ExecutionControl(): JSX.Element | null {
-  const model = useModelStore((s) => s.model);
-  const setExecution = useModelStore((s) => s.setExecution);
-  const recompute = useModelStore((s) => s.recompute);
-  const play = useModelStore((s) => s.play);
-  const playbackStep = useModelStore((s) => s.playbackStep);
-  const trajectoryLength = useModelStore((s) => s.trajectory.length);
+  const { modelStore } = useTrama();
+  const model = modelStore((s) => s.model);
+  const setExecution = modelStore((s) => s.setExecution);
+  const recompute = modelStore((s) => s.recompute);
+  const play = modelStore((s) => s.play);
+  const playbackStep = modelStore((s) => s.playbackStep);
+  const trajectoryLength = modelStore((s) => s.trajectory.length);
 
   const visible = hasFeedbackEdges(model);
 

@@ -1,7 +1,7 @@
 import * as Tabs from '@radix-ui/react-tabs';
 import * as ToggleGroup from '@radix-ui/react-toggle-group';
 import { useCallback, useMemo, useState } from 'react';
-import { useModelStore, useUIStore } from '../store/index.js';
+import { useTrama } from '../store/index.js';
 import { shapeRegistry } from '../store/registries.js';
 import { TramaPopover } from '../util/TramaPopover.js';
 import { TramaCarousel } from '../util/TramaCarousel.js';
@@ -11,10 +11,11 @@ import { getShapeEditor } from './editor-registry.js';
 import './register-default-editors.js';
 
 export function FunctionPicker(): JSX.Element | null {
-  const picker = useUIStore((s) => s.functionPicker);
-  const close = useUIStore((s) => s.closeFunctionPicker);
-  const updateEdge = useModelStore((s) => s.updateEdge);
-  const model = useModelStore((s) => s.model);
+  const { modelStore, uiStore } = useTrama();
+  const picker = uiStore((s) => s.functionPicker);
+  const close = uiStore((s) => s.closeFunctionPicker);
+  const updateEdge = modelStore((s) => s.updateEdge);
+  const model = modelStore((s) => s.model);
 
   const edge = picker ? model.edges[picker.edgeId] : null;
 

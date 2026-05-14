@@ -51,17 +51,3 @@ export function createNodeFlashRegistry(): NodeFlashRegistry {
   };
 }
 
-const defaultRegistry = createNodeFlashRegistry();
-
-/** 호환 shim — Stage B 후반에 제거. */
-export function triggerNodeFlash(nodeId: NodeId): void {
-  defaultRegistry.trigger(nodeId);
-}
-
-export function getNodeFlashId(nodeId: NodeId): number {
-  return defaultRegistry.getFlashId(nodeId);
-}
-
-export function subscribeNodeFlash(nodeId: NodeId, listener: Listener): () => void {
-  return defaultRegistry.subscribe(nodeId, listener);
-}

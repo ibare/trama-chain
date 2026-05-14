@@ -13,10 +13,10 @@ import { FunctionPicker } from './function-picker/FunctionPicker.js';
 import { UnitInspectorLayer } from './node/UnitInspectorLayer.js';
 import { ExecutionControl } from './execution-control/ExecutionControl.js';
 import { InsertNodeHandler } from './interactions/InsertNodeHandler.js';
-import { useModelStore, useUIStore } from './store/index.js';
 import {
   TramaInstanceProvider,
   createTramaInstance,
+  useTrama,
   type TramaInstance,
 } from './store/trama-instance.js';
 import { combinerRegistry, shapeRegistry } from './store/registries.js';
@@ -56,11 +56,12 @@ export function TramaEditor(props: Props): JSX.Element {
 }
 
 function TramaEditorInner({ initialJson, onChange, options, readOnly = false }: Props): JSX.Element {
-  const setModel = useModelStore((s) => s.setModel);
-  const model = useModelStore((s) => s.model);
-  const setQuestion = useModelStore((s) => s.setQuestion);
-  const setReadOnly = useUIStore((s) => s.setReadOnly);
-  const isReadOnly = useUIStore((s) => s.readOnly);
+  const { modelStore, uiStore } = useTrama();
+  const setModel = modelStore((s) => s.setModel);
+  const model = modelStore((s) => s.model);
+  const setQuestion = modelStore((s) => s.setQuestion);
+  const setReadOnly = uiStore((s) => s.setReadOnly);
+  const isReadOnly = uiStore((s) => s.readOnly);
 
   // readOnly prop을 UI store에 동기화. mount + prop 변경 시.
   useEffect(() => {

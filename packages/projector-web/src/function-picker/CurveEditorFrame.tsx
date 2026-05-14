@@ -5,8 +5,8 @@ import {
   type PointerEvent as ReactPointerEvent,
   type ReactNode,
 } from 'react';
-import type { Edge, ResolvedUnit } from '@trama/core';
-import { useModelStore } from '../store/index.js';
+import type { Edge, ResolvedUnit, Model } from '@trama/core';
+import { useTrama } from '../store/index.js';
 import { resolveNodeUnit } from '../util/unit-resolver.js';
 import { formatNodeValue } from '../util/format.js';
 
@@ -89,12 +89,13 @@ interface Props {
 }
 
 export function useEdgeDomainUnits(edge: Edge): {
-  fromNode: ReturnType<typeof useModelStore.getState>['model']['nodes'][string] | undefined;
-  toNode: ReturnType<typeof useModelStore.getState>['model']['nodes'][string] | undefined;
+  fromNode: Model['nodes'][string] | undefined;
+  toNode: Model['nodes'][string] | undefined;
   aUnit: ResolvedUnit;
   bUnit: ResolvedUnit;
 } {
-  const model = useModelStore((s) => s.model);
+  const { modelStore } = useTrama();
+  const model = modelStore((s) => s.model);
   const fromNode = model.nodes[edge.from];
   const toNode = model.nodes[edge.to];
   const aUnit = useMemo(

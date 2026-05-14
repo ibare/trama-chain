@@ -78,26 +78,3 @@ export function createDragRegistry(): DragRegistry {
   };
 }
 
-const defaultRegistry = createDragRegistry();
-
-/** 호환 shim — Stage B 후반에 제거. */
-export function registerNodeEl(id: NodeId, el: SVGGElement): () => void {
-  return defaultRegistry.registerNodeEl(id, el);
-}
-
-export function getNodeEl(id: NodeId): SVGGElement | undefined {
-  return defaultRegistry.getNodeEl(id);
-}
-
-export function registerEdgeHandle(
-  id: EdgeId,
-  fromId: NodeId,
-  toId: NodeId,
-  handle: EdgeHandle,
-): () => void {
-  return defaultRegistry.registerEdgeHandle(id, fromId, toId, handle);
-}
-
-export function getIncidentEdgeHandles(nodeId: NodeId): EdgeHandle[] {
-  return defaultRegistry.getIncidentEdgeHandles(nodeId);
-}

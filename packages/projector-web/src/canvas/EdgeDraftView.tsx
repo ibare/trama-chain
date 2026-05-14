@@ -1,6 +1,5 @@
 import { useEffect, useRef } from 'react';
-import { useUIStore } from '../store/index.js';
-import { registerTicker } from './animation-loop.js';
+import { useTrama } from '../store/index.js';
 import {
   cableToPoints,
   createCable,
@@ -15,7 +14,8 @@ import {
  * 매 프레임 startPoint·pointer/snap.point를 endpoint로 강제한다.
  */
 export function EdgeDraftView(): JSX.Element | null {
-  const draft = useUIStore((s) => s.edgeDraft);
+  const { uiStore, animationLoop } = useTrama();
+  const draft = uiStore((s) => s.edgeDraft);
 
   const cableRef = useRef<Cable | null>(null);
   const sessionIdRef = useRef<string | null>(null);
@@ -54,8 +54,8 @@ export function EdgeDraftView(): JSX.Element | null {
       stepCable(cable);
       pathRef.current?.setAttribute('points', cableToPoints(cable));
     };
-    return registerTicker(tick);
-  }, [sessionId]);
+    return animationLoop.register(tick);
+  }, [sessionId, animationLoop]);
 
   if (!draft || !cableRef.current) return null;
 

@@ -1,13 +1,7 @@
 import { memo, useEffect, useMemo, useRef, useSyncExternalStore } from 'react';
 import { tokens } from '@trama/tokens';
-import {
-  getActivePulses,
-  pulseProgress,
-  subscribePulseList,
-  subscribePulseTick,
-  type Pulse,
-} from './pulse-registry.js';
-import { getCable } from '../edge/cable-points-registry.js';
+import { useTrama } from '../store/index.js';
+import type { Pulse } from './pulse-registry.js';
 import { cablePointAt } from '../edge/cable-physics.js';
 
 const CORE_RADIUS = parseFloat(tokens.spacing.pulseCoreRadius);
@@ -19,9 +13,14 @@ const HALO_RADIUS = parseFloat(tokens.spacing.pulseHaloRadius);
  * 매 프레임 imperative하게 refs로 갱신해 React 리렌더링 없이 흐르게 한다.
  */
 function PulseLayerImpl(): JSX.Element {
-  // 펄스 set 변화에 React 리렌더 (spawn/remove). getActivePulses는 캐싱된 스냅샷을
+  const { pulseRegistry, cableRegistry } = useTrama();
+  // 펄스 set 변화에 React 리렌더 (spawn/remove). getActive는 캐싱된 스냅샷을
   // 반환하므로 spawn/remove가 일어나기 전까지는 동일 참조 → 안정.
-  const pulses = useSyncExternalStore(subscribePulseList, getActivePulses, getActivePulses);
+  const pulses = useSyncExternalStore(
+    pulseRegistry.subscribeList,
+    pulseRegistry.getActive,
+    pulseRegistry.getActive,
+  );
 
   // 각 펄스 SVG element ref. key=pulse.id로 안정.
   const refs = useRef<Map<string, { core: SVGCircleElement; halo: SVGCircleElement }>>(
@@ -32,12 +31,12 @@ function PulseLayerImpl(): JSX.Element {
   useEffect(() => {
     const tick = (): void => {
       const now = performance.now();
-      for (const p of getActivePulses()) {
+      for (const p of pulseRegistry.getActive()) {
         const els = refs.current.get(p.id);
         if (!els) continue;
-        const cable = getCable(p.edgeId);
+        const cable = cableRegistry.get(p.edgeId);
         if (!cable) continue;
-        const t = pulseProgress(p, now);
+        const t = pulseRegistry.pulseProgress(p, now);
         const pt = cablePointAt(cable, t);
         els.core.setAttribute('cx', String(pt.x));
         els.core.setAttribute('cy', String(pt.y));
@@ -45,23 +44,23 @@ function PulseLayerImpl(): JSX.Element {
         els.halo.setAttribute('cy', String(pt.y));
       }
     };
-    return subscribePulseTick(tick);
-  }, []);
+    return pulseRegistry.subscribeTick(tick);
+  }, [cableRegistry, pulseRegistry]);
 
   // 첫 좌표 — mount 시 1프레임이라도 정확히 그리도록 init position 계산.
   const initialPositions = useMemo(() => {
     const now = performance.now();
     const m = new Map<string, { x: number; y: number }>();
     for (const p of pulses) {
-      const cable = getCable(p.edgeId);
+      const cable = cableRegistry.get(p.edgeId);
       if (!cable) {
         m.set(p.id, { x: 0, y: 0 });
         continue;
       }
-      m.set(p.id, cablePointAt(cable, pulseProgress(p, now)));
+      m.set(p.id, cablePointAt(cable, pulseRegistry.pulseProgress(p, now)));
     }
     return m;
-  }, [pulses]);
+  }, [cableRegistry, pulseRegistry, pulses]);
 
   return (
     <g className="trama-pulse-layer">

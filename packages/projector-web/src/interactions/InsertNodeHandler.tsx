@@ -1,5 +1,5 @@
 import { useEffect } from 'react';
-import { useModelStore, useUIStore } from '../store/index.js';
+import { useTrama } from '../store/index.js';
 
 /**
  * insertNodeIntent가 활성화되면:
@@ -10,13 +10,14 @@ import { useModelStore, useUIStore } from '../store/index.js';
  * v3-스타일 "벌어지며 등장" 애니메이션은 시각 디테일 단계(§19)에서 보강.
  */
 export function InsertNodeHandler(): null {
-  const intent = useUIStore((s) => s.insertNodeIntent);
-  const clear = useUIStore((s) => s.clearInsertNodeIntent);
-  const setEditing = useUIStore((s) => s.setEditingNode);
-  const addNode = useModelStore((s) => s.addNode);
-  const addEdge = useModelStore((s) => s.addEdge);
-  const removeEdge = useModelStore((s) => s.removeEdge);
-  const model = useModelStore((s) => s.model);
+  const { modelStore, uiStore } = useTrama();
+  const intent = uiStore((s) => s.insertNodeIntent);
+  const clear = uiStore((s) => s.clearInsertNodeIntent);
+  const setEditing = uiStore((s) => s.setEditingNode);
+  const addNode = modelStore((s) => s.addNode);
+  const addEdge = modelStore((s) => s.addEdge);
+  const removeEdge = modelStore((s) => s.removeEdge);
+  const model = modelStore((s) => s.model);
 
   useEffect(() => {
     if (!intent) return;

@@ -1,7 +1,7 @@
 import { useCallback } from 'react';
 import * as Form from '@radix-ui/react-form';
 import type { Edge, ShapeParamField } from '@trama/core';
-import { useModelStore } from '../store/index.js';
+import { useTrama } from '../store/index.js';
 
 interface Props {
   edge: Edge;
@@ -17,7 +17,8 @@ interface Props {
  * server validation 채널, aria 자동 부여.
  */
 export function ShapeParamEditor({ edge, fields }: Props): JSX.Element {
-  const updateEdge = useModelStore((s) => s.updateEdge);
+  const { modelStore } = useTrama();
+  const updateEdge = modelStore((s) => s.updateEdge);
   const params = edge.shape.params as Record<string, unknown>;
 
   const setField = useCallback(

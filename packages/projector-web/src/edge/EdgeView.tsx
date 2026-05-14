@@ -8,7 +8,7 @@ import {
   type EdgeId,
   type Node,
 } from '@trama/core';
-import { useModelStore, useUIStore } from '../store/index.js';
+import { useTrama } from '../store/index.js';
 import { shapeRegistry } from '../store/registries.js';
 import { getNodeLayout } from '../node/box.js';
 import { getConditionalNodeLayout } from '../node/conditional-box.js';
@@ -17,10 +17,8 @@ import { useExpressionMeasureStore } from '../expression/expression-measure-stor
 import type { FizzexMeasure } from '../expression/use-fizzex-renderer.js';
 import { resolveNodeUnit } from '../util/unit-resolver.js';
 import { type Point } from './geometry.js';
-import { registerEdgeHandle, type EdgeHandle } from '../canvas/drag-registry.js';
+import { type EdgeHandle } from '../canvas/drag-registry.js';
 import { completeEdgeDraft } from '../canvas/edge-draft-actions.js';
-import { registerTicker } from '../canvas/animation-loop.js';
-import { registerCable } from './cable-points-registry.js';
 import {
   cableEndTangent,
   cableMidpoint,
@@ -75,23 +73,25 @@ function EdgeViewImpl({
   socketIndex,
   introducing,
 }: Props): JSX.Element | null {
-  const edge = useModelStore((s) => s.model.edges[edgeId]);
+  const instance = useTrama();
+  const { modelStore, uiStore, animationLoop, cableRegistry, dragRegistry } = instance;
+  const edge = modelStore((s) => s.model.edges[edgeId]);
   const fromId = edge?.from ?? '';
   const toId = edge?.to ?? '';
-  const fromNode = useModelStore((s) => (fromId ? s.model.nodes[fromId] : undefined));
-  const toNode = useModelStore((s) => (toId ? s.model.nodes[toId] : undefined));
-  const srcValue = useModelStore((s) => {
+  const fromNode = modelStore((s) => (fromId ? s.model.nodes[fromId] : undefined));
+  const toNode = modelStore((s) => (toId ? s.model.nodes[toId] : undefined));
+  const srcValue = modelStore((s) => {
     if (!fromId) return 0;
     const n = s.model.nodes[fromId];
     const fallback = n && isValueNode(n) ? n.initialValue : 0;
     return s.executionState.values[fromId] ?? fallback;
   });
 
-  const openFunctionPicker = useUIStore((s) => s.openFunctionPicker);
-  const startInsertNodeFromEdge = useUIStore((s) => s.startInsertNodeFromEdge);
-  const selectEdge = useUIStore((s) => s.selectEdge);
-  const startEdgeDraft = useUIStore((s) => s.startEdgeDraft);
-  const isDetaching = useUIStore((s) => s.edgeDraft?.detachingEdgeId === edgeId);
+  const openFunctionPicker = uiStore((s) => s.openFunctionPicker);
+  const startInsertNodeFromEdge = uiStore((s) => s.startInsertNodeFromEdge);
+  const selectEdge = uiStore((s) => s.selectEdge);
+  const startEdgeDraft = uiStore((s) => s.startEdgeDraft);
+  const isDetaching = uiStore((s) => s.edgeDraft?.detachingEdgeId === edgeId);
   const [hover, setHover] = useState(false);
 
   const [morphing, setMorphing] = useState(false);
@@ -211,13 +211,13 @@ function EdgeViewImpl({
         shapeMarkerRef.current.setAttribute('transform', `translate(${m.x},${m.y})`);
       }
     };
-    const unregisterTicker = registerTicker(tick);
-    const unregisterCable = registerCable(edgeId, cable);
+    const unregisterTicker = animationLoop.register(tick);
+    const unregisterCable = cableRegistry.register(edgeId, cable);
     return () => {
       unregisterTicker();
       unregisterCable();
     };
-  }, [edgeId]);
+  }, [edgeId, animationLoop, cableRegistry]);
 
   // 노드 드래그 중 imperative 갱신을 위한 drag-registry 핸들. 여기선 endpoint ref만
   // 갱신하면 ticker가 다음 프레임에 알아서 케이블을 끌어간다.
@@ -237,8 +237,8 @@ function EdgeViewImpl({
         }
       },
     };
-    return registerEdgeHandle(edgeId, fromId, toId, handle);
-  }, [edgeId, fromId, toId]);
+    return dragRegistry.registerEdgeHandle(edgeId, fromId, toId, handle);
+  }, [edgeId, fromId, toId, dragRegistry]);
 
   if (!edge || !fromNode || !toNode) return null;
 
@@ -284,7 +284,7 @@ function EdgeViewImpl({
 
   const onTipPointerUp = (e: React.PointerEvent<SVGCircleElement>): void => {
     (e.target as Element).releasePointerCapture?.(e.pointerId);
-    completeEdgeDraft({ dropScreen: { x: e.clientX, y: e.clientY } });
+    completeEdgeDraft(instance, { dropScreen: { x: e.clientX, y: e.clientY } });
   };
 
   return (

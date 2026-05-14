@@ -1,13 +1,11 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import type { EdgeId, NodeId } from '@trama/core';
-import { useModelStore, useUIStore } from '../store/index.js';
+import { useTrama } from '../store/index.js';
 import { EdgeView } from '../edge/EdgeView.js';
 import { NodeView } from '../node/NodeView.js';
 import { PulseLayer } from '../pulse/PulseLayer.js';
 import { EdgeDraftView } from './EdgeDraftView.js';
 import { CanvasContextMenu } from './CanvasContextMenu.js';
-import { setViewport as setViewportSingleton } from './viewport.js';
-import { findNearestInputSocket } from './socket-registry.js';
 import { isConditionalNode, isExpressionNode } from '@trama/core';
 
 const ZOOM_MIN = 0.2;
@@ -18,24 +16,25 @@ const PAN_THRESHOLD_PX = 3;
 const SNAP_RADIUS_PX = 12;
 
 export function Canvas(): JSX.Element {
+  const { modelStore, uiStore, viewport: viewportContainer, socketRegistry } = useTrama();
   // 좁은 셀렉터 — Canvas 자체는 topology(노드·엣지 목록) 변경에만 리렌더된다.
   // 드래그 오프셋, 값 변화, 셀렉션 변화는 모두 자식이 자기 id로 직접 구독하므로
   // 여기서는 구독하지 않는다.
-  const nodeOrder = useModelStore((s) => s.model.nodeOrder);
-  const edgeOrder = useModelStore((s) => s.model.edgeOrder);
-  const edges = useModelStore((s) => s.model.edges);
-  const nodes = useModelStore((s) => s.model.nodes);
+  const nodeOrder = modelStore((s) => s.model.nodeOrder);
+  const edgeOrder = modelStore((s) => s.model.edgeOrder);
+  const edges = modelStore((s) => s.model.edges);
+  const nodes = modelStore((s) => s.model.nodes);
   const nodeCount = nodeOrder.length;
 
-  const addNode = useModelStore((s) => s.addNode);
-  const setEditingNode = useUIStore((s) => s.setEditingNode);
-  const clearSelection = useUIStore((s) => s.clearSelection);
-  const clearInsertIntent = useUIStore((s) => s.clearInsertNodeIntent);
-  const openCanvasContextMenu = useUIStore((s) => s.openCanvasContextMenu);
-  const closeCanvasContextMenu = useUIStore((s) => s.closeCanvasContextMenu);
-  const edgeDraft = useUIStore((s) => s.edgeDraft);
-  const updateEdgeDraft = useUIStore((s) => s.updateEdgeDraft);
-  const endEdgeDraft = useUIStore((s) => s.endEdgeDraft);
+  const addNode = modelStore((s) => s.addNode);
+  const setEditingNode = uiStore((s) => s.setEditingNode);
+  const clearSelection = uiStore((s) => s.clearSelection);
+  const clearInsertIntent = uiStore((s) => s.clearInsertNodeIntent);
+  const openCanvasContextMenu = uiStore((s) => s.openCanvasContextMenu);
+  const closeCanvasContextMenu = uiStore((s) => s.closeCanvasContextMenu);
+  const edgeDraft = uiStore((s) => s.edgeDraft);
+  const updateEdgeDraft = uiStore((s) => s.updateEdgeDraft);
+  const endEdgeDraft = uiStore((s) => s.endEdgeDraft);
 
   const svgRef = useRef<SVGSVGElement | null>(null);
 
@@ -49,8 +48,8 @@ export function Canvas(): JSX.Element {
   const viewportRef = useRef(viewport);
   viewportRef.current = viewport;
   useEffect(() => {
-    setViewportSingleton(viewport);
-  }, [viewport]);
+    viewportContainer.set(viewport);
+  }, [viewport, viewportContainer]);
 
   const toCanvasCoords = useCallback((clientX: number, clientY: number) => {
     const svg = svgRef.current;
@@ -140,7 +139,7 @@ export function Canvas(): JSX.Element {
 
   const onCanvasDoubleClick = useCallback(
     (e: React.MouseEvent<SVGSVGElement>) => {
-      if (useUIStore.getState().readOnly) return;
+      if (uiStore.getState().readOnly) return;
       const target = e.target as Element;
       if (target !== e.currentTarget && !target.classList?.contains?.('trama-canvas-bg')) return;
       const pos = toCanvasCoords(e.clientX, e.clientY);
@@ -153,7 +152,7 @@ export function Canvas(): JSX.Element {
       });
       setEditingNode(node.id);
     },
-    [addNode, nodeCount, setEditingNode, toCanvasCoords],
+    [addNode, nodeCount, setEditingNode, toCanvasCoords, uiStore],
   );
 
   const onPointerMove = useCallback(
@@ -171,7 +170,7 @@ export function Canvas(): JSX.Element {
       const pos = toCanvasCoords(e.clientX, e.clientY);
       const lag: 0 | 1 = e.altKey ? 1 : 0;
       // 스냅: 가장 가까운 입력 소켓을 찾고 screen 거리가 임계치 이내면 스냅.
-      const model = useModelStore.getState().model;
+      const model = modelStore.getState().model;
       const positions: Record<string, { x: number; y: number } | undefined> = {};
       for (const nid of Object.keys(model.nodes)) {
         const p = model.nodes[nid]?.position;
@@ -195,7 +194,7 @@ export function Canvas(): JSX.Element {
           occupiedCond.add(occupiedKey(e2.to, e2.slotIndex));
         }
       }
-      const nearest = findNearestInputSocket(pos, positions, (entry) => {
+      const nearest = socketRegistry.findNearest(pos, positions, (entry) => {
         // 자기 자신으로 돌아가는 엣지는 막는다.
         if (entry.nodeId === fromId) return false;
         const tgt = model.nodes[entry.nodeId];
@@ -223,7 +222,7 @@ export function Canvas(): JSX.Element {
       }
       updateEdgeDraft({ pointer: pos, lag, snap });
     },
-    [edgeDraft, toCanvasCoords, updateEdgeDraft],
+    [edgeDraft, toCanvasCoords, updateEdgeDraft, modelStore, socketRegistry],
   );
 
   const onPointerUp = useCallback(
@@ -237,11 +236,11 @@ export function Canvas(): JSX.Element {
     [edgeDraft, endEdgeDraft],
   );
 
-  const undo = useModelStore((s) => s.undo);
-  const redo = useModelStore((s) => s.redo);
-  const removeNode = useModelStore((s) => s.removeNode);
-  const removeEdge = useModelStore((s) => s.removeEdge);
-  const selection = useUIStore((s) => s.selection);
+  const undo = modelStore((s) => s.undo);
+  const redo = modelStore((s) => s.redo);
+  const removeNode = modelStore((s) => s.removeNode);
+  const removeEdge = modelStore((s) => s.removeEdge);
+  const selection = uiStore((s) => s.selection);
 
   // 휠 줌 — 마우스 포커스 줌. React onWheel은 passive로 등록될 수 있어
   // preventDefault가 막힐 수 있으므로 native addEventListener({passive:false}).
@@ -269,7 +268,7 @@ export function Canvas(): JSX.Element {
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
       // readOnly에서는 모델 변경 단축키 전부 비활성. 셀렉션·pan/zoom은 유지된다.
-      if (useUIStore.getState().readOnly) return;
+      if (uiStore.getState().readOnly) return;
       const mod = e.metaKey || e.ctrlKey;
       if (mod && e.key.toLowerCase() === 'z' && !e.shiftKey) {
         e.preventDefault();
@@ -295,7 +294,7 @@ export function Canvas(): JSX.Element {
     };
     window.addEventListener('keydown', onKey);
     return () => window.removeEventListener('keydown', onKey);
-  }, [redo, removeEdge, removeNode, selection, undo]);
+  }, [redo, removeEdge, removeNode, selection, undo, uiStore]);
 
   return (
     <>

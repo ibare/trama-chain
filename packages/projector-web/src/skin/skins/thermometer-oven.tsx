@@ -1,5 +1,5 @@
 import { useCallback, useRef } from 'react';
-import { getCurrentZoom } from '../../canvas/viewport.js';
+import { useTrama } from '../../store/index.js';
 import { InteractiveArea } from '../../node/InteractiveArea.js';
 import type { SkinRenderProps } from '../types.js';
 
@@ -27,6 +27,7 @@ export function ThermometerOven({
   disabled,
   onLabelClick,
 }: SkinRenderProps): JSX.Element {
+  const { viewport } = useTrama();
   const labelSlotH = 24;
   const labelCenterY = -halfH + labelSlotH / 2;
 
@@ -124,10 +125,10 @@ export function ThermometerOven({
       dragRef.current = {
         startClientY: e.clientY,
         startRatio: ratio,
-        zoom: getCurrentZoom(),
+        zoom: viewport.getCurrentZoom(),
       };
     },
-    [onScrub, ratio],
+    [onScrub, ratio, viewport],
   );
 
   const onPointerMove = useCallback(

@@ -51,24 +51,3 @@ export function createViewportContainer(): ViewportContainer {
   };
 }
 
-/**
- * 호환 shim — 호출부 마이그레이션이 끝나면 제거된다 (Stage B 후반).
- * 새 코드는 useTrama().viewport 사용.
- */
-const defaultContainer = createViewportContainer();
-
-export function getViewport(): Viewport {
-  return defaultContainer.get();
-}
-
-export function setViewport(next: Viewport): void {
-  defaultContainer.set(next);
-}
-
-export function subscribeViewport(cb: () => void): () => void {
-  return defaultContainer.subscribe(cb);
-}
-
-export function getCurrentZoom(): number {
-  return defaultContainer.getCurrentZoom();
-}

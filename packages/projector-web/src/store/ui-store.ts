@@ -224,5 +224,3 @@ export function createUIStore(): UIStoreInstance {
   }));
 }
 
-/** 호환 shim — Stage B 후반에 제거. 새 코드는 useTrama().uiStore 사용. */
-export const useUIStore: UIStoreInstance = createUIStore();

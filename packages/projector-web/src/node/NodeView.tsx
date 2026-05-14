@@ -1,6 +1,6 @@
 import { memo } from 'react';
 import type { NodeId } from '@trama/core';
-import { useModelStore } from '../store/index.js';
+import { useTrama } from '../store/index.js';
 import { getNodeKindUI } from './kind-catalog.js';
 import './register-default-kinds.js';
 
@@ -15,7 +15,8 @@ interface Props {
  * 자동으로 dispatcher·컨텍스트 메뉴가 인지한다.
  */
 function NodeViewDispatchImpl({ id, incomingCount }: Props): JSX.Element | null {
-  const kind = useModelStore((s) => s.model.nodes[id]?.kind);
+  const { modelStore } = useTrama();
+  const kind = modelStore((s) => s.model.nodes[id]?.kind);
   if (!kind) return null;
   const ui = getNodeKindUI(kind);
   if (!ui) return null;

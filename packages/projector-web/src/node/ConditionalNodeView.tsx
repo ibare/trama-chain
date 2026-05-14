@@ -6,7 +6,7 @@ import {
   type ConditionalOperator,
   type NodeId,
 } from '@trama/core';
-import { useModelStore, useUIStore } from '../store/index.js';
+import { useTrama } from '../store/index.js';
 import {
   CONDITIONAL_CARD_H,
   CONDITIONAL_CARD_W,
@@ -16,7 +16,6 @@ import { NodeFrame } from './NodeFrame.js';
 import { InteractiveArea } from './InteractiveArea.js';
 import { Socket } from './Socket.js';
 import { useInputConnectionMask, useOutputConnected } from './use-socket-connections.js';
-import { registerInputSocket } from '../canvas/socket-registry.js';
 import { completeEdgeDraft } from '../canvas/edge-draft-actions.js';
 import { slotColor } from './slot-palette.js';
 
@@ -33,12 +32,14 @@ const CARD_CORNER = parseFloat(tokens.spacing.cardCornerRadius);
 const OPERATORS: ConditionalOperator[] = ['>', '==', '!='];
 
 function ConditionalNodeViewImpl({ id }: Props): JSX.Element | null {
-  const node = useModelStore((s) => s.model.nodes[id]);
-  const trueValid = useModelStore((s) => isOutputValid(s.executionState, id, 0));
-  const falseValid = useModelStore((s) => isOutputValid(s.executionState, id, 1));
-  const updateNode = useModelStore((s) => s.updateNode);
-  const selection = useUIStore((s) => s.selection);
-  const startEdgeDraft = useUIStore((s) => s.startEdgeDraft);
+  const instance = useTrama();
+  const { modelStore, uiStore, socketRegistry } = instance;
+  const node = modelStore((s) => s.model.nodes[id]);
+  const trueValid = modelStore((s) => isOutputValid(s.executionState, id, 0));
+  const falseValid = modelStore((s) => isOutputValid(s.executionState, id, 1));
+  const updateNode = modelStore((s) => s.updateNode);
+  const selection = uiStore((s) => s.selection);
+  const startEdgeDraft = uiStore((s) => s.startEdgeDraft);
   const inputMask = useInputConnectionMask(id);
   const outTrueConnected = useOutputConnected(id, 0);
   const outFalseConnected = useOutputConnected(id, 1);
@@ -49,12 +50,12 @@ function ConditionalNodeViewImpl({ id }: Props): JSX.Element | null {
 
   // 입력 슬롯 등록 — snap 후보가 된다. (A=0, B=1)
   useEffect(() => {
-    const unA = registerInputSocket({
+    const unA = socketRegistry.register({
       nodeId: id,
       slotIndex: 0,
       offset: { x: layout.inputSockets[0]!.x, y: layout.inputSockets[0]!.y },
     });
-    const unB = registerInputSocket({
+    const unB = socketRegistry.register({
       nodeId: id,
       slotIndex: 1,
       offset: { x: layout.inputSockets[1]!.x, y: layout.inputSockets[1]!.y },
@@ -63,7 +64,7 @@ function ConditionalNodeViewImpl({ id }: Props): JSX.Element | null {
       unA();
       unB();
     };
-  }, [id, layout.inputSockets]);
+  }, [id, layout.inputSockets, socketRegistry]);
 
   const makeOutputHandlers = useCallback(
     (slotIndex: 0 | 1, valid: boolean) => ({
@@ -85,19 +86,19 @@ function ConditionalNodeViewImpl({ id }: Props): JSX.Element | null {
       },
       onPointerUp: (e: React.PointerEvent<SVGCircleElement>) => {
         (e.target as Element).releasePointerCapture?.(e.pointerId);
-        completeEdgeDraft({ dropScreen: { x: e.clientX, y: e.clientY } });
+        completeEdgeDraft(instance, { dropScreen: { x: e.clientX, y: e.clientY } });
       },
     }),
-    [id, layout.outputSockets, node, pos.x, pos.y, startEdgeDraft],
+    [id, instance, layout.outputSockets, node, pos.x, pos.y, startEdgeDraft],
   );
 
   const onOperatorClick = useCallback(() => {
-    if (useUIStore.getState().readOnly) return;
+    if (uiStore.getState().readOnly) return;
     if (!node || !isConditionalNode(node)) return;
     const idx = OPERATORS.indexOf(node.operator);
     const next = OPERATORS[(idx + 1) % OPERATORS.length]!;
     updateNode(id, { operator: next }, 'update-node', '연산자 변경');
-  }, [id, node, updateNode]);
+  }, [id, node, uiStore, updateNode]);
 
   if (!node || !isConditionalNode(node)) return null;
 

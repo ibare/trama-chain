@@ -10,7 +10,7 @@ import {
   type UnitDef,
   type ValueNode,
 } from '@trama/core';
-import { useModelStore } from '../store/index.js';
+import { useTrama } from '../store/index.js';
 import { resolveNodeUnit } from '../util/unit-resolver.js';
 import { listSkinsForUnit } from '../skin/registry.js';
 import type { SkinDefinition } from '../skin/types.js';
@@ -31,7 +31,8 @@ interface Props {
  *   (재클릭으로 해제되지 않음). 해제는 명시적 "해제" 버튼으로 통일.
  */
 export function UnitInspector({ node }: Props): JSX.Element {
-  const updateNode = useModelStore((s) => s.updateNode);
+  const { modelStore } = useTrama();
+  const updateNode = modelStore((s) => s.updateNode);
 
   const currentDef = defaultUnitCatalog.get(node.unitId);
   const unit = resolveNodeUnit(node);

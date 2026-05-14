@@ -1,7 +1,7 @@
 import { useCallback } from 'react';
 import * as Form from '@radix-ui/react-form';
 import type { Edge } from '@trama/core';
-import { useModelStore } from '../store/index.js';
+import { useTrama } from '../store/index.js';
 import {
   CurveEditorFrame,
   clamp01,
@@ -40,7 +40,8 @@ const DEFAULTS: StochasticParams = {
  * 4개 파라미터(prob/win/lose/bias)는 그 아래 number input 그리드로 편집.
  */
 export function StochasticEditor({ edge }: Props): JSX.Element {
-  const updateEdge = useModelStore((s) => s.updateEdge);
+  const { modelStore } = useTrama();
+  const updateEdge = modelStore((s) => s.updateEdge);
   const reset = useShapeReset(edge, DEFAULTS as unknown as Record<string, unknown>);
 
   const p = edge.shape.params as Partial<StochasticParams>;

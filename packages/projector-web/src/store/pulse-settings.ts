@@ -34,10 +34,3 @@ export function createPulseSettingsStore(): PulseSettingsStore {
   }));
 }
 
-/** 호환 shim — Stage B 후반에 제거. */
-export const usePulseSettingsStore: PulseSettingsStore = createPulseSettingsStore();
-
-/** Non-reactive 조회 — spawn 시점에 박제용. */
-export function getCurrentTravelSpeedMultiplier(): number {
-  return usePulseSettingsStore.getState().travelSpeedMultiplier;
-}

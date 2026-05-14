@@ -48,9 +48,3 @@ export function createAnimationLoop(): AnimationLoop {
   };
 }
 
-const defaultLoop = createAnimationLoop();
-
-/** 호환 shim — Stage B 후반에 제거. 새 코드는 useTrama().animationLoop.register 사용. */
-export function registerTicker(t: Ticker): () => void {
-  return defaultLoop.register(t);
-}

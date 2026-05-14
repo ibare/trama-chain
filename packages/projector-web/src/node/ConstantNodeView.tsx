@@ -2,7 +2,7 @@ import { memo, useCallback, useEffect, useState } from 'react';
 import * as Form from '@radix-ui/react-form';
 import { tokens } from '@trama/tokens';
 import { isConstantNode, type NodeId } from '@trama/core';
-import { useModelStore, useUIStore } from '../store/index.js';
+import { useTrama } from '../store/index.js';
 import { NodeFrame } from './NodeFrame.js';
 import { Socket } from './Socket.js';
 import { useOutputConnected } from './use-socket-connections.js';
@@ -32,12 +32,14 @@ function formatConstantValue(v: number): string {
 }
 
 function ConstantNodeViewImpl({ id }: Props): JSX.Element | null {
-  const node = useModelStore((s) => s.model.nodes[id]);
-  const updateNode = useModelStore((s) => s.updateNode);
-  const selection = useUIStore((s) => s.selection);
-  const editingNodeId = useUIStore((s) => s.editingNodeId);
-  const setEditingNode = useUIStore((s) => s.setEditingNode);
-  const startEdgeDraft = useUIStore((s) => s.startEdgeDraft);
+  const instance = useTrama();
+  const { modelStore, uiStore } = instance;
+  const node = modelStore((s) => s.model.nodes[id]);
+  const updateNode = modelStore((s) => s.updateNode);
+  const selection = uiStore((s) => s.selection);
+  const editingNodeId = uiStore((s) => s.editingNodeId);
+  const setEditingNode = uiStore((s) => s.setEditingNode);
+  const startEdgeDraft = uiStore((s) => s.startEdgeDraft);
   const outputConnected = useOutputConnected(id);
 
   const pos = node?.position ?? { x: 200, y: 200 };
@@ -66,8 +68,8 @@ function ConstantNodeViewImpl({ id }: Props): JSX.Element | null {
 
   const onSocketPointerUp = useCallback((e: React.PointerEvent<SVGCircleElement>) => {
     (e.target as Element).releasePointerCapture?.(e.pointerId);
-    completeEdgeDraft({ dropScreen: { x: e.clientX, y: e.clientY } });
-  }, []);
+    completeEdgeDraft(instance, { dropScreen: { x: e.clientX, y: e.clientY } });
+  }, [instance]);
 
   // 인라인 편집 — 임의 수면 value/label 모두, 카탈로그 상수면 label만.
   const [nameDraft, setNameDraft] = useState(labelDraftSeed);

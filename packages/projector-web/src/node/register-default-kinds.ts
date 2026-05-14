@@ -1,4 +1,3 @@
-import { useModelStore, useUIStore } from '../store/index.js';
 import { constantRegistry } from '../store/registries.js';
 import { ValueNodeView } from './ValueNodeView.js';
 import { ConstantNodeView } from './ConstantNodeView.js';
@@ -12,6 +11,10 @@ import { registerNodeKindUI } from './kind-catalog.js';
  *
  * Side-effect import: NodeView·CanvasContextMenu가 카탈로그를 조회하기 전에
  * 등록이 끝나도록, 모듈 최상위에서 즉시 register 호출.
+ *
+ * buildMenuItems은 호출 시점에 `TramaInstance`를 인자로 받아 그 인스턴스의
+ * store만 만지도록 한다 — 모듈 최상위 register는 디스크립터 형상만 정의하고
+ * 실제 액션은 메뉴 클릭 시 인스턴스를 캡처해 실행된다.
  */
 
 registerNodeKindUI({
@@ -19,13 +22,13 @@ registerNodeKindUI({
   menuSectionLabel: '노드',
   menuSectionOrder: 10,
   View: ValueNodeView,
-  buildMenuItems: () => [
+  buildMenuItems: (instance) => [
     {
       key: 'value',
       label: '값 노드',
       onSelect: (canvasPos) => {
-        const addNode = useModelStore.getState().addNode;
-        const setEditingNode = useUIStore.getState().setEditingNode;
+        const addNode = instance.modelStore.getState().addNode;
+        const setEditingNode = instance.uiStore.getState().setEditingNode;
         const node = addNode({
           label: '새 변수',
           unitId: 'rating-10',
@@ -43,13 +46,13 @@ registerNodeKindUI({
   menuSectionLabel: '노드',
   menuSectionOrder: 11,
   View: ConditionalNodeView,
-  buildMenuItems: () => [
+  buildMenuItems: (instance) => [
     {
       key: 'conditional',
       label: '조건 노드',
       symbol: 'If',
       onSelect: (canvasPos) => {
-        const addConditionalNode = useModelStore.getState().addConditionalNode;
+        const addConditionalNode = instance.modelStore.getState().addConditionalNode;
         addConditionalNode({
           label: '조건',
           operator: '>',
@@ -65,7 +68,7 @@ registerNodeKindUI({
   menuSectionLabel: '상수',
   menuSectionOrder: 18,
   View: ConstantNodeView,
-  buildMenuItems: () =>
+  buildMenuItems: (instance) =>
     constantRegistry.list().map((def) => {
       const isCustom = def.key === 'custom';
       return {
@@ -73,8 +76,8 @@ registerNodeKindUI({
         label: def.labels.ko,
         symbol: def.symbol,
         onSelect: (canvasPos) => {
-          const addConstantNode = useModelStore.getState().addConstantNode;
-          const setEditingNode = useUIStore.getState().setEditingNode;
+          const addConstantNode = instance.modelStore.getState().addConstantNode;
+          const setEditingNode = instance.uiStore.getState().setEditingNode;
           const node = addConstantNode({
             label: isCustom ? '상수' : def.symbol,
             value: def.value,
@@ -116,7 +119,7 @@ registerNodeKindUI({
   menuSectionLabel: '식',
   menuSectionOrder: 15,
   View: ExpressionNodeView,
-  buildMenuItems: () =>
+  buildMenuItems: (instance) =>
     EXPRESSION_PRESETS.map((preset) => {
       const isCustom = preset.key === 'custom';
       return {
@@ -124,8 +127,8 @@ registerNodeKindUI({
         label: preset.label,
         symbol: preset.symbol,
         onSelect: (canvasPos) => {
-          const addExpressionNode = useModelStore.getState().addExpressionNode;
-          const setEditingNode = useUIStore.getState().setEditingNode;
+          const addExpressionNode = instance.modelStore.getState().addExpressionNode;
+          const setEditingNode = instance.uiStore.getState().setEditingNode;
           const latex = isCustom ? 'a + b' : preset.latex;
           const analysis = fizzexExpressionEvaluator.analyze(latex);
           const node = addExpressionNode({

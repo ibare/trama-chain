@@ -1,6 +1,6 @@
 import { useCallback } from 'react';
 import type { Edge } from '@trama/core';
-import { useModelStore } from '../store/index.js';
+import { useTrama } from '../store/index.js';
 
 /**
  * shape params 일부를 패치해서 edge에 commit하는 헬퍼.
@@ -14,7 +14,8 @@ export function useShapeCommit<P extends object>(
   edge: Edge,
   label = '곡선 조정',
 ): (patch: Partial<P>) => void {
-  const updateEdge = useModelStore((s) => s.updateEdge);
+  const { modelStore } = useTrama();
+  const updateEdge = modelStore((s) => s.updateEdge);
   const kind = edge.shape.kind;
   const params = edge.shape.params as P;
   return useCallback(
@@ -40,7 +41,8 @@ export function useShapeReset(
   edge: Edge,
   defaults: Record<string, unknown>,
 ): () => void {
-  const updateEdge = useModelStore((s) => s.updateEdge);
+  const { modelStore } = useTrama();
+  const updateEdge = modelStore((s) => s.updateEdge);
   const kind = edge.shape.kind;
   return useCallback(() => {
     updateEdge(

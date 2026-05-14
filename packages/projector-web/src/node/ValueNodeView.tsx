@@ -2,7 +2,7 @@ import { memo, Suspense, useCallback, useEffect, useState } from 'react';
 import * as Form from '@radix-ui/react-form';
 import { tokens } from '@trama/tokens';
 import { isValueNode, type NodeId } from '@trama/core';
-import { useModelStore, useUIStore } from '../store/index.js';
+import { useTrama } from '../store/index.js';
 import { combinerRegistry } from '../store/registries.js';
 import { formatNodeValue } from '../util/format.js';
 import { resolveNodeUnit } from '../util/unit-resolver.js';
@@ -12,7 +12,6 @@ import { NodeFrame } from './NodeFrame.js';
 import { InteractiveArea } from './InteractiveArea.js';
 import { Socket } from './Socket.js';
 import { useOutputConnected } from './use-socket-connections.js';
-import { registerInputSocket } from '../canvas/socket-registry.js';
 import { slotColor } from './slot-palette.js';
 import { completeEdgeDraft } from '../canvas/edge-draft-actions.js';
 import { getLazySkin } from '../skin/registry.js';
@@ -42,30 +41,32 @@ function combinerSymbol(key: string): string {
 }
 
 function ValueNodeViewImpl({ id, incomingCount }: Props): JSX.Element | null {
-  const node = useModelStore((s) => s.model.nodes[id]);
-  const currentValue = useModelStore((s) => {
+  const instance = useTrama();
+  const { modelStore, uiStore, socketRegistry } = instance;
+  const node = modelStore((s) => s.model.nodes[id]);
+  const currentValue = modelStore((s) => {
     const n = s.model.nodes[id];
     const fallback = n && isValueNode(n) ? n.initialValue : 0;
     return s.executionState.values[id] ?? fallback;
   });
 
-  const updateNode = useModelStore((s) => s.updateNode);
-  const scrubInitialValue = useModelStore((s) => s.scrubInitialValue);
+  const updateNode = modelStore((s) => s.updateNode);
+  const scrubInitialValue = modelStore((s) => s.scrubInitialValue);
   const outputConnected = useOutputConnected(id);
-  const playbackStep = useModelStore((s) => s.playbackStep);
-  const trajectoryLength = useModelStore((s) => s.trajectory.length);
-  const selectNode = useUIStore((s) => s.selectNode);
-  const editingNodeId = useUIStore((s) => s.editingNodeId);
-  const setEditingNode = useUIStore((s) => s.setEditingNode);
-  const startEdgeDraft = useUIStore((s) => s.startEdgeDraft);
-  const openUnitInspector = useUIStore((s) => s.openUnitInspector);
-  const isSelected = useUIStore(
+  const playbackStep = modelStore((s) => s.playbackStep);
+  const trajectoryLength = modelStore((s) => s.trajectory.length);
+  const selectNode = uiStore((s) => s.selectNode);
+  const editingNodeId = uiStore((s) => s.editingNodeId);
+  const setEditingNode = uiStore((s) => s.setEditingNode);
+  const startEdgeDraft = uiStore((s) => s.startEdgeDraft);
+  const openUnitInspector = uiStore((s) => s.openUnitInspector);
+  const isSelected = uiStore(
     (s) => s.selection.kind === 'node' && s.selection.id === id,
   );
 
   // lag=0 인입 엣지가 하나라도 있으면 매 step마다 propagation이 값을 덮어쓰므로
   // initialValue 슬라이더는 사용자에게 거짓 affordance가 된다.
-  const hasLag0Incoming = useModelStore((s) => {
+  const hasLag0Incoming = modelStore((s) => {
     for (const eid of s.model.edgeOrder) {
       const e = s.model.edges[eid];
       if (e && e.to === id && e.lag === 0) return true;
@@ -88,12 +89,12 @@ function ValueNodeViewImpl({ id, incomingCount }: Props): JSX.Element | null {
   useEffect(() => {
     if (!node || !isValueNode(node)) return;
     const layoutNow = getNodeLayout(node, { incomingCount });
-    const unreg = registerInputSocket({
+    const unreg = socketRegistry.register({
       nodeId: id,
       offset: { x: layoutNow.leftPin.cx, y: layoutNow.leftPin.cy },
     });
     return unreg;
-  }, [id, incomingCount, node]);
+  }, [id, incomingCount, node, socketRegistry]);
 
   const onSocketPointerDown = useCallback(
     (e: React.PointerEvent<SVGCircleElement>) => {
@@ -112,8 +113,8 @@ function ValueNodeViewImpl({ id, incomingCount }: Props): JSX.Element | null {
 
   const onSocketPointerUp = useCallback((e: React.PointerEvent<SVGCircleElement>) => {
     (e.target as Element).releasePointerCapture?.(e.pointerId);
-    completeEdgeDraft({ dropScreen: { x: e.clientX, y: e.clientY } });
-  }, []);
+    completeEdgeDraft(instance, { dropScreen: { x: e.clientX, y: e.clientY } });
+  }, [instance]);
 
   const [nameDraft, setNameDraft] = useState(labelDraftSeed);
   useEffect(() => {

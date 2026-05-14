@@ -1,12 +1,7 @@
 import type { EdgeId, NodeId } from '@trama/core';
 import { tokens } from '@trama/tokens';
 import type { AnimationLoop } from '../canvas/animation-loop.js';
-import { registerTicker } from '../canvas/animation-loop.js';
 import type { PulseSettingsStore } from '../store/pulse-settings.js';
-import {
-  getCurrentTravelSpeedMultiplier,
-  usePulseSettingsStore,
-} from '../store/pulse-settings.js';
 
 /**
  * 활성 펄스 lifecycle을 관리. spawn → 매 프레임 진행 → 도착 시 arrivalHandler 호출 → 제거.
@@ -180,44 +175,3 @@ export function createPulseRegistry({
   };
 }
 
-/**
- * 호환 shim — Stage B 후반에 제거.
- * defaultRegistry는 default animation-loop과 default pulse-settings를 사용한다.
- * 이는 진정한 인스턴스 격리가 아니므로, 호출부가 Context를 통해 인스턴스의
- * pulseRegistry를 사용하도록 마이그레이션될 때까지의 임시 호환층.
- */
-const defaultRegistry = createPulseRegistry({
-  animationLoop: { register: registerTicker, dispose: () => {} },
-  pulseSettingsStore: usePulseSettingsStore,
-});
-
-export function setArrivalHandler(h: ArrivalHandler | null): void {
-  defaultRegistry.setArrivalHandler(h);
-}
-
-export function spawnPulse(args: PulseSpawnArgs): Pulse {
-  return defaultRegistry.spawn(args);
-}
-
-export function pulseProgress(p: Pulse, now: number = performance.now()): number {
-  return defaultRegistry.pulseProgress(p, now);
-}
-
-export function getActivePulses(): readonly Pulse[] {
-  return defaultRegistry.getActive();
-}
-
-export function subscribePulseList(listener: Listener): () => void {
-  return defaultRegistry.subscribeList(listener);
-}
-
-export function subscribePulseTick(listener: Listener): () => void {
-  return defaultRegistry.subscribeTick(listener);
-}
-
-export function clearAllPulses(): void {
-  defaultRegistry.clearAll();
-}
-
-// 호환 shim 내부 의존 — `getCurrentTravelSpeedMultiplier` 호출이 코드 내 다른 곳에 있을 수 있어 export 유지.
-export { getCurrentTravelSpeedMultiplier };

@@ -1,13 +1,8 @@
 import { memo, useCallback, useEffect, useRef, type ReactNode } from 'react';
 import type { NodeId } from '@trama/core';
 import { tokens } from '@trama/tokens';
-import { useModelStore, useUIStore } from '../store/index.js';
-import {
-  getIncidentEdgeHandles,
-  registerNodeEl,
-  type EdgeHandle,
-} from '../canvas/drag-registry.js';
-import { getCurrentZoom } from '../canvas/viewport.js';
+import { useTrama } from '../store/index.js';
+import { type EdgeHandle } from '../canvas/drag-registry.js';
 import { useNodeFlashId } from '../pulse/use-node-flash.js';
 
 const DRAG_THRESHOLD_PX = 3;
@@ -52,15 +47,16 @@ function NodeFrameImpl({
   onBodyDoubleClick,
   children,
 }: Props): JSX.Element {
-  const selectNode = useUIStore((s) => s.selectNode);
-  const updateNode = useModelStore((s) => s.updateNode);
+  const { modelStore, uiStore, viewport, dragRegistry } = useTrama();
+  const selectNode = uiStore((s) => s.selectNode);
+  const updateNode = modelStore((s) => s.updateNode);
 
   const outerGRef = useRef<SVGGElement | null>(null);
   useEffect(() => {
     const el = outerGRef.current;
     if (!el) return undefined;
-    return registerNodeEl(id, el);
-  }, [id]);
+    return dragRegistry.registerNodeEl(id, el);
+  }, [id, dragRegistry]);
 
   const moveRef = useRef<{
     startClientX: number;
@@ -77,7 +73,7 @@ function NodeFrameImpl({
   const onPointerDown = useCallback(
     (e: React.PointerEvent<SVGRectElement>) => {
       if (canStartDrag && !canStartDrag()) return;
-      const readOnly = useUIStore.getState().readOnly;
+      const readOnly = uiStore.getState().readOnly;
       // readOnly에서도 노드 클릭 선택은 허용(셀렉션 = 비파괴 인터랙션). 드래그만 차단.
       e.stopPropagation();
       selectNode(id);
@@ -91,11 +87,11 @@ function NodeFrameImpl({
         lastDx: 0,
         lastDy: 0,
         dragged: false,
-        zoom: getCurrentZoom(),
-        incidents: getIncidentEdgeHandles(id),
+        zoom: viewport.getCurrentZoom(),
+        incidents: dragRegistry.getIncidentEdgeHandles(id),
       };
     },
-    [canStartDrag, id, pos.x, pos.y, selectNode],
+    [canStartDrag, dragRegistry, id, pos.x, pos.y, selectNode, uiStore, viewport],
   );
 
   const onPointerMove = useCallback(

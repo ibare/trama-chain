@@ -29,13 +29,3 @@ export function createCableRegistry(): CableRegistry {
   };
 }
 
-const defaultRegistry = createCableRegistry();
-
-/** 호환 shim — Stage B 후반에 제거. */
-export function registerCable(edgeId: EdgeId, cable: Cable): () => void {
-  return defaultRegistry.register(edgeId, cable);
-}
-
-export function getCable(edgeId: EdgeId): Cable | undefined {
-  return defaultRegistry.get(edgeId);
-}

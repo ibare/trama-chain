@@ -12,7 +12,7 @@ import {
   EditorView as FizzexEditor,
   type EditorState as FizzexEditorState,
 } from 'fizzex';
-import { useModelStore, useUIStore } from '../store/index.js';
+import { useTrama } from '../store/index.js';
 import {
   useFizzexRenderer,
   type FizzexMeasure,
@@ -24,7 +24,6 @@ import {
   useInputConnectionMask,
   useOutputConnected,
 } from './use-socket-connections.js';
-import { registerInputSocket } from '../canvas/socket-registry.js';
 import { completeEdgeDraft } from '../canvas/edge-draft-actions.js';
 import { getNodeLayout } from './box.js';
 import { slotColor } from './slot-palette.js';
@@ -115,14 +114,16 @@ function formatInvalidReason(d: EvalDiagnosis & { ok: false }): string {
 }
 
 function ExpressionNodeViewImpl({ id }: Props): JSX.Element | null {
-  const node = useModelStore((s) => s.model.nodes[id]);
-  const isValid = useModelStore((s) => isNodeValid(s.executionState, id));
-  const invalidReason = useModelStore((s) => s.executionState.invalidReasons[id]);
-  const updateNode = useModelStore((s) => s.updateNode);
-  const selection = useUIStore((s) => s.selection);
-  const editingNodeId = useUIStore((s) => s.editingNodeId);
-  const setEditingNode = useUIStore((s) => s.setEditingNode);
-  const startEdgeDraft = useUIStore((s) => s.startEdgeDraft);
+  const instance = useTrama();
+  const { modelStore, uiStore, socketRegistry } = instance;
+  const node = modelStore((s) => s.model.nodes[id]);
+  const isValid = modelStore((s) => isNodeValid(s.executionState, id));
+  const invalidReason = modelStore((s) => s.executionState.invalidReasons[id]);
+  const updateNode = modelStore((s) => s.updateNode);
+  const selection = uiStore((s) => s.selection);
+  const editingNodeId = uiStore((s) => s.editingNodeId);
+  const setEditingNode = uiStore((s) => s.setEditingNode);
+  const startEdgeDraft = uiStore((s) => s.startEdgeDraft);
   const inputMask = useInputConnectionMask(id);
   const outputConnected = useOutputConnected(id);
 
@@ -162,7 +163,7 @@ function ExpressionNodeViewImpl({ id }: Props): JSX.Element | null {
     layoutNow.leftPin.sockets.forEach((s, i) => {
       if (i >= node.variables.length) return;
       unregs.push(
-        registerInputSocket({
+        socketRegistry.register({
           nodeId: id,
           slotIndex: i,
           offset: { x: s.x, y: s.y },
@@ -170,7 +171,7 @@ function ExpressionNodeViewImpl({ id }: Props): JSX.Element | null {
       );
     });
     return () => unregs.forEach((u) => u());
-  }, [id, node, measured]);
+  }, [id, node, measured, socketRegistry]);
 
   const canStartDrag = useCallback(
     () => editingNodeId !== id,
@@ -202,9 +203,9 @@ function ExpressionNodeViewImpl({ id }: Props): JSX.Element | null {
   const onSocketPointerUp = useCallback(
     (e: React.PointerEvent<SVGCircleElement>) => {
       (e.target as Element).releasePointerCapture?.(e.pointerId);
-      completeEdgeDraft({ dropScreen: { x: e.clientX, y: e.clientY } });
+      completeEdgeDraft(instance, { dropScreen: { x: e.clientX, y: e.clientY } });
     },
-    [],
+    [instance],
   );
 
   // 인라인 수식 편집 — fizzex EditorView. 진입 시점의 latex을 EditorState로 변환해

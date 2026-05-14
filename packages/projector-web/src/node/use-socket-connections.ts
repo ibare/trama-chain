@@ -1,4 +1,4 @@
-import { useModelStore } from '../store/index.js';
+import { useTrama } from '../store/index.js';
 import type { NodeId } from '@trama/core';
 
 /**
@@ -6,7 +6,8 @@ import type { NodeId } from '@trama/core';
  * 슬롯이 여러 개인 ConditionalNode는 sourceSlotIndex로 구분.
  */
 export function useOutputConnected(nodeId: NodeId, sourceSlotIndex?: number): boolean {
-  return useModelStore((s) => {
+  const { modelStore } = useTrama();
+  return modelStore((s) => {
     for (const eid of s.model.edgeOrder) {
       const e = s.model.edges[eid];
       if (!e || e.from !== nodeId) continue;
@@ -24,7 +25,8 @@ export function useOutputConnected(nodeId: NodeId, sourceSlotIndex?: number): bo
  * 노드의 입력 슬롯이 연결되어 있는지. slotIndex가 없으면 to 매칭만으로 판정.
  */
 export function useInputConnected(nodeId: NodeId, slotIndex?: number): boolean {
-  return useModelStore((s) => {
+  const { modelStore } = useTrama();
+  return modelStore((s) => {
     for (const eid of s.model.edgeOrder) {
       const e = s.model.edges[eid];
       if (!e || e.to !== nodeId) continue;
@@ -43,7 +45,8 @@ export function useInputConnected(nodeId: NodeId, slotIndex?: number): boolean {
  * `(mask & (1 << i)) !== 0`. number 반환이라 store 비교가 안정적.
  */
 export function useInputConnectionMask(nodeId: NodeId): number {
-  return useModelStore((s) => {
+  const { modelStore } = useTrama();
+  return modelStore((s) => {
     let mask = 0;
     for (const eid of s.model.edgeOrder) {
       const e = s.model.edges[eid];

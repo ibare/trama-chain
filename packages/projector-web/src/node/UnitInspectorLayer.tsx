@@ -1,20 +1,20 @@
 import { useMemo, useSyncExternalStore } from 'react';
 import { isValueNode } from '@trama/core';
-import { useModelStore, useUIStore } from '../store/index.js';
+import { useTrama } from '../store/index.js';
 import { getNodeLayout } from './box.js';
 import { UnitInspector } from './UnitInspector.js';
 import { TramaPopover } from '../util/TramaPopover.js';
-import { getViewport, subscribeViewport } from '../canvas/viewport.js';
 
 /**
  * UnitInspector를 노드 우상단 옆에 띄우는 어댑터.
  * 노드 위치(캔버스 좌표) → viewport 변환 → 화면 좌표 anchor.
  */
 export function UnitInspectorLayer(): JSX.Element | null {
-  const nodeId = useUIStore((s) => s.unitInspector?.nodeId ?? null);
-  const closeInspector = useUIStore((s) => s.closeUnitInspector);
-  const node = useModelStore((s) => (nodeId ? s.model.nodes[nodeId] : null));
-  const incomingCount = useModelStore((s) => {
+  const { modelStore, uiStore, viewport: viewportContainer } = useTrama();
+  const nodeId = uiStore((s) => s.unitInspector?.nodeId ?? null);
+  const closeInspector = uiStore((s) => s.closeUnitInspector);
+  const node = modelStore((s) => (nodeId ? s.model.nodes[nodeId] : null));
+  const incomingCount = modelStore((s) => {
     if (!nodeId) return 0;
     let n = 0;
     for (const eid of s.model.edgeOrder) {
@@ -24,7 +24,11 @@ export function UnitInspectorLayer(): JSX.Element | null {
     return n;
   });
 
-  const viewport = useSyncExternalStore(subscribeViewport, getViewport, getViewport);
+  const viewport = useSyncExternalStore(
+    viewportContainer.subscribe,
+    viewportContainer.get,
+    viewportContainer.get,
+  );
 
   const anchor = useMemo(() => {
     if (!node || !node.position) return null;

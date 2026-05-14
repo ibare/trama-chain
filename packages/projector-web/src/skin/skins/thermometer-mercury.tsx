@@ -1,5 +1,5 @@
 import { useCallback, useId, useRef } from 'react';
-import { getCurrentZoom } from '../../canvas/viewport.js';
+import { useTrama } from '../../store/index.js';
 import { formatNodeValue } from '../../util/format.js';
 import { InteractiveArea } from '../../node/InteractiveArea.js';
 import type { SkinRenderProps } from '../types.js';
@@ -31,6 +31,7 @@ export function ThermometerMercury({
   disabled,
   onLabelClick,
 }: SkinRenderProps): JSX.Element {
+  const { viewport } = useTrama();
   const uid = useId().replace(/[:#]/g, '');
 
   // 상단 라벨 슬롯
@@ -122,10 +123,10 @@ export function ThermometerMercury({
       dragRef.current = {
         startClientY: e.clientY,
         startRatio: ratio,
-        zoom: getCurrentZoom(),
+        zoom: viewport.getCurrentZoom(),
       };
     },
-    [onScrub, ratio],
+    [onScrub, ratio, viewport],
   );
 
   const onPointerMove = useCallback(

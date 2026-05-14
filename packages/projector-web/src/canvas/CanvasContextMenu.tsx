@@ -1,5 +1,5 @@
 import { useEffect, useRef } from 'react';
-import { useUIStore } from '../store/index.js';
+import { useTrama } from '../store/index.js';
 import { listNodeKindUIs, type NodeMenuItem } from '../node/kind-catalog.js';
 import '../node/register-default-kinds.js';
 
@@ -12,8 +12,10 @@ const MENU_PADDING = 8;
  * 새 노드 종류 추가 시 카탈로그에 디스크립터를 등록하면 자동 반영.
  */
 export function CanvasContextMenu(): JSX.Element | null {
-  const state = useUIStore((s) => s.canvasContextMenu);
-  const close = useUIStore((s) => s.closeCanvasContextMenu);
+  const instance = useTrama();
+  const { uiStore } = instance;
+  const state = uiStore((s) => s.canvasContextMenu);
+  const close = uiStore((s) => s.closeCanvasContextMenu);
   const ref = useRef<HTMLDivElement | null>(null);
 
   useEffect(() => {
@@ -41,7 +43,7 @@ export function CanvasContextMenu(): JSX.Element | null {
   const sectionMap = new Map<string, { order: number; items: NodeMenuItem[] }>();
   for (const desc of listNodeKindUIs()) {
     const existing = sectionMap.get(desc.menuSectionLabel);
-    const items = desc.buildMenuItems();
+    const items = desc.buildMenuItems(instance);
     if (existing) {
       existing.items = [...existing.items, ...items];
     } else {
