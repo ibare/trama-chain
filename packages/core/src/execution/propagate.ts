@@ -1,6 +1,6 @@
 import type { CombinerRegistry } from '../combiners/index.js';
 import type { Model, Value } from '../model/index.js';
-import { isNumericValue, isValueNode, numericValue } from '../model/index.js';
+import { booleanValue, isNumericValue, isValueNode, numericValue } from '../model/index.js';
 import type { ShapeRegistry } from '../functions/index.js';
 import type { Rng } from '../functions/types.js';
 import {
@@ -108,29 +108,40 @@ export function applyFeedbackEdges(
   const next: Record<string, Value> = { ...state.values };
   const validOutputs = new Set(state.validOutputs);
 
-  const byTarget = new Map<string, number[]>();
+  // ValueKind별 buckets — numeric은 단위 클램프와 raw passthrough를 따지고
+  // boolean은 그저 boolean combiner로 합친다.
+  const byTargetNumeric = new Map<string, number[]>();
+  const byTargetBoolean = new Map<string, boolean[]>();
   const rawSourceTargets = new Set<string>();
   for (const edge of topology.feedbackEdges) {
     const target = model.nodes[edge.to];
     const source = model.nodes[edge.from];
     if (!target || !source) continue;
     if (!canBeFeedbackTarget(target, nodeKindRegistry)) continue;
+    if (!isValueNode(target)) continue;
     const srcSlot = edge.sourceSlotIndex ?? 0;
     if (!validOutputs.has(outputKey(edge.from, srcSlot))) continue;
-    // numeric ValueNode가 1단계 유일의 feedback target. boolean Value source는 기여 불가.
     const sourceVal =
       state.values[edge.from] ?? (isValueNode(source) ? source.initialValue : undefined);
-    if (!sourceVal || sourceVal.kind !== 'numeric') continue;
-    const list = byTarget.get(edge.to) ?? [];
-    list.push(sourceVal.n);
-    byTarget.set(edge.to, list);
-    if (isRawOutputNode(source, nodeKindRegistry)) rawSourceTargets.add(edge.to);
+    if (!sourceVal) continue;
+    // PortType 호환: source ValueKind ≠ target ValueKind면 기여하지 않음.
+    if (sourceVal.kind !== target.initialValue.kind) continue;
+    if (sourceVal.kind === 'numeric') {
+      const list = byTargetNumeric.get(edge.to) ?? [];
+      list.push(edge.inverted ? -sourceVal.n : sourceVal.n);
+      byTargetNumeric.set(edge.to, list);
+      if (isRawOutputNode(source, nodeKindRegistry)) rawSourceTargets.add(edge.to);
+    } else {
+      const list = byTargetBoolean.get(edge.to) ?? [];
+      list.push(edge.inverted ? !sourceVal.b : sourceVal.b);
+      byTargetBoolean.set(edge.to, list);
+    }
   }
 
-  for (const [tid, contribs] of byTarget) {
+  for (const [tid, contribs] of byTargetNumeric) {
     const target = model.nodes[tid];
-    if (!target || !isValueNode(target)) continue; // 현재 feedback target은 ValueNode뿐
-    if (!isNumericValue(target.initialValue)) continue; // numeric만 1단계 지원
+    if (!target || !isValueNode(target)) continue;
+    if (!isNumericValue(target.initialValue)) continue;
     const combiner = options.combinerRegistry.getOfKind(target.combiner, 'numeric');
     if (!combiner) throw new MissingCombinerError(target.combiner);
     const baseVal = next[tid];
@@ -141,6 +152,19 @@ export function applyFeedbackEdges(
       ? combined
       : clampToUnit(combined, getNodeOutputUnit(target, catalog, nodeKindRegistry));
     next[tid] = numericValue(finalNumber, target.initialValue.unitId);
+    validOutputs.add(outputKey(tid, 0));
+  }
+
+  for (const [tid, contribs] of byTargetBoolean) {
+    const target = model.nodes[tid];
+    if (!target || !isValueNode(target)) continue;
+    if (target.initialValue.kind !== 'boolean') continue;
+    const combiner = options.combinerRegistry.getOfKind(target.combiner, 'boolean');
+    if (!combiner) throw new MissingCombinerError(target.combiner);
+    const baseVal = next[tid];
+    const baseBool =
+      baseVal && baseVal.kind === 'boolean' ? baseVal.b : target.initialValue.b;
+    next[tid] = booleanValue(combiner.combine([baseBool, ...contribs]));
     validOutputs.add(outputKey(tid, 0));
   }
 

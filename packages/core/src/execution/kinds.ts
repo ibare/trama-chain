@@ -2,7 +2,7 @@ import type { CombinerRegistry } from '../combiners/index.js';
 import type { ShapeRegistry } from '../functions/index.js';
 import type { Rng } from '../functions/types.js';
 import type { Edge, Model, Node, NodeId, Value, ValueKind } from '../model/index.js';
-import { isValueNode, isNumericValue, numericValue } from '../model/index.js';
+import { booleanValue, isValueNode, isNumericValue, numericValue } from '../model/index.js';
 import {
   clamp01,
   clampToUnit,
@@ -31,6 +31,23 @@ function getNumericNext(ctx: PropagateContext, id: NodeId): number | undefined {
   const source = ctx.model.nodes[id];
   if (source && isValueNode(source) && isNumericValue(source.initialValue)) {
     return source.initialValue.n;
+  }
+  return undefined;
+}
+
+/**
+ * boolean Value 버전. boolean ValueNode propagate가 사용.
+ * source가 numeric이면 undefined — PortType 검사가 막아야 하지만 안전망.
+ */
+function getBooleanNext(ctx: PropagateContext, id: NodeId): boolean | undefined {
+  const v = ctx.next[id];
+  if (v) {
+    if (v.kind === 'boolean') return v.b;
+    return undefined;
+  }
+  const source = ctx.model.nodes[id];
+  if (source && isValueNode(source) && source.initialValue.kind === 'boolean') {
+    return source.initialValue.b;
   }
   return undefined;
 }
@@ -181,8 +198,13 @@ const valueNodeDescriptor: NodeKindDescriptor<Extract<Node, { kind: 'value' }>> 
     const incoming = ctx.incoming;
     if (incoming.length === 0) return; // 입력 없음: 기존 값 유지
 
-    // 1단계는 numeric ValueNode만 지원 — boolean ValueNode는 5단계에서 별도 descriptor로.
-    if (!isNumericValue(node.initialValue)) return;
+    // ValueKind별 propagate 분기 — 같은 'value' 디스크립터 안에서 numeric/boolean을
+    // 각자의 경로로 다룬다. 노드 종류를 둘로 쪼개지 않는 이유는 모델·UI·serialize가
+    // 동일한 ValueNode 구조를 공유하고 initialValue.kind 하나로 분기 가능하기 때문.
+    if (node.initialValue.kind === 'boolean') {
+      propagateBooleanValueNode(node, ctx);
+      return;
+    }
 
     // numeric ValueNode는 numeric combiner만 받는다. 키가 없거나 ValueKind가
     // 맞지 않으면 동일한 에러로 떨어뜨려 등록 누락과 잘못된 매칭을 한 자리에서 잡는다.
@@ -239,6 +261,41 @@ const valueNodeDescriptor: NodeKindDescriptor<Extract<Node, { kind: 'value' }>> 
     ctx.validOutputs.add(outputKey(node.id, 0));
   },
 };
+
+/**
+ * boolean ValueNode의 lag=0 전파.
+ *
+ * - 각 incoming edge에서 source의 boolean을 모은다 — numeric source는 PortType
+ *   검사로 막혀야 하지만 안전망으로 undefined skip.
+ * - edge.inverted=true면 boolean을 뒤집어 기여 (numeric의 1-x 대응).
+ * - shape는 boolean에 의미가 없어 무시. raw passthrough 분기도 없음.
+ * - boolean combiner(and/or/xor)는 6단계에 등록. 미등록이면 MissingCombinerError.
+ */
+function propagateBooleanValueNode(
+  node: Extract<Node, { kind: 'value' }>,
+  ctx: PropagateContext,
+): void {
+  if (node.initialValue.kind !== 'boolean') return;
+  const combiner = ctx.combinerRegistry.getOfKind(node.combiner, 'boolean');
+  if (!combiner) throw new MissingCombinerError(node.combiner);
+
+  const contributions: boolean[] = [];
+  for (const edge of ctx.incoming) {
+    const source = ctx.model.nodes[edge.from];
+    if (!source) continue;
+    if (!isEdgeSourceValid(ctx, edge)) continue;
+    const b = getBooleanNext(ctx, edge.from);
+    if (b === undefined) continue;
+    contributions.push(edge.inverted ? !b : b);
+  }
+
+  if (contributions.length === 0) {
+    ctx.validOutputs.delete(outputKey(node.id, 0));
+    return;
+  }
+  ctx.next[node.id] = booleanValue(combiner.combine(contributions));
+  ctx.validOutputs.add(outputKey(node.id, 0));
+}
 
 const constantNodeDescriptor: NodeKindDescriptor<Extract<Node, { kind: 'constant' }>> = {
   kind: 'constant',
