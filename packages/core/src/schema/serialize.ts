@@ -23,7 +23,6 @@ const VALUE_NODE_KEY_ORDER: (keyof TramaValueNode)[] = [
   'kind',
   'id',
   'label',
-  'unitId',
   'unitOverride',
   'initialValue',
   'position',

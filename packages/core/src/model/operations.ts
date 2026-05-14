@@ -11,6 +11,7 @@ import type {
   ValueNode,
 } from './types.js';
 import { makeEdgeId, makeModelId, makeNodeId } from './ids.js';
+import { numericValue, type Value } from './value.js';
 
 export function createEmptyModel(now: number = Date.now()): Model {
   return {
@@ -33,9 +34,13 @@ function touch(model: Model, now: number = Date.now()): Model {
 
 export interface AddValueNodeInput {
   label: string;
+  /** numeric ValueNode 편의 입력 — unitId+initialNumber로 NumericValue 자동 생성. */
   unitId: string;
   unitOverride?: ValueNode['unitOverride'];
-  initialValue: number;
+  /** 시작값(수치). Value 자체를 직접 넘기려면 initialValue 사용. */
+  initialNumber?: number;
+  /** 명시적 Value를 넘길 때. initialNumber보다 우선. */
+  initialValue?: Value;
   position?: { x: number; y: number } | null;
   combiner?: string;
   isFocal?: boolean;
@@ -45,13 +50,14 @@ export interface AddValueNodeInput {
 
 export function addValueNode(model: Model, input: AddValueNodeInput, now?: number): Model {
   const id = input.id ?? makeNodeId();
+  const initial: Value =
+    input.initialValue ?? numericValue(input.initialNumber ?? 0, input.unitId);
   const node: ValueNode = {
     kind: 'value',
     id,
     label: input.label,
-    unitId: input.unitId,
     unitOverride: input.unitOverride,
-    initialValue: input.initialValue,
+    initialValue: initial,
     position: input.position ?? null,
     combiner: input.combiner ?? 'sum',
     isFocal: input.isFocal ?? false,
@@ -69,7 +75,8 @@ export function addValueNode(model: Model, input: AddValueNodeInput, now?: numbe
 
 export interface AddConstantNodeInput {
   label: string;
-  value: number;
+  /** 명시적 Value. 또는 number를 넘기면 'free' 단위 NumericValue로 wrap. */
+  value: Value | number;
   constantKey?: string;
   position?: { x: number; y: number } | null;
   isFocal?: boolean;
@@ -83,11 +90,13 @@ export function addConstantNode(
   now?: number,
 ): Model {
   const id = input.id ?? makeNodeId();
+  const value: Value =
+    typeof input.value === 'number' ? numericValue(input.value, 'free') : input.value;
   const node: ConstantNode = {
     kind: 'constant',
     id,
     label: input.label,
-    value: input.value,
+    value,
     constantKey: input.constantKey,
     position: input.position ?? null,
     isFocal: input.isFocal ?? false,

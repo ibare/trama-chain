@@ -1,7 +1,7 @@
 import { memo, useCallback, useEffect, useState } from 'react';
 import * as Form from '@radix-ui/react-form';
 import { tokens } from '@trama/tokens';
-import { isConstantNode, type NodeId } from '@trama/core';
+import { isConstantNode, isNumericValue, numericValue, type NodeId } from '@trama/core';
 import { useTrama } from '../store/index.js';
 import { NodeFrame } from './NodeFrame.js';
 import { NodeBody } from './NodeBody.js';
@@ -46,7 +46,9 @@ function ConstantNodeViewImpl({ id }: Props): JSX.Element | null {
   const posX = node?.position?.x ?? 0;
   const posY = node?.position?.y ?? 0;
   const labelDraftSeed = node?.label ?? '';
-  const valueDraftSeed = node && isConstantNode(node) ? node.value : 0;
+  const constantNumeric =
+    node && isConstantNode(node) && isNumericValue(node.value) ? node.value.n : 0;
+  const valueDraftSeed = constantNumeric;
   const isCustom = node && isConstantNode(node) && (node.constantKey ?? '') === 'custom';
 
   // 사용자 정의 임의 수에 한해, 본체 더블클릭으로 수치 인라인 편집 진입.
@@ -68,7 +70,9 @@ function ConstantNodeViewImpl({ id }: Props): JSX.Element | null {
   useEffect(() => {
     if (isEditing && node) {
       setNameDraft(node.label);
-      if (isConstantNode(node)) setValueDraft(String(node.value));
+      if (isConstantNode(node) && isNumericValue(node.value)) {
+        setValueDraft(String(node.value.n));
+      }
     }
   }, [isEditing, node]);
 
@@ -77,12 +81,14 @@ function ConstantNodeViewImpl({ id }: Props): JSX.Element | null {
       setEditingNode(null);
       return;
     }
-    const patch: { label?: string; value?: number } = {};
+    const patch: { label?: string; value?: ReturnType<typeof numericValue> } = {};
     const v = nameDraft.trim();
     if (v && v !== node.label) patch.label = v;
-    if (isCustom) {
+    if (isCustom && isNumericValue(node.value)) {
       const parsed = parseFloat(valueDraft);
-      if (Number.isFinite(parsed) && parsed !== node.value) patch.value = parsed;
+      if (Number.isFinite(parsed) && parsed !== node.value.n) {
+        patch.value = numericValue(parsed, node.value.unitId);
+      }
     }
     if (Object.keys(patch).length > 0) {
       updateNode(id, patch);
@@ -103,7 +109,7 @@ function ConstantNodeViewImpl({ id }: Props): JSX.Element | null {
   const isSelected = selection.kind === 'node' && selection.id === id;
   const stateClass = 'is-focal';
 
-  const valueText = formatConstantValue(node.value);
+  const valueText = formatConstantValue(constantNumeric);
 
   return (
     <NodeFrame

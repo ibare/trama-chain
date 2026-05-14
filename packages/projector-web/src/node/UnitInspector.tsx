@@ -6,6 +6,8 @@ import { useCallback, useMemo, useState } from 'react';
 import {
   categoryLabels,
   defaultUnitCatalog,
+  isNumericValue,
+  numericValue,
   type UnitCategory,
   type UnitDef,
   type ValueNode,
@@ -34,7 +36,11 @@ export function UnitInspector({ node }: Props): JSX.Element {
   const { modelStore } = useTrama();
   const updateNode = modelStore((s) => s.updateNode);
 
-  const currentDef = defaultUnitCatalog.get(node.unitId);
+  // numeric ValueNode 전용 인스펙터. boolean ValueNode는 단위 개념이 없어 별도 패널이 필요.
+  const initialNumeric = isNumericValue(node.initialValue) ? node.initialValue : null;
+  const currentUnitId = initialNumeric?.unitId ?? 'free';
+  const currentInitialNumber = initialNumeric?.n ?? 0;
+  const currentDef = defaultUnitCatalog.get(currentUnitId);
   const unit = resolveNodeUnit(node);
 
   const categories = useMemo<UnitCategory[]>(() => {
@@ -55,14 +61,13 @@ export function UnitInspector({ node }: Props): JSX.Element {
   const onPickUnit = useCallback(
     (id: string) => {
       const def = defaultUnitCatalog.get(id);
-      if (!def || def.id === node.unitId) return;
+      if (!def || def.id === currentUnitId) return;
       updateNode(node.id, {
-        unitId: def.id,
         unitOverride: undefined,
-        initialValue: def.defaultInitial,
+        initialValue: numericValue(def.defaultInitial, def.id),
       });
     },
-    [node.id, node.unitId, updateNode],
+    [node.id, currentUnitId, updateNode],
   );
 
   const setRange = useCallback(
@@ -78,19 +83,22 @@ export function UnitInspector({ node }: Props): JSX.Element {
       const finalOverride = allDefault ? undefined : nextOverride;
       const newMin = nextOverride.min ?? currentDef.defaultMin;
       const newMax = nextOverride.max ?? currentDef.defaultMax;
-      const newInitial = Math.max(newMin, Math.min(node.initialValue, newMax));
-      updateNode(node.id, { unitOverride: finalOverride, initialValue: newInitial });
+      const newInitial = Math.max(newMin, Math.min(currentInitialNumber, newMax));
+      updateNode(node.id, {
+        unitOverride: finalOverride,
+        initialValue: numericValue(newInitial, currentUnitId),
+      });
     },
-    [currentDef, node.id, node.initialValue, node.unitOverride, updateNode],
+    [currentDef, currentInitialNumber, currentUnitId, node.id, node.unitOverride, updateNode],
   );
 
   const onReset = useCallback(() => {
     if (!currentDef) return;
     updateNode(node.id, {
       unitOverride: undefined,
-      initialValue: currentDef.defaultInitial,
+      initialValue: numericValue(currentDef.defaultInitial, currentUnitId),
     });
-  }, [currentDef, node.id, updateNode]);
+  }, [currentDef, currentUnitId, node.id, updateNode]);
 
   // 스킨이 적용된 동안엔 range editor를 숨긴다 — 스킨이 도메인 권위로 범위를 결정.
   const showRangeEditor =
@@ -107,14 +115,14 @@ export function UnitInspector({ node }: Props): JSX.Element {
       const def = skinCandidates.find((d) => d.key === key);
       if (!def) return;
       const r = def.domain.range;
-      const newInitial = Math.max(r.min, Math.min(node.initialValue, r.max));
+      const newInitial = Math.max(r.min, Math.min(currentInitialNumber, r.max));
       updateNode(node.id, {
         skin: { kind: def.key, params: {} },
         unitOverride: { min: r.min, max: r.max, step: r.step },
-        initialValue: newInitial,
+        initialValue: numericValue(newInitial, currentUnitId),
       });
     },
-    [node.id, node.initialValue, skinCandidates, updateNode],
+    [currentInitialNumber, currentUnitId, node.id, skinCandidates, updateNode],
   );
 
   const onClearSkin = useCallback(() => {
@@ -150,7 +158,7 @@ export function UnitInspector({ node }: Props): JSX.Element {
 
       <ToggleGroup.Root
         type="single"
-        value={node.unitId}
+        value={currentUnitId}
         onValueChange={(v) => v && onPickUnit(v)}
         aria-label="단위 종류"
         className="trama-unit-inspector-units"

@@ -8,6 +8,7 @@ import {
 import { createDefaultCombinerRegistry } from '../src/combiners/index.js';
 import { createDefaultShapeRegistry } from '../src/functions/index.js';
 import {
+  getNumericValue,
   initializeFromInitialValues,
   isOutputValid,
   propagateOneStep,
@@ -27,7 +28,7 @@ describe('ConstantNode', () => {
     let m = createEmptyModel();
     m = addConstantNode(m, { id: 'pi', label: 'π', value: Math.PI, constantKey: 'pi' });
     const s = initializeFromInitialValues(m);
-    expect(s.values.pi).toBe(Math.PI);
+    expect(getNumericValue(s, 'pi')).toBe(Math.PI);
     expect(isOutputValid(s, 'pi')).toBe(true);
   });
 
@@ -40,7 +41,7 @@ describe('ConstantNode', () => {
       // 타깃 단위가 작더라도 raw 9.81이 그대로 와야 한다.
       unitId: 'count',
       unitOverride: { min: 0, max: 1 },
-      initialValue: 0,
+      initialNumber: 0,
     });
     m = addEdge(m, {
       from: 'g',
@@ -51,7 +52,7 @@ describe('ConstantNode', () => {
       shapeRegistry: shapes,
       combinerRegistry: combiners,
     });
-    expect(s.values.out).toBeCloseTo(9.81);
+    expect(getNumericValue(s, 'out')).toBeCloseTo(9.81);
   });
 
   it('직렬화 라운드트립 — 상수 노드 보존', () => {
@@ -76,7 +77,10 @@ describe('ConstantNode', () => {
     const restored = round.nodes.pi;
     expect(restored?.kind).toBe('constant');
     if (restored && restored.kind === 'constant') {
-      expect(restored.value).toBe(Math.PI);
+      expect(restored.value.kind).toBe('numeric');
+      if (restored.value.kind === 'numeric') {
+        expect(restored.value.n).toBe(Math.PI);
+      }
       expect(restored.constantKey).toBe('pi');
       expect(restored.position).toEqual({ x: 100, y: 50 });
     }

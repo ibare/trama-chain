@@ -30,7 +30,7 @@ function buildModel() {
     label: '체중',
     unitId: 'kg',
     unitOverride: { min: 40, max: 110 },
-    initialValue: 70,
+    initialNumber: 70,
     position: { x: 540, y: 170 },
     combiner: 'sum',
     isFocal: true,
@@ -40,7 +40,7 @@ function buildModel() {
     label: '섭취량',
     unitId: 'count',
     unitOverride: { min: 0, max: 4000, suffix: 'kcal' },
-    initialValue: 2200,
+    initialNumber: 2200,
     position: { x: 200, y: 170 },
   });
   m = addEdge(m, {
@@ -173,7 +173,7 @@ describe('serialize / parse round-trip', () => {
       label: '잔액',
       unitId: 'krw',
       unitOverride: { min: 0, max: 30000000 },
-      initialValue: 10000000,
+      initialNumber: 10000000,
       position: { x: 400, y: 170 },
       combiner: 'sum',
       isFocal: true,
@@ -183,7 +183,7 @@ describe('serialize / parse round-trip', () => {
       label: '회당 결과',
       unitId: 'krw',
       unitOverride: { min: -1000000, max: 5000000 },
-      initialValue: 0,
+      initialNumber: 0,
       position: { x: 250, y: 170 },
     });
     m = addEdge(m, {

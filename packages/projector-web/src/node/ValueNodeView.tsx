@@ -1,6 +1,6 @@
 import { memo, useCallback, useEffect } from 'react';
 import { tokens } from '@trama/tokens';
-import { isValueNode, type NodeId } from '@trama/core';
+import { isNumericValue, isValueNode, type NodeId } from '@trama/core';
 import { useTrama } from '../store/index.js';
 import { resolveNodeUnit } from '../util/unit-resolver.js';
 import { useNodeLayout } from './use-node-layout.js';
@@ -27,8 +27,11 @@ function ValueNodeViewImpl({ id, incomingCount }: Props): JSX.Element | null {
   const node = modelStore((s) => s.model.nodes[id]);
   const currentValue = modelStore((s) => {
     const n = s.model.nodes[id];
-    const fallback = n && isValueNode(n) ? n.initialValue : 0;
-    return s.executionState.values[id] ?? fallback;
+    const fallbackVal =
+      n && isValueNode(n) && isNumericValue(n.initialValue) ? n.initialValue.n : 0;
+    const v = s.executionState.values[id];
+    if (v && isNumericValue(v)) return v.n;
+    return fallbackVal;
   });
 
   const updateNode = modelStore((s) => s.updateNode);

@@ -1,6 +1,6 @@
 import type { CombinerRegistry } from '../combiners/index.js';
-import type { Model } from '../model/index.js';
-import { isValueNode } from '../model/index.js';
+import type { Model, Value } from '../model/index.js';
+import { isNumericValue, isValueNode, numericValue } from '../model/index.js';
 import type { ShapeRegistry } from '../functions/index.js';
 import type { Rng } from '../functions/types.js';
 import {
@@ -54,7 +54,7 @@ export function propagateOneStep(
   const rng = options.rng ?? defaultRng;
   const catalog = options.unitCatalog ?? defaultUnitCatalog;
   const nodeKindRegistry = options.nodeKindRegistry ?? defaultNodeKindRegistry;
-  const next: Record<string, number> = { ...state.values };
+  const next: Record<string, Value> = { ...state.values };
   const validOutputs = new Set(state.validOutputs);
   const invalidReasons: ExecutionState['invalidReasons'] = {
     ...state.invalidReasons,
@@ -105,7 +105,7 @@ export function applyFeedbackEdges(
   if (topology.feedbackEdges.length === 0) return state;
   const catalog = options.unitCatalog ?? defaultUnitCatalog;
   const nodeKindRegistry = options.nodeKindRegistry ?? defaultNodeKindRegistry;
-  const next: Record<string, number> = { ...state.values };
+  const next: Record<string, Value> = { ...state.values };
   const validOutputs = new Set(state.validOutputs);
 
   const byTarget = new Map<string, number[]>();
@@ -117,10 +117,12 @@ export function applyFeedbackEdges(
     if (!canBeFeedbackTarget(target, nodeKindRegistry)) continue;
     const srcSlot = edge.sourceSlotIndex ?? 0;
     if (!validOutputs.has(outputKey(edge.from, srcSlot))) continue;
-    const sourceValue =
-      state.values[edge.from] ?? (isValueNode(source) ? source.initialValue : 0);
+    // numeric ValueNode가 1단계 유일의 feedback target. boolean Value source는 기여 불가.
+    const sourceVal =
+      state.values[edge.from] ?? (isValueNode(source) ? source.initialValue : undefined);
+    if (!sourceVal || sourceVal.kind !== 'numeric') continue;
     const list = byTarget.get(edge.to) ?? [];
-    list.push(sourceValue);
+    list.push(sourceVal.n);
     byTarget.set(edge.to, list);
     if (isRawOutputNode(source, nodeKindRegistry)) rawSourceTargets.add(edge.to);
   }
@@ -128,13 +130,17 @@ export function applyFeedbackEdges(
   for (const [tid, contribs] of byTarget) {
     const target = model.nodes[tid];
     if (!target || !isValueNode(target)) continue; // 현재 feedback target은 ValueNode뿐
+    if (!isNumericValue(target.initialValue)) continue; // numeric만 1단계 지원
     const combiner = options.combinerRegistry.get(target.combiner);
     if (!combiner) throw new MissingCombinerError(target.combiner);
-    const baseValue = next[tid] ?? target.initialValue;
-    const combined = combiner.combine([baseValue, ...contribs]);
-    next[tid] = rawSourceTargets.has(tid)
+    const baseVal = next[tid];
+    const baseNumber =
+      baseVal && baseVal.kind === 'numeric' ? baseVal.n : target.initialValue.n;
+    const combined = combiner.combine([baseNumber, ...contribs]);
+    const finalNumber = rawSourceTargets.has(tid)
       ? combined
       : clampToUnit(combined, getNodeOutputUnit(target, catalog, nodeKindRegistry));
+    next[tid] = numericValue(finalNumber, target.initialValue.unitId);
     validOutputs.add(outputKey(tid, 0));
   }
 

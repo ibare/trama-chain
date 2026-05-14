@@ -13,6 +13,7 @@ import { createDefaultCombinerRegistry } from '../src/combiners/index.js';
 import { createDefaultShapeRegistry } from '../src/functions/index.js';
 import type { ConditionOperator } from '../src/model/types.js';
 import {
+  getNumericValue,
   initializeFromInitialValues,
   isOutputValid,
   outputKey,
@@ -33,7 +34,7 @@ function setup(v: number, threshold: number, operator: ConditionOperator = '>') 
     label: 'V',
     unitId: 'count',
     unitOverride: { min: -100, max: 100 },
-    initialValue: v,
+    initialNumber: v,
   });
   m = addConditionNode(m, { id: 'c', label: '조건', operator, threshold });
   m = addEdge(m, {
@@ -52,7 +53,7 @@ describe('ConditionNode 게이트 시맨틱', () => {
       shapeRegistry: shapes,
       combinerRegistry: combiners,
     });
-    expect(s.values.c).toBe(7);
+    expect(getNumericValue(s, 'c')).toBe(7);
     expect(isOutputValid(s, 'c', 0)).toBe(true);
   });
 
@@ -112,7 +113,7 @@ describe('ConditionNode 게이트 시맨틱', () => {
       id: 'v',
       label: '무게',
       unitId: 'kg',
-      initialValue: 41.8,
+      initialNumber: 41.8,
     });
     m = addConditionNode(m, { id: 'c', label: '조건', operator: '!=', threshold: 0 });
     m = addEdge(m, {
@@ -126,7 +127,7 @@ describe('ConditionNode 게이트 시맨틱', () => {
       combinerRegistry: combiners,
     });
     expect(isOutputValid(s, 'c', 0)).toBe(true);
-    expect(s.values.c).toBe(41.8);
+    expect(getNumericValue(s, 'c')).toBe(41.8);
   });
 
   it('입력 미연결이면 출력 invalid', () => {
@@ -145,7 +146,7 @@ describe('ConditionNode 게이트 시맨틱', () => {
       id: 'out',
       label: '출력',
       unitId: 'raw',
-      initialValue: 0,
+      initialNumber: 0,
     });
     m = addEdge(m, {
       from: 'c',
@@ -156,14 +157,14 @@ describe('ConditionNode 게이트 시맨틱', () => {
       shapeRegistry: shapes,
       combinerRegistry: combiners,
     });
-    expect(s.values.out).toBe(7);
+    expect(getNumericValue(s, 'out')).toBe(7);
 
     let m2 = setup(2, 5, '>'); // 차단
     m2 = addValueNode(m2, {
       id: 'out',
       label: '출력',
       unitId: 'raw',
-      initialValue: 0,
+      initialNumber: 0,
     });
     m2 = addEdge(m2, {
       from: 'c',
@@ -174,7 +175,7 @@ describe('ConditionNode 게이트 시맨틱', () => {
       shapeRegistry: shapes,
       combinerRegistry: combiners,
     });
-    expect(s2.values.out).toBe(0);
+    expect(getNumericValue(s2, 'out')).toBe(0);
   });
 
   it('차단되면 다운스트림 ValueNode도 invalid (invalid 전파)', () => {
@@ -185,7 +186,7 @@ describe('ConditionNode 게이트 시맨틱', () => {
       id: 'out',
       label: '출력',
       unitId: 'raw',
-      initialValue: 0,
+      initialNumber: 0,
     });
     m = addEdge(m, {
       from: 'c',
@@ -208,13 +209,13 @@ describe('ConditionNode 게이트 시맨틱', () => {
       id: 'v1',
       label: 'V1',
       unitId: 'raw',
-      initialValue: 5,
+      initialNumber: 5,
     });
     m = addValueNode(m, {
       id: 'v2',
       label: 'V2',
       unitId: 'raw',
-      initialValue: 3,
+      initialNumber: 3,
     });
     m = addConditionNode(m, { id: 'c', label: '조건', operator: '>', threshold: 100 });
     m = addEdge(m, {
@@ -227,7 +228,7 @@ describe('ConditionNode 게이트 시맨틱', () => {
       id: 'sum',
       label: '합',
       unitId: 'raw',
-      initialValue: 0,
+      initialNumber: 0,
     });
     m = addEdge(m, {
       from: 'c',

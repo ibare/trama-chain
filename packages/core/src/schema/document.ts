@@ -18,14 +18,31 @@ export const NodeSkinSchema = z
   })
   .strict();
 
+/** numeric ValueKind — 수치 + 카탈로그 단위 키. */
+export const NumericValueSchema = z.object({
+  kind: z.literal('numeric'),
+  n: z.number(),
+  unitId: z.string(),
+});
+
+/** boolean ValueKind — 2값 신호. 단위 없음. */
+export const BooleanValueSchema = z.object({
+  kind: z.literal('boolean'),
+  b: z.boolean(),
+});
+
+/** Value sum type — 신호가 흐르는 모든 자리의 시멘틱 타입. */
+export const ValueSchema = z.discriminatedUnion('kind', [
+  NumericValueSchema,
+  BooleanValueSchema,
+]);
+
 export const ValueNodeSchema = z.object({
   kind: z.literal('value'),
   id: z.string(),
   label: z.string(),
-  /** 카탈로그 단위 키. 알 수 없는 키면 documentToModel에서 free로 폴백. */
-  unitId: z.string(),
   unitOverride: UnitOverrideSchema.optional(),
-  initialValue: z.number(),
+  initialValue: ValueSchema,
   position: z.object({ x: z.number(), y: z.number() }).nullable(),
   combiner: z.string(),
   isFocal: z.boolean(),
@@ -37,7 +54,7 @@ export const ConstantNodeSchema = z.object({
   kind: z.literal('constant'),
   id: z.string(),
   label: z.string(),
-  value: z.number(),
+  value: ValueSchema,
   /** 카탈로그 항목 식별자. 사용자 정의 임의 수면 비어 있다. */
   constantKey: z.string().optional(),
   position: z.object({ x: z.number(), y: z.number() }).nullable(),

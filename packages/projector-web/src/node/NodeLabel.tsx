@@ -65,9 +65,17 @@ export function NodeLabel({
     else onCancel();
   };
 
+  // text의 anchor 기준점(x)을 foreignObject·hit-rect의 좌상단 기준으로 변환.
+  // text는 textAnchor에 따라 x가 시작/중앙/끝을 의미하지만, foreignObject는
+  // 항상 좌상단이라 보정하지 않으면 'middle'/'end'에서 노드 밖으로 새어 나간다.
+  const boxX =
+    textAnchor === 'middle' ? x - width / 2 :
+    textAnchor === 'end' ? x - width :
+    x;
+
   if (isEditing) {
     return (
-      <foreignObject x={x} y={y - TEXT_BASELINE_TO_TOP} width={width} height={INPUT_HEIGHT}>
+      <foreignObject x={boxX} y={y - TEXT_BASELINE_TO_TOP} width={width} height={INPUT_HEIGHT}>
         <Form.Root onSubmit={(e) => e.preventDefault()}>
           <InlineSvgInput
             name="label"
@@ -91,7 +99,7 @@ export function NodeLabel({
       {onIsolatedDoubleClick && (
         <rect
           className="trama-node-label-hit"
-          x={x - TRIGGER_X_INSET}
+          x={boxX - TRIGGER_X_INSET}
           y={y - TEXT_BASELINE_TO_TOP}
           width={width}
           height={TRIGGER_HEIGHT}

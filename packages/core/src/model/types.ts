@@ -1,4 +1,5 @@
 import type { UnitOverride } from '../units/index.js';
+import type { Value } from './value.js';
 
 export type ModelId = string;
 export type NodeId = string;
@@ -17,15 +18,20 @@ export interface NodeSkin {
   params: Record<string, unknown>;
 }
 
+/**
+ * 값 노드 — 사용자가 시작값을 설정하고 입력에 따라 갱신되는 신호 노드.
+ * - `initialValue`: 신호 종류(Value sum type). 현재는 numeric만 지원하지만 보일러플레이트
+ *   분기 추가 없이 boolean·enum 등으로 확장될 수 있게 sum type을 통과시킨다.
+ * - 단위(unitId)는 numeric Value 안에 종속 — boolean·enum에는 단위 개념이 없다.
+ * - `unitOverride`는 카탈로그 기본값을 노드별로 좁힐 때만 채운다.
+ */
 export interface ValueNode {
   kind: 'value';
   id: NodeId;
   label: string;
-  /** 카탈로그 단위 키 (예: 'kg', 'rating-10', 'confidence'). */
-  unitId: string;
   /** 카탈로그 기본값을 노드별로 좁힐 때만 채운다. 비어 있으면 카탈로그 default. */
   unitOverride?: UnitOverride;
-  initialValue: number;
+  initialValue: Value;
   position: { x: number; y: number } | null;
   /** Combiner key, registered in CombinerRegistry */
   combiner: string;
@@ -36,16 +42,16 @@ export interface ValueNode {
 }
 
 /**
- * 상수 노드 — 사용자/카탈로그가 부여한 고정 수치.
- * - `value`: 실행 시 항상 사용되는 수치 (π·g 등 카탈로그 값 또는 사용자 임의 수).
+ * 상수 노드 — 사용자/카탈로그가 부여한 고정 값.
+ * - `value`: 실행 시 항상 사용되는 값 (π·g 등 카탈로그 값 또는 사용자 임의 수).
  * - `constantKey`: 카탈로그 항목 식별자. 사용자 정의 임의 수면 비어있다.
- * - 단위는 raw 통과 — 하류 ValueNode는 자동 단위 폴백.
+ * - 단위는 numeric Value 안에 종속 (raw 흐름이면 'free').
  */
 export interface ConstantNode {
   kind: 'constant';
   id: NodeId;
   label: string;
-  value: number;
+  value: Value;
   constantKey?: string;
   position: { x: number; y: number } | null;
   isFocal: boolean;

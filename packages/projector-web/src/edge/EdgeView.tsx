@@ -3,6 +3,7 @@ import { tokens } from '@trama/tokens';
 import {
   isConditionNode,
   isExpressionNode,
+  isNumericValue,
   isOutputValid,
   isValueNode,
   normalize,
@@ -84,8 +85,11 @@ function EdgeViewImpl({
   const srcValue = modelStore((s) => {
     if (!fromId) return 0;
     const n = s.model.nodes[fromId];
-    const fallback = n && isValueNode(n) ? n.initialValue : 0;
-    return s.executionState.values[fromId] ?? fallback;
+    const fallback =
+      n && isValueNode(n) && isNumericValue(n.initialValue) ? n.initialValue.n : 0;
+    const v = s.executionState.values[fromId];
+    if (v && isNumericValue(v)) return v.n;
+    return fallback;
   });
   // source 출력 슬롯이 현재 valid한가. condition 게이트가 닫히는 등으로 invalid가
   // 되면 target 끝을 소켓에서 풀어 케이블이 대롱대롱 늘어진 시각을 만든다.

@@ -202,7 +202,9 @@ function ConditionNodeViewImpl({ id }: Props): JSX.Element | null {
       </InteractiveArea>
 
       {editTarget === 'threshold' ? (
-        <foreignObject x={-18} y={-18} width={92} height={36}>
+        // 표시 텍스트("4 kg")가 x=4 textAnchor="start"에서 시작하므로 input 좌측 패딩을
+        // 보정해 같은 시각 위치에서 편집을 이어간다.
+        <foreignObject x={0} y={-13} width={70} height={26}>
           <Form.Root onSubmit={(e) => e.preventDefault()}>
             <InlineSvgInput
               name="threshold"
@@ -230,10 +232,10 @@ function ConditionNodeViewImpl({ id }: Props): JSX.Element | null {
           </text>
           <rect
             className="trama-condition-threshold-hit"
-            x={-18}
-            y={-18}
-            width={92}
-            height={36}
+            x={0}
+            y={-13}
+            width={70}
+            height={26}
             fill="transparent"
             onDoubleClick={onThresholdDoubleClick}
           />

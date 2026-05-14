@@ -1,5 +1,5 @@
 import { useCallback, useRef } from 'react';
-import type { ValueNode } from '@trama/core';
+import { isNumericValue, type ValueNode } from '@trama/core';
 import { useTrama } from '../store/index.js';
 import { resolveNodeUnit } from '../util/unit-resolver.js';
 
@@ -45,7 +45,9 @@ export function NodeBorderTrack({ node, halfW, trackY }: Props): JSX.Element | n
   const unit = resolveNodeUnit(node);
   const { min, max, step } = boundsForSlider(unit);
   const range = max - min;
-  const value = node.initialValue;
+  // boolean ValueNode는 트랙 슬라이더가 의미가 없어 트랙 자체를 그리지 않는다.
+  const numericInitial = isNumericValue(node.initialValue) ? node.initialValue.n : null;
+  const value = numericInitial ?? 0;
 
   const trackLen = 2 * halfW - 2 * TRACK_INSET;
   const trackLeft = -trackLen / 2;
@@ -67,9 +69,9 @@ export function NodeBorderTrack({ node, halfW, trackY }: Props): JSX.Element | n
       const dNorm = dxCanvas / trackLen;
       const raw = startValue + dNorm * range;
       const snapped = snap(clamp(raw, min, max), step);
-      if (snapped !== node.initialValue) scrubInitialValue(node.id, snapped);
+      if (snapped !== numericInitial) scrubInitialValue(node.id, snapped);
     },
-    [max, min, node.id, node.initialValue, range, scrubInitialValue, step, trackLen],
+    [max, min, node.id, numericInitial, range, scrubInitialValue, step, trackLen],
   );
 
   const onPointerDown = useCallback(
@@ -99,7 +101,7 @@ export function NodeBorderTrack({ node, halfW, trackY }: Props): JSX.Element | n
     dragRef.current = null;
   }, []);
 
-  if (range <= 0 || trackLen <= 0) return null;
+  if (numericInitial === null || range <= 0 || trackLen <= 0) return null;
 
   return (
     <g className="trama-node-track" pointerEvents="auto">

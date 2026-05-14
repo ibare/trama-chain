@@ -37,7 +37,9 @@ import type {
   Node,
   NodeId,
   NodePatch,
+  Value,
 } from '@trama/core';
+import { isNumericValue, isValueNode, numericValue } from '@trama/core';
 import { tokens } from '@trama/tokens';
 import { combinerRegistry, shapeRegistry } from './registries.js';
 import { fizzexExpressionEvaluator } from '../expression/fizzex-evaluator.js';
@@ -164,7 +166,7 @@ export function createModelStore({
       const slot = e.sourceSlotIndex ?? 0;
       if (!executionState.validOutputs.has(outputKey(sourceNodeId, slot))) continue;
       const sourceValue = executionState.values[sourceNodeId];
-      if (typeof sourceValue !== 'number') continue;
+      if (!sourceValue) continue;
       pulseRegistry.spawn({
         edgeId: eid,
         sourceNodeId,
@@ -218,7 +220,7 @@ export function createModelStore({
     }
 
     store.setState((s) => {
-      const newValues: Record<NodeId, number> = { ...s.executionState.values };
+      const newValues: Record<NodeId, Value> = { ...s.executionState.values };
       if (result.newValue !== undefined) newValues[pulse.targetNodeId] = result.newValue;
       return {
         executionState: {
@@ -330,15 +332,15 @@ export function createModelStore({
 
       if (simpleValue && !playbackActive) {
         const recomputed = computeExecutionState(after);
-        const nextNodeValue =
-          'value' in patch && typeof patch.value === 'number'
-            ? patch.value
-            : 'initialValue' in patch && typeof patch.initialValue === 'number'
-              ? patch.initialValue
+        const nextNodeValue: Value | undefined =
+          'value' in patch && patch.value && typeof patch.value === 'object' && 'kind' in patch.value
+            ? (patch.value as Value)
+            : 'initialValue' in patch && patch.initialValue
+              ? (patch.initialValue as Value)
               : undefined;
         set((s) => {
-          const newValues: Record<NodeId, number> = { ...s.executionState.values };
-          if (typeof nextNodeValue === 'number') newValues[id] = nextNodeValue;
+          const newValues: Record<NodeId, Value> = { ...s.executionState.values };
+          if (nextNodeValue) newValues[id] = nextNodeValue;
           const newValid = new Set(s.executionState.validOutputs);
           newValid.add(outputKey(id, 0));
           return {
@@ -445,14 +447,18 @@ export function createModelStore({
 
     scrubInitialValue: (id, nextValue) => {
       const before = get().model;
-      const after = updateNodeOp(before, id, { initialValue: nextValue });
+      const node = before.nodes[id];
+      // 스크럽은 numeric ValueNode 전용 — boolean은 토글 UI라 별도 경로를 가질 예정.
+      if (!node || !isValueNode(node) || !isNumericValue(node.initialValue)) return;
+      const nextNumeric = numericValue(nextValue, node.initialValue.unitId);
+      const after = updateNodeOp(before, id, { initialValue: nextNumeric });
       if (after === before) return;
       const recomputed = computeExecutionState(after);
       const playbackActive = get().playbackStep !== null;
       set((s) => {
-        const nextValues: Record<NodeId, number> = playbackActive
+        const nextValues: Record<NodeId, Value> = playbackActive
           ? s.executionState.values
-          : { ...s.executionState.values, [id]: nextValue };
+          : { ...s.executionState.values, [id]: nextNumeric };
         const nextValid = playbackActive
           ? s.executionState.validOutputs
           : new Set(s.executionState.validOutputs);

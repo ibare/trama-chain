@@ -1,4 +1,4 @@
-import type { Model, NodeId } from '../model/index.js';
+import type { Model, NodeId, Value } from '../model/index.js';
 import type { EvalDiagnosis } from './expression-evaluator.js';
 import { defaultNodeKindRegistry, type NodeKindRegistry } from './kinds.js';
 
@@ -15,7 +15,7 @@ import { defaultNodeKindRegistry, type NodeKindRegistry } from './kinds.js';
  * 영향이 없다.
  */
 export interface ExecutionState {
-  values: Record<NodeId, number>;
+  values: Record<NodeId, Value>;
   validOutputs: Set<string>;
   invalidReasons: Record<NodeId, EvalDiagnosis & { ok: false }>;
 }
@@ -29,7 +29,7 @@ export function initializeFromInitialValues(
   model: Model,
   registry: NodeKindRegistry = defaultNodeKindRegistry,
 ): ExecutionState {
-  const values: Record<NodeId, number> = {};
+  const values: Record<NodeId, Value> = {};
   const validOutputs = new Set<string>();
   for (const nid of model.nodeOrder) {
     const node = model.nodes[nid];
@@ -37,14 +37,25 @@ export function initializeFromInitialValues(
     const desc = registry.forNode(node);
     if (!desc) continue;
     const v = desc.initialValue(node);
-    if (typeof v === 'number') values[nid] = v;
+    if (v !== undefined) values[nid] = v;
     if (desc.initialValid(node)) validOutputs.add(outputKey(nid, 0));
   }
   return { values, validOutputs, invalidReasons: {} };
 }
 
-export function getNodeValue(state: ExecutionState, id: NodeId): number {
-  return state.values[id] ?? 0;
+/**
+ * 노드 값 조회. 미기록이면 undefined — 호출자가 직접 분기해야 한다.
+ * 과거 number 폴백(0)은 ValueKind 모호성을 만들기 때문에 제거.
+ */
+export function getNodeValue(state: ExecutionState, id: NodeId): Value | undefined {
+  return state.values[id];
+}
+
+/** 노드의 numeric 값. boolean Value거나 미기록이면 undefined. */
+export function getNumericValue(state: ExecutionState, id: NodeId): number | undefined {
+  const v = state.values[id];
+  if (!v || v.kind !== 'numeric') return undefined;
+  return v.n;
 }
 
 /** 슬롯 단위 유효성 조회. */

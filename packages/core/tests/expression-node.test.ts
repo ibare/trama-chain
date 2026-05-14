@@ -8,6 +8,7 @@ import {
 import { createDefaultCombinerRegistry } from '../src/combiners/index.js';
 import { createDefaultShapeRegistry } from '../src/functions/index.js';
 import {
+  getNumericValue,
   initializeFromInitialValues,
   isOutputValid,
   propagateOneStep,
@@ -59,14 +60,14 @@ function setupSum() {
     label: 'A',
     unitId: 'count',
     unitOverride: { min: -100, max: 100 },
-    initialValue: 3,
+    initialNumber: 3,
   });
   m = addValueNode(m, {
     id: 'b',
     label: 'B',
     unitId: 'count',
     unitOverride: { min: -100, max: 100 },
-    initialValue: 5,
+    initialNumber: 5,
   });
   m = addExpressionNode(m, {
     id: 'e',
@@ -97,7 +98,7 @@ describe('ExpressionNode propagation', () => {
       combinerRegistry: combiners,
       expressionEvaluator: stubEvaluator,
     });
-    expect(s.values['e']).toBe(8);
+    expect(getNumericValue(s, 'e')).toBe(8);
     expect(isOutputValid(s, 'e', 0)).toBe(true);
     expect(s.invalidReasons['e']).toBeUndefined();
   });
@@ -141,7 +142,7 @@ describe('ExpressionNode propagation', () => {
       combinerRegistry: combiners,
       expressionEvaluator: stubEvaluator,
     });
-    expect(s.values['k']).toBe(42);
+    expect(getNumericValue(s, 'k')).toBe(42);
     expect(isOutputValid(s, 'k', 0)).toBe(true);
     expect(s.invalidReasons['k']).toBeUndefined();
   });

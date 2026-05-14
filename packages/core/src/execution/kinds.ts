@@ -1,8 +1,8 @@
 import type { CombinerRegistry } from '../combiners/index.js';
 import type { ShapeRegistry } from '../functions/index.js';
 import type { Rng } from '../functions/types.js';
-import type { Edge, Model, Node, NodeId } from '../model/index.js';
-import { isValueNode } from '../model/index.js';
+import type { Edge, Model, Node, NodeId, Value } from '../model/index.js';
+import { isValueNode, isNumericValue, numericValue } from '../model/index.js';
 import {
   clamp01,
   clampToUnit,
@@ -15,6 +15,25 @@ import {
 import { MissingCombinerError, MissingShapeError } from './errors.js';
 import type { EvalDiagnosis, ExpressionEvaluator } from './expression-evaluator.js';
 import { outputKey } from './state.js';
+
+/**
+ * propagate 컨텍스트에서 source 노드의 현재 numeric value를 꺼낸다.
+ * - ctx.next에 기록돼 있으면 그것 (Value sum type 중 numeric만 인정).
+ * - 없으면 ValueNode의 initialValue에서 폴백.
+ * - boolean Value거나 미기록이면 undefined — caller가 skip해야 한다.
+ */
+function getNumericNext(ctx: PropagateContext, id: NodeId): number | undefined {
+  const v = ctx.next[id];
+  if (v) {
+    if (v.kind === 'numeric') return v.n;
+    return undefined;
+  }
+  const source = ctx.model.nodes[id];
+  if (source && isValueNode(source) && isNumericValue(source.initialValue)) {
+    return source.initialValue.n;
+  }
+  return undefined;
+}
 
 /**
  * 단위가 명시되지 않은 raw 출력 노드(상수·조건 게이트·식)의 폴백.
@@ -53,7 +72,7 @@ export function isIdentityShape(edge: Edge): boolean {
 export interface PropagateContext {
   model: Model;
   incoming: ReadonlyArray<Edge>;
-  next: Record<NodeId, number>;
+  next: Record<NodeId, Value>;
   validOutputs: Set<string>;
   /**
    * 노드별 마지막 실패 사유 (UI invalid 배지/툴팁 노출용).
@@ -75,8 +94,8 @@ export interface PropagateContext {
  */
 export interface NodeKindDescriptor<N extends Node = Node> {
   kind: N['kind'];
-  /** 초기 state.values에 기록할 값. undefined면 미기록(propagate 단계에서 채움). */
-  initialValue(node: N): number | undefined;
+  /** 초기 state.values에 기록할 Value. undefined면 미기록(propagate 단계에서 채움). */
+  initialValue(node: N): Value | undefined;
   /** 초기 validOutputs(슬롯 0)에 포함시킬지. 단출력 노드 전제. */
   initialValid(node: N): boolean;
   /** 이 노드의 출력 단위. raw 통과(outputsRaw=true)여도 시각화·클램프 폴백용으로 의미가 있다. */
@@ -140,13 +159,18 @@ const valueNodeDescriptor: NodeKindDescriptor<Extract<Node, { kind: 'value' }>> 
   initialValue: (node) => node.initialValue,
   initialValid: () => true,
   outputUnit: (node, catalog) => {
-    const def = catalog.get(node.unitId);
+    // 단위는 numeric Value 안에 종속 — boolean ValueNode는 단위 없음.
+    if (!isNumericValue(node.initialValue)) return FREE_FALLBACK;
+    const def = catalog.get(node.initialValue.unitId);
     if (!def) return FREE_FALLBACK;
     return resolveUnit(def, node.unitOverride);
   },
   propagate: (node, ctx) => {
     const incoming = ctx.incoming;
     if (incoming.length === 0) return; // 입력 없음: 기존 값 유지
+
+    // 1단계는 numeric ValueNode만 지원 — boolean ValueNode는 5단계에서 별도 descriptor로.
+    if (!isNumericValue(node.initialValue)) return;
 
     const combiner = ctx.combinerRegistry.get(node.combiner);
     if (!combiner) throw new MissingCombinerError(node.combiner);
@@ -163,8 +187,10 @@ const valueNodeDescriptor: NodeKindDescriptor<Extract<Node, { kind: 'value' }>> 
       const source = ctx.model.nodes[edge.from];
       if (!source) continue;
       if (!isEdgeSourceValid(ctx, edge)) continue;
-      const sourceValue =
-        ctx.next[edge.from] ?? (isValueNode(source) ? source.initialValue : 0);
+      const sourceValue = getNumericNext(ctx, edge.from);
+      // boolean source 또는 미기록은 numeric ValueNode에 기여하지 않음.
+      // (PortType 검사는 3단계에서 도입되어 이런 연결을 차단한다.)
+      if (sourceValue === undefined) continue;
       const sourceDesc = ctx.nodeKindRegistry.forNode(source);
 
       // raw-output source + identity shape: 단위 정보가 없으니 값 그대로 흘림.
@@ -194,7 +220,8 @@ const valueNodeDescriptor: NodeKindDescriptor<Extract<Node, { kind: 'value' }>> 
     }
     const combined = combiner.combine(contributions);
     // raw passthrough가 섞이면 target clamp 건너뜀(단위 미정의 의미 보존).
-    ctx.next[node.id] = hasRawPassthrough ? combined : clampToUnit(combined, targetUnit);
+    const finalNumber = hasRawPassthrough ? combined : clampToUnit(combined, targetUnit);
+    ctx.next[node.id] = numericValue(finalNumber, node.initialValue.unitId);
     ctx.validOutputs.add(outputKey(node.id, 0));
   },
 };
@@ -238,6 +265,7 @@ const conditionNodeDescriptor: NodeKindDescriptor<
   outputUnit: () => FREE_FALLBACK,
   propagate: (node, ctx) => {
     let value: number | undefined;
+    let valueObj: Value | undefined;
     for (const edge of ctx.incoming) {
       // 단일 슬롯 게이트 — slotIndex가 명시되지 않은 엣지(undefined)는 슬롯 0으로
       // 간주한다. 명시된 경우엔 0만 허용.
@@ -246,8 +274,12 @@ const conditionNodeDescriptor: NodeKindDescriptor<
       const source = ctx.model.nodes[edge.from];
       if (!source) continue;
       if (!isEdgeSourceValid(ctx, edge)) continue;
-      value =
-        ctx.next[edge.from] ?? (isValueNode(source) ? source.initialValue : 0);
+      // 조건 노드는 numeric 비교 — boolean source는 입력으로 받지 않음(PortType 검사가
+      // 3단계에서 막는다). 1단계에선 boolean이 들어오면 skip.
+      const n = getNumericNext(ctx, edge.from);
+      if (n === undefined) continue;
+      value = n;
+      valueObj = ctx.next[edge.from] ?? (isValueNode(source) ? source.initialValue : undefined);
       break;
     }
 
@@ -281,7 +313,11 @@ const conditionNodeDescriptor: NodeKindDescriptor<
     }
 
     if (cond) {
-      ctx.next[node.id] = value;
+      // raw passthrough — 입력 numeric Value를 그대로 흘려보낸다.
+      // valueObj가 있으면 그대로, 없으면 'free' 단위로 wrap.
+      ctx.next[node.id] = valueObj && valueObj.kind === 'numeric'
+        ? valueObj
+        : numericValue(value, 'free');
       ctx.validOutputs.add(outputKey(node.id, 0));
     } else {
       ctx.validOutputs.delete(outputKey(node.id, 0));
@@ -313,7 +349,7 @@ const expressionNodeDescriptor: NodeKindDescriptor<
       // 변수가 없는 상수식 — diagnose로 평가하여 실패 사유까지 적재.
       const diag = ctx.expressionEvaluator.diagnose(node.latex, {});
       if (diag.ok && Number.isFinite(diag.value)) {
-        ctx.next[node.id] = diag.value;
+        ctx.next[node.id] = numericValue(diag.value, 'free');
         ctx.validOutputs.add(outputKey(node.id, 0));
         delete ctx.invalidReasons[node.id];
       } else {
@@ -325,9 +361,11 @@ const expressionNodeDescriptor: NodeKindDescriptor<
       return;
     }
 
+    // fizzex는 numeric 전용 — boolean Value 변수는 invalid로 거부.
     const bindings: Record<string, number> = {};
     const filled = new Array<boolean>(arity).fill(false);
     const missing: string[] = [];
+    let booleanBindingVar: string | undefined;
 
     for (const edge of ctx.incoming) {
       const slot = edge.slotIndex;
@@ -336,12 +374,28 @@ const expressionNodeDescriptor: NodeKindDescriptor<
       const source = ctx.model.nodes[edge.from];
       if (!source) continue;
       if (!isEdgeSourceValid(ctx, edge)) continue;
-      const value =
-        ctx.next[edge.from] ?? (isValueNode(source) ? source.initialValue : 0);
+      const sourceV = ctx.next[edge.from] ?? (isValueNode(source) ? source.initialValue : undefined);
+      if (!sourceV) continue;
       const varName = node.variables[slot];
       if (typeof varName !== 'string') continue;
-      bindings[varName] = value;
+      if (sourceV.kind === 'boolean') {
+        // boolean 입력은 fizzex가 처리하지 못함 — 식 노드를 invalid로.
+        booleanBindingVar = varName;
+        break;
+      }
+      bindings[varName] = sourceV.n;
       filled[slot] = true;
+    }
+
+    if (booleanBindingVar !== undefined) {
+      ctx.validOutputs.delete(outputKey(node.id, 0));
+      ctx.invalidReasons[node.id] = {
+        ok: false,
+        status: 'unsupported',
+        variable: booleanBindingVar,
+        reason: `boolean 입력은 식에 사용 불가: ${booleanBindingVar}`,
+      };
+      return;
     }
 
     if (!filled.every((f) => f)) {
@@ -369,7 +423,7 @@ const expressionNodeDescriptor: NodeKindDescriptor<
         : diag;
       return;
     }
-    ctx.next[node.id] = diag.value;
+    ctx.next[node.id] = numericValue(diag.value, 'free');
     ctx.validOutputs.add(outputKey(node.id, 0));
     delete ctx.invalidReasons[node.id];
   },

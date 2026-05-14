@@ -29,7 +29,7 @@ export function InsertNodeHandler(): null {
     const node = addNode({
       label: '새 변수',
       unitId: 'rating-10',
-      initialValue: 5,
+      initialNumber: 5,
       position: intent.position,
     });
     addEdge({

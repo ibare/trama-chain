@@ -1,4 +1,4 @@
-import type { EdgeId, NodeId } from '@trama/core';
+import type { EdgeId, NodeId, Value } from '@trama/core';
 import { tokens } from '@trama/tokens';
 import type { AnimationLoop } from '../canvas/animation-loop.js';
 import type { PulseSettingsStore } from '../store/pulse-settings.js';
@@ -18,7 +18,7 @@ export interface Pulse {
   sourceSlotIndex: number;
   targetNodeId: NodeId;
   /** spawn 시점에 박제. 도착 후 target 재계산 시 이 source의 출력으로 사용. */
-  sourceValue: number;
+  sourceValue: Value;
   /** performance.now() 기준 spawn 시각. */
   startTime: number;
   /** spawn 시점에 (BASE_TRAVEL_MS * multiplier)로 박제. */
@@ -30,7 +30,7 @@ export interface PulseSpawnArgs {
   sourceNodeId: NodeId;
   sourceSlotIndex: number;
   targetNodeId: NodeId;
-  sourceValue: number;
+  sourceValue: Value;
 }
 
 export type ArrivalHandler = (pulse: Pulse) => void;

@@ -1,5 +1,10 @@
 import { describe, expect, it } from 'vitest';
-import { addValueNode, createEmptyModel, updateNode } from '../src/model/index.js';
+import {
+  addValueNode,
+  createEmptyModel,
+  numericValue,
+  updateNode,
+} from '../src/model/index.js';
 import { OperationLog } from '../src/history/index.js';
 
 describe('OperationLog', () => {
@@ -10,7 +15,7 @@ describe('OperationLog', () => {
       id: 'a',
       label: 'A',
       unitId: 'free',
-      initialValue: 0,
+      initialNumber: 0,
     });
     log.record({ kind: 'add-node', label: '노드 추가', before: m0, after: m1 });
     expect(log.canUndo()).toBe(true);
@@ -24,11 +29,11 @@ describe('OperationLog', () => {
     const log = new OperationLog();
     let m = createEmptyModel(0);
     const m0 = m;
-    m = addValueNode(m, { id: 'a', label: 'A', unitId: 'free', initialValue: 0 });
+    m = addValueNode(m, { id: 'a', label: 'A', unitId: 'free', initialNumber: 0 });
     const m1 = m;
     log.record({ kind: 'add-node', label: 'add', before: m0, after: m1 });
 
-    const m2 = updateNode(m1, 'a', { initialValue: 0.5 });
+    const m2 = updateNode(m1, 'a', { initialValue: numericValue(0.5, 'free') });
     log.coalesceWithLast({
       kind: 'scrub-value',
       label: 'scrub',
@@ -50,7 +55,7 @@ describe('OperationLog', () => {
     });
     expect(log.depth().undo).toBe(2);
 
-    const m3 = updateNode(m2, 'a', { initialValue: 0.8 });
+    const m3 = updateNode(m2, 'a', { initialValue: numericValue(0.8, 'free') });
     const ok = log.coalesceWithLast({
       kind: 'scrub-value',
       label: 'scrub',
@@ -67,7 +72,7 @@ describe('OperationLog', () => {
   it('record clears redo stack', () => {
     const log = new OperationLog();
     const m0 = createEmptyModel(0);
-    const m1 = addValueNode(m0, { id: 'a', label: 'A', unitId: 'free', initialValue: 0 });
+    const m1 = addValueNode(m0, { id: 'a', label: 'A', unitId: 'free', initialNumber: 0 });
     log.record({ kind: 'add-node', label: 'add', before: m0, after: m1 });
     log.undo();
     expect(log.canRedo()).toBe(true);

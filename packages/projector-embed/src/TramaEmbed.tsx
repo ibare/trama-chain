@@ -4,6 +4,7 @@ import {
   defaultUnitCatalog,
   documentToModel,
   initializeFromInitialValues,
+  isNumericValue,
   isValueNode,
   normalize,
   parseTrama,
@@ -13,6 +14,7 @@ import {
   type Node,
   type NodeId,
   type ResolvedUnit,
+  type Value,
   type ValueNode,
 } from '@trama/core';
 import { combinerRegistry, shapeRegistry } from './registries.js';
@@ -32,13 +34,15 @@ const FREE_FALLBACK: ResolvedUnit = {
 
 function resolveNodeUnit(node: Node): ResolvedUnit {
   if (!isValueNode(node)) return FREE_FALLBACK;
-  const def = defaultUnitCatalog.get(node.unitId);
+  if (!isNumericValue(node.initialValue)) return FREE_FALLBACK;
+  const def = defaultUnitCatalog.get(node.initialValue.unitId);
   if (!def) return FREE_FALLBACK;
   return resolveUnit(def, node.unitOverride);
 }
 
-function valueNodeInitial(node: Node): number {
-  return isValueNode(node) ? node.initialValue : 0;
+function valueAsNumber(v: Value | undefined): number {
+  if (!v || !isNumericValue(v)) return 0;
+  return v.n;
 }
 
 const CARD_CORNER = parseFloat(tokens.spacing.cardCornerRadius);
@@ -150,7 +154,10 @@ export function TramaEmbed({ json, height = 360, showQuestion = true }: Props): 
 
           const { d, tip, tangent, mid } = staticEdgePath(start, end, { lag: edge.lag });
 
-          const srcValue = values[edge.from] ?? valueNodeInitial(fromNode);
+          const srcRaw =
+            values[edge.from] ??
+            (isValueNode(fromNode) ? fromNode.initialValue : undefined);
+          const srcValue = valueAsNumber(srcRaw);
           const srcNorm = normalize(srcValue, resolveNodeUnit(fromNode));
           const isFeedback = edge.lag === 1;
           const isStrained = srcNorm < STRAINED_LOW || srcNorm > STRAINED_HIGH;
@@ -177,7 +184,7 @@ export function TramaEmbed({ json, height = 360, showQuestion = true }: Props): 
           const node = model.nodes[nid];
           if (!node || !isValueNode(node)) return null; // embed는 ValueNode만 렌더
           const layout = layouts[nid]!;
-          const v = values[nid] ?? node.initialValue;
+          const v = valueAsNumber(values[nid] ?? node.initialValue);
           return <StaticNode key={nid} node={node} layout={layout} currentValue={v} />;
         })}
       </svg>

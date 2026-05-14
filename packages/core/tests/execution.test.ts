@@ -12,6 +12,7 @@ import {
   InstantaneousCycleError,
   buildTopology,
   executeModel,
+  getNumericValue,
   initializeFromInitialValues,
   propagateOneStep,
 } from '../src/execution/index.js';
@@ -34,9 +35,9 @@ function numberUnit(min: number, max: number, suffix = '') {
 describe('topology', () => {
   it('orders simple chain', () => {
     let m = createEmptyModel();
-    m = addValueNode(m, { id: 'a', label: 'A', ...numberUnit(0, 10), initialValue: 0 });
-    m = addValueNode(m, { id: 'b', label: 'B', ...numberUnit(0, 10), initialValue: 0 });
-    m = addValueNode(m, { id: 'c', label: 'C', ...numberUnit(0, 10), initialValue: 0 });
+    m = addValueNode(m, { id: 'a', label: 'A', ...numberUnit(0, 10), initialNumber: 0 });
+    m = addValueNode(m, { id: 'b', label: 'B', ...numberUnit(0, 10), initialNumber: 0 });
+    m = addValueNode(m, { id: 'c', label: 'C', ...numberUnit(0, 10), initialNumber: 0 });
     m = addEdge(m, { from: 'a', to: 'b', shape: { kind: 'linear', params: { slope: 1, offset: 0 } } });
     m = addEdge(m, { from: 'b', to: 'c', shape: { kind: 'linear', params: { slope: 1, offset: 0 } } });
     const t = buildTopology(m);
@@ -45,8 +46,8 @@ describe('topology', () => {
 
   it('throws on instantaneous cycle', () => {
     let m = createEmptyModel();
-    m = addValueNode(m, { id: 'a', label: 'A', ...numberUnit(0, 10), initialValue: 0 });
-    m = addValueNode(m, { id: 'b', label: 'B', ...numberUnit(0, 10), initialValue: 0 });
+    m = addValueNode(m, { id: 'a', label: 'A', ...numberUnit(0, 10), initialNumber: 0 });
+    m = addValueNode(m, { id: 'b', label: 'B', ...numberUnit(0, 10), initialNumber: 0 });
     m = addEdge(m, { from: 'a', to: 'b', shape: { kind: 'linear', params: { slope: 1, offset: 0 } } });
     m = addEdge(m, { from: 'b', to: 'a', shape: { kind: 'linear', params: { slope: 1, offset: 0 } } });
     expect(() => buildTopology(m)).toThrow(InstantaneousCycleError);
@@ -54,8 +55,8 @@ describe('topology', () => {
 
   it('allows feedback (lag=1) cycle without error', () => {
     let m = createEmptyModel();
-    m = addValueNode(m, { id: 'a', label: 'A', ...numberUnit(0, 10), initialValue: 0 });
-    m = addValueNode(m, { id: 'b', label: 'B', ...numberUnit(0, 10), initialValue: 0 });
+    m = addValueNode(m, { id: 'a', label: 'A', ...numberUnit(0, 10), initialNumber: 0 });
+    m = addValueNode(m, { id: 'b', label: 'B', ...numberUnit(0, 10), initialNumber: 0 });
     m = addEdge(m, { from: 'a', to: 'b', shape: { kind: 'linear', params: { slope: 1, offset: 0 } } });
     m = addEdge(m, {
       from: 'b',
@@ -70,8 +71,8 @@ describe('topology', () => {
 describe('propagateOneStep', () => {
   it('linear chain propagates', () => {
     let m = createEmptyModel();
-    m = addValueNode(m, { id: 'a', label: 'A', ...numberUnit(0, 100), initialValue: 50 });
-    m = addValueNode(m, { id: 'b', label: 'B', ...numberUnit(0, 100), initialValue: 0 });
+    m = addValueNode(m, { id: 'a', label: 'A', ...numberUnit(0, 100), initialNumber: 50 });
+    m = addValueNode(m, { id: 'b', label: 'B', ...numberUnit(0, 100), initialNumber: 0 });
     m = addEdge(m, {
       from: 'a',
       to: 'b',
@@ -82,18 +83,18 @@ describe('propagateOneStep', () => {
       combinerRegistry: combiners,
     });
     // 50/100 = 0.5 → linear(0.5) = 0.5 → denorm to [0,100] = 50
-    expect(state.values.b).toBeCloseTo(50);
+    expect(getNumericValue(state, 'b')).toBeCloseTo(50);
   });
 
   it('sum combiner combines multiple inputs', () => {
     let m = createEmptyModel();
-    m = addValueNode(m, { id: 'a', label: 'A', ...numberUnit(0, 10), initialValue: 5 });
-    m = addValueNode(m, { id: 'b', label: 'B', ...numberUnit(0, 10), initialValue: 3 });
+    m = addValueNode(m, { id: 'a', label: 'A', ...numberUnit(0, 10), initialNumber: 5 });
+    m = addValueNode(m, { id: 'b', label: 'B', ...numberUnit(0, 10), initialNumber: 3 });
     m = addValueNode(m, {
       id: 'c',
       label: 'C',
       ...numberUnit(0, 20),
-      initialValue: 0,
+      initialNumber: 0,
       combiner: 'sum',
     });
     m = addEdge(m, { from: 'a', to: 'c', shape: { kind: 'linear', params: { slope: 1, offset: 0 } } });
@@ -105,13 +106,13 @@ describe('propagateOneStep', () => {
     // a contrib: norm 0.5 → linear → 0.5 → denorm [0,20] = 10
     // b contrib: norm 0.3 → linear → 0.3 → denorm [0,20] = 6
     // sum = 16
-    expect(state.values.c).toBeCloseTo(16);
+    expect(getNumericValue(state, 'c')).toBeCloseTo(16);
   });
 
   it('inverted edge flips output', () => {
     let m = createEmptyModel();
-    m = addValueNode(m, { id: 'a', label: 'A', ...numberUnit(0, 10), initialValue: 8 });
-    m = addValueNode(m, { id: 'b', label: 'B', ...numberUnit(0, 10), initialValue: 0 });
+    m = addValueNode(m, { id: 'a', label: 'A', ...numberUnit(0, 10), initialNumber: 8 });
+    m = addValueNode(m, { id: 'b', label: 'B', ...numberUnit(0, 10), initialNumber: 0 });
     m = addEdge(m, {
       from: 'a',
       to: 'b',
@@ -123,7 +124,7 @@ describe('propagateOneStep', () => {
       combinerRegistry: combiners,
     });
     // 0.8 → 1 - 0.8 = 0.2 → 2
-    expect(state.values.b).toBeCloseTo(2);
+    expect(getNumericValue(state, 'b')).toBeCloseTo(2);
   });
 });
 
@@ -134,14 +135,14 @@ describe('executeModel (N-step)', () => {
       id: 'balance',
       label: '잔액',
       ...numberUnit(0, 10000),
-      initialValue: 1000,
+      initialNumber: 1000,
       combiner: 'sum',
     });
     m = addValueNode(m, {
       id: 'interest',
       label: '이자',
       ...numberUnit(0, 1000),
-      initialValue: 0,
+      initialNumber: 0,
     });
     // interest = 0.1 * balance (slope 0.1)
     m = addEdge(m, {
@@ -165,7 +166,7 @@ describe('executeModel (N-step)', () => {
     // traj[0] = initial, traj[1] propagation 후, ...
     expect(traj.length).toBeGreaterThanOrEqual(4);
     // 잔액이 시간이 갈수록 증가 (10% 복리)
-    const finalBalance = traj[traj.length - 1]!.values.balance;
+    const finalBalance = getNumericValue(traj[traj.length - 1]!, 'balance');
     expect(finalBalance).toBeGreaterThan(1000);
   });
 
@@ -183,8 +184,8 @@ describe('executeModel (N-step)', () => {
       combinerRegistry: combiners,
       rng: mulberry32(42),
     });
-    const f1 = r1[r1.length - 1]!.values.balance;
-    const f2 = r2[r2.length - 1]!.values.balance;
+    const f1 = getNumericValue(r1[r1.length - 1]!, 'balance');
+    const f2 = getNumericValue(r2[r2.length - 1]!, 'balance');
     expect(f1).toBe(f2);
 
     const r3 = executeModel(m, {
@@ -192,7 +193,7 @@ describe('executeModel (N-step)', () => {
       combinerRegistry: combiners,
       rng: mulberry32(43),
     });
-    const f3 = r3[r3.length - 1]!.values.balance;
+    const f3 = getNumericValue(r3[r3.length - 1]!, 'balance');
     expect(f3).not.toBe(f1);
   });
 });
@@ -203,20 +204,20 @@ function stochasticSlotModel(): Model {
     id: 'balance',
     label: '잔액',
     ...numberUnit(0, 30000000, 'krw'),
-    initialValue: 10000000,
+    initialNumber: 10000000,
     combiner: 'sum',
   });
   m = addValueNode(m, {
     id: 'bet',
     label: '회당 베팅',
     ...numberUnit(10000, 1000000, 'krw'),
-    initialValue: 50000,
+    initialNumber: 50000,
   });
   m = addValueNode(m, {
     id: 'outcome',
     label: '회당 결과',
     ...numberUnit(-1000000, 5000000, 'krw'),
-    initialValue: 0,
+    initialNumber: 0,
   });
   m = addEdge(m, {
     from: 'bet',

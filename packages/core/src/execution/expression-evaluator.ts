@@ -2,6 +2,10 @@
  * ExpressionNode 전파에 필요한 동기 평가자 인터페이스.
  * core 패키지는 fizzex 같은 수식 파서에 직접 의존하지 않기 위해
  * 이 인터페이스만 노출하고, 실제 구현체는 호출 측(projector-web 등)에서 주입한다.
+ *
+ * **타입 도메인**: numeric 전용. 변수 바인딩은 raw number로만 들어온다.
+ * boolean Value 입력은 식 노드 디스크립터(kinds.ts)에서 evaluator 호출 *이전에*
+ * unsupported 진단으로 거부된다 — 이 인터페이스는 boolean을 모른다.
  */
 
 /** 식이 요구하는 자유변수와 등장하는 수학 상수. */

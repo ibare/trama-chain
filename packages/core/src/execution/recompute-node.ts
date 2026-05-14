@@ -1,7 +1,7 @@
 import type { CombinerRegistry } from '../combiners/index.js';
 import type { ShapeRegistry } from '../functions/index.js';
 import type { Rng } from '../functions/types.js';
-import type { Model, NodeId } from '../model/index.js';
+import type { Model, NodeId, Value } from '../model/index.js';
 import { defaultUnitCatalog, type UnitCatalog } from '../units/index.js';
 import {
   defaultNodeKindRegistry,
@@ -30,12 +30,12 @@ export interface RecomputeNodeOptions {
    * snapshot 값을 해당 source의 출력으로 간주하기 위함. 다른 입력은
    * 현재 state 그대로 사용.
    */
-  sourceValueOverrides?: Readonly<Record<NodeId, number>>;
+  sourceValueOverrides?: Readonly<Record<NodeId, Value>>;
 }
 
 export interface RecomputeNodeResult {
   /** 재계산 후의 새 target 값. validOutputs에서 빠진 경우 undefined. */
-  newValue: number | undefined;
+  newValue: Value | undefined;
   /** 단출력 노드 기준 슬롯 0의 valid 여부. */
   isValid: boolean;
   /** 갱신된 validOutputs 집합 (조건 노드 등 다출력 케이스 포함). */
@@ -83,7 +83,7 @@ export function recomputeNode(
   const incoming = topology.incomingByTarget.get(nodeId) ?? [];
 
   // 작업용 카피. 디스크립터가 mutate해도 caller의 state는 건드리지 않음.
-  const workingValues: Record<NodeId, number> = { ...state.values };
+  const workingValues: Record<NodeId, Value> = { ...state.values };
   const workingValid = new Set(state.validOutputs);
   const workingInvalidReasons: ExecutionState['invalidReasons'] = {
     ...state.invalidReasons,
