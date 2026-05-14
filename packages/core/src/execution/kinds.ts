@@ -1,7 +1,7 @@
 import type { CombinerRegistry } from '../combiners/index.js';
 import type { ShapeRegistry } from '../functions/index.js';
 import type { Rng } from '../functions/types.js';
-import type { Edge, Model, Node, NodeId, Value } from '../model/index.js';
+import type { Edge, Model, Node, NodeId, Value, ValueKind } from '../model/index.js';
 import { isValueNode, isNumericValue, numericValue } from '../model/index.js';
 import {
   clamp01,
@@ -101,6 +101,14 @@ export interface NodeKindDescriptor<N extends Node = Node> {
   /** 이 노드의 출력 단위. raw 통과(outputsRaw=true)여도 시각화·클램프 폴백용으로 의미가 있다. */
   outputUnit(node: N, catalog: UnitCatalog): ResolvedUnit;
   /**
+   * 이 노드의 입력 PortType. null이면 이 노드는 입력을 받지 않는다
+   * (예: Constant). 현재는 노드 전체가 단일 PortType — 슬롯별 분기 필요해지면
+   * 별도 슬롯 인자 시그니처로 확장한다.
+   */
+  inputPortType(node: N): ValueKind | null;
+  /** 이 노드 출력의 PortType. 단출력 전제. */
+  outputPortType(node: N): ValueKind;
+  /**
    * 이 노드를 source로 두는 엣지가 raw passthrough인지.
    * true면 ValueNode 타깃의 normalize/shape/denormalize 파이프라인이 우회되고
    * 타깃의 단위 클램프도 건너뛴다 (예: 함수 결과 1760이 cm[0..250]에 짓이겨지지 않게).
@@ -158,6 +166,10 @@ const valueNodeDescriptor: NodeKindDescriptor<Extract<Node, { kind: 'value' }>> 
   canBeFeedbackTarget: true,
   initialValue: (node) => node.initialValue,
   initialValid: () => true,
+  // ValueNode의 PortType은 initialValue의 kind 그대로 — boolean ValueNode가
+  // 추가되어도 동일 디스크립터에서 분기된다. propagate 로직은 5단계에서 분기 강화.
+  inputPortType: (node) => node.initialValue.kind,
+  outputPortType: (node) => node.initialValue.kind,
   outputUnit: (node, catalog) => {
     // 단위는 numeric Value 안에 종속 — boolean ValueNode는 단위 없음.
     if (!isNumericValue(node.initialValue)) return FREE_FALLBACK;
@@ -234,6 +246,9 @@ const constantNodeDescriptor: NodeKindDescriptor<Extract<Node, { kind: 'constant
   canBeFeedbackTarget: false,
   initialValue: (node) => node.value,
   initialValid: () => true,
+  // 상수는 입력을 받지 않는다 — addEdge가 target=Constant 엣지를 거부.
+  inputPortType: () => null,
+  outputPortType: (node) => node.value.kind,
   outputUnit: () => FREE_FALLBACK,
   // 상수는 incoming을 받지 않는다 — 초기값으로 결정되고 매 step 동일.
   // 슬롯/엣지를 통한 입력이 있더라도 무시하고 자기 value를 유지한다.
@@ -264,6 +279,10 @@ const conditionNodeDescriptor: NodeKindDescriptor<
   canBeFeedbackTarget: false,
   initialValue: () => undefined,
   initialValid: () => false,
+  // 조건 게이트는 numeric을 비교 — boolean 입력은 ComparisonNode(7단계)로.
+  // 출력은 입력 numeric의 raw passthrough.
+  inputPortType: () => 'numeric',
+  outputPortType: () => 'numeric',
   outputUnit: () => FREE_FALLBACK,
   propagate: (node, ctx) => {
     let value: number | undefined;
@@ -344,6 +363,9 @@ const expressionNodeDescriptor: NodeKindDescriptor<
   canBeFeedbackTarget: false,
   initialValue: () => undefined,
   initialValid: () => false,
+  // fizzex는 numeric 전용 — boolean 변수는 propagate에서도 거부된다.
+  inputPortType: () => 'numeric',
+  outputPortType: () => 'numeric',
   outputUnit: () => FREE_FALLBACK,
   propagate: (node, ctx) => {
     const arity = node.variables.length;
@@ -473,4 +495,62 @@ export function canBeFeedbackTarget(
   registry: NodeKindRegistry = defaultNodeKindRegistry,
 ): boolean {
   return registry.forNode(node)?.canBeFeedbackTarget ?? false;
+}
+
+/**
+ * 노드의 입력 PortType. null이면 입력을 받지 않는다.
+ * 미등록 종류는 null로 안전 폴백.
+ */
+export function getInputPortType(
+  node: Node,
+  registry: NodeKindRegistry = defaultNodeKindRegistry,
+): ValueKind | null {
+  return registry.forNode(node)?.inputPortType(node) ?? null;
+}
+
+/**
+ * 노드의 출력 PortType. 미등록 종류는 'numeric'으로 안전 폴백 —
+ * 1단계 호환성 검사가 통과하도록.
+ */
+export function getOutputPortType(
+  node: Node,
+  registry: NodeKindRegistry = defaultNodeKindRegistry,
+): ValueKind {
+  return registry.forNode(node)?.outputPortType(node) ?? 'numeric';
+}
+
+export type EdgeCompatibility =
+  | { compatible: true }
+  | { compatible: false; reason: string };
+
+/**
+ * source → target 엣지의 PortType 호환성을 본다.
+ *
+ * 검사 항목:
+ *  1. target이 입력을 받지 않는 종류면 거부 (Constant 등)
+ *  2. source의 outputPortType과 target의 inputPortType이 다르면 거부
+ *
+ * 자동 변환은 없다 — numeric을 boolean으로(또는 그 반대) 흘리려면
+ * 명시적 노드(ComparisonNode 등)를 끼워야 한다.
+ */
+export function checkEdgeCompatibility(
+  source: Node,
+  target: Node,
+  registry: NodeKindRegistry = defaultNodeKindRegistry,
+): EdgeCompatibility {
+  const targetIn = getInputPortType(target, registry);
+  if (targetIn === null) {
+    return {
+      compatible: false,
+      reason: `target node "${target.kind}" does not accept inputs`,
+    };
+  }
+  const sourceOut = getOutputPortType(source, registry);
+  if (sourceOut !== targetIn) {
+    return {
+      compatible: false,
+      reason: `port type mismatch: source outputs "${sourceOut}", target expects "${targetIn}"`,
+    };
+  }
+  return { compatible: true };
 }
