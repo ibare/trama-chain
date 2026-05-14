@@ -13,6 +13,8 @@ import { shapeRegistry } from '../store/registries.js';
 import { getNodeLayout } from '../node/box.js';
 import { getConditionalNodeLayout } from '../node/conditional-box.js';
 import { slotColor } from '../node/slot-palette.js';
+import { useExpressionMeasureStore } from '../expression/expression-measure-store.js';
+import type { FizzexMeasure } from '../expression/use-fizzex-renderer.js';
 import { resolveNodeUnit } from '../util/unit-resolver.js';
 import { type Point } from './geometry.js';
 import { registerEdgeHandle, type EdgeHandle } from '../canvas/drag-registry.js';
@@ -104,14 +106,23 @@ function EdgeViewImpl({
     return undefined;
   }, [edge]);
 
+  // 식 노드는 fizzex 렌더 후 측정값으로 폭·높이가 동적으로 변한다. 핀 좌표도 따라가야
+  // 하므로 ExpressionNodeView가 store에 흘려둔 측정값을 그대로 받아 layout 계산에 쓴다.
+  const fromMeasure = useExpressionMeasureStore((s) =>
+    fromNode && isExpressionNode(fromNode) ? s.measures[fromNode.id] : undefined,
+  );
+  const toMeasure = useExpressionMeasureStore((s) =>
+    toNode && isExpressionNode(toNode) ? s.measures[toNode.id] : undefined,
+  );
+
   // 노드 종류에 맞는 끝점 좌표. baseStart/baseEnd가 변하면 케이블의 endpoint도 따라옴.
   const edgeSourceSlotIndex = edge?.sourceSlotIndex;
   const baseStart: Point = useMemo(() => {
     if (!fromNode) return { x: 0, y: 0 };
     const base = fromNode.position ?? { x: 0, y: 0 };
-    const socket = rightOutputSocket(fromNode, fromIncomingCount, edgeSourceSlotIndex);
+    const socket = rightOutputSocket(fromNode, fromIncomingCount, edgeSourceSlotIndex, fromMeasure);
     return { x: base.x + socket.x, y: base.y + socket.y };
-  }, [fromNode, fromIncomingCount, edgeSourceSlotIndex]);
+  }, [fromNode, fromIncomingCount, edgeSourceSlotIndex, fromMeasure]);
 
   const edgeSlotIndex = edge?.slotIndex;
   // 슬롯 인식 노드(조건·식)는 model에 저장된 edge.slotIndex가 진실. 그 외(ValueNode
@@ -124,9 +135,9 @@ function EdgeViewImpl({
   const baseEnd: Point = useMemo(() => {
     if (!toNode) return { x: 0, y: 0 };
     const base = toNode.position ?? { x: 0, y: 0 };
-    const socket = leftInputSocket(toNode, toIncomingCount, effectiveSocket);
+    const socket = leftInputSocket(toNode, toIncomingCount, effectiveSocket, toMeasure);
     return { x: base.x + socket.x, y: base.y + socket.y };
-  }, [toNode, toIncomingCount, effectiveSocket]);
+  }, [toNode, toIncomingCount, effectiveSocket, toMeasure]);
 
   // 케이블 인스턴스 — 한 번 생성. baseStart/baseEnd는 첫 프레임 초기값으로만 사용하고
   // 이후엔 liveEndpointsRef를 통해 매 프레임 갱신된다.
@@ -395,6 +406,7 @@ function rightOutputSocket(
   node: Node,
   fromIncomingCount: number,
   sourceSlotIndex?: number,
+  measure?: FizzexMeasure,
 ): Point {
   if (isConditionalNode(node)) {
     const layout = getConditionalNodeLayout();
@@ -402,19 +414,30 @@ function rightOutputSocket(
     const s = layout.outputSockets[idx]!;
     return { x: s.x, y: s.y };
   }
-  const layout = getNodeLayout(node, { incomingCount: fromIncomingCount });
+  const layout = getNodeLayout(node, {
+    incomingCount: fromIncomingCount,
+    expressionSize: measure,
+  });
   return layout.rightPin.sockets[0] ?? { x: 0, y: 0 };
 }
 
 /** 노드 종류에 맞는 좌측(입력) 소켓 좌표 — 노드 중심 기준. */
-function leftInputSocket(node: Node, toIncomingCount: number, socketIndex: number): Point {
+function leftInputSocket(
+  node: Node,
+  toIncomingCount: number,
+  socketIndex: number,
+  measure?: FizzexMeasure,
+): Point {
   if (isConditionalNode(node)) {
     const layout = getConditionalNodeLayout();
     const idx = socketIndex === 1 ? 1 : 0;
     const s = layout.inputSockets[idx]!;
     return { x: s.x, y: s.y };
   }
-  const layout = getNodeLayout(node, { incomingCount: toIncomingCount });
+  const layout = getNodeLayout(node, {
+    incomingCount: toIncomingCount,
+    expressionSize: measure,
+  });
   return (
     layout.leftPin.sockets[Math.max(0, socketIndex)] ??
     layout.leftPin.sockets[0] ?? { x: 0, y: 0 }

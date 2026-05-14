@@ -11,6 +11,7 @@ import {
   useFizzexRenderer,
   type FizzexMeasure,
 } from '../expression/use-fizzex-renderer.js';
+import { useExpressionMeasureStore } from '../expression/expression-measure-store.js';
 import { NodeFrame } from './NodeFrame.js';
 import { Socket } from './Socket.js';
 import {
@@ -63,12 +64,21 @@ function ExpressionNodeViewImpl({ id }: Props): JSX.Element | null {
   // fizzex가 측정한 식의 픽셀 폭·높이. 측정 전이면 null — getNodeLayout이
   // fallback 크기 사용. 측정 후 setState로 리렌더되며 노드 bbox가 적정 크기로 펴짐.
   const [measured, setMeasured] = useState<FizzexMeasure | null>(null);
-  const onMeasure = useCallback((size: FizzexMeasure) => {
-    setMeasured((prev) => {
-      if (prev && prev.width === size.width && prev.height === size.height) return prev;
-      return size;
-    });
-  }, []);
+  const setStoreMeasure = useExpressionMeasureStore((s) => s.setMeasure);
+  const clearStoreMeasure = useExpressionMeasureStore((s) => s.clearMeasure);
+  const onMeasure = useCallback(
+    (size: FizzexMeasure) => {
+      setMeasured((prev) => {
+        if (prev && prev.width === size.width && prev.height === size.height) return prev;
+        return size;
+      });
+      // EdgeView가 핀 좌표를 정확히 계산하려면 동일한 측정값이 필요 — store에 흘려둔다.
+      setStoreMeasure(id, size);
+    },
+    [id, setStoreMeasure],
+  );
+  // 노드가 언마운트되면 측정값 기록 제거 — stale 측정값으로 EdgeView가 잘못 계산하지 않도록.
+  useEffect(() => () => clearStoreMeasure(id), [id, clearStoreMeasure]);
 
   // 입력 슬롯 등록 — 변수 갯수만큼. 좌표는 공통 box.ts 레이아웃을 그대로 사용해
   // EdgeView가 부르는 좌표와 어긋나지 않게 단일 출처로 둔다.
