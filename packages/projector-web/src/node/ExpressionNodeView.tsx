@@ -263,20 +263,34 @@ function ExpressionNodeViewImpl({ id }: Props): JSX.Element | null {
         );
       })}
 
-      {/* 우측 출력 — valid일 때만 */}
-      {isValid && (
-        <>
-          <Socket cx={outSocket.x} cy={outSocket.y} connected={outputConnected} />
-          <circle
-            className="trama-node-socket-hit"
-            cx={outSocket.x}
-            cy={outSocket.y}
-            r={Math.max(SOCKET_SIZE, 12)}
-            onPointerDown={onSocketPointerDown}
-            onPointerUp={onSocketPointerUp}
+      {/* 우측 출력 — 항상 노출. invalid일 땐 X 마크로 평가 불가를 알린다. 호버 시
+          노드 전체 <title>에 사유가 뜨고, 드래그 시작은 onSocketPointerDown에서
+          isValid 가드로 차단된다. */}
+      <Socket cx={outSocket.x} cy={outSocket.y} connected={outputConnected} />
+      {!isValid && (
+        <g className="trama-socket-invalid-mark" pointerEvents="none">
+          <line
+            x1={outSocket.x - 4}
+            y1={outSocket.y - 4}
+            x2={outSocket.x + 4}
+            y2={outSocket.y + 4}
           />
-        </>
+          <line
+            x1={outSocket.x - 4}
+            y1={outSocket.y + 4}
+            x2={outSocket.x + 4}
+            y2={outSocket.y - 4}
+          />
+        </g>
       )}
+      <circle
+        className={`trama-node-socket-hit${isValid ? '' : ' is-invalid'}`}
+        cx={outSocket.x}
+        cy={outSocket.y}
+        r={Math.max(SOCKET_SIZE, 12)}
+        onPointerDown={onSocketPointerDown}
+        onPointerUp={onSocketPointerUp}
+      />
     </NodeFrame>
   );
 }

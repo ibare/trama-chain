@@ -180,6 +180,17 @@
   cursor: crosshair;
 }
 
+[data-trama-root] .trama-node-socket-hit.is-invalid {
+  cursor: not-allowed;
+}
+
+/* 평가 불가 소켓에 그려지는 X 마크 — 출력은 노출되어 있지만 값이 안 흐름을 알린다. */
+[data-trama-root] .trama-socket-invalid-mark line {
+  stroke: var(--color-edge-strained);
+  stroke-width: 1.5px;
+  stroke-linecap: round;
+}
+
 /* Combiner 칩 ------------------------------------------------------- */
 [data-trama-root] .trama-node-combiner {
   fill: var(--color-combiner-fill);
