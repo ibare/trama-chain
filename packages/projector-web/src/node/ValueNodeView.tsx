@@ -1,5 +1,4 @@
-import { memo, Suspense, useCallback, useEffect, useState } from 'react';
-import * as Form from '@radix-ui/react-form';
+import { memo, Suspense, useCallback, useEffect } from 'react';
 import { tokens } from '@trama/tokens';
 import { isValueNode, type NodeId } from '@trama/core';
 import { useTrama } from '../store/index.js';
@@ -9,6 +8,7 @@ import { resolveNodeUnit } from '../util/unit-resolver.js';
 import { getNodeLayout } from './box.js';
 import { NodeBorderTrack } from './NodeBorderTrack.js';
 import { NodeFrame } from './NodeFrame.js';
+import { NodeLabel } from './NodeLabel.js';
 import { InteractiveArea } from './InteractiveArea.js';
 import { Socket } from './Socket.js';
 import { useOutputConnected } from './use-socket-connections.js';
@@ -74,7 +74,6 @@ function ValueNodeViewImpl({ id, incomingCount }: Props): JSX.Element | null {
     return false;
   });
 
-  const labelDraftSeed = node?.label ?? '';
   const pos = node?.position ?? { x: 200, y: 200 };
 
   // 인라인 편집 중에는 drag 시작을 막아 input 포커스가 끊기지 않게.
@@ -117,20 +116,14 @@ function ValueNodeViewImpl({ id, incomingCount }: Props): JSX.Element | null {
     completeEdgeDraft(instance, { dropScreen: { x: e.clientX, y: e.clientY } });
   }, [instance]);
 
-  const [nameDraft, setNameDraft] = useState(labelDraftSeed);
-  useEffect(() => {
-    if (editingNodeId === id && node) setNameDraft(node.label);
-  }, [editingNodeId, id, node]);
-
-  const commitName = useCallback(() => {
-    if (!node) {
+  const commitLabel = useCallback(
+    (next: string) => {
+      if (node && next !== node.label) updateNode(id, { label: next });
       setEditingNode(null);
-      return;
-    }
-    const v = nameDraft.trim();
-    if (v && v !== node.label) updateNode(id, { label: v });
-    setEditingNode(null);
-  }, [id, nameDraft, node, setEditingNode, updateNode]);
+    },
+    [id, node, setEditingNode, updateNode],
+  );
+  const cancelLabel = useCallback(() => setEditingNode(null), [setEditingNode]);
 
   if (!node) return null;
   if (!isValueNode(node)) return null;
@@ -214,40 +207,15 @@ function ValueNodeViewImpl({ id, incomingCount }: Props): JSX.Element | null {
             rx={CARD_CORNER}
             ry={CARD_CORNER}
           />
-          {editingNodeId === id ? (
-            <foreignObject
-              x={layout.textX}
-              y={layout.labelY - 14}
-              width={width - (layout.textX - -halfW) * 2}
-              height={26}
-            >
-              <Form.Root onSubmit={(e) => e.preventDefault()}>
-                <Form.Field name="label">
-                  <Form.Control
-                    className="trama-node-name-input"
-                    value={nameDraft}
-                    autoFocus
-                    onChange={(e) => setNameDraft(e.currentTarget.value)}
-                    onBlur={commitName}
-                    onKeyDown={(e) => {
-                      if (e.key === 'Enter') commitName();
-                      if (e.key === 'Escape') setEditingNode(null);
-                    }}
-                    onPointerDown={(e) => e.stopPropagation()}
-                  />
-                </Form.Field>
-              </Form.Root>
-            </foreignObject>
-          ) : (
-            <text
-              className="trama-node-label"
-              x={layout.textX}
-              y={layout.labelY}
-              textAnchor="start"
-            >
-              {node.label}
-            </text>
-          )}
+          <NodeLabel
+            text={node.label}
+            x={layout.textX}
+            y={layout.labelY}
+            width={width - (layout.textX - -halfW) * 2}
+            isEditing={editingNodeId === id}
+            onCommit={commitLabel}
+            onCancel={cancelLabel}
+          />
 
           <text
             className="trama-node-value"

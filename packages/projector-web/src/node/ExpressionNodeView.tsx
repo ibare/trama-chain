@@ -19,6 +19,7 @@ import {
 } from '../expression/use-fizzex-renderer.js';
 import { useExpressionMeasureStore } from '../expression/expression-measure-store.js';
 import { NodeFrame } from './NodeFrame.js';
+import { NodeLabel } from './NodeLabel.js';
 import { Socket } from './Socket.js';
 import {
   useInputConnectionMask,
@@ -178,9 +179,24 @@ function ExpressionNodeViewImpl({ id }: Props): JSX.Element | null {
     [editingNodeId, id],
   );
 
+  // 라벨(타이틀)과 식 본체는 별개의 인라인 편집기. 어느 쪽을 열었는지는 로컬 상태로
+  // 추적 — uiStore의 editingNodeId는 "이 노드가 편집 중이다"만 전달하고, 어느 영역
+  // 편집인지는 노드 내부 관심사.
+  const [editTarget, setEditTarget] = useState<'label' | 'latex'>('latex');
+
   const onBodyDoubleClick = useCallback(() => {
+    setEditTarget('latex');
     setEditingNode(id);
   }, [id, setEditingNode]);
+
+  const onLabelDoubleClick = useCallback(
+    (e: React.MouseEvent) => {
+      e.stopPropagation();
+      setEditTarget('label');
+      setEditingNode(id);
+    },
+    [id, setEditingNode],
+  );
 
   const onSocketPointerDown = useCallback(
     (e: React.PointerEvent<SVGCircleElement>) => {
@@ -215,7 +231,7 @@ function ExpressionNodeViewImpl({ id }: Props): JSX.Element | null {
   const editorStateRef = useRef<FizzexEditorState | null>(null);
   const [editorInitialState, setEditorInitialState] = useState<FizzexEditorState | null>(null);
   useEffect(() => {
-    if (editingNodeId === id) {
+    if (editingNodeId === id && editTarget === 'latex') {
       const initial = createStateFromLatex(latex);
       editorStateRef.current = initial;
       setEditorInitialState(initial);
@@ -223,7 +239,7 @@ function ExpressionNodeViewImpl({ id }: Props): JSX.Element | null {
       editorStateRef.current = null;
       setEditorInitialState(null);
     }
-  }, [editingNodeId, id, latex]);
+  }, [editingNodeId, editTarget, id, latex]);
 
   const commitLatex = useCallback(() => {
     if (!node || !isExpressionNode(node)) {
@@ -238,6 +254,16 @@ function ExpressionNodeViewImpl({ id }: Props): JSX.Element | null {
     }
     setEditingNode(null);
   }, [id, node, setEditingNode, updateNode]);
+
+  // 라벨(타이틀) 인라인 편집은 NodeLabel 컴포넌트가 담당. 여기선 커밋·취소 콜백만 제공.
+  const commitLabel = useCallback(
+    (next: string) => {
+      if (node && next !== node.label) updateNode(id, { label: next });
+      setEditingNode(null);
+    },
+    [id, node, setEditingNode, updateNode],
+  );
+  const cancelLabel = useCallback(() => setEditingNode(null), [setEditingNode]);
 
   // fizzex Canvas 렌더러를 host div의 마운트 라이프타임에 묶는다.
   // 편집/뷰 토글로 div가 remount되어도 callback ref가 새 view를 부착·재렌더.
@@ -263,6 +289,8 @@ function ExpressionNodeViewImpl({ id }: Props): JSX.Element | null {
   const isSelected = selection.kind === 'node' && selection.id === id;
   const stateClass = isValid ? 'is-calm' : 'is-low';
   const isEditing = editingNodeId === id;
+  const isEditingLabel = isEditing && editTarget === 'label';
+  const isEditingLatex = isEditing && editTarget === 'latex';
 
   // 수식 본체 영역 — box.ts가 변수 거터·좌우 인셋을 반영해 계산해준다.
   // 측정 전이거나 fallback이면 expressionBody가 null이 될 수 없도록 box.ts에서
@@ -297,11 +325,18 @@ function ExpressionNodeViewImpl({ id }: Props): JSX.Element | null {
         rx={CARD_CORNER}
         ry={CARD_CORNER}
       />
-      <text className="trama-node-label" x={textX} y={labelY} textAnchor="start">
-        {node.label}
-      </text>
+      <NodeLabel
+        text={node.label}
+        x={textX}
+        y={labelY}
+        width={width - (textX - -halfW) * 2}
+        isEditing={isEditingLabel}
+        onCommit={commitLabel}
+        onCancel={cancelLabel}
+        onIsolatedDoubleClick={onLabelDoubleClick}
+      />
 
-      {isEditing && editorInitialState ? (
+      {isEditingLatex && editorInitialState ? (
         <foreignObject x={body.x} y={body.y} width={body.w} height={body.h}>
           <EditorHost
             onCommit={commitLatex}
