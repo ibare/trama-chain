@@ -16,11 +16,6 @@ interface Props {
   height: number;
   /** 추가 root className. 노드별 hook 클래스(예: 'trama-conditional-node') 부착용. */
   className?: string;
-  /**
-   * drag 시작을 막을 조건. true 반환 시 drag 진행, false면 무시.
-   * (예: ValueNode가 인라인 편집 중일 때 false로 잠금)
-   */
-  canStartDrag?: () => boolean;
   /** body 빈 영역 더블클릭. (예: 인라인 편집 진입) */
   onBodyDoubleClick?: (e: React.MouseEvent<SVGRectElement>) => void;
   children: ReactNode;
@@ -48,13 +43,16 @@ function NodeFrameImpl({
   width,
   height,
   className,
-  canStartDrag,
   onBodyDoubleClick,
   children,
 }: Props): JSX.Element {
   const { modelStore, uiStore, viewport, dragRegistry } = useTrama();
   const selectNode = uiStore((s) => s.selectNode);
   const updateNode = modelStore((s) => s.updateNode);
+  // 이 노드가 인라인 편집 중이면 drag 시작을 막아 input 포커스가 끊기지 않게 한다.
+  // 노드 뷰가 콜백으로 따로 전달하지 않아도 NodeFrame이 단일 출처로 강제 — 편집
+  // 상태와 드래그 차단의 일관성 계약을 모든 노드에 동일하게 적용.
+  const isEditing = uiStore((s) => s.editingNodeId === id);
 
   const outerGRef = useRef<SVGGElement | null>(null);
   useEffect(() => {
@@ -77,7 +75,7 @@ function NodeFrameImpl({
 
   const onPointerDown = useCallback(
     (e: React.PointerEvent<SVGGElement>) => {
-      if (canStartDrag && !canStartDrag()) return;
+      if (isEditing) return;
       const readOnly = uiStore.getState().readOnly;
       // readOnly에서도 노드 클릭 선택은 허용(셀렉션 = 비파괴 인터랙션). 드래그만 차단.
       e.stopPropagation();
@@ -98,7 +96,7 @@ function NodeFrameImpl({
         incidents: dragRegistry.getIncidentEdgeHandles(id),
       };
     },
-    [canStartDrag, dragRegistry, id, pos.x, pos.y, selectNode, uiStore, viewport],
+    [dragRegistry, id, isEditing, pos.x, pos.y, selectNode, uiStore, viewport],
   );
 
   const onPointerMove = useCallback(

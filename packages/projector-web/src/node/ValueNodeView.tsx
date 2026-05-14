@@ -76,9 +76,6 @@ function ValueNodeViewImpl({ id, incomingCount }: Props): JSX.Element | null {
   const pos = node?.position ?? { x: 200, y: 200 };
   const layout = useNodeLayout(node, { incomingCount });
 
-  // 인라인 편집 중에는 drag 시작을 막아 input 포커스가 끊기지 않게.
-  const canStartDrag = useCallback(() => editingNodeId !== id, [editingNodeId, id]);
-
   const onBodyDoubleClick = useCallback(() => {
     setEditingNode(id);
   }, [id, setEditingNode]);
@@ -150,7 +147,6 @@ function ValueNodeViewImpl({ id, incomingCount }: Props): JSX.Element | null {
       pos={pos}
       width={width}
       height={height}
-      canStartDrag={canStartDrag}
       onBodyDoubleClick={onBodyDoubleClick}
     >
       {hasSkin && SkinLazy ? (

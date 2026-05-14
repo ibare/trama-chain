@@ -45,9 +45,6 @@ function ConstantNodeViewImpl({ id }: Props): JSX.Element | null {
   const valueDraftSeed = node && isConstantNode(node) ? node.value : 0;
   const isCustom = node && isConstantNode(node) && (node.constantKey ?? '') === 'custom';
 
-  // 인라인 편집 중에는 drag 시작을 막아 input 포커스가 끊기지 않게.
-  const canStartDrag = useCallback(() => editingNodeId !== id, [editingNodeId, id]);
-
   // 사용자 정의 임의 수에 한해, 본체 더블클릭으로 수치 인라인 편집 진입.
   // 카탈로그 상수(π·g 등)는 값이 고정 의미라 편집 불가 — 라벨만 편집.
   const onBodyDoubleClick = useCallback(() => {
@@ -112,7 +109,6 @@ function ConstantNodeViewImpl({ id }: Props): JSX.Element | null {
       width={CARD_W}
       height={CARD_H}
       className="trama-constant-node"
-      canStartDrag={canStartDrag}
       onBodyDoubleClick={onBodyDoubleClick}
     >
       <rect

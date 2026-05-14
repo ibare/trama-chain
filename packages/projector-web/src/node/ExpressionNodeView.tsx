@@ -174,11 +174,6 @@ function ExpressionNodeViewImpl({ id }: Props): JSX.Element | null {
     return () => unregs.forEach((u) => u());
   }, [id, layout, node, socketRegistry]);
 
-  const canStartDrag = useCallback(
-    () => editingNodeId !== id,
-    [editingNodeId, id],
-  );
-
   // 라벨(타이틀)과 식 본체는 별개의 인라인 편집기. 어느 쪽을 열었는지는 로컬 상태로
   // 추적 — uiStore의 editingNodeId는 "이 노드가 편집 중이다"만 전달하고, 어느 영역
   // 편집인지는 노드 내부 관심사.
@@ -292,7 +287,6 @@ function ExpressionNodeViewImpl({ id }: Props): JSX.Element | null {
       width={width}
       height={height}
       className={`trama-expression-node${isValid ? '' : ' is-invalid'}`}
-      canStartDrag={canStartDrag}
       onBodyDoubleClick={onBodyDoubleClick}
     >
       {!isValid && invalidReason ? (
