@@ -94,7 +94,7 @@ function ConstantNodeViewImpl({ id }: Props): JSX.Element | null {
       if (Number.isFinite(parsed) && parsed !== node.value) patch.value = parsed;
     }
     if (Object.keys(patch).length > 0) {
-      updateNode(id, patch, 'update-node', '상수 편집');
+      updateNode(id, patch);
     }
     setEditingNode(null);
   }, [id, isCustom, nameDraft, node, setEditingNode, updateNode, valueDraft]);

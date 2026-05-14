@@ -24,12 +24,9 @@ export function FunctionPicker(): JSX.Element | null {
       if (!edge) return;
       const def = shapeRegistry.get(key);
       if (!def) return;
-      updateEdge(
-        edge.id,
-        { shape: { kind: key, params: def.defaultParams as Record<string, unknown> } },
-        'change-shape',
-        '함수 변경',
-      );
+      updateEdge(edge.id, {
+        shape: { kind: key, params: def.defaultParams as Record<string, unknown> },
+      });
       const hasInlineEditor = !!getShapeEditor(key) || (def.paramFields?.length ?? 0) > 0;
       if (!hasInlineEditor) close();
     },
@@ -39,12 +36,7 @@ export function FunctionPicker(): JSX.Element | null {
   // "선택 해제" → 'none' kind sentinel로 되돌림. 변환 없이 값이 그대로 흐름.
   const clearShape = useCallback(() => {
     if (!edge) return;
-    updateEdge(
-      edge.id,
-      { shape: { kind: 'none', params: {} } },
-      'change-shape',
-      '변환 없음',
-    );
+    updateEdge(edge.id, { shape: { kind: 'none', params: {} } });
   }, [edge, updateEdge]);
 
   // 현재 shape의 defaultParams로 통째 복원.
@@ -52,17 +44,12 @@ export function FunctionPicker(): JSX.Element | null {
     if (!edge) return;
     const def = shapeRegistry.get(edge.shape.kind);
     if (!def) return;
-    updateEdge(
-      edge.id,
-      {
-        shape: {
-          kind: edge.shape.kind,
-          params: { ...(def.defaultParams as Record<string, unknown>) },
-        },
+    updateEdge(edge.id, {
+      shape: {
+        kind: edge.shape.kind,
+        params: { ...(def.defaultParams as Record<string, unknown>) },
       },
-      'change-shape',
-      '기본값으로',
-    );
+    });
   }, [edge, updateEdge]);
 
   // picker 열린 그 시점의 카테고리를 기본 탭으로. 이후엔 사용자 선택을 따라간다.

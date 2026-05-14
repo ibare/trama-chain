@@ -127,12 +127,9 @@ function NodeFrameImpl({
       moveRef.current = null;
       (e.target as Element).releasePointerCapture?.(e.pointerId);
       if (m?.dragged && (m.lastDx !== 0 || m.lastDy !== 0)) {
-        updateNode(
-          id,
-          { position: { x: m.startPosX + m.lastDx, y: m.startPosY + m.lastDy } },
-          'move-node',
-          '위치 이동',
-        );
+        updateNode(id, {
+          position: { x: m.startPosX + m.lastDx, y: m.startPosY + m.lastDy },
+        });
       }
     },
     [id, updateNode],

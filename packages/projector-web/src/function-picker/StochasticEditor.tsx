@@ -52,24 +52,19 @@ export function StochasticEditor({ edge }: Props): JSX.Element {
 
   const commit = useCallback(
     (patch: Partial<StochasticParams>) => {
-      updateEdge(
-        edge.id,
-        {
-          shape: {
-            kind: 'stochastic',
-            params: {
-              distribution: 'bernoulli',
-              winProbability,
-              winMultiplier,
-              loseMultiplier,
-              bias,
-              ...patch,
-            },
+      updateEdge(edge.id, {
+        shape: {
+          kind: 'stochastic',
+          params: {
+            distribution: 'bernoulli',
+            winProbability,
+            winMultiplier,
+            loseMultiplier,
+            bias,
+            ...patch,
           },
         },
-        'change-shape',
-        '확률 분포 변경',
-      );
+      });
     },
     [bias, edge.id, loseMultiplier, updateEdge, winMultiplier, winProbability],
   );

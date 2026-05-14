@@ -233,7 +233,7 @@ function ExpressionNodeViewImpl({ id }: Props): JSX.Element | null {
     const next = state ? astToLatex(state.ast).trim() : '';
     if (next && next !== node.latex) {
       // variables는 model-store.updateNode가 fizzex.analyze 로 자동 동기화.
-      updateNode(id, { latex: next }, 'update-node', '식 편집');
+      updateNode(id, { latex: next });
     }
     setEditingNode(null);
   }, [id, node, setEditingNode, updateNode]);

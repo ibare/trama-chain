@@ -58,12 +58,7 @@ export function PiecewiseEditor({ edge }: Props): JSX.Element | null {
   const commit = useCallback(
     (next: Pt[]) => {
       const sorted = [...next].sort((a, b) => a.x - b.x);
-      updateEdge(
-        edge.id,
-        { shape: { kind: 'piecewise', params: { points: sorted } } },
-        'change-shape',
-        '구간 변경',
-      );
+      updateEdge(edge.id, { shape: { kind: 'piecewise', params: { points: sorted } } });
     },
     [edge.id, updateEdge],
   );

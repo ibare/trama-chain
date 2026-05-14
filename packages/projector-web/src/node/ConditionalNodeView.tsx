@@ -97,7 +97,7 @@ function ConditionalNodeViewImpl({ id }: Props): JSX.Element | null {
     if (!node || !isConditionalNode(node)) return;
     const idx = OPERATORS.indexOf(node.operator);
     const next = OPERATORS[(idx + 1) % OPERATORS.length]!;
-    updateNode(id, { operator: next }, 'update-node', '연산자 변경');
+    updateNode(id, { operator: next });
   }, [id, node, uiStore, updateNode]);
 
   if (!node || !isConditionalNode(node)) return null;

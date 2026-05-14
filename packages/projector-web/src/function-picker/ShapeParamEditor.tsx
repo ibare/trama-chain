@@ -25,12 +25,9 @@ export function ShapeParamEditor({ edge, fields }: Props): JSX.Element {
     (key: string, raw: string) => {
       const v = parseFloat(raw);
       if (!Number.isFinite(v)) return;
-      updateEdge(
-        edge.id,
-        { shape: { kind: edge.shape.kind, params: { ...params, [key]: v } } },
-        'change-shape',
-        '파라미터 변경',
-      );
+      updateEdge(edge.id, {
+        shape: { kind: edge.shape.kind, params: { ...params, [key]: v } },
+      });
     },
     [edge.id, edge.shape.kind, params, updateEdge],
   );

@@ -1,6 +1,5 @@
 import { create, type StoreApi, type UseBoundStore } from 'zustand';
 import {
-  OperationLog,
   addConditionalNode as addConditionalNodeOp,
   addConstantNode as addConstantNodeOp,
   addEdge as addEdgeOp,
@@ -38,8 +37,6 @@ import type {
   Node,
   NodeId,
   NodePatch,
-  Operation,
-  OperationKind,
 } from '@trama/core';
 import { tokens } from '@trama/tokens';
 import { combinerRegistry, shapeRegistry } from './registries.js';
@@ -57,9 +54,6 @@ export interface ModelStore {
   trajectory: ExecutionState[];
   /** 재생 중이면 현재 step index(0..N-1), 아니면 null. */
   playbackStep: number | null;
-  log: OperationLog;
-  canUndo: boolean;
-  canRedo: boolean;
 
   // commands ---------------------------------------------------------------
   setModel: (next: Model) => void;
@@ -67,40 +61,25 @@ export interface ModelStore {
   loadFromJson: (json: string) => boolean;
   exportToJson: () => string;
 
-  addNode: (input: AddValueNodeInput, opKind?: OperationKind, label?: string) => Node;
-  addConstantNode: (
-    input: AddConstantNodeInput,
-    opKind?: OperationKind,
-    label?: string,
-  ) => Node;
-  addConditionalNode: (
-    input: AddConditionalNodeInput,
-    opKind?: OperationKind,
-    label?: string,
-  ) => Node;
-  addExpressionNode: (
-    input: AddExpressionNodeInput,
-    opKind?: OperationKind,
-    label?: string,
-  ) => Node;
-  updateNode: (id: NodeId, patch: NodePatch, kind?: OperationKind, label?: string) => void;
+  addNode: (input: AddValueNodeInput) => Node;
+  addConstantNode: (input: AddConstantNodeInput) => Node;
+  addConditionalNode: (input: AddConditionalNodeInput) => Node;
+  addExpressionNode: (input: AddExpressionNodeInput) => Node;
+  updateNode: (id: NodeId, patch: NodePatch) => void;
   removeNode: (id: NodeId) => void;
 
   addEdge: (input: AddEdgeInput) => Edge | null;
-  updateEdge: (id: EdgeId, patch: Partial<Omit<Edge, 'id'>>, kind?: OperationKind, label?: string) => void;
+  updateEdge: (id: EdgeId, patch: Partial<Omit<Edge, 'id'>>) => void;
   removeEdge: (id: EdgeId) => void;
 
   setQuestion: (q: string | null) => void;
   setExecution: (e: Partial<Model['execution']>) => void;
 
-  /** 노드 값 스크럽: 같은 노드 연속 스크럽을 한 undo 단위로 묶는다. */
+  /** 노드 값 스크럽: 펄스 spawn 트리거 + 즉시 값 반영. */
   scrubInitialValue: (id: NodeId, nextValue: number) => void;
 
   /** trajectory를 step-by-step 애니메이션 재생 (§ 11.7). feedback 모델에서만 의미. */
   play: () => void;
-
-  undo: () => void;
-  redo: () => void;
 }
 
 export type ModelStoreInstance = UseBoundStore<StoreApi<ModelStore>>;
@@ -108,24 +87,6 @@ export type ModelStoreInstance = UseBoundStore<StoreApi<ModelStore>>;
 export interface ModelStoreDeps {
   pulseRegistry: PulseRegistry;
   nodeFlashRegistry: NodeFlashRegistry;
-}
-
-function record(
-  state: ModelStore,
-  before: Model,
-  after: Model,
-  kind: OperationKind,
-  label: string,
-  meta?: Operation['meta'],
-  coalesce = false,
-): void {
-  const op: Operation = { kind, label, before, after, meta };
-  if (coalesce) {
-    const ok = state.log.coalesceWithLast(op);
-    if (!ok) state.log.record(op);
-  } else {
-    state.log.record(op);
-  }
 }
 
 /** Node patch가 propagation 결과에 영향을 줄 수 있는 필드를 포함하는지. */
@@ -267,9 +228,6 @@ export function createModelStore({
     executionState: initialExec.executionState,
     trajectory: initialExec.trajectory,
     playbackStep: null,
-    log: new OperationLog(),
-    canUndo: false,
-    canRedo: false,
 
     setModel: (next) => {
       const exec = computeExecutionState(next);
@@ -295,79 +253,47 @@ export function createModelStore({
       return serializeTrama(modelToDocument(get().model));
     },
 
-    addNode: (input, opKind = 'add-node', label = '노드 추가') => {
+    addNode: (input) => {
       const before = get().model;
       const after = addValueNodeOp(before, input);
       const newId = after.nodeOrder[after.nodeOrder.length - 1]!;
       const node = after.nodes[newId]!;
       const exec = computeExecutionState(after);
-      set((s) => {
-        record(s, before, after, opKind, label, { nodeId: newId, node });
-        return {
-          model: after,
-          ...exec,
-          canUndo: s.log.canUndo(),
-          canRedo: s.log.canRedo(),
-        };
-      });
+      set({ model: after, ...exec });
       return node;
     },
 
-    addConstantNode: (input, opKind = 'add-node', label = '상수 노드 추가') => {
+    addConstantNode: (input) => {
       const before = get().model;
       const after = addConstantNodeOp(before, input);
       const newId = after.nodeOrder[after.nodeOrder.length - 1]!;
       const node = after.nodes[newId]!;
       const exec = computeExecutionState(after);
-      set((s) => {
-        record(s, before, after, opKind, label, { nodeId: newId, node });
-        return {
-          model: after,
-          ...exec,
-          canUndo: s.log.canUndo(),
-          canRedo: s.log.canRedo(),
-        };
-      });
+      set({ model: after, ...exec });
       return node;
     },
 
-    addConditionalNode: (input, opKind = 'add-node', label = '조건 노드 추가') => {
+    addConditionalNode: (input) => {
       const before = get().model;
       const after = addConditionalNodeOp(before, input);
       const newId = after.nodeOrder[after.nodeOrder.length - 1]!;
       const node = after.nodes[newId]!;
       const exec = computeExecutionState(after);
-      set((s) => {
-        record(s, before, after, opKind, label, { nodeId: newId, node });
-        return {
-          model: after,
-          ...exec,
-          canUndo: s.log.canUndo(),
-          canRedo: s.log.canRedo(),
-        };
-      });
+      set({ model: after, ...exec });
       return node;
     },
 
-    addExpressionNode: (input, opKind = 'add-node', label = '식 노드 추가') => {
+    addExpressionNode: (input) => {
       const before = get().model;
       const after = addExpressionNodeOp(before, input);
       const newId = after.nodeOrder[after.nodeOrder.length - 1]!;
       const node = after.nodes[newId]!;
       const exec = computeExecutionState(after);
-      set((s) => {
-        record(s, before, after, opKind, label, { nodeId: newId, node });
-        return {
-          model: after,
-          ...exec,
-          canUndo: s.log.canUndo(),
-          canRedo: s.log.canRedo(),
-        };
-      });
+      set({ model: after, ...exec });
       return node;
     },
 
-    updateNode: (id, rawPatch, kind = 'update-node', label = '노드 수정') => {
+    updateNode: (id, rawPatch) => {
       const before = get().model;
       const node = before.nodes[id];
       const patch: NodePatch =
@@ -388,7 +314,6 @@ export function createModelStore({
 
       const affectsValues = patchAffectsValues(patch);
       const simpleValue = patchIsSimpleValueChange(patch);
-      const shouldCoalesce = kind === 'move-node' || kind === 'rename-node';
       const playbackActive = get().playbackStep !== null;
 
       if (simpleValue && !playbackActive) {
@@ -400,7 +325,6 @@ export function createModelStore({
               ? patch.initialValue
               : undefined;
         set((s) => {
-          record(s, before, after, kind, label, { nodeId: id }, shouldCoalesce);
           const newValues: Record<NodeId, number> = { ...s.executionState.values };
           if (typeof nextNodeValue === 'number') newValues[id] = nextNodeValue;
           const newValid = new Set(s.executionState.validOutputs);
@@ -413,8 +337,6 @@ export function createModelStore({
               invalidReasons: s.executionState.invalidReasons,
             },
             trajectory: recomputed.trajectory,
-            canUndo: s.log.canUndo(),
-            canRedo: s.log.canRedo(),
           };
         });
         nodeFlashRegistry.trigger(id);
@@ -424,15 +346,7 @@ export function createModelStore({
       }
 
       const exec = affectsValues ? computeExecutionState(after) : null;
-      set((s) => {
-        record(s, before, after, kind, label, { nodeId: id }, shouldCoalesce);
-        return {
-          model: after,
-          ...(exec ?? {}),
-          canUndo: s.log.canUndo(),
-          canRedo: s.log.canRedo(),
-        };
-      });
+      set({ model: after, ...(exec ?? {}) });
     },
 
     removeNode: (id) => {
@@ -440,15 +354,7 @@ export function createModelStore({
       const after = removeNodeOp(before, id);
       if (after === before) return;
       const exec = computeExecutionState(after);
-      set((s) => {
-        record(s, before, after, 'remove-node', '노드 삭제', { nodeId: id });
-        return {
-          model: after,
-          ...exec,
-          canUndo: s.log.canUndo(),
-          canRedo: s.log.canRedo(),
-        };
-      });
+      set({ model: after, ...exec });
     },
 
     addEdge: (input) => {
@@ -483,19 +389,11 @@ export function createModelStore({
       const newId = after.edgeOrder[after.edgeOrder.length - 1]!;
       const edge = after.edges[newId]!;
       const exec = computeExecutionState(after);
-      set((s) => {
-        record(s, before, after, 'add-edge', '엣지 추가', { edgeId: newId, edge });
-        return {
-          model: after,
-          ...exec,
-          canUndo: s.log.canUndo(),
-          canRedo: s.log.canRedo(),
-        };
-      });
+      set({ model: after, ...exec });
       return edge;
     },
 
-    updateEdge: (id, patch, kind = 'update-edge', label = '엣지 수정') => {
+    updateEdge: (id, patch) => {
       const before = get().model;
       const candidate = updateEdgeOp(before, id, patch);
       if (candidate === before) return;
@@ -508,15 +406,7 @@ export function createModelStore({
       }
       const after = candidate;
       const exec = computeExecutionState(after);
-      set((s) => {
-        record(s, before, after, kind, label, { edgeId: id });
-        return {
-          model: after,
-          ...exec,
-          canUndo: s.log.canUndo(),
-          canRedo: s.log.canRedo(),
-        };
-      });
+      set({ model: after, ...exec });
     },
 
     removeEdge: (id) => {
@@ -524,24 +414,13 @@ export function createModelStore({
       const after = removeEdgeOp(before, id);
       if (after === before) return;
       const exec = computeExecutionState(after);
-      set((s) => {
-        record(s, before, after, 'remove-edge', '엣지 삭제', { edgeId: id });
-        return {
-          model: after,
-          ...exec,
-          canUndo: s.log.canUndo(),
-          canRedo: s.log.canRedo(),
-        };
-      });
+      set({ model: after, ...exec });
     },
 
     setQuestion: (q) => {
       const before = get().model;
       const after = setQuestionOp(before, q);
-      set((s) => {
-        record(s, before, after, 'set-question', '질문 변경');
-        return { model: after, canUndo: s.log.canUndo(), canRedo: s.log.canRedo() };
-      });
+      set({ model: after });
     },
 
     setExecution: (e) => {
@@ -549,15 +428,7 @@ export function createModelStore({
       const after = setExecutionOp(before, e);
       if (after === before) return;
       const exec = computeExecutionState(after);
-      set((s) => {
-        record(s, before, after, 'set-execution', '실행 설정 변경');
-        return {
-          model: after,
-          ...exec,
-          canUndo: s.log.canUndo(),
-          canRedo: s.log.canRedo(),
-        };
-      });
+      set({ model: after, ...exec });
     },
 
     scrubInitialValue: (id, nextValue) => {
@@ -567,7 +438,6 @@ export function createModelStore({
       const recomputed = computeExecutionState(after);
       const playbackActive = get().playbackStep !== null;
       set((s) => {
-        record(s, before, after, 'scrub-value', '값 변경', { nodeId: id }, true);
         const nextValues: Record<NodeId, number> = playbackActive
           ? s.executionState.values
           : { ...s.executionState.values, [id]: nextValue };
@@ -585,8 +455,6 @@ export function createModelStore({
                 invalidReasons: s.executionState.invalidReasons,
               },
           trajectory: recomputed.trajectory,
-          canUndo: s.log.canUndo(),
-          canRedo: s.log.canRedo(),
         };
       });
       if (!playbackActive) {
@@ -611,22 +479,6 @@ export function createModelStore({
           set({ executionState: s, playbackStep: isLast ? null : i });
         }, i * STEP_TICK_MS);
       });
-    },
-
-    undo: () => {
-      const log = get().log;
-      const prev = log.undo();
-      if (!prev) return;
-      const exec = computeExecutionState(prev);
-      set({ model: prev, ...exec, canUndo: log.canUndo(), canRedo: log.canRedo() });
-    },
-
-    redo: () => {
-      const log = get().log;
-      const next = log.redo();
-      if (!next) return;
-      const exec = computeExecutionState(next);
-      set({ model: next, ...exec, canUndo: log.canUndo(), canRedo: log.canRedo() });
     },
   }));
 

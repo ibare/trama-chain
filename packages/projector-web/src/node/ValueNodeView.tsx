@@ -127,7 +127,7 @@ function ValueNodeViewImpl({ id, incomingCount }: Props): JSX.Element | null {
       return;
     }
     const v = nameDraft.trim();
-    if (v && v !== node.label) updateNode(id, { label: v }, 'rename-node', '이름 변경');
+    if (v && v !== node.label) updateNode(id, { label: v });
     setEditingNode(null);
   }, [id, nameDraft, node, setEditingNode, updateNode]);
 

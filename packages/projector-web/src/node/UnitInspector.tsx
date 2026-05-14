@@ -56,12 +56,11 @@ export function UnitInspector({ node }: Props): JSX.Element {
     (id: string) => {
       const def = defaultUnitCatalog.get(id);
       if (!def || def.id === node.unitId) return;
-      updateNode(
-        node.id,
-        { unitId: def.id, unitOverride: undefined, initialValue: def.defaultInitial },
-        'update-node',
-        '단위 변경',
-      );
+      updateNode(node.id, {
+        unitId: def.id,
+        unitOverride: undefined,
+        initialValue: def.defaultInitial,
+      });
     },
     [node.id, node.unitId, updateNode],
   );
@@ -80,24 +79,17 @@ export function UnitInspector({ node }: Props): JSX.Element {
       const newMin = nextOverride.min ?? currentDef.defaultMin;
       const newMax = nextOverride.max ?? currentDef.defaultMax;
       const newInitial = Math.max(newMin, Math.min(node.initialValue, newMax));
-      updateNode(
-        node.id,
-        { unitOverride: finalOverride, initialValue: newInitial },
-        'update-node',
-        '범위 변경',
-      );
+      updateNode(node.id, { unitOverride: finalOverride, initialValue: newInitial });
     },
     [currentDef, node.id, node.initialValue, node.unitOverride, updateNode],
   );
 
   const onReset = useCallback(() => {
     if (!currentDef) return;
-    updateNode(
-      node.id,
-      { unitOverride: undefined, initialValue: currentDef.defaultInitial },
-      'update-node',
-      '단위 기본값 리셋',
-    );
+    updateNode(node.id, {
+      unitOverride: undefined,
+      initialValue: currentDef.defaultInitial,
+    });
   }, [currentDef, node.id, updateNode]);
 
   // 스킨이 적용된 동안엔 range editor를 숨긴다 — 스킨이 도메인 권위로 범위를 결정.
@@ -116,22 +108,17 @@ export function UnitInspector({ node }: Props): JSX.Element {
       if (!def) return;
       const r = def.domain.range;
       const newInitial = Math.max(r.min, Math.min(node.initialValue, r.max));
-      updateNode(
-        node.id,
-        {
-          skin: { kind: def.key, params: {} },
-          unitOverride: { min: r.min, max: r.max, step: r.step },
-          initialValue: newInitial,
-        },
-        'update-node',
-        '스킨 적용',
-      );
+      updateNode(node.id, {
+        skin: { kind: def.key, params: {} },
+        unitOverride: { min: r.min, max: r.max, step: r.step },
+        initialValue: newInitial,
+      });
     },
     [node.id, node.initialValue, skinCandidates, updateNode],
   );
 
   const onClearSkin = useCallback(() => {
-    updateNode(node.id, { skin: undefined }, 'update-node', '스킨 해제');
+    updateNode(node.id, { skin: undefined });
   }, [node.id, updateNode]);
 
   return (

@@ -236,8 +236,6 @@ export function Canvas(): JSX.Element {
     [edgeDraft, endEdgeDraft],
   );
 
-  const undo = modelStore((s) => s.undo);
-  const redo = modelStore((s) => s.redo);
   const removeNode = modelStore((s) => s.removeNode);
   const removeEdge = modelStore((s) => s.removeEdge);
   const selection = uiStore((s) => s.selection);
@@ -269,17 +267,7 @@ export function Canvas(): JSX.Element {
     const onKey = (e: KeyboardEvent) => {
       // readOnly에서는 모델 변경 단축키 전부 비활성. 셀렉션·pan/zoom은 유지된다.
       if (uiStore.getState().readOnly) return;
-      const mod = e.metaKey || e.ctrlKey;
-      if (mod && e.key.toLowerCase() === 'z' && !e.shiftKey) {
-        e.preventDefault();
-        undo();
-        return;
-      }
-      if (mod && (e.key.toLowerCase() === 'y' || (e.key.toLowerCase() === 'z' && e.shiftKey))) {
-        e.preventDefault();
-        redo();
-        return;
-      }
+      // undo/redo는 호스트(ProseMirror history 등)가 controlled value 흐름으로 처리.
       if (e.key === 'Delete' || e.key === 'Backspace') {
         const active = document.activeElement;
         if (active && (active.tagName === 'INPUT' || active.tagName === 'TEXTAREA')) return;
@@ -294,7 +282,7 @@ export function Canvas(): JSX.Element {
     };
     window.addEventListener('keydown', onKey);
     return () => window.removeEventListener('keydown', onKey);
-  }, [redo, removeEdge, removeNode, selection, undo, uiStore]);
+  }, [removeEdge, removeNode, selection, uiStore]);
 
   return (
     <>

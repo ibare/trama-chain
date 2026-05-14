@@ -37,12 +37,10 @@ export function completeEdgeDraft(
         snap.toNodeId === edge.to &&
         (snap.slotIndex ?? undefined) === (edge.slotIndex ?? undefined);
       if (!sameTarget) {
-        modelStore.updateEdge(
-          detachingEdgeId,
-          { to: snap.toNodeId, slotIndex: snap.slotIndex },
-          'update-edge',
-          '엣지 재연결',
-        );
+        modelStore.updateEdge(detachingEdgeId, {
+          to: snap.toNodeId,
+          slotIndex: snap.slotIndex,
+        });
       }
     } else {
       modelStore.removeEdge(detachingEdgeId);
