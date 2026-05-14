@@ -48,6 +48,12 @@ function ConstantNodeViewImpl({ id }: Props): JSX.Element | null {
   const labelDraftSeed = node?.label ?? '';
   const constantNumeric =
     node && isConstantNode(node) && isNumericValue(node.value) ? node.value.n : 0;
+  const isBooleanConstant =
+    node && isConstantNode(node) && node.value.kind === 'boolean';
+  const constantBoolean =
+    node && isConstantNode(node) && node.value.kind === 'boolean'
+      ? node.value.b
+      : false;
   const valueDraftSeed = constantNumeric;
   const isCustom = node && isConstantNode(node) && (node.constantKey ?? '') === 'custom';
 
@@ -109,7 +115,11 @@ function ConstantNodeViewImpl({ id }: Props): JSX.Element | null {
   const isSelected = selection.kind === 'node' && selection.id === id;
   const stateClass = 'is-focal';
 
-  const valueText = formatConstantValue(constantNumeric);
+  const valueText = isBooleanConstant
+    ? constantBoolean
+      ? '참'
+      : '거짓'
+    : formatConstantValue(constantNumeric);
 
   return (
     <NodeFrame

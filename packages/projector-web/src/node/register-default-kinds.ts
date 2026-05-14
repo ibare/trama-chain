@@ -1,3 +1,4 @@
+import { booleanValue, numericValue } from '@trama/core';
 import { constantRegistry } from '../store/registries.js';
 import { ValueNodeView } from './ValueNodeView.js';
 import { ConstantNodeView } from './ConstantNodeView.js';
@@ -79,9 +80,13 @@ registerNodeKindUI({
         onSelect: (canvasPos) => {
           const addConstantNode = instance.modelStore.getState().addConstantNode;
           const setEditingNode = instance.uiStore.getState().setEditingNode;
+          const value =
+            def.valueKind === 'boolean'
+              ? booleanValue(def.value)
+              : numericValue(def.value, 'free');
           const node = addConstantNode({
             label: isCustom ? '상수' : def.symbol,
-            value: def.value,
+            value,
             constantKey: def.key,
             position: canvasPos,
           });

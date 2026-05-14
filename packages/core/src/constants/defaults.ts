@@ -1,8 +1,13 @@
 import { ConstantRegistry } from './registry.js';
-import type { ConstantDefinition } from './types.js';
+import type {
+  BooleanConstantDefinition,
+  ConstantDefinition,
+  NumericConstantDefinition,
+} from './types.js';
 
-const PI: ConstantDefinition = {
+const PI: NumericConstantDefinition = {
   key: 'pi',
+  valueKind: 'numeric',
   labels: { ko: '원주율', en: 'Pi' },
   symbol: 'π',
   value: Math.PI,
@@ -14,8 +19,9 @@ const PI: ConstantDefinition = {
   fizzexName: 'π',
 };
 
-const E: ConstantDefinition = {
+const E: NumericConstantDefinition = {
   key: 'e',
+  valueKind: 'numeric',
   labels: { ko: '자연상수', en: 'Euler’s number' },
   symbol: 'e',
   value: Math.E,
@@ -27,32 +33,36 @@ const E: ConstantDefinition = {
   fizzexName: 'e',
 };
 
-const ONE_HALF: ConstantDefinition = {
+const ONE_HALF: NumericConstantDefinition = {
   key: 'one-half',
+  valueKind: 'numeric',
   labels: { ko: '이분의 일', en: 'One half' },
   symbol: '½',
   value: 0.5,
   category: 'math',
 };
 
-const ONE_THIRD: ConstantDefinition = {
+const ONE_THIRD: NumericConstantDefinition = {
   key: 'one-third',
+  valueKind: 'numeric',
   labels: { ko: '삼분의 일', en: 'One third' },
   symbol: '⅓',
   value: 1 / 3,
   category: 'math',
 };
 
-const ONE_FOURTH: ConstantDefinition = {
+const ONE_FOURTH: NumericConstantDefinition = {
   key: 'one-fourth',
+  valueKind: 'numeric',
   labels: { ko: '사분의 일', en: 'One fourth' },
   symbol: '¼',
   value: 0.25,
   category: 'math',
 };
 
-const GRAVITY: ConstantDefinition = {
+const GRAVITY: NumericConstantDefinition = {
   key: 'g',
+  valueKind: 'numeric',
   labels: { ko: '중력가속도', en: 'Gravity' },
   symbol: 'g',
   value: 9.80665,
@@ -63,8 +73,9 @@ const GRAVITY: ConstantDefinition = {
   category: 'physics',
 };
 
-const SPEED_OF_LIGHT: ConstantDefinition = {
+const SPEED_OF_LIGHT: NumericConstantDefinition = {
   key: 'c',
+  valueKind: 'numeric',
   labels: { ko: '빛의 속도', en: 'Speed of light' },
   symbol: 'c',
   value: 299_792_458,
@@ -76,8 +87,9 @@ const SPEED_OF_LIGHT: ConstantDefinition = {
 };
 
 /** 카탈로그에 없는 임의 수 — UI에서 "직접 입력" 진입점이 사용. */
-const CUSTOM_PLACEHOLDER: ConstantDefinition = {
+const CUSTOM_PLACEHOLDER: NumericConstantDefinition = {
   key: 'custom',
+  valueKind: 'numeric',
   labels: { ko: '임의 수', en: 'Custom number' },
   symbol: '?',
   value: 0,
@@ -86,6 +98,32 @@ const CUSTOM_PLACEHOLDER: ConstantDefinition = {
     en: 'User-defined numeric value',
   },
   category: 'custom',
+};
+
+const TRUE_CONSTANT: BooleanConstantDefinition = {
+  key: 'true',
+  valueKind: 'boolean',
+  labels: { ko: '참', en: 'True' },
+  symbol: '⊤',
+  value: true,
+  description: {
+    ko: '논리값 참',
+    en: 'Logical true',
+  },
+  category: 'logic',
+};
+
+const FALSE_CONSTANT: BooleanConstantDefinition = {
+  key: 'false',
+  valueKind: 'boolean',
+  labels: { ko: '거짓', en: 'False' },
+  symbol: '⊥',
+  value: false,
+  description: {
+    ko: '논리값 거짓',
+    en: 'Logical false',
+  },
+  category: 'logic',
 };
 
 export const DEFAULT_CONSTANTS: readonly ConstantDefinition[] = [
@@ -97,6 +135,8 @@ export const DEFAULT_CONSTANTS: readonly ConstantDefinition[] = [
   GRAVITY,
   SPEED_OF_LIGHT,
   CUSTOM_PLACEHOLDER,
+  TRUE_CONSTANT,
+  FALSE_CONSTANT,
 ];
 
 export function createDefaultConstantRegistry(): ConstantRegistry {

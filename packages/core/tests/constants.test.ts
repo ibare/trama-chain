@@ -27,11 +27,11 @@ describe('ConstantRegistry', () => {
   });
 
   it('수치 값이 정확하다', () => {
-    expect(reg.get('pi')?.value).toBe(Math.PI);
-    expect(reg.get('e')?.value).toBe(Math.E);
-    expect(reg.get('one-half')?.value).toBe(0.5);
-    expect(reg.get('g')?.value).toBeCloseTo(9.80665);
-    expect(reg.get('c')?.value).toBe(299_792_458);
+    expect(reg.getOfKind('pi', 'numeric')?.value).toBe(Math.PI);
+    expect(reg.getOfKind('e', 'numeric')?.value).toBe(Math.E);
+    expect(reg.getOfKind('one-half', 'numeric')?.value).toBe(0.5);
+    expect(reg.getOfKind('g', 'numeric')?.value).toBeCloseTo(9.80665);
+    expect(reg.getOfKind('c', 'numeric')?.value).toBe(299_792_458);
   });
 
   it('카테고리별 묶음', () => {
@@ -42,12 +42,33 @@ describe('ConstantRegistry', () => {
       expect.arrayContaining(['g', 'c']),
     );
     expect(reg.listByCategory('custom').map((d) => d.key)).toEqual(['custom']);
+    expect(reg.listByCategory('logic').map((d) => d.key)).toEqual(['true', 'false']);
+  });
+
+  it('boolean 상수 카탈로그 항목', () => {
+    expect(reg.has('true')).toBe(true);
+    expect(reg.has('false')).toBe(true);
+    const t = reg.getOfKind('true', 'boolean');
+    const f = reg.getOfKind('false', 'boolean');
+    expect(t?.value).toBe(true);
+    expect(f?.value).toBe(false);
+  });
+
+  it('getOfKind는 valueKind로 좁히고 mismatch는 undefined', () => {
+    expect(reg.getOfKind('pi', 'boolean')).toBeUndefined();
+    expect(reg.getOfKind('true', 'numeric')).toBeUndefined();
+  });
+
+  it('listForKind는 ValueKind별 항목만 반환', () => {
+    expect(reg.listForKind('boolean').map((d) => d.key)).toEqual(['true', 'false']);
+    expect(reg.listForKind('numeric').length).toBeGreaterThanOrEqual(8);
   });
 
   it('중복 등록은 거부한다', () => {
     const r = new ConstantRegistry();
     r.register({
       key: 'x',
+      valueKind: 'numeric',
       labels: { ko: 'X', en: 'X' },
       symbol: 'x',
       value: 1,
@@ -56,6 +77,7 @@ describe('ConstantRegistry', () => {
     expect(() =>
       r.register({
         key: 'x',
+        valueKind: 'numeric',
         labels: { ko: 'X', en: 'X' },
         symbol: 'x',
         value: 2,
