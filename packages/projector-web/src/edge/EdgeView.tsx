@@ -3,6 +3,7 @@ import { tokens } from '@trama/tokens';
 import {
   isConditionNode,
   isExpressionNode,
+  isOutputValid,
   isValueNode,
   normalize,
   type EdgeId,
@@ -86,6 +87,13 @@ function EdgeViewImpl({
     const fallback = n && isValueNode(n) ? n.initialValue : 0;
     return s.executionState.values[fromId] ?? fallback;
   });
+  // source 출력 슬롯이 현재 valid한가. condition 게이트가 닫히는 등으로 invalid가
+  // 되면 target 끝을 소켓에서 풀어 케이블이 대롱대롱 늘어진 시각을 만든다.
+  const edgeSourceSlot = edge?.sourceSlotIndex ?? 0;
+  const sourceValid = modelStore((s) => {
+    if (!fromId) return true;
+    return isOutputValid(s.executionState, fromId, edgeSourceSlot);
+  });
 
   const openFunctionPicker = uiStore((s) => s.openFunctionPicker);
   const startInsertNodeFromEdge = uiStore((s) => s.startInsertNodeFromEdge);
@@ -159,6 +167,13 @@ function EdgeViewImpl({
     liveEndpointsRef.current.end = { x: baseEnd.x, y: baseEnd.y };
   }, [baseStart.x, baseStart.y, baseEnd.x, baseEnd.y]);
 
+  // sourceValid는 ticker가 매 프레임 읽도록 ref로도 유지 — effect deps에 넣어
+  // ticker 재등록을 일으키지 않기 위함.
+  const sourceValidRef = useRef(sourceValid);
+  useEffect(() => {
+    sourceValidRef.current = sourceValid;
+  }, [sourceValid]);
+
   const lag = edge?.lag ?? 0;
 
   // 첫 렌더용 초기 좌표 — 케이블 점 배열에서 직접 뽑는다.
@@ -186,7 +201,7 @@ function EdgeViewImpl({
     const tick = (): void => {
       const live = liveEndpointsRef.current;
       setCableEndpoints(cable, live.start, live.end);
-      stepCable(cable);
+      stepCable(cable, { endFree: !sourceValidRef.current });
 
       const pointsStr = cableToPoints(cable);
       pathRef.current?.setAttribute('points', pointsStr);
@@ -251,7 +266,7 @@ function EdgeViewImpl({
   if (introducing) baseClasses.push('is-introducing');
 
   const arrowClass = `trama-arrow${isFeedback ? ' is-feedback' : ''}${isStrained ? ' is-strained' : ''}`;
-  const groupCls = `trama-edge-group${morphing ? ' is-morphing' : ''}${isDetaching ? ' is-detaching' : ''}`;
+  const groupCls = `trama-edge-group${morphing ? ' is-morphing' : ''}${isDetaching ? ' is-detaching' : ''}${sourceValid ? '' : ' is-gated'}`;
 
   // 멀티슬롯 노드에 연결된 엣지에 슬롯 식별색을 CSS 변수로 부여.
   // feedback·strained는 styles.css 우선순위로 이 색을 덮어 시맨틱 상태가 우선됨.

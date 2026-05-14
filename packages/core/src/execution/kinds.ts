@@ -185,7 +185,13 @@ const valueNodeDescriptor: NodeKindDescriptor<Extract<Node, { kind: 'value' }>> 
       contributions.push(denormalize(out01, targetUnit));
     }
 
-    if (contributions.length === 0) return; // 모든 source 무효: 값 유지
+    if (contributions.length === 0) {
+      // 엣지는 있는데 valid한 source가 하나도 없는 경우 — 출력을 invalid로 떨어뜨려
+      // stale 값이 다운스트림으로 흐르지 않게 한다. (조건 게이트가 닫힌 직후 등)
+      // ctx.next[node.id]는 건드리지 않아 UI가 "마지막 값"을 흐리게 보여줄 수 있다.
+      ctx.validOutputs.delete(outputKey(node.id, 0));
+      return;
+    }
     const combined = combiner.combine(contributions);
     // raw passthrough가 섞이면 target clamp 건너뜀(단위 미정의 의미 보존).
     ctx.next[node.id] = hasRawPassthrough ? combined : clampToUnit(combined, targetUnit);

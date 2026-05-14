@@ -334,6 +334,18 @@
   opacity: 0.25;
 }
 
+/* condition 게이트가 닫혀 source 출력이 invalid가 된 엣지 — target 끝이 소켓에서
+   풀려 케이블이 중력으로 늘어진 상태. 점선·반투명으로 "일시 차단"을 표시한다. */
+[data-trama-root] .trama-edge-group.is-gated .trama-edge {
+  opacity: 0.45;
+  stroke-dasharray: 4 4;
+  transition: opacity 200ms ease, stroke-dasharray 200ms ease;
+}
+[data-trama-root] .trama-edge-group.is-gated .trama-arrow {
+  opacity: 0.35;
+  transition: opacity 200ms ease;
+}
+
 /* snap 대상 입력 소켓 위에 떠 있는 강조 링 — pointer-events:none으로 hit 간섭 없음. */
 [data-trama-root] .trama-snap-target-ring {
   fill: none;

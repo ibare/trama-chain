@@ -152,6 +152,77 @@ describe('ConditionNode 게이트 시맨틱', () => {
     expect(s2.values.out).toBe(0);
   });
 
+  it('차단되면 다운스트림 ValueNode도 invalid (invalid 전파)', () => {
+    // condition 차단 시, condition→out 엣지 하나뿐인 ValueNode는 출력이 invalid가
+    // 되어 더 깊은 다운스트림이 stale 값을 받지 않는다.
+    let m = setup(2, 5, '>'); // 차단
+    m = addValueNode(m, {
+      id: 'out',
+      label: '출력',
+      unitId: 'raw',
+      initialValue: 0,
+    });
+    m = addEdge(m, {
+      from: 'c',
+      to: 'out',
+      shape: { kind: 'linear', params: { slope: 1, offset: 0 } },
+    });
+    const s = propagateOneStep(initializeFromInitialValues(m), m, {
+      shapeRegistry: shapes,
+      combinerRegistry: combiners,
+    });
+    expect(isOutputValid(s, 'c', 0)).toBe(false);
+    expect(isOutputValid(s, 'out', 0)).toBe(false);
+  });
+
+  it('입력이 모두 invalid이고 valid가 하나라도 있으면 invalid한 source는 무시 (부분 차단)', () => {
+    // 두 입력 중 하나만 condition으로 게이팅. 게이트가 닫히면 그 contribution은
+    // 빠지지만 다른 valid 입력으로 값이 계산되고 valid 유지.
+    let m = createEmptyModel();
+    m = addValueNode(m, {
+      id: 'v1',
+      label: 'V1',
+      unitId: 'raw',
+      initialValue: 5,
+    });
+    m = addValueNode(m, {
+      id: 'v2',
+      label: 'V2',
+      unitId: 'raw',
+      initialValue: 3,
+    });
+    m = addConditionNode(m, { id: 'c', label: '조건', operator: '>', threshold: 100 });
+    m = addEdge(m, {
+      from: 'v1',
+      to: 'c',
+      shape: { kind: 'linear', params: { slope: 1, offset: 0 } },
+      slotIndex: 0,
+    });
+    m = addValueNode(m, {
+      id: 'sum',
+      label: '합',
+      unitId: 'raw',
+      initialValue: 0,
+    });
+    m = addEdge(m, {
+      from: 'c',
+      to: 'sum',
+      shape: { kind: 'linear', params: { slope: 1, offset: 0 } },
+    });
+    m = addEdge(m, {
+      from: 'v2',
+      to: 'sum',
+      shape: { kind: 'linear', params: { slope: 1, offset: 0 } },
+    });
+    const s = propagateOneStep(initializeFromInitialValues(m), m, {
+      shapeRegistry: shapes,
+      combinerRegistry: combiners,
+    });
+    // c는 차단, v2만 유효 → sum은 valid 유지 (v2 기여만 반영).
+    expect(isOutputValid(s, 'c', 0)).toBe(false);
+    expect(isOutputValid(s, 'sum', 0)).toBe(true);
+  });
+
   it('outputKey 키 포맷', () => {
     expect(outputKey('c', 0)).toBe('c:0');
     expect(outputKey('c')).toBe('c:0');
