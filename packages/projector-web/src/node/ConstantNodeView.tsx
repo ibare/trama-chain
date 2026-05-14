@@ -5,6 +5,7 @@ import { isConstantNode, type NodeId } from '@trama/core';
 import { useTrama } from '../store/index.js';
 import { NodeFrame } from './NodeFrame.js';
 import { NodeBody } from './NodeBody.js';
+import { InlineSvgInput } from './InlineSvgInput.js';
 import { Socket } from './Socket.js';
 import { useOutputConnected } from './use-socket-connections.js';
 import { useEdgeDraftSource } from '../canvas/use-edge-draft-source.js';
@@ -123,40 +124,31 @@ function ConstantNodeViewImpl({ id }: Props): JSX.Element | null {
             className="trama-constant-editor"
             onSubmit={(e) => e.preventDefault()}
           >
-            <Form.Field name="label">
-              <Form.Control
-                className="trama-node-name-input"
-                value={nameDraft}
-                autoFocus
-                onChange={(e) => setNameDraft(e.currentTarget.value)}
-                onKeyDown={(e) => {
-                  if (e.key === 'Enter' && !isCustom) commitEdit();
-                  if (e.key === 'Escape') setEditingNode(null);
-                }}
-                onBlur={() => {
-                  if (!isCustom) commitEdit();
-                }}
-                onPointerDown={(e) => e.stopPropagation()}
-                placeholder="라벨"
-              />
-            </Form.Field>
+            <InlineSvgInput
+              name="label"
+              className="trama-node-name-input"
+              value={nameDraft}
+              autoFocus
+              placeholder="라벨"
+              onChange={setNameDraft}
+              onCommit={commitEdit}
+              onCancel={() => setEditingNode(null)}
+              // 카탈로그 상수(π·g 등)는 라벨만 편집 — Enter로 즉시 커밋. 임의 수치는
+              // 다음 input(value)으로 포커스를 옮길 여지가 있어 Enter 커밋을 막는다.
+              commitOnEnter={!isCustom}
+            />
             {isCustom && (
-              <Form.Field name="value">
-                <Form.Control
-                  className="trama-node-name-input"
-                  value={valueDraft}
-                  type="number"
-                  step="any"
-                  onChange={(e) => setValueDraft(e.currentTarget.value)}
-                  onKeyDown={(e) => {
-                    if (e.key === 'Enter') commitEdit();
-                    if (e.key === 'Escape') setEditingNode(null);
-                  }}
-                  onBlur={commitEdit}
-                  onPointerDown={(e) => e.stopPropagation()}
-                  placeholder="수치"
-                />
-              </Form.Field>
+              <InlineSvgInput
+                name="value"
+                className="trama-node-name-input"
+                value={valueDraft}
+                type="number"
+                step="any"
+                placeholder="수치"
+                onChange={setValueDraft}
+                onCommit={commitEdit}
+                onCancel={() => setEditingNode(null)}
+              />
             )}
           </Form.Root>
         </foreignObject>

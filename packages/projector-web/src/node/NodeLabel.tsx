@@ -1,5 +1,6 @@
 import { useEffect, useState, type MouseEvent } from 'react';
 import * as Form from '@radix-ui/react-form';
+import { InlineSvgInput } from './InlineSvgInput.js';
 
 interface Props {
   /** 현재 라벨 텍스트. 표시·편집 진입 시 draft 초기값. */
@@ -68,20 +69,15 @@ export function NodeLabel({
     return (
       <foreignObject x={x} y={y - TEXT_BASELINE_TO_TOP} width={width} height={INPUT_HEIGHT}>
         <Form.Root onSubmit={(e) => e.preventDefault()}>
-          <Form.Field name="label">
-            <Form.Control
-              className="trama-node-name-input"
-              value={draft}
-              autoFocus
-              onChange={(e) => setDraft(e.currentTarget.value)}
-              onBlur={commit}
-              onKeyDown={(e) => {
-                if (e.key === 'Enter') commit();
-                if (e.key === 'Escape') onCancel();
-              }}
-              onPointerDown={(e) => e.stopPropagation()}
-            />
-          </Form.Field>
+          <InlineSvgInput
+            name="label"
+            className="trama-node-name-input"
+            value={draft}
+            autoFocus
+            onChange={setDraft}
+            onCommit={commit}
+            onCancel={onCancel}
+          />
         </Form.Root>
       </foreignObject>
     );
