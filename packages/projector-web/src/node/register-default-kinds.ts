@@ -3,6 +3,7 @@ import { constantRegistry } from '../store/registries.js';
 import { ValueNodeView } from './ValueNodeView.js';
 import { ConstantNodeView } from './ConstantNodeView.js';
 import { ConditionNodeView } from './ConditionNodeView.js';
+import { ComparisonNodeView } from './ComparisonNodeView.js';
 import { ExpressionNodeView } from './ExpressionNodeView.js';
 import { fizzexExpressionEvaluator } from '../expression/fizzex-evaluator.js';
 import { registerNodeKindUI } from './kind-catalog.js';
@@ -73,6 +74,30 @@ registerNodeKindUI({
         const addConditionNode = instance.modelStore.getState().addConditionNode;
         addConditionNode({
           label: '조건',
+          operator: '>',
+          threshold: 0,
+          position: canvasPos,
+        });
+      },
+    },
+  ],
+});
+
+registerNodeKindUI({
+  kind: 'comparison',
+  menuSectionLabel: '노드',
+  menuSectionOrder: 12,
+  View: ComparisonNodeView,
+  buildMenuItems: (instance) => [
+    {
+      key: 'comparison',
+      label: '비교 노드',
+      symbol: '⊤?',
+      onSelect: (canvasPos) => {
+        const addComparisonNode =
+          instance.modelStore.getState().addComparisonNode;
+        addComparisonNode({
+          label: '비교',
           operator: '>',
           threshold: 0,
           position: canvasPos,
