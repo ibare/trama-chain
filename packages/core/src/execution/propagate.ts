@@ -28,7 +28,7 @@ import { buildTopology, type InstantaneousTopology } from './topology.js';
 export interface PropagateOptions {
   shapeRegistry: ShapeRegistry;
   combinerRegistry: CombinerRegistry;
-  /** 노드 종류 디스크립터 레지스트리. 미지정 시 기본 (value·constant·conditional·expression). */
+  /** 노드 종류 디스크립터 레지스트리. 미지정 시 기본 (value·constant·condition·expression). */
   nodeKindRegistry?: NodeKindRegistry;
   /** 단위 카탈로그. 미지정 시 기본 카탈로그. 알 수 없는 unitId는 free로 폴백. */
   unitCatalog?: UnitCatalog;

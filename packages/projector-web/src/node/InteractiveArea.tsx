@@ -7,7 +7,7 @@ interface Props {
   height: number;
   rx?: number;
   ry?: number;
-  /** hit rect 자체 className 추가. (예: `'trama-conditional-operator-hit'`로 hover 효과 입히기) */
+  /** hit rect 자체 className 추가. (예: `'trama-condition-operator-hit'`로 hover 효과 입히기) */
   hitClassName?: string;
   /** 클릭 동작. hit rect의 onClick으로 부착. */
   onClick?: (e: MouseEvent<SVGRectElement>) => void;
@@ -28,10 +28,10 @@ interface Props {
  * 자식(visual)은 자동으로 `pointer-events:none`이라 사용자가 별도 클래스/속성 없이
  * 텍스트·도형을 안전하게 얹을 수 있다.
  *
- * 사용 예 — Conditional 노드의 연산자 토글:
+ * 사용 예 — Condition 노드의 연산자 토글:
  * ```tsx
  * <InteractiveArea x={-56} y={-22} width={112} height={44} rx={6} ry={6}
- *   hitClassName="trama-conditional-operator-hit"
+ *   hitClassName="trama-condition-operator-hit"
  *   onClick={cycleOperator}>
  *   <text className="trama-function-symbol" x={0} y={4} textAnchor="middle">
  *     {`A ${node.operator} B`}

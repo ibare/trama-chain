@@ -45,13 +45,14 @@ export const ConstantNodeSchema = z.object({
   description: z.string().nullable().optional(),
 });
 
-export const ConditionalOperatorSchema = z.enum(['>', '==', '!=']);
+export const ConditionOperatorSchema = z.enum(['>', '<', '>=', '<=', '==', '!=']);
 
-export const ConditionalNodeSchema = z.object({
-  kind: z.literal('conditional'),
+export const ConditionNodeSchema = z.object({
+  kind: z.literal('condition'),
   id: z.string(),
   label: z.string(),
-  operator: ConditionalOperatorSchema,
+  operator: ConditionOperatorSchema,
+  threshold: z.number(),
   position: z.object({ x: z.number(), y: z.number() }).nullable(),
   isFocal: z.boolean(),
   description: z.string().nullable().optional(),
@@ -72,7 +73,7 @@ export const ExpressionNodeSchema = z.object({
 export const NodeSchema = z.discriminatedUnion('kind', [
   ValueNodeSchema,
   ConstantNodeSchema,
-  ConditionalNodeSchema,
+  ConditionNodeSchema,
   ExpressionNodeSchema,
 ]);
 
@@ -87,7 +88,7 @@ export const EdgeSchema = z.object({
   inverted: z.boolean(),
   lag: z.union([z.literal(0), z.literal(1)]),
   slotIndex: z.number().int().min(0).optional(),
-  /** source가 다출력 노드(예: ConditionalNode)일 때 어느 출력 슬롯에서 시작했는지. */
+  /** source가 다출력 노드일 때 어느 출력 슬롯에서 시작했는지. 단일 출력 노드는 0/생략. */
   sourceSlotIndex: z.number().int().min(0).optional(),
   description: z.string().nullable().optional(),
 });
@@ -112,6 +113,6 @@ export type TramaDocument = z.infer<typeof TramaDocumentSchema>;
 export type TramaNode = z.infer<typeof NodeSchema>;
 export type TramaValueNode = z.infer<typeof ValueNodeSchema>;
 export type TramaConstantNode = z.infer<typeof ConstantNodeSchema>;
-export type TramaConditionalNode = z.infer<typeof ConditionalNodeSchema>;
+export type TramaConditionNode = z.infer<typeof ConditionNodeSchema>;
 export type TramaExpressionNode = z.infer<typeof ExpressionNodeSchema>;
 export type TramaEdge = z.infer<typeof EdgeSchema>;

@@ -115,11 +115,8 @@ export function recomputeNode(
 
   desc.propagate(node, ctx);
 
-  // 디스크립터 출력 슬롯 수집: 조건 노드는 0/1 모두, 그 외는 0.
-  const outputSlotKeys =
-    node.kind === 'conditional'
-      ? [outputKey(nodeId, 0), outputKey(nodeId, 1)]
-      : [outputKey(nodeId, 0)];
+  // 모든 노드가 출력 슬롯 0 하나만 사용 — 조건 노드도 게이트 시맨틱이라 단일 출력.
+  const outputSlotKeys = [outputKey(nodeId, 0)];
 
   return {
     newValue: workingValues[nodeId],

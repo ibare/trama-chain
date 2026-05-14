@@ -1,6 +1,6 @@
 import { create, type StoreApi, type UseBoundStore } from 'zustand';
 import {
-  addConditionalNode as addConditionalNodeOp,
+  addConditionNode as addConditionNodeOp,
   addConstantNode as addConstantNodeOp,
   addEdge as addEdgeOp,
   addExpressionNode as addExpressionNodeOp,
@@ -10,7 +10,7 @@ import {
   executeModel,
   hasFeedbackEdges,
   initializeFromInitialValues,
-  isConditionalNode,
+  isConditionNode,
   isExpressionNode,
   modelToDocument,
   outputKey,
@@ -25,7 +25,7 @@ import {
   updateNode as updateNodeOp,
 } from '@trama/core';
 import type {
-  AddConditionalNodeInput,
+  AddConditionNodeInput,
   AddConstantNodeInput,
   AddEdgeInput,
   AddExpressionNodeInput,
@@ -63,7 +63,7 @@ export interface ModelStore {
 
   addNode: (input: AddValueNodeInput) => Node;
   addConstantNode: (input: AddConstantNodeInput) => Node;
-  addConditionalNode: (input: AddConditionalNodeInput) => Node;
+  addConditionNode: (input: AddConditionNodeInput) => Node;
   addExpressionNode: (input: AddExpressionNodeInput) => Node;
   updateNode: (id: NodeId, patch: NodePatch) => void;
   removeNode: (id: NodeId) => void;
@@ -273,9 +273,9 @@ export function createModelStore({
       return node;
     },
 
-    addConditionalNode: (input) => {
+    addConditionNode: (input) => {
       const before = get().model;
-      const after = addConditionalNodeOp(before, input);
+      const after = addConditionNodeOp(before, input);
       const newId = after.nodeOrder[after.nodeOrder.length - 1]!;
       const node = after.nodes[newId]!;
       const exec = computeExecutionState(after);
@@ -369,7 +369,7 @@ export function createModelStore({
           .filter((e) => e && e.to === input.to);
         if (occupied.some((e) => e!.slotIndex === slot)) return null;
       }
-      if (targetNode && isConditionalNode(targetNode)) {
+      if (targetNode && isConditionNode(targetNode)) {
         const slot = input.slotIndex;
         if (typeof slot !== 'number' || slot < 0 || slot > 1) return null;
         const occupied = before.edgeOrder

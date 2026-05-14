@@ -1,13 +1,13 @@
 import { constantRegistry } from '../store/registries.js';
 import { ValueNodeView } from './ValueNodeView.js';
 import { ConstantNodeView } from './ConstantNodeView.js';
-import { ConditionalNodeView } from './ConditionalNodeView.js';
+import { ConditionNodeView } from './ConditionNodeView.js';
 import { ExpressionNodeView } from './ExpressionNodeView.js';
 import { fizzexExpressionEvaluator } from '../expression/fizzex-evaluator.js';
 import { registerNodeKindUI } from './kind-catalog.js';
 
 /**
- * 기본 노드 종류(value·constant·conditional·expression) UI 디스크립터 등록.
+ * 기본 노드 종류(value·constant·condition·expression) UI 디스크립터 등록.
  *
  * Side-effect import: NodeView·CanvasContextMenu가 카탈로그를 조회하기 전에
  * 등록이 끝나도록, 모듈 최상위에서 즉시 register 호출.
@@ -42,20 +42,21 @@ registerNodeKindUI({
 });
 
 registerNodeKindUI({
-  kind: 'conditional',
+  kind: 'condition',
   menuSectionLabel: '노드',
   menuSectionOrder: 11,
-  View: ConditionalNodeView,
+  View: ConditionNodeView,
   buildMenuItems: (instance) => [
     {
-      key: 'conditional',
+      key: 'condition',
       label: '조건 노드',
       symbol: 'If',
       onSelect: (canvasPos) => {
-        const addConditionalNode = instance.modelStore.getState().addConditionalNode;
-        addConditionalNode({
+        const addConditionNode = instance.modelStore.getState().addConditionNode;
+        addConditionNode({
           label: '조건',
           operator: '>',
+          threshold: 0,
           position: canvasPos,
         });
       },

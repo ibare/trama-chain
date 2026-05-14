@@ -3,7 +3,7 @@ import type { NodeId } from '@trama/core';
 
 /**
  * 노드의 출력 소켓이 어딘가에 연결되어 있는지.
- * 슬롯이 여러 개인 ConditionalNode는 sourceSlotIndex로 구분.
+ * 현재 모든 노드가 단일 출력 슬롯이라 sourceSlotIndex는 0/생략 — 인자는 향후 확장용.
  */
 export function useOutputConnected(nodeId: NodeId, sourceSlotIndex?: number): boolean {
   const { modelStore } = useTrama();

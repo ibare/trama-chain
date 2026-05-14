@@ -15,7 +15,7 @@ interface Options {
    * 안정성이 필요하면 caller가 useCallback으로 감싼다.
    */
   getStartPoint: () => { x: number; y: number };
-  /** 출력 슬롯이 여러 개인 노드(예: Conditional)에서 어느 슬롯이 시작인지. */
+  /** 출력 슬롯이 여러 개인 노드에서 어느 슬롯이 시작인지. 현재 단일 출력만 사용. */
   sourceSlotIndex?: number;
 }
 

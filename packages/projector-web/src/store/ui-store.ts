@@ -8,7 +8,7 @@ export type Selection =
 
 export interface EdgeDraftSnap {
   toNodeId: NodeId;
-  /** function·conditional 등 슬롯 의미가 있는 target에서만 정의됨. ValueNode면 undefined. */
+  /** function·condition 등 슬롯 의미가 있는 target에서만 정의됨. ValueNode면 undefined. */
   slotIndex?: number;
   /** 캔버스 좌표 — 소켓 중심 */
   point: { x: number; y: number };
@@ -22,7 +22,7 @@ export interface EdgeDraft {
   pointer: { x: number; y: number };
   /** Alt 키 등으로 사용자가 feedback 엣지를 그리겠다고 표시 */
   lag: 0 | 1;
-  /** 출력 노드가 다중 출력일 때 선택된 슬롯 (Conditional 참/거짓). */
+  /** 출력 노드가 다중 출력일 때 선택된 슬롯. 현재 단일 출력만 사용. */
   sourceSlotIndex?: number;
   /** 현재 5px 안에 잡힌 입력 소켓. null이면 미스냅 상태. */
   snap: EdgeDraftSnap | null;

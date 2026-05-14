@@ -14,7 +14,7 @@ interface Props {
   /** drag hit 영역의 크기 — 보통 노드 박스 width/height. 노드 중심 기준 사각형. */
   width: number;
   height: number;
-  /** 추가 root className. 노드별 hook 클래스(예: 'trama-conditional-node') 부착용. */
+  /** 추가 root className. 노드별 hook 클래스(예: 'trama-condition-node') 부착용. */
   className?: string;
   /** body 빈 영역 더블클릭. (예: 인라인 편집 진입) */
   onBodyDoubleClick?: (e: React.MouseEvent<SVGRectElement>) => void;

@@ -16,7 +16,7 @@ interface Props {
 /**
  * 노드 본문 사각 배경(corner-rounded rect).
  *
- * 모든 카드형 노드(Value·Constant·Conditional·Expression)는 동일한 (width/height,
+ * 모든 카드형 노드(Value·Constant·Condition·Expression)는 동일한 (width/height,
  * 모서리 반경, state 톤, selected stroke) 계약을 따른다. 인라인 rect로 따로
  * 그리면 클래스 조합 순서나 corner radius 토큰이 노드별로 어긋날 여지가 생기므로
  * 단일 컴포넌트로 강제 — 새로운 노드가 추가되어도 NodeBody만 끼면 시각이 통일된다.

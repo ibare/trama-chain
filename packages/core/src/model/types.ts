@@ -53,21 +53,25 @@ export interface ConstantNode {
 }
 
 /**
- * 비교 연산자. A·B 두 입력에 대해 어느 식으로 비교할지.
+ * 비교 연산자. 입력값을 노드 내장 threshold와 비교한다.
  */
-export type ConditionalOperator = '>' | '==' | '!=';
+export type ConditionOperator = '>' | '<' | '>=' | '<=' | '==' | '!=';
 
 /**
- * 조건 노드 — A·B 두 입력을 비교해 A의 값을 참/거짓 두 출력 슬롯 중 하나로 라우팅.
- * - slot 0(A) / slot 1(B) 입력. 둘 다 연결돼야 valid.
- * - 출력 슬롯 0(참) / 1(거짓). 한 시점에 하나만 valid이며 값은 둘 다 A의 값.
- * - boolean을 만들지 않는다 — 분기 라우터 의미.
+ * 조건 노드 — 단일 입력을 노드 내장 임계값과 비교해 통과 여부를 결정하는 게이트.
+ * - 입력 슬롯 1개. 연결되고 source가 valid해야 동작.
+ * - `value op threshold`가 참이면 입력값을 단위까지 보존한 채 출력으로 흘려보낸다.
+ *   거짓이면 출력 invalid — 다음 노드에 값이 도달하지 않는다.
+ * - boolean을 만들지 않는다 — 데이터 통과 게이트 의미.
+ *   참/거짓을 신호로 쓰려면 별도의 Comparator 노드(추후 도입)를 사용.
  */
-export interface ConditionalNode {
-  kind: 'conditional';
+export interface ConditionNode {
+  kind: 'condition';
   id: NodeId;
   label: string;
-  operator: ConditionalOperator;
+  operator: ConditionOperator;
+  /** 비교 임계값. 입력 단위 도메인의 raw 수치로 해석된다. */
+  threshold: number;
   position: { x: number; y: number } | null;
   isFocal: boolean;
   description?: string | null;
@@ -99,7 +103,7 @@ export interface ExpressionNode {
 export type Node =
   | ValueNode
   | ConstantNode
-  | ConditionalNode
+  | ConditionNode
   | ExpressionNode;
 
 export function isValueNode(n: Node): n is ValueNode {
@@ -108,8 +112,8 @@ export function isValueNode(n: Node): n is ValueNode {
 export function isConstantNode(n: Node): n is ConstantNode {
   return n.kind === 'constant';
 }
-export function isConditionalNode(n: Node): n is ConditionalNode {
-  return n.kind === 'conditional';
+export function isConditionNode(n: Node): n is ConditionNode {
+  return n.kind === 'condition';
 }
 export function isExpressionNode(n: Node): n is ExpressionNode {
   return n.kind === 'expression';
@@ -123,11 +127,11 @@ export interface Edge {
   inverted: boolean;
   /** 0: same-timestep instantaneous. 1: feedback to next timestep. */
   lag: EdgeLag;
-  /** target이 다입력 노드(ExpressionNode·ConditionalNode)일 때 슬롯 인덱스(0-based). ValueNode target에선 무시. */
+  /** target이 다입력 노드(ExpressionNode)일 때 슬롯 인덱스(0-based). 단일 입력 노드에선 무시. */
   slotIndex?: number;
   /**
-   * source가 다출력 노드(예: ConditionalNode — 0=참, 1=거짓)일 때 어느 출력에서 시작한
-   * 엣지인지. 단일 출력 노드(value·function·constant)에선 무시되고 0으로 취급.
+   * source가 다출력 노드일 때 어느 출력에서 시작한 엣지인지.
+   * 현재 모든 노드가 단일 출력이라 0/생략으로 취급되지만, 향후 확장을 위해 필드는 유지.
    */
   sourceSlotIndex?: number;
   description?: string | null;

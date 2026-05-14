@@ -1,5 +1,5 @@
 import type {
-  ConditionalNode,
+  ConditionNode,
   ConstantNode,
   Edge,
   ExpressionNode,
@@ -8,13 +8,13 @@ import type {
   ValueNode,
 } from '../model/index.js';
 import {
-  isConditionalNode,
+  isConditionNode,
   isConstantNode,
   isExpressionNode,
   isValueNode,
 } from '../model/index.js';
 import type {
-  TramaConditionalNode,
+  TramaConditionNode,
   TramaConstantNode,
   TramaDocument,
   TramaEdge,
@@ -75,12 +75,13 @@ function nodeToDoc(n: Node): TramaNode {
     };
     return doc;
   }
-  if (isConditionalNode(n)) {
-    const doc: TramaConditionalNode = {
-      kind: 'conditional',
+  if (isConditionNode(n)) {
+    const doc: TramaConditionNode = {
+      kind: 'condition',
       id: n.id,
       label: n.label,
       operator: n.operator,
+      threshold: n.threshold,
       position: n.position,
       isFocal: n.isFocal,
       description: n.description ?? null,
@@ -147,12 +148,13 @@ export function documentToModel(doc: TramaDocument): Model {
         description: n.description ?? null,
       };
       nodes[n.id] = node;
-    } else if (n.kind === 'conditional') {
-      const node: ConditionalNode = {
-        kind: 'conditional',
+    } else if (n.kind === 'condition') {
+      const node: ConditionNode = {
+        kind: 'condition',
         id: n.id,
         label: n.label,
         operator: n.operator,
+        threshold: n.threshold,
         position: n.position,
         isFocal: n.isFocal,
         description: n.description ?? null,

@@ -17,7 +17,7 @@ import type { EvalDiagnosis, ExpressionEvaluator } from './expression-evaluator.
 import { outputKey } from './state.js';
 
 /**
- * 단위가 명시되지 않은 raw 출력 노드(상수·조건·식)의 폴백.
+ * 단위가 명시되지 않은 raw 출력 노드(상수·조건 게이트·식)의 폴백.
  * 값은 raw로 흐르고, 시각화 단계에서 자동 단위 추론이 동작한다.
  */
 export const FREE_FALLBACK: ResolvedUnit = {
@@ -154,7 +154,7 @@ const valueNodeDescriptor: NodeKindDescriptor<Extract<Node, { kind: 'value' }>> 
     const targetUnit = ctx.nodeKindRegistry.forNode(node)?.outputUnit(node, ctx.catalog) ?? FREE_FALLBACK;
 
     // 의미 모델: source 종류와 무관하게 엣지의 shape이 *비-identity*면 적용한다.
-    // - raw-output source(Function/Constant/Conditional) + identity shape → raw passthrough (단위 없음).
+    // - raw-output source(Function/Constant/Condition) + identity shape → raw passthrough (단위 없음).
     // - raw-output source + 비-identity shape → 정규화 폴백으로 shape 적용 (FREE 단위는 [0,1] 클램프).
     // - value source는 항상 normalize→shape→denormalize 파이프라인 (단위 변환·inverted 의미 보존).
     let hasRawPassthrough = false;
@@ -209,73 +209,74 @@ const constantNodeDescriptor: NodeKindDescriptor<Extract<Node, { kind: 'constant
 };
 
 /**
- * 조건 노드 디스크립터.
+ * 조건 노드 디스크립터 — 단일 입력 / 단일 출력 게이트.
  *
  * 동작:
- *   1. slot 0(A), slot 1(B) 입력 모두 채워지고 source가 valid해야 함.
- *   2. `node.operator`로 A·B 비교 (단위 무시, 값만).
- *   3. 결과에 따라 출력 슬롯 0(참) 또는 1(거짓) 중 하나만 valid로 표시.
- *   4. 값은 두 슬롯 모두 A의 값 — 하나의 `next[node.id]`에 저장하고 슬롯 게이팅은 validOutputs로.
+ *   1. slot 0 입력 하나만 사용. source가 valid해야 함.
+ *   2. `value op node.threshold`로 비교 (단위 무시, raw 수치).
+ *   3. 참이면 입력값을 그대로 next에 흘려보내고 slot 0 valid.
+ *      거짓이면 slot 0 invalid — 출력이 끊긴다.
+ *   4. raw passthrough: 입력의 단위가 그대로 다음 노드에 전달된다.
  *
- * 둘 중 하나라도 미연결/무효면 두 출력 모두 invalid.
+ * boolean을 생산하지 않는 데이터 통과 게이트 의미. 참/거짓 신호가 필요한
+ * 논리 회로는 별도의 Comparator 노드(추후 도입)가 담당.
  */
-const conditionalNodeDescriptor: NodeKindDescriptor<
-  Extract<Node, { kind: 'conditional' }>
+const conditionNodeDescriptor: NodeKindDescriptor<
+  Extract<Node, { kind: 'condition' }>
 > = {
-  kind: 'conditional',
+  kind: 'condition',
   outputsRaw: true,
   canBeFeedbackTarget: false,
   initialValue: () => undefined,
   initialValid: () => false,
   outputUnit: () => FREE_FALLBACK,
   propagate: (node, ctx) => {
-    const inputs: (number | undefined)[] = [undefined, undefined];
-    const filled = [false, false];
-
+    let value: number | undefined;
     for (const edge of ctx.incoming) {
       const slot = edge.slotIndex;
-      if (typeof slot !== 'number' || slot < 0 || slot > 1) continue;
-      if (filled[slot]) continue;
+      if (typeof slot !== 'number' || slot !== 0) continue;
       const source = ctx.model.nodes[edge.from];
       if (!source) continue;
       if (!isEdgeSourceValid(ctx, edge)) continue;
-      const value =
+      value =
         ctx.next[edge.from] ?? (isValueNode(source) ? source.initialValue : 0);
-      inputs[slot] = value;
-      filled[slot] = true;
+      break;
     }
 
-    if (!filled[0] || !filled[1]) {
+    if (value === undefined) {
       ctx.validOutputs.delete(outputKey(node.id, 0));
-      ctx.validOutputs.delete(outputKey(node.id, 1));
       return;
     }
 
-    const a = inputs[0] as number;
-    const b = inputs[1] as number;
     let cond: boolean;
     switch (node.operator) {
       case '>':
-        cond = a > b;
+        cond = value > node.threshold;
+        break;
+      case '<':
+        cond = value < node.threshold;
+        break;
+      case '>=':
+        cond = value >= node.threshold;
+        break;
+      case '<=':
+        cond = value <= node.threshold;
         break;
       case '==':
-        cond = a === b;
+        cond = value === node.threshold;
         break;
       case '!=':
-        cond = a !== b;
+        cond = value !== node.threshold;
         break;
       default:
         cond = false;
     }
 
-    // 두 출력 모두 A의 값. 활성 슬롯만 validOutputs에 등록.
-    ctx.next[node.id] = a;
     if (cond) {
+      ctx.next[node.id] = value;
       ctx.validOutputs.add(outputKey(node.id, 0));
-      ctx.validOutputs.delete(outputKey(node.id, 1));
     } else {
       ctx.validOutputs.delete(outputKey(node.id, 0));
-      ctx.validOutputs.add(outputKey(node.id, 1));
     }
   },
 };
@@ -370,7 +371,7 @@ export function createDefaultNodeKindRegistry(): NodeKindRegistry {
   return createNodeKindRegistry()
     .register(valueNodeDescriptor)
     .register(constantNodeDescriptor)
-    .register(conditionalNodeDescriptor)
+    .register(conditionNodeDescriptor)
     .register(expressionNodeDescriptor);
 }
 

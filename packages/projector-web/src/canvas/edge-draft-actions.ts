@@ -65,7 +65,7 @@ export function completeEdgeDraft(
     if (created && opts?.dropScreen) {
       const fromNode = model.nodes[fromNodeId];
       const fromIsValue = fromNode && isValueNode(fromNode);
-      const targetIsBranching = targetNode && targetNode.kind === 'conditional';
+      const targetIsBranching = targetNode && targetNode.kind === 'condition';
       if (fromIsValue && !targetIsBranching) {
         ui.openFunctionPicker(created.id, opts.dropScreen);
       }

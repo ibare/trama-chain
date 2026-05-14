@@ -1,7 +1,7 @@
 import { memo, useEffect, useMemo, useRef, useState } from 'react';
 import { tokens } from '@trama/tokens';
 import {
-  isConditionalNode,
+  isConditionNode,
   isExpressionNode,
   isValueNode,
   normalize,
@@ -11,7 +11,7 @@ import {
 import { useTrama } from '../store/index.js';
 import { shapeRegistry } from '../store/registries.js';
 import { getNodeLayout } from '../node/box.js';
-import { getConditionalNodeLayout } from '../node/conditional-box.js';
+import { getConditionNodeLayout } from '../node/condition-box.js';
 import { slotColor } from '../node/slot-palette.js';
 import { useExpressionMeasureStore } from '../expression/expression-measure-store.js';
 import type { FizzexMeasure } from '../expression/use-fizzex-renderer.js';
@@ -128,7 +128,7 @@ function EdgeViewImpl({
   // 슬롯 인식 노드(조건·식)는 model에 저장된 edge.slotIndex가 진실. 그 외(ValueNode
   // 다입력)는 핀 안 시각 순서로 socketIndex(엣지 생성 순) 사용.
   const effectiveSocket = toNode
-    ? isConditionalNode(toNode) || isExpressionNode(toNode)
+    ? isConditionNode(toNode) || isExpressionNode(toNode)
       ? (typeof edgeSlotIndex === 'number' ? edgeSlotIndex : 0)
       : socketIndex
     : 0;
@@ -405,13 +405,11 @@ export const EdgeView = memo(EdgeViewImpl);
 function rightOutputSocket(
   node: Node,
   fromIncomingCount: number,
-  sourceSlotIndex?: number,
+  _sourceSlotIndex?: number,
   measure?: FizzexMeasure,
 ): Point {
-  if (isConditionalNode(node)) {
-    const layout = getConditionalNodeLayout();
-    const idx = sourceSlotIndex === 1 ? 1 : 0;
-    const s = layout.outputSockets[idx]!;
+  if (isConditionNode(node)) {
+    const s = getConditionNodeLayout().outputSocket;
     return { x: s.x, y: s.y };
   }
   const layout = getNodeLayout(node, {
@@ -428,10 +426,8 @@ function leftInputSocket(
   socketIndex: number,
   measure?: FizzexMeasure,
 ): Point {
-  if (isConditionalNode(node)) {
-    const layout = getConditionalNodeLayout();
-    const idx = socketIndex === 1 ? 1 : 0;
-    const s = layout.inputSockets[idx]!;
+  if (isConditionNode(node)) {
+    const s = getConditionNodeLayout().inputSocket;
     return { x: s.x, y: s.y };
   }
   const layout = getNodeLayout(node, {

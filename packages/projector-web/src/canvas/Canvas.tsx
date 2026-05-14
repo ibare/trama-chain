@@ -6,7 +6,7 @@ import { NodeView } from '../node/NodeView.js';
 import { PulseLayer } from '../pulse/PulseLayer.js';
 import { EdgeDraftView } from './EdgeDraftView.js';
 import { CanvasContextMenu } from './CanvasContextMenu.js';
-import { isConditionalNode, isExpressionNode } from '@trama/core';
+import { isConditionNode, isExpressionNode } from '@trama/core';
 
 const ZOOM_MIN = 0.2;
 const ZOOM_MAX = 4;
@@ -190,7 +190,7 @@ export function Canvas(): JSX.Element {
         const tgt = model.nodes[e2.to];
         if (tgt && isExpressionNode(tgt)) {
           occupiedExpr.add(occupiedKey(e2.to, e2.slotIndex));
-        } else if (tgt && isConditionalNode(tgt)) {
+        } else if (tgt && isConditionNode(tgt)) {
           occupiedCond.add(occupiedKey(e2.to, e2.slotIndex));
         }
       }
@@ -202,7 +202,7 @@ export function Canvas(): JSX.Element {
         if (isExpressionNode(tgt)) {
           return !occupiedExpr.has(occupiedKey(entry.nodeId, entry.slotIndex));
         }
-        if (isConditionalNode(tgt)) {
+        if (isConditionNode(tgt)) {
           return !occupiedCond.has(occupiedKey(entry.nodeId, entry.slotIndex));
         }
         // ValueNode는 multi-incoming 가능 — 항상 후보.

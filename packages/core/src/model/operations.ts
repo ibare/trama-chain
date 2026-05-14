@@ -1,6 +1,6 @@
 import type {
-  ConditionalNode,
-  ConditionalOperator,
+  ConditionNode,
+  ConditionOperator,
   ConstantNode,
   Edge,
   EdgeId,
@@ -141,26 +141,29 @@ export function addExpressionNode(
   );
 }
 
-export interface AddConditionalNodeInput {
+export interface AddConditionNodeInput {
   label: string;
-  operator?: ConditionalOperator;
+  operator?: ConditionOperator;
+  /** 비교 임계값. 입력 단위의 raw 수치로 해석된다. */
+  threshold?: number;
   position?: { x: number; y: number } | null;
   isFocal?: boolean;
   description?: string | null;
   id?: NodeId;
 }
 
-export function addConditionalNode(
+export function addConditionNode(
   model: Model,
-  input: AddConditionalNodeInput,
+  input: AddConditionNodeInput,
   now?: number,
 ): Model {
   const id = input.id ?? makeNodeId();
-  const node: ConditionalNode = {
-    kind: 'conditional',
+  const node: ConditionNode = {
+    kind: 'condition',
     id,
     label: input.label,
     operator: input.operator ?? '>',
+    threshold: input.threshold ?? 0,
     position: input.position ?? null,
     isFocal: input.isFocal ?? false,
     description: input.description ?? null,
