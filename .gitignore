@@ -11,6 +11,9 @@ build/
 .vite/
 *.tsbuildinfo
 
+# npm pack 산출물 (호스트 전달용 tarball — 빌드로 재현 가능)
+*.tgz
+
 # 테스트
 coverage/
 

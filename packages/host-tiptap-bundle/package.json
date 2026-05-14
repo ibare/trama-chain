@@ -1,6 +1,6 @@
 {
   "name": "@trama/host-tiptap-bundle",
-  "version": "0.0.0",
+  "version": "0.1.0",
   "private": true,
   "type": "module",
   "description": "Self-contained ESM bundle of @trama/host-tiptap + projector-web + core + fizzex. 메티 등 외부 호스트 앱에서 단일 의존(file: tarball)으로 소비.",
