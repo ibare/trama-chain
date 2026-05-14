@@ -1,4 +1,4 @@
-import { memo, useCallback, useEffect, useState } from 'react';
+import { memo, useCallback, useEffect, useRef, useState } from 'react';
 import { tokens } from '@trama/tokens';
 import {
   isExpressionNode,
@@ -6,6 +6,12 @@ import {
   type EvalDiagnosis,
   type NodeId,
 } from '@trama/core';
+import {
+  astToLatex,
+  createStateFromLatex,
+  EditorView as FizzexEditor,
+  type EditorState as FizzexEditorState,
+} from 'fizzex';
 import { useModelStore, useUIStore } from '../store/index.js';
 import {
   useFizzexRenderer,
@@ -138,10 +144,20 @@ function ExpressionNodeViewImpl({ id }: Props): JSX.Element | null {
     [],
   );
 
-  // 인라인 LaTeX 편집 — textarea.
-  const [latexDraft, setLatexDraft] = useState(latex);
+  // 인라인 수식 편집 — fizzex EditorView. 진입 시점의 latex을 EditorState로 변환해
+  // initialState로 넘기고, 편집 중 최신 상태는 ref에 박아두었다가 커밋 시 astToLatex로
+  // 직렬화. LaTeX 문법을 모르는 사용자도 자동완성·키 바인딩으로 수식을 만들 수 있다.
+  const editorStateRef = useRef<FizzexEditorState | null>(null);
+  const [editorInitialState, setEditorInitialState] = useState<FizzexEditorState | null>(null);
   useEffect(() => {
-    if (editingNodeId === id) setLatexDraft(latex);
+    if (editingNodeId === id) {
+      const initial = createStateFromLatex(latex);
+      editorStateRef.current = initial;
+      setEditorInitialState(initial);
+    } else {
+      editorStateRef.current = null;
+      setEditorInitialState(null);
+    }
   }, [editingNodeId, id, latex]);
 
   const commitLatex = useCallback(() => {
@@ -149,13 +165,14 @@ function ExpressionNodeViewImpl({ id }: Props): JSX.Element | null {
       setEditingNode(null);
       return;
     }
-    const v = latexDraft.trim();
-    if (v && v !== node.latex) {
+    const state = editorStateRef.current;
+    const next = state ? astToLatex(state.ast).trim() : '';
+    if (next && next !== node.latex) {
       // variables는 model-store.updateNode가 fizzex.analyze 로 자동 동기화.
-      updateNode(id, { latex: v }, 'update-node', '식 편집');
+      updateNode(id, { latex: next }, 'update-node', '식 편집');
     }
     setEditingNode(null);
-  }, [id, latexDraft, node, setEditingNode, updateNode]);
+  }, [id, node, setEditingNode, updateNode]);
 
   // fizzex Canvas 렌더러를 host div의 마운트 라이프타임에 묶는다.
   // 편집/뷰 토글로 div가 remount되어도 callback ref가 새 view를 부착·재렌더.
@@ -219,24 +236,34 @@ function ExpressionNodeViewImpl({ id }: Props): JSX.Element | null {
         {node.label}
       </text>
 
-      {isEditing ? (
+      {isEditing && editorInitialState ? (
         <foreignObject x={body.x} y={body.y} width={body.w} height={body.h}>
-          <textarea
+          <div
             className="trama-expression-editor"
-            value={latexDraft}
-            autoFocus
-            onChange={(e) => setLatexDraft(e.target.value)}
-            onBlur={commitLatex}
+            onPointerDown={(e) => e.stopPropagation()}
             onKeyDown={(e) => {
               if (e.key === 'Enter' && (e.metaKey || e.ctrlKey)) {
                 e.preventDefault();
                 commitLatex();
               }
-              if (e.key === 'Escape') setEditingNode(null);
+              if (e.key === 'Escape') {
+                e.preventDefault();
+                setEditingNode(null);
+              }
             }}
-            onPointerDown={(e) => e.stopPropagation()}
-            placeholder="LaTeX 식 (예: a + b)"
-          />
+          >
+            <FizzexEditor
+              initialState={editorInitialState}
+              onChange={(s) => {
+                editorStateRef.current = s;
+              }}
+              autoSize
+              minWidth={Math.max(40, body.w - 8)}
+              minHeight={Math.max(36, body.h - 8)}
+              padding={4}
+              displayMode="inline"
+            />
+          </div>
         </foreignObject>
       ) : (
         <foreignObject x={body.x} y={body.y} width={body.w} height={body.h}>
