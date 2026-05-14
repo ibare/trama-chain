@@ -311,10 +311,16 @@ function ExpressionNodeViewImpl({ id }: Props): JSX.Element | null {
                 editorStateRef.current = s;
               }}
               autoSize
-              minWidth={Math.max(40, body.w - 8)}
-              minHeight={Math.max(36, body.h - 8)}
-              padding={4}
+              // body 영역을 최소 폭·높이로 — 짧은 식에서도 클릭 면적이 충분하고,
+              // 식이 길어지면 autoSize가 캔버스를 더 키운다 (foreignObject 경계를
+              // 넘어가도 commit 이후 view 재측정으로 노드 bbox가 따라 펴진다).
+              minWidth={Math.max(140, body.w - 8)}
+              minHeight={Math.max(48, body.h - 8)}
+              padding={6}
               displayMode="inline"
+              // LaTeX 명령어를 모르는 사용자가 분수·제곱·루트·그릭문자 등을 발견할 수
+              // 있게 자동완성 칩을 노출 — 본 교체의 핵심 가치.
+              showSuggestions
             />
           </EditorHost>
         </foreignObject>
