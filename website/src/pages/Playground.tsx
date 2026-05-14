@@ -13,14 +13,14 @@ function buildInitialJson(): string {
   m = addValueNode(m, {
     label: '입력',
     unitId: 'rating-10',
-    initialValue: 5,
+    initialNumber: 5,
     position: { x: 360, y: 280 },
     isFocal: false,
   });
   m = addValueNode(m, {
     label: '출력',
     unitId: 'rating-10',
-    initialValue: 0,
+    initialNumber: 0,
     position: { x: 760, y: 280 },
     isFocal: true,
   });

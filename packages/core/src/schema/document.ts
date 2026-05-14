@@ -75,6 +75,17 @@ export const ConditionNodeSchema = z.object({
   description: z.string().nullable().optional(),
 });
 
+export const ComparisonNodeSchema = z.object({
+  kind: z.literal('comparison'),
+  id: z.string(),
+  label: z.string(),
+  operator: ConditionOperatorSchema,
+  threshold: z.number(),
+  position: z.object({ x: z.number(), y: z.number() }).nullable(),
+  isFocal: z.boolean(),
+  description: z.string().nullable().optional(),
+});
+
 export const ExpressionNodeSchema = z.object({
   kind: z.literal('expression'),
   id: z.string(),
@@ -91,6 +102,7 @@ export const NodeSchema = z.discriminatedUnion('kind', [
   ValueNodeSchema,
   ConstantNodeSchema,
   ConditionNodeSchema,
+  ComparisonNodeSchema,
   ExpressionNodeSchema,
 ]);
 
@@ -131,5 +143,6 @@ export type TramaNode = z.infer<typeof NodeSchema>;
 export type TramaValueNode = z.infer<typeof ValueNodeSchema>;
 export type TramaConstantNode = z.infer<typeof ConstantNodeSchema>;
 export type TramaConditionNode = z.infer<typeof ConditionNodeSchema>;
+export type TramaComparisonNode = z.infer<typeof ComparisonNodeSchema>;
 export type TramaExpressionNode = z.infer<typeof ExpressionNodeSchema>;
 export type TramaEdge = z.infer<typeof EdgeSchema>;

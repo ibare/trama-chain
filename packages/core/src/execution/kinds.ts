@@ -404,6 +404,78 @@ const conditionNodeDescriptor: NodeKindDescriptor<
 };
 
 /**
+ * 비교 노드 디스크립터 — numeric 입력을 받아 boolean 출력을 *생산*하는 연산자.
+ *
+ * 동작:
+ *   1. 단일 numeric 슬롯(0)만 사용. source가 valid해야 함.
+ *   2. `value op node.threshold` 결과를 boolean Value로 next에 기록.
+ *      ConditionNode와 달리 입력값을 흘리는 게 아니라 boolean을 *만들어* 낸다.
+ *   3. 입력 source가 invalid·없음이면 출력도 invalid (boolean false를 노출하지 않음 —
+ *      "비교 자체가 의미 없다" vs "false다"가 구분되어야 한다).
+ *
+ * 통상의 사용: 노드 한 개로 numeric→boolean 변환. 결과를 boolean ValueNode·
+ * boolean Combiner와 연결해 논리 회로를 짠다.
+ */
+const comparisonNodeDescriptor: NodeKindDescriptor<
+  Extract<Node, { kind: 'comparison' }>
+> = {
+  kind: 'comparison',
+  outputsRaw: false,
+  canBeFeedbackTarget: false,
+  initialValue: () => undefined,
+  initialValid: () => false,
+  inputPortType: () => 'numeric',
+  outputPortType: () => 'boolean',
+  outputUnit: () => FREE_FALLBACK,
+  propagate: (node, ctx) => {
+    let value: number | undefined;
+    for (const edge of ctx.incoming) {
+      const slot = edge.slotIndex;
+      if (typeof slot === 'number' && slot !== 0) continue;
+      const source = ctx.model.nodes[edge.from];
+      if (!source) continue;
+      if (!isEdgeSourceValid(ctx, edge)) continue;
+      const n = getNumericNext(ctx, edge.from);
+      if (n === undefined) continue;
+      value = n;
+      break;
+    }
+
+    if (value === undefined) {
+      ctx.validOutputs.delete(outputKey(node.id, 0));
+      return;
+    }
+
+    let cond: boolean;
+    switch (node.operator) {
+      case '>':
+        cond = value > node.threshold;
+        break;
+      case '<':
+        cond = value < node.threshold;
+        break;
+      case '>=':
+        cond = value >= node.threshold;
+        break;
+      case '<=':
+        cond = value <= node.threshold;
+        break;
+      case '==':
+        cond = value === node.threshold;
+        break;
+      case '!=':
+        cond = value !== node.threshold;
+        break;
+      default:
+        cond = false;
+    }
+
+    ctx.next[node.id] = booleanValue(cond);
+    ctx.validOutputs.add(outputKey(node.id, 0));
+  },
+};
+
+/**
  * 식 노드 디스크립터.
  *
  * 동작:
@@ -515,6 +587,7 @@ export function createDefaultNodeKindRegistry(): NodeKindRegistry {
     .register(valueNodeDescriptor)
     .register(constantNodeDescriptor)
     .register(conditionNodeDescriptor)
+    .register(comparisonNodeDescriptor)
     .register(expressionNodeDescriptor);
 }
 

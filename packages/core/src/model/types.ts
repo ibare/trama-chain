@@ -84,6 +84,29 @@ export interface ConditionNode {
 }
 
 /**
+ * 비교 노드 — 단일 numeric 입력을 노드 내장 threshold와 비교해 그 결과를
+ * boolean으로 출력하는 *연산자* (게이트가 아니다).
+ *
+ * ConditionNode와의 구분:
+ *   - ConditionNode: 비교 결과를 통과/차단으로만 쓰고 *입력값*을 흘려보낸다.
+ *   - ComparisonNode: 비교 결과 자체를 boolean Value로 출력한다.
+ *
+ * 둘은 의미가 달라 한 노드로 합치지 않는다 — boolean을 가지고 일을 하려면
+ * ComparisonNode + boolean ValueNode 조합이 필요하다.
+ */
+export interface ComparisonNode {
+  kind: 'comparison';
+  id: NodeId;
+  label: string;
+  operator: ConditionOperator;
+  /** 비교 임계값. 입력 단위 도메인의 raw 수치로 해석된다. */
+  threshold: number;
+  position: { x: number; y: number } | null;
+  isFocal: boolean;
+  description?: string | null;
+}
+
+/**
  * 식 노드 — LaTeX 수식을 받고 자유변수·수학 상수를 모두 입력 슬롯으로 노출.
  * - `latex`: 원본 LaTeX 문자열 (fizzex parseLatex로 AST 변환).
  * - `variables`: 식이 요구하는 바인딩 이름 배열. 슬롯 인덱스 = 배열 인덱스.
@@ -110,6 +133,7 @@ export type Node =
   | ValueNode
   | ConstantNode
   | ConditionNode
+  | ComparisonNode
   | ExpressionNode;
 
 export function isValueNode(n: Node): n is ValueNode {
@@ -120,6 +144,9 @@ export function isConstantNode(n: Node): n is ConstantNode {
 }
 export function isConditionNode(n: Node): n is ConditionNode {
   return n.kind === 'condition';
+}
+export function isComparisonNode(n: Node): n is ComparisonNode {
+  return n.kind === 'comparison';
 }
 export function isExpressionNode(n: Node): n is ExpressionNode {
   return n.kind === 'expression';
