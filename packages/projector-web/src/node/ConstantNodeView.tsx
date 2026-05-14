@@ -58,6 +58,7 @@ function ConstantNodeViewImpl({ id }: Props): JSX.Element | null {
 
   const onSocketPointerDown = useCallback(
     (e: React.PointerEvent<SVGCircleElement>) => {
+      e.stopPropagation();
       (e.target as Element).setPointerCapture(e.pointerId);
       const lag: 0 | 1 = e.altKey ? 1 : 0;
       const startPoint = { x: pos.x + CARD_W / 2, y: pos.y };

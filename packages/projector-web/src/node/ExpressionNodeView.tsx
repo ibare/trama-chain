@@ -185,6 +185,7 @@ function ExpressionNodeViewImpl({ id }: Props): JSX.Element | null {
   const onSocketPointerDown = useCallback(
     (e: React.PointerEvent<SVGCircleElement>) => {
       if (!isValid || !node) return;
+      e.stopPropagation();
       (e.target as Element).setPointerCapture(e.pointerId);
       const lag: 0 | 1 = e.altKey ? 1 : 0;
       const layoutNow = getNodeLayout(node, {
@@ -346,6 +347,7 @@ function ExpressionNodeViewImpl({ id }: Props): JSX.Element | null {
               cx={s.x}
               cy={s.y}
               r={Math.max(SOCKET_SIZE, 12)}
+              onPointerDown={(e) => e.stopPropagation()}
             />
             <text
               className="trama-expression-var"

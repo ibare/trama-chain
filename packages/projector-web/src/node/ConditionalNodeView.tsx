@@ -70,6 +70,7 @@ function ConditionalNodeViewImpl({ id }: Props): JSX.Element | null {
     (slotIndex: 0 | 1, valid: boolean) => ({
       onPointerDown: (e: React.PointerEvent<SVGCircleElement>) => {
         if (!node || !valid) return;
+        e.stopPropagation();
         (e.target as Element).setPointerCapture(e.pointerId);
         const lag: 0 | 1 = e.altKey ? 1 : 0;
         const startPoint = {
@@ -194,6 +195,7 @@ function ConditionalNodeViewImpl({ id }: Props): JSX.Element | null {
               cx={s.x}
               cy={s.y}
               r={Math.max(SOCKET_SIZE, 12)}
+              onPointerDown={(e) => e.stopPropagation()}
             />
           </g>
         );

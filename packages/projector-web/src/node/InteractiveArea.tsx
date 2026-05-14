@@ -20,9 +20,10 @@ interface Props {
 /**
  * 노드 위에 얹는 인터랙티브 클릭 영역.
  *
- * NodeFrame이 drag rect를 z-order 가장 아래에 깔아 두므로, 그 위에 놓이는 이
- * 컴포넌트의 transparent hit `<rect>`가 클릭을 잡고, 같은 `<g>` 형제인 drag rect의
- * `onPointerDown`은 호출되지 않는다 (SVG hit-test는 topmost 요소에만 발화).
+ * NodeFrame은 outer `<g>`에 drag pointer 핸들러를 부착하므로, 자식에서 발생한
+ * pointerdown은 React 합성 이벤트로 outer까지 버블링되어 드래그를 트리거한다.
+ * 이를 막기 위해 hit `<rect>`에 `onPointerDown`/`onPointerMove`에서
+ * `stopPropagation`을 내장 부착 — 사용자는 신경 쓰지 않아도 된다.
  *
  * 자식(visual)은 자동으로 `pointer-events:none`이라 사용자가 별도 클래스/속성 없이
  * 텍스트·도형을 안전하게 얹을 수 있다.
@@ -62,6 +63,8 @@ export function InteractiveArea({
         rx={rx}
         ry={ry}
         fill="transparent"
+        onPointerDown={(e) => e.stopPropagation()}
+        onPointerMove={(e) => e.stopPropagation()}
         onClick={onClick}
         onDoubleClick={onDoubleClick}
       />

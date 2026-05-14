@@ -29,13 +29,18 @@ interface Props {
 /**
  * 노드 공통 뼈대.
  *
- * **핵심 구조**: drag hit `<rect>`를 자식보다 *먼저* 그려 z-order 가장 아래에 깐다.
- * 자식의 인터랙티브 요소(InteractiveArea·socket-hit 등)는 자체 hit-area를 갖고 z-order
- * 위에 와서 hit-testing에서 우선. 자식의 *장식* 요소(visual rect·label text)는
- * `pointer-events:none`이라 hit가 통과해 drag rect로 떨어진다.
+ * **핵심 구조**: drag 핸들러를 outer `<g>`에 부착한다. 자식 element 위에서
+ * 발생한 pointerdown은 React 합성 이벤트로 outer `<g>`까지 버블링되어 드래그가
+ * 시작된다 — 자식이 `<rect fill="transparent">`이든 `<foreignObject>`이든
+ * 동일하게 작동. 덕분에 식 노드처럼 본체를 foreignObject로 채우는 경우에도
+ * 드래그가 영역 어디서든 가능.
  *
- * 이 구조 덕에 새 인터랙티브 자식을 추가할 때 `stopPropagation` 같은 ad hoc
- * 처리를 매번 깔지 않아도 된다 — `<InteractiveArea>`로 감싸기만 하면 자동.
+ * 자식의 인터랙티브 요소(InteractiveArea·socket-hit 등)는 React 합성 이벤트
+ * 단계에서 `stopPropagation`을 호출해 outer로 버블링을 막아야 한다 —
+ * `<InteractiveArea>`는 자체 hit-rect에 이를 빌트인으로 부착하고 있다.
+ *
+ * 빈 본체 영역에서도 hit-test가 발생해야 하므로 transparent `<rect>`를 자식
+ * 첫머리에 깔아 영역을 정의 — 핸들러는 갖지 않고 fill만 제공.
  */
 function NodeFrameImpl({
   id,
@@ -71,14 +76,16 @@ function NodeFrameImpl({
   } | null>(null);
 
   const onPointerDown = useCallback(
-    (e: React.PointerEvent<SVGRectElement>) => {
+    (e: React.PointerEvent<SVGGElement>) => {
       if (canStartDrag && !canStartDrag()) return;
       const readOnly = uiStore.getState().readOnly;
       // readOnly에서도 노드 클릭 선택은 허용(셀렉션 = 비파괴 인터랙션). 드래그만 차단.
       e.stopPropagation();
       selectNode(id);
       if (readOnly) return;
-      (e.target as Element).setPointerCapture(e.pointerId);
+      // pointerCapture는 outer `<g>` 위에서 잡는다 — capture된 element가 sibling으로
+      // 떠나도 pointermove/up이 동일 element에 도달하도록.
+      e.currentTarget.setPointerCapture(e.pointerId);
       moveRef.current = {
         startClientX: e.clientX,
         startClientY: e.clientY,
@@ -95,7 +102,7 @@ function NodeFrameImpl({
   );
 
   const onPointerMove = useCallback(
-    (e: React.PointerEvent<SVGRectElement>) => {
+    (e: React.PointerEvent<SVGGElement>) => {
       const m = moveRef.current;
       if (!m) return;
       const dxClient = e.clientX - m.startClientX;
@@ -122,10 +129,10 @@ function NodeFrameImpl({
   );
 
   const onPointerUp = useCallback(
-    (e: React.PointerEvent<SVGRectElement>) => {
+    (e: React.PointerEvent<SVGGElement>) => {
       const m = moveRef.current;
       moveRef.current = null;
-      (e.target as Element).releasePointerCapture?.(e.pointerId);
+      e.currentTarget.releasePointerCapture?.(e.pointerId);
       if (m?.dragged && (m.lastDx !== 0 || m.lastDy !== 0)) {
         updateNode(id, {
           position: { x: m.startPosX + m.lastDx, y: m.startPosY + m.lastDy },
@@ -147,6 +154,10 @@ function NodeFrameImpl({
       className={rootClass}
       data-trama-node-id={id}
       transform={`translate(${pos.x} ${pos.y})`}
+      onPointerDown={onPointerDown}
+      onPointerMove={onPointerMove}
+      onPointerUp={onPointerUp}
+      onDoubleClick={onBodyDoubleClick}
     >
       <rect
         className="trama-node-drag-hit"
@@ -155,10 +166,6 @@ function NodeFrameImpl({
         width={width}
         height={height}
         fill="transparent"
-        onPointerDown={onPointerDown}
-        onPointerMove={onPointerMove}
-        onPointerUp={onPointerUp}
-        onDoubleClick={onBodyDoubleClick}
       />
       {children}
       {flashId > 0 && (
