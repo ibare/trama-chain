@@ -6,7 +6,7 @@ import { useTrama } from '../store/index.js';
 import { NodeFrame } from './NodeFrame.js';
 import { Socket } from './Socket.js';
 import { useOutputConnected } from './use-socket-connections.js';
-import { completeEdgeDraft } from '../canvas/edge-draft-actions.js';
+import { useEdgeDraftSource } from '../canvas/use-edge-draft-source.js';
 
 interface Props {
   id: NodeId;
@@ -32,14 +32,12 @@ function formatConstantValue(v: number): string {
 }
 
 function ConstantNodeViewImpl({ id }: Props): JSX.Element | null {
-  const instance = useTrama();
-  const { modelStore, uiStore } = instance;
+  const { modelStore, uiStore } = useTrama();
   const node = modelStore((s) => s.model.nodes[id]);
   const updateNode = modelStore((s) => s.updateNode);
   const selection = uiStore((s) => s.selection);
   const editingNodeId = uiStore((s) => s.editingNodeId);
   const setEditingNode = uiStore((s) => s.setEditingNode);
-  const startEdgeDraft = uiStore((s) => s.startEdgeDraft);
   const outputConnected = useOutputConnected(id);
 
   const pos = node?.position ?? { x: 200, y: 200 };
@@ -56,21 +54,12 @@ function ConstantNodeViewImpl({ id }: Props): JSX.Element | null {
     setEditingNode(id);
   }, [id, setEditingNode]);
 
-  const onSocketPointerDown = useCallback(
-    (e: React.PointerEvent<SVGCircleElement>) => {
-      e.stopPropagation();
-      (e.target as Element).setPointerCapture(e.pointerId);
-      const lag: 0 | 1 = e.altKey ? 1 : 0;
-      const startPoint = { x: pos.x + CARD_W / 2, y: pos.y };
-      startEdgeDraft({ fromNodeId: id, startPoint, pointer: startPoint, lag });
-    },
-    [id, pos.x, pos.y, startEdgeDraft],
+  const getOutputStartPoint = useCallback(
+    () => ({ x: pos.x + CARD_W / 2, y: pos.y }),
+    [pos.x, pos.y],
   );
-
-  const onSocketPointerUp = useCallback((e: React.PointerEvent<SVGCircleElement>) => {
-    (e.target as Element).releasePointerCapture?.(e.pointerId);
-    completeEdgeDraft(instance, { dropScreen: { x: e.clientX, y: e.clientY } });
-  }, [instance]);
+  const { onPointerDown: onSocketPointerDown, onPointerUp: onSocketPointerUp } =
+    useEdgeDraftSource(id, { getStartPoint: getOutputStartPoint });
 
   // 인라인 편집 — 임의 수면 value/label 모두, 카탈로그 상수면 label만.
   const [nameDraft, setNameDraft] = useState(labelDraftSeed);

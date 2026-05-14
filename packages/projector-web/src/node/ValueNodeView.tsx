@@ -13,7 +13,7 @@ import { InteractiveArea } from './InteractiveArea.js';
 import { Socket } from './Socket.js';
 import { useOutputConnected } from './use-socket-connections.js';
 import { slotColor } from './slot-palette.js';
-import { completeEdgeDraft } from '../canvas/edge-draft-actions.js';
+import { useEdgeDraftSource } from '../canvas/use-edge-draft-source.js';
 import { getLazySkin } from '../skin/registry.js';
 import '../skin/register-default-skins.js';
 
@@ -58,7 +58,6 @@ function ValueNodeViewImpl({ id, incomingCount }: Props): JSX.Element | null {
   const selectNode = uiStore((s) => s.selectNode);
   const editingNodeId = uiStore((s) => s.editingNodeId);
   const setEditingNode = uiStore((s) => s.setEditingNode);
-  const startEdgeDraft = uiStore((s) => s.startEdgeDraft);
   const openUnitInspector = uiStore((s) => s.openUnitInspector);
   const isSelected = uiStore(
     (s) => s.selection.kind === 'node' && s.selection.id === id,
@@ -95,26 +94,16 @@ function ValueNodeViewImpl({ id, incomingCount }: Props): JSX.Element | null {
     return unreg;
   }, [id, incomingCount, node, socketRegistry]);
 
-  const onSocketPointerDown = useCallback(
-    (e: React.PointerEvent<SVGCircleElement>) => {
-      if (!node) return;
-      e.stopPropagation();
-      (e.target as Element).setPointerCapture(e.pointerId);
-      const lag: 0 | 1 = e.altKey ? 1 : 0;
-      const layoutNow = getNodeLayout(node, { incomingCount });
-      const out = layoutNow.rightPin.sockets[0];
-      const startPoint = out
-        ? { x: pos.x + out.x, y: pos.y + out.y }
-        : { x: pos.x, y: pos.y };
-      startEdgeDraft({ fromNodeId: id, startPoint, pointer: startPoint, lag });
-    },
-    [id, incomingCount, node, pos.x, pos.y, startEdgeDraft],
-  );
-
-  const onSocketPointerUp = useCallback((e: React.PointerEvent<SVGCircleElement>) => {
-    (e.target as Element).releasePointerCapture?.(e.pointerId);
-    completeEdgeDraft(instance, { dropScreen: { x: e.clientX, y: e.clientY } });
-  }, [instance]);
+  const getOutputStartPoint = useCallback(() => {
+    if (!node) return { x: pos.x, y: pos.y };
+    const layoutNow = getNodeLayout(node, { incomingCount });
+    const out = layoutNow.rightPin.sockets[0];
+    return out
+      ? { x: pos.x + out.x, y: pos.y + out.y }
+      : { x: pos.x, y: pos.y };
+  }, [incomingCount, node, pos.x, pos.y]);
+  const { onPointerDown: onSocketPointerDown, onPointerUp: onSocketPointerUp } =
+    useEdgeDraftSource(id, { enabled: !!node, getStartPoint: getOutputStartPoint });
 
   const commitLabel = useCallback(
     (next: string) => {

@@ -16,7 +16,7 @@ import { NodeFrame } from './NodeFrame.js';
 import { InteractiveArea } from './InteractiveArea.js';
 import { Socket } from './Socket.js';
 import { useInputConnectionMask, useOutputConnected } from './use-socket-connections.js';
-import { completeEdgeDraft } from '../canvas/edge-draft-actions.js';
+import { useEdgeDraftSource } from '../canvas/use-edge-draft-source.js';
 import { slotColor } from './slot-palette.js';
 
 interface Props {
@@ -32,14 +32,12 @@ const CARD_CORNER = parseFloat(tokens.spacing.cardCornerRadius);
 const OPERATORS: ConditionalOperator[] = ['>', '==', '!='];
 
 function ConditionalNodeViewImpl({ id }: Props): JSX.Element | null {
-  const instance = useTrama();
-  const { modelStore, uiStore, socketRegistry } = instance;
+  const { modelStore, uiStore, socketRegistry } = useTrama();
   const node = modelStore((s) => s.model.nodes[id]);
   const trueValid = modelStore((s) => isOutputValid(s.executionState, id, 0));
   const falseValid = modelStore((s) => isOutputValid(s.executionState, id, 1));
   const updateNode = modelStore((s) => s.updateNode);
   const selection = uiStore((s) => s.selection);
-  const startEdgeDraft = uiStore((s) => s.startEdgeDraft);
   const inputMask = useInputConnectionMask(id);
   const outTrueConnected = useOutputConnected(id, 0);
   const outFalseConnected = useOutputConnected(id, 1);
@@ -66,32 +64,30 @@ function ConditionalNodeViewImpl({ id }: Props): JSX.Element | null {
     };
   }, [id, layout.inputSockets, socketRegistry]);
 
-  const makeOutputHandlers = useCallback(
-    (slotIndex: 0 | 1, valid: boolean) => ({
-      onPointerDown: (e: React.PointerEvent<SVGCircleElement>) => {
-        if (!node || !valid) return;
-        e.stopPropagation();
-        (e.target as Element).setPointerCapture(e.pointerId);
-        const lag: 0 | 1 = e.altKey ? 1 : 0;
-        const startPoint = {
-          x: pos.x + layout.outputSockets[slotIndex]!.x,
-          y: pos.y + layout.outputSockets[slotIndex]!.y,
-        };
-        startEdgeDraft({
-          fromNodeId: id,
-          startPoint,
-          pointer: startPoint,
-          lag,
-          sourceSlotIndex: slotIndex,
-        });
-      },
-      onPointerUp: (e: React.PointerEvent<SVGCircleElement>) => {
-        (e.target as Element).releasePointerCapture?.(e.pointerId);
-        completeEdgeDraft(instance, { dropScreen: { x: e.clientX, y: e.clientY } });
-      },
+  const getTrueStartPoint = useCallback(
+    () => ({
+      x: pos.x + layout.outputSockets[0]!.x,
+      y: pos.y + layout.outputSockets[0]!.y,
     }),
-    [id, instance, layout.outputSockets, node, pos.x, pos.y, startEdgeDraft],
+    [layout.outputSockets, pos.x, pos.y],
   );
+  const getFalseStartPoint = useCallback(
+    () => ({
+      x: pos.x + layout.outputSockets[1]!.x,
+      y: pos.y + layout.outputSockets[1]!.y,
+    }),
+    [layout.outputSockets, pos.x, pos.y],
+  );
+  const trueHandlers = useEdgeDraftSource(id, {
+    enabled: !!node && trueValid,
+    getStartPoint: getTrueStartPoint,
+    sourceSlotIndex: 0,
+  });
+  const falseHandlers = useEdgeDraftSource(id, {
+    enabled: !!node && falseValid,
+    getStartPoint: getFalseStartPoint,
+    sourceSlotIndex: 1,
+  });
 
   const onOperatorClick = useCallback(() => {
     if (uiStore.getState().readOnly) return;
@@ -203,7 +199,7 @@ function ConditionalNodeViewImpl({ id }: Props): JSX.Element | null {
 
       {/* 출력 슬롯 (TR=참, BR=거짓) — 두 슬롯 모두 항상 노출, valid 여부는 상태 클래스로. */}
       {outputSlots.map((s) => {
-        const handlers = makeOutputHandlers(s.slot, s.valid);
+        const handlers = s.slot === 0 ? trueHandlers : falseHandlers;
         const slotConnected = s.slot === 0 ? outTrueConnected : outFalseConnected;
         return (
           <g key={`out${s.slot}`} className={s.valid ? '' : 'is-inactive-output'}>

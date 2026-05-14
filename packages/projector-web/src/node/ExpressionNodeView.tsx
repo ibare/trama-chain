@@ -25,7 +25,7 @@ import {
   useInputConnectionMask,
   useOutputConnected,
 } from './use-socket-connections.js';
-import { completeEdgeDraft } from '../canvas/edge-draft-actions.js';
+import { useEdgeDraftSource } from '../canvas/use-edge-draft-source.js';
 import { getNodeLayout } from './box.js';
 import { slotColor } from './slot-palette.js';
 
@@ -115,8 +115,7 @@ function formatInvalidReason(d: EvalDiagnosis & { ok: false }): string {
 }
 
 function ExpressionNodeViewImpl({ id }: Props): JSX.Element | null {
-  const instance = useTrama();
-  const { modelStore, uiStore, socketRegistry } = instance;
+  const { modelStore, uiStore, socketRegistry } = useTrama();
   const node = modelStore((s) => s.model.nodes[id]);
   const isValid = modelStore((s) => isNodeValid(s.executionState, id));
   const invalidReason = modelStore((s) => s.executionState.invalidReasons[id]);
@@ -124,7 +123,6 @@ function ExpressionNodeViewImpl({ id }: Props): JSX.Element | null {
   const selection = uiStore((s) => s.selection);
   const editingNodeId = uiStore((s) => s.editingNodeId);
   const setEditingNode = uiStore((s) => s.setEditingNode);
-  const startEdgeDraft = uiStore((s) => s.startEdgeDraft);
   const inputMask = useInputConnectionMask(id);
   const outputConnected = useOutputConnected(id);
 
@@ -198,32 +196,22 @@ function ExpressionNodeViewImpl({ id }: Props): JSX.Element | null {
     [id, setEditingNode],
   );
 
-  const onSocketPointerDown = useCallback(
-    (e: React.PointerEvent<SVGCircleElement>) => {
-      if (!isValid || !node) return;
-      e.stopPropagation();
-      (e.target as Element).setPointerCapture(e.pointerId);
-      const lag: 0 | 1 = e.altKey ? 1 : 0;
-      const layoutNow = getNodeLayout(node, {
-        incomingCount: variables.length,
-        expressionSize: measured ?? undefined,
-      });
-      const out = layoutNow.rightPin.sockets[0];
-      const startPoint = out
-        ? { x: pos.x + out.x, y: pos.y + out.y }
-        : { x: pos.x, y: pos.y };
-      startEdgeDraft({ fromNodeId: id, startPoint, pointer: startPoint, lag });
-    },
-    [id, isValid, measured, node, pos.x, pos.y, startEdgeDraft, variables.length],
-  );
-
-  const onSocketPointerUp = useCallback(
-    (e: React.PointerEvent<SVGCircleElement>) => {
-      (e.target as Element).releasePointerCapture?.(e.pointerId);
-      completeEdgeDraft(instance, { dropScreen: { x: e.clientX, y: e.clientY } });
-    },
-    [instance],
-  );
+  const getOutputStartPoint = useCallback(() => {
+    if (!node) return { x: pos.x, y: pos.y };
+    const layoutNow = getNodeLayout(node, {
+      incomingCount: variables.length,
+      expressionSize: measured ?? undefined,
+    });
+    const out = layoutNow.rightPin.sockets[0];
+    return out
+      ? { x: pos.x + out.x, y: pos.y + out.y }
+      : { x: pos.x, y: pos.y };
+  }, [measured, node, pos.x, pos.y, variables.length]);
+  const { onPointerDown: onSocketPointerDown, onPointerUp: onSocketPointerUp } =
+    useEdgeDraftSource(id, {
+      enabled: isValid && !!node,
+      getStartPoint: getOutputStartPoint,
+    });
 
   // 인라인 수식 편집 — fizzex EditorView. 진입 시점의 latex을 EditorState로 변환해
   // initialState로 넘기고, 편집 중 최신 상태는 ref에 박아두었다가 커밋 시 astToLatex로
