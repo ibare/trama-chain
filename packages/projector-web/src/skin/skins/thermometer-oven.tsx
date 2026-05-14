@@ -121,7 +121,7 @@ export function ThermometerOven({
     (e: React.PointerEvent<SVGGElement>) => {
       if (!onScrub) return;
       e.stopPropagation();
-      (e.target as Element).setPointerCapture(e.pointerId);
+      e.currentTarget.setPointerCapture(e.pointerId);
       dragRef.current = {
         startClientY: e.clientY,
         startRatio: ratio,
@@ -140,7 +140,7 @@ export function ThermometerOven({
   );
 
   const onPointerUp = useCallback((e: React.PointerEvent<SVGGElement>) => {
-    (e.target as Element).releasePointerCapture?.(e.pointerId);
+    e.currentTarget.releasePointerCapture?.(e.pointerId);
     dragRef.current = null;
   }, []);
 

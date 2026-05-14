@@ -269,7 +269,7 @@ function EdgeViewImpl({
 
   const onTipPointerDown = (e: React.PointerEvent<SVGCircleElement>): void => {
     e.stopPropagation();
-    (e.target as Element).setPointerCapture(e.pointerId);
+    e.currentTarget.setPointerCapture(e.pointerId);
     const cable = cableRef.current!;
     const { tip } = cableEndTangent(cable);
     startEdgeDraft({
@@ -283,7 +283,7 @@ function EdgeViewImpl({
   };
 
   const onTipPointerUp = (e: React.PointerEvent<SVGCircleElement>): void => {
-    (e.target as Element).releasePointerCapture?.(e.pointerId);
+    e.currentTarget.releasePointerCapture?.(e.pointerId);
     completeEdgeDraft(instance, { dropScreen: { x: e.clientX, y: e.clientY } });
   };
 

@@ -110,7 +110,7 @@ export function Canvas(): JSX.Element {
       closeCanvasContextMenu();
       // 좌클릭만 패닝.
       if (e.button !== 0) return;
-      target.setPointerCapture?.(e.pointerId);
+      e.currentTarget.setPointerCapture?.(e.pointerId);
       const v = viewportRef.current;
       panRef.current = {
         startClientX: e.clientX,
@@ -228,7 +228,7 @@ export function Canvas(): JSX.Element {
   const onPointerUp = useCallback(
     (e: React.PointerEvent<SVGSVGElement>) => {
       if (panRef.current) {
-        (e.target as Element).releasePointerCapture?.(panRef.current.pointerId);
+        e.currentTarget.releasePointerCapture?.(panRef.current.pointerId);
         panRef.current = null;
       }
       if (edgeDraft) endEdgeDraft();

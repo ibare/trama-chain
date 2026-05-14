@@ -75,7 +75,7 @@ export function NodeBorderTrack({ node, halfW, trackY }: Props): JSX.Element | n
   const onPointerDown = useCallback(
     (e: React.PointerEvent<SVGRectElement>) => {
       e.stopPropagation();
-      (e.target as Element).setPointerCapture(e.pointerId);
+      e.currentTarget.setPointerCapture(e.pointerId);
       dragRef.current = {
         startClientX: e.clientX,
         startValue: value,
@@ -95,7 +95,7 @@ export function NodeBorderTrack({ node, halfW, trackY }: Props): JSX.Element | n
   );
 
   const onPointerUp = useCallback((e: React.PointerEvent<SVGRectElement>) => {
-    (e.target as Element).releasePointerCapture?.(e.pointerId);
+    e.currentTarget.releasePointerCapture?.(e.pointerId);
     dragRef.current = null;
   }, []);
 
