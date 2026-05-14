@@ -39,6 +39,23 @@ registerNodeKindUI({
         setEditingNode(node.id);
       },
     },
+    {
+      key: 'value-boolean',
+      label: '참/거짓 값 노드',
+      symbol: '⊤',
+      onSelect: (canvasPos) => {
+        const addNode = instance.modelStore.getState().addNode;
+        const setEditingNode = instance.uiStore.getState().setEditingNode;
+        const node = addNode({
+          label: '플래그',
+          unitId: 'free',
+          initialValue: booleanValue(false),
+          combiner: 'or',
+          position: canvasPos,
+        });
+        setEditingNode(node.id);
+      },
+    },
   ],
 });
 
