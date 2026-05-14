@@ -54,7 +54,10 @@ function ValueNodeViewImpl({ id, incomingCount }: Props): JSX.Element | null {
     return false;
   });
 
-  const pos = node?.position ?? { x: 200, y: 200 };
+  // 좌표는 아래 가드 `!node || !node.position`이 통과해야만 의미를 갖는다.
+  // hook 순서를 깨지 않기 위한 primitive 폴백 — 화면에는 도달하지 않는다.
+  const posX = node?.position?.x ?? 0;
+  const posY = node?.position?.y ?? 0;
   const layout = useNodeLayout(node, { incomingCount });
 
   const onBodyDoubleClick = useCallback(() => {
@@ -73,9 +76,9 @@ function ValueNodeViewImpl({ id, incomingCount }: Props): JSX.Element | null {
   const getOutputStartPoint = useCallback(() => {
     const out = layout?.rightPin.sockets[0];
     return out
-      ? { x: pos.x + out.x, y: pos.y + out.y }
-      : { x: pos.x, y: pos.y };
-  }, [layout, pos.x, pos.y]);
+      ? { x: posX + out.x, y: posY + out.y }
+      : { x: posX, y: posY };
+  }, [layout, posX, posY]);
   const { onPointerDown: onSocketPointerDown, onPointerUp: onSocketPointerUp } =
     useEdgeDraftSource(id, { enabled: !!layout, getStartPoint: getOutputStartPoint });
 
@@ -100,6 +103,7 @@ function ValueNodeViewImpl({ id, incomingCount }: Props): JSX.Element | null {
 
   if (!node) return null;
   if (!isValueNode(node)) return null;
+  if (!node.position) return null;
   if (!layout) return null;
 
   const { halfW, halfH, width, height } = layout;
@@ -122,7 +126,7 @@ function ValueNodeViewImpl({ id, incomingCount }: Props): JSX.Element | null {
   return (
     <NodeFrame
       id={id}
-      pos={pos}
+      pos={node.position}
       width={width}
       height={height}
       onBodyDoubleClick={onBodyDoubleClick}

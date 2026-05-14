@@ -42,7 +42,10 @@ function ConditionalNodeViewImpl({ id }: Props): JSX.Element | null {
   const outTrueConnected = useOutputConnected(id, 0);
   const outFalseConnected = useOutputConnected(id, 1);
 
-  const pos = node?.position ?? { x: 200, y: 200 };
+  // 좌표는 아래 가드 `!node ... || !node.position`이 통과해야만 의미를 갖는다.
+  // hook 순서를 깨지 않기 위한 primitive 폴백 — 화면에는 도달하지 않는다.
+  const posX = node?.position?.x ?? 0;
+  const posY = node?.position?.y ?? 0;
   const layout = getConditionalNodeLayout();
   const { halfH } = layout;
 
@@ -66,17 +69,17 @@ function ConditionalNodeViewImpl({ id }: Props): JSX.Element | null {
 
   const getTrueStartPoint = useCallback(
     () => ({
-      x: pos.x + layout.outputSockets[0]!.x,
-      y: pos.y + layout.outputSockets[0]!.y,
+      x: posX + layout.outputSockets[0]!.x,
+      y: posY + layout.outputSockets[0]!.y,
     }),
-    [layout.outputSockets, pos.x, pos.y],
+    [layout.outputSockets, posX, posY],
   );
   const getFalseStartPoint = useCallback(
     () => ({
-      x: pos.x + layout.outputSockets[1]!.x,
-      y: pos.y + layout.outputSockets[1]!.y,
+      x: posX + layout.outputSockets[1]!.x,
+      y: posY + layout.outputSockets[1]!.y,
     }),
-    [layout.outputSockets, pos.x, pos.y],
+    [layout.outputSockets, posX, posY],
   );
   const trueHandlers = useEdgeDraftSource(id, {
     enabled: !!node && trueValid,
@@ -97,7 +100,7 @@ function ConditionalNodeViewImpl({ id }: Props): JSX.Element | null {
     updateNode(id, { operator: next });
   }, [id, node, uiStore, updateNode]);
 
-  if (!node || !isConditionalNode(node)) return null;
+  if (!node || !isConditionalNode(node) || !node.position) return null;
 
   const isSelected = selection.kind === 'node' && selection.id === id;
   // 노드 활성 상태: 양 입력이 모두 valid해야 출력이 살아남는다.
@@ -130,7 +133,7 @@ function ConditionalNodeViewImpl({ id }: Props): JSX.Element | null {
   return (
     <NodeFrame
       id={id}
-      pos={pos}
+      pos={node.position}
       width={CARD_W}
       height={CARD_H}
       className={`trama-conditional-node${isActive ? '' : ' is-invalid'}`}

@@ -128,7 +128,10 @@ function ExpressionNodeViewImpl({ id }: Props): JSX.Element | null {
   const inputMask = useInputConnectionMask(id);
   const outputConnected = useOutputConnected(id);
 
-  const pos = node?.position ?? { x: 200, y: 200 };
+  // 좌표는 아래 가드 `!node ... || !node.position`이 통과해야만 의미를 갖는다.
+  // hook 순서를 깨지 않기 위한 primitive 폴백 — 화면에는 도달하지 않는다.
+  const posX = node?.position?.x ?? 0;
+  const posY = node?.position?.y ?? 0;
   const latex = node && isExpressionNode(node) ? node.latex : '';
   const variables = node && isExpressionNode(node) ? node.variables : [];
 
@@ -193,9 +196,9 @@ function ExpressionNodeViewImpl({ id }: Props): JSX.Element | null {
   const getOutputStartPoint = useCallback(() => {
     const out = layout?.rightPin.sockets[0];
     return out
-      ? { x: pos.x + out.x, y: pos.y + out.y }
-      : { x: pos.x, y: pos.y };
-  }, [layout, pos.x, pos.y]);
+      ? { x: posX + out.x, y: posY + out.y }
+      : { x: posX, y: posY };
+  }, [layout, posX, posY]);
   const { onPointerDown: onSocketPointerDown, onPointerUp: onSocketPointerUp } =
     useEdgeDraftSource(id, {
       enabled: isValid && !!layout,
@@ -256,7 +259,7 @@ function ExpressionNodeViewImpl({ id }: Props): JSX.Element | null {
     onMeasure,
   );
 
-  if (!node || !isExpressionNode(node)) return null;
+  if (!node || !isExpressionNode(node) || !node.position) return null;
   if (!layout) return null;
 
   const { width, height, halfW, halfH, textX, labelY } = layout;
@@ -279,7 +282,7 @@ function ExpressionNodeViewImpl({ id }: Props): JSX.Element | null {
   return (
     <NodeFrame
       id={id}
-      pos={pos}
+      pos={node.position}
       width={width}
       height={height}
       className={`trama-expression-node${isValid ? '' : ' is-invalid'}`}

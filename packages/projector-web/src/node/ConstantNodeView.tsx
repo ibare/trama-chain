@@ -41,7 +41,10 @@ function ConstantNodeViewImpl({ id }: Props): JSX.Element | null {
   const setEditingNode = uiStore((s) => s.setEditingNode);
   const outputConnected = useOutputConnected(id);
 
-  const pos = node?.position ?? { x: 200, y: 200 };
+  // 좌표는 아래 가드 `!node ... || !node.position`이 통과해야만 의미를 갖는다.
+  // hook 순서를 깨지 않기 위한 primitive 폴백 — 화면에는 도달하지 않는다.
+  const posX = node?.position?.x ?? 0;
+  const posY = node?.position?.y ?? 0;
   const labelDraftSeed = node?.label ?? '';
   const valueDraftSeed = node && isConstantNode(node) ? node.value : 0;
   const isCustom = node && isConstantNode(node) && (node.constantKey ?? '') === 'custom';
@@ -53,8 +56,8 @@ function ConstantNodeViewImpl({ id }: Props): JSX.Element | null {
   }, [id, setEditingNode]);
 
   const getOutputStartPoint = useCallback(
-    () => ({ x: pos.x + CARD_W / 2, y: pos.y }),
-    [pos.x, pos.y],
+    () => ({ x: posX + CARD_W / 2, y: posY }),
+    [posX, posY],
   );
   const { onPointerDown: onSocketPointerDown, onPointerUp: onSocketPointerUp } =
     useEdgeDraftSource(id, { getStartPoint: getOutputStartPoint });
@@ -87,7 +90,7 @@ function ConstantNodeViewImpl({ id }: Props): JSX.Element | null {
     setEditingNode(null);
   }, [id, isCustom, nameDraft, node, setEditingNode, updateNode, valueDraft]);
 
-  if (!node || !isConstantNode(node)) return null;
+  if (!node || !isConstantNode(node) || !node.position) return null;
 
   const halfW = CARD_W / 2;
   const halfH = CARD_H / 2;
@@ -105,7 +108,7 @@ function ConstantNodeViewImpl({ id }: Props): JSX.Element | null {
   return (
     <NodeFrame
       id={id}
-      pos={pos}
+      pos={node.position}
       width={CARD_W}
       height={CARD_H}
       className="trama-constant-node"
