@@ -140,6 +140,7 @@ export function Canvas(): JSX.Element {
 
   const onCanvasDoubleClick = useCallback(
     (e: React.MouseEvent<SVGSVGElement>) => {
+      if (useUIStore.getState().readOnly) return;
       const target = e.target as Element;
       if (target !== e.currentTarget && !target.classList?.contains?.('trama-canvas-bg')) return;
       const pos = toCanvasCoords(e.clientX, e.clientY);
@@ -267,6 +268,8 @@ export function Canvas(): JSX.Element {
 
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
+      // readOnly에서는 모델 변경 단축키 전부 비활성. 셀렉션·pan/zoom은 유지된다.
+      if (useUIStore.getState().readOnly) return;
       const mod = e.metaKey || e.ctrlKey;
       if (mod && e.key.toLowerCase() === 'z' && !e.shiftKey) {
         e.preventDefault();

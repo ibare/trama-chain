@@ -63,6 +63,13 @@ export interface RunFlashState {
 
 export interface UIStore {
   selection: Selection;
+  /**
+   * 읽기 전용 모드. 호스트(Tiptap 등) 임배딩에서 마운트 어댑터가 set.
+   * 진실 출처는 단일 — 이 플래그가 켜지면 mutator setter들이 일찍 no-op하고
+   * 인터랙티브 진입점(노드 드래그·컨텍스트 메뉴·키보드 삭제 등)에서도 가드한다.
+   * pan/zoom·셀렉션·플래시 같은 비파괴 인터랙션은 그대로 유지.
+   */
+  readOnly: boolean;
   /** 진행 중인 엣지 드래그 */
   edgeDraft: EdgeDraft | null;
   /** 엣지에 새 노드 끼워넣기 의도 */
@@ -77,6 +84,8 @@ export interface UIStore {
   editingNodeId: NodeId | null;
   /** N-step 실행 시 현재 시각화 단계 (애니메이션용) */
   runFlash: RunFlashState | null;
+
+  setReadOnly: (v: boolean) => void;
 
   selectNode: (id: NodeId) => void;
   selectEdge: (id: EdgeId) => void;
@@ -116,8 +125,9 @@ export interface UIStore {
   setRunFlash: (s: RunFlashState | null) => void;
 }
 
-export const useUIStore = create<UIStore>((set) => ({
+export const useUIStore = create<UIStore>((set, get) => ({
   selection: { kind: 'none' },
+  readOnly: false,
   edgeDraft: null,
   insertNodeIntent: null,
   functionPicker: null,
@@ -125,6 +135,24 @@ export const useUIStore = create<UIStore>((set) => ({
   canvasContextMenu: null,
   editingNodeId: null,
   runFlash: null,
+
+  setReadOnly: (v) => {
+    if (get().readOnly === v) return;
+    if (v) {
+      // 켤 때 진행 중이던 인터랙션 상태들을 청소. 안 그러면 잔여 패널이 떠 있을 수 있다.
+      set({
+        readOnly: true,
+        edgeDraft: null,
+        insertNodeIntent: null,
+        functionPicker: null,
+        unitInspector: null,
+        canvasContextMenu: null,
+        editingNodeId: null,
+      });
+    } else {
+      set({ readOnly: false });
+    }
+  },
 
   selectNode: (id) => set({ selection: { kind: 'node', id } }),
   selectEdge: (id) => set({ selection: { kind: 'edge', id } }),
@@ -137,7 +165,8 @@ export const useUIStore = create<UIStore>((set) => ({
     lag = 0,
     sourceSlotIndex,
     detachingEdgeId,
-  }) =>
+  }) => {
+    if (get().readOnly) return;
     set({
       edgeDraft: {
         fromNodeId,
@@ -148,7 +177,8 @@ export const useUIStore = create<UIStore>((set) => ({
         snap: null,
         detachingEdgeId: detachingEdgeId ?? null,
       },
-    }),
+    });
+  },
   updateEdgeDraft: (patch) =>
     set((s) => {
       if (!s.edgeDraft) return {};
@@ -160,20 +190,33 @@ export const useUIStore = create<UIStore>((set) => ({
     }),
   endEdgeDraft: () => set({ edgeDraft: null }),
 
-  startInsertNodeFromEdge: (edgeId, position) =>
-    set({ insertNodeIntent: { edgeId, position } }),
+  startInsertNodeFromEdge: (edgeId, position) => {
+    if (get().readOnly) return;
+    set({ insertNodeIntent: { edgeId, position } });
+  },
   clearInsertNodeIntent: () => set({ insertNodeIntent: null }),
 
-  openFunctionPicker: (edgeId, anchor) => set({ functionPicker: { edgeId, anchor } }),
+  openFunctionPicker: (edgeId, anchor) => {
+    if (get().readOnly) return;
+    set({ functionPicker: { edgeId, anchor } });
+  },
   closeFunctionPicker: () => set({ functionPicker: null }),
 
-  openUnitInspector: (nodeId) => set({ unitInspector: { nodeId } }),
+  openUnitInspector: (nodeId) => {
+    if (get().readOnly) return;
+    set({ unitInspector: { nodeId } });
+  },
   closeUnitInspector: () => set({ unitInspector: null }),
 
-  openCanvasContextMenu: (screen, canvas) =>
-    set({ canvasContextMenu: { screen, canvas } }),
+  openCanvasContextMenu: (screen, canvas) => {
+    if (get().readOnly) return;
+    set({ canvasContextMenu: { screen, canvas } });
+  },
   closeCanvasContextMenu: () => set({ canvasContextMenu: null }),
 
-  setEditingNode: (id) => set({ editingNodeId: id }),
+  setEditingNode: (id) => {
+    if (id !== null && get().readOnly) return;
+    set({ editingNodeId: id });
+  },
   setRunFlash: (s) => set({ runFlash: s }),
 }));

@@ -92,6 +92,7 @@ function ConditionalNodeViewImpl({ id }: Props): JSX.Element | null {
   );
 
   const onOperatorClick = useCallback(() => {
+    if (useUIStore.getState().readOnly) return;
     if (!node || !isConditionalNode(node)) return;
     const idx = OPERATORS.indexOf(node.operator);
     const next = OPERATORS[(idx + 1) % OPERATORS.length]!;

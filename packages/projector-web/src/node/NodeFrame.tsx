@@ -77,9 +77,12 @@ function NodeFrameImpl({
   const onPointerDown = useCallback(
     (e: React.PointerEvent<SVGRectElement>) => {
       if (canStartDrag && !canStartDrag()) return;
+      const readOnly = useUIStore.getState().readOnly;
+      // readOnly에서도 노드 클릭 선택은 허용(셀렉션 = 비파괴 인터랙션). 드래그만 차단.
       e.stopPropagation();
-      (e.target as Element).setPointerCapture(e.pointerId);
       selectNode(id);
+      if (readOnly) return;
+      (e.target as Element).setPointerCapture(e.pointerId);
       moveRef.current = {
         startClientX: e.clientX,
         startClientY: e.clientY,

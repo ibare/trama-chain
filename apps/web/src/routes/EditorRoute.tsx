@@ -1,4 +1,4 @@
-import { useCallback, useMemo } from 'react';
+import { useCallback, useMemo, useState } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
 import { TramaEditor, shapeRegistry, combinerRegistry } from '@trama/projector-web';
 import { documentToModel, parseTrama } from '@trama/core';
@@ -7,6 +7,8 @@ import { exportMarkdown, loadModelJson, saveModel } from '../storage.js';
 export function EditorRoute(): JSX.Element {
   const { id } = useParams<{ id: string }>();
   const navigate = useNavigate();
+  // Step 1 검증용 임시 토글. Step 4 sandbox 통과하면 제거.
+  const [readOnly, setReadOnly] = useState(false);
 
   const initialJson = useMemo(() => (id ? loadModelJson(id) : null), [id]);
 
@@ -64,7 +66,7 @@ export function EditorRoute(): JSX.Element {
 
   return (
     <div style={{ position: 'relative', width: '100vw', height: '100vh' }}>
-      <TramaEditor initialJson={initialJson} onChange={onChange} />
+      <TramaEditor initialJson={initialJson} onChange={onChange} readOnly={readOnly} />
       <div
         style={{
           position: 'absolute',
@@ -76,6 +78,14 @@ export function EditorRoute(): JSX.Element {
           pointerEvents: 'auto',
         }}
       >
+        <button
+          type="button"
+          onClick={() => setReadOnly((v) => !v)}
+          style={{ ...menuButton, background: readOnly ? '#e8d8b8' : menuButton.background }}
+          title="읽기 전용 토글 (Step 1 검증용)"
+        >
+          {readOnly ? '읽기 전용 ON' : '읽기 전용 OFF'}
+        </button>
         <button
           type="button"
           onClick={() => navigate('/')}
