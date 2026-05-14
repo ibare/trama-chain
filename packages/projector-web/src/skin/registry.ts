@@ -1,5 +1,5 @@
 import { lazy, type LazyExoticComponent } from 'react';
-import type { ResolvedUnit } from '@trama/core';
+import type { ResolvedUnit, ValueKind } from '@trama/core';
 import type { SkinComponent, SkinDefinition } from './types.js';
 
 const map = new Map<string, SkinDefinition>();
@@ -17,8 +17,22 @@ export function listAllSkins(): SkinDefinition[] {
   return Array.from(map.values());
 }
 
+/**
+ * 주어진 numeric ResolvedUnit에 적용 가능한 스킨 목록. 스킨의 valueKind가
+ * 'numeric'이고 unitId가 노드 단위와 일치해야 후보가 된다.
+ */
 export function listSkinsForUnit(unit: ResolvedUnit): SkinDefinition[] {
-  return Array.from(map.values()).filter((s) => s.domain.unit === unit.id);
+  return Array.from(map.values()).filter(
+    (s) => s.domain.valueKind === 'numeric' && s.domain.unitId === unit.id,
+  );
+}
+
+/**
+ * 주어진 ValueKind에 적용 가능한 스킨 목록. boolean ValueNode가 사용한다 —
+ * boolean 스킨은 단위 개념이 없어 unitId 매칭이 불필요하다.
+ */
+export function listSkinsForValueKind(kind: ValueKind): SkinDefinition[] {
+  return Array.from(map.values()).filter((s) => s.domain.valueKind === kind);
 }
 
 /**

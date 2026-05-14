@@ -114,6 +114,8 @@ export function UnitInspector({ node }: Props): JSX.Element {
     (key: string) => {
       const def = skinCandidates.find((d) => d.key === key);
       if (!def) return;
+      // UnitInspector는 numeric ValueNode 전용 — 후보 스킨도 numeric 도메인뿐.
+      if (def.domain.valueKind !== 'numeric') return;
       const r = def.domain.range;
       const newInitial = Math.max(r.min, Math.min(currentInitialNumber, r.max));
       updateNode(node.id, {
