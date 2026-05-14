@@ -36,7 +36,7 @@ function ConstantNodeViewImpl({ id }: Props): JSX.Element | null {
   const node = modelStore((s) => s.model.nodes[id]);
   const updateNode = modelStore((s) => s.updateNode);
   const selection = uiStore((s) => s.selection);
-  const editingNodeId = uiStore((s) => s.editingNodeId);
+  const isEditing = uiStore((s) => s.editingNode?.id === id);
   const setEditingNode = uiStore((s) => s.setEditingNode);
   const outputConnected = useOutputConnected(id);
 
@@ -62,11 +62,11 @@ function ConstantNodeViewImpl({ id }: Props): JSX.Element | null {
   const [nameDraft, setNameDraft] = useState(labelDraftSeed);
   const [valueDraft, setValueDraft] = useState(String(valueDraftSeed));
   useEffect(() => {
-    if (editingNodeId === id && node) {
+    if (isEditing && node) {
       setNameDraft(node.label);
       if (isConstantNode(node)) setValueDraft(String(node.value));
     }
-  }, [editingNodeId, id, node]);
+  }, [isEditing, node]);
 
   const commitEdit = useCallback(() => {
     if (!node || !isConstantNode(node)) {
@@ -98,7 +98,6 @@ function ConstantNodeViewImpl({ id }: Props): JSX.Element | null {
 
   const isSelected = selection.kind === 'node' && selection.id === id;
   const stateClass = 'is-focal';
-  const isEditing = editingNodeId === id;
 
   const valueText = formatConstantValue(node.value);
 

@@ -52,7 +52,7 @@ function NodeFrameImpl({
   // 이 노드가 인라인 편집 중이면 drag 시작을 막아 input 포커스가 끊기지 않게 한다.
   // 노드 뷰가 콜백으로 따로 전달하지 않아도 NodeFrame이 단일 출처로 강제 — 편집
   // 상태와 드래그 차단의 일관성 계약을 모든 노드에 동일하게 적용.
-  const isEditing = uiStore((s) => s.editingNodeId === id);
+  const isEditing = uiStore((s) => s.editingNode?.id === id);
 
   const outerGRef = useRef<SVGGElement | null>(null);
   useEffect(() => {

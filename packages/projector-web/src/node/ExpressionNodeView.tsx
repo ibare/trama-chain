@@ -121,8 +121,10 @@ function ExpressionNodeViewImpl({ id }: Props): JSX.Element | null {
   const invalidReason = modelStore((s) => s.executionState.invalidReasons[id]);
   const updateNode = modelStore((s) => s.updateNode);
   const selection = uiStore((s) => s.selection);
-  const editingNodeId = uiStore((s) => s.editingNodeId);
+  const editingNode = uiStore((s) => s.editingNode);
   const setEditingNode = uiStore((s) => s.setEditingNode);
+  const isEditing = editingNode?.id === id;
+  const editTarget = isEditing ? editingNode.target : null;
   const inputMask = useInputConnectionMask(id);
   const outputConnected = useOutputConnected(id);
 
@@ -174,21 +176,16 @@ function ExpressionNodeViewImpl({ id }: Props): JSX.Element | null {
     return () => unregs.forEach((u) => u());
   }, [id, layout, node, socketRegistry]);
 
-  // 라벨(타이틀)과 식 본체는 별개의 인라인 편집기. 어느 쪽을 열었는지는 로컬 상태로
-  // 추적 — uiStore의 editingNodeId는 "이 노드가 편집 중이다"만 전달하고, 어느 영역
-  // 편집인지는 노드 내부 관심사.
-  const [editTarget, setEditTarget] = useState<'label' | 'latex'>('latex');
-
+  // 라벨(타이틀)과 식 본체는 별개의 인라인 편집기. 어느 쪽을 열었는지는 uiStore의
+  // editingNode.target이 단일 진실 — 'latex'면 fizzex editor, 'label'이면 라벨 input.
   const onBodyDoubleClick = useCallback(() => {
-    setEditTarget('latex');
-    setEditingNode(id);
+    setEditingNode(id, 'latex');
   }, [id, setEditingNode]);
 
   const onLabelDoubleClick = useCallback(
     (e: React.MouseEvent) => {
       e.stopPropagation();
-      setEditTarget('label');
-      setEditingNode(id);
+      setEditingNode(id, 'label');
     },
     [id, setEditingNode],
   );
@@ -211,7 +208,7 @@ function ExpressionNodeViewImpl({ id }: Props): JSX.Element | null {
   const editorStateRef = useRef<FizzexEditorState | null>(null);
   const [editorInitialState, setEditorInitialState] = useState<FizzexEditorState | null>(null);
   useEffect(() => {
-    if (editingNodeId === id && editTarget === 'latex') {
+    if (editTarget === 'latex') {
       const initial = createStateFromLatex(latex);
       editorStateRef.current = initial;
       setEditorInitialState(initial);
@@ -219,7 +216,7 @@ function ExpressionNodeViewImpl({ id }: Props): JSX.Element | null {
       editorStateRef.current = null;
       setEditorInitialState(null);
     }
-  }, [editingNodeId, editTarget, id, latex]);
+  }, [editTarget, latex]);
 
   const commitLatex = useCallback(() => {
     if (!node || !isExpressionNode(node)) {
@@ -265,9 +262,8 @@ function ExpressionNodeViewImpl({ id }: Props): JSX.Element | null {
   const { width, height, halfW, halfH, textX, labelY } = layout;
   const isSelected = selection.kind === 'node' && selection.id === id;
   const stateClass = isValid ? 'is-calm' : 'is-low';
-  const isEditing = editingNodeId === id;
-  const isEditingLabel = isEditing && editTarget === 'label';
-  const isEditingLatex = isEditing && editTarget === 'latex';
+  const isEditingLabel = editTarget === 'label';
+  const isEditingLatex = editTarget === 'latex';
 
   // 수식 본체 영역 — box.ts가 변수 거터·좌우 인셋을 반영해 계산해준다.
   // 측정 전이거나 fallback이면 expressionBody가 null이 될 수 없도록 box.ts에서

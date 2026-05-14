@@ -80,8 +80,17 @@ export interface UIStore {
   unitInspector: UnitInspectorState | null;
   /** 캔버스 우클릭 컨텍스트 메뉴 */
   canvasContextMenu: CanvasContextMenuState | null;
-  /** 인라인 이름 편집 중인 노드 */
-  editingNodeId: NodeId | null;
+  /**
+   * 인라인 편집 중인 노드와 그 안의 어떤 영역을 편집 중인지.
+   *
+   * target은 노드가 자유롭게 정의하는 문자열 키 — 단일 영역만 편집하는
+   * ValueNode·ConstantNode는 'body'로 두고, ExpressionNode는 'label'·'latex'를
+   * 구분해 라벨 input과 fizzex editor 중 어느 쪽을 활성화할지 결정한다.
+   *
+   * 이 값을 단일 진실로 두면 노드 뷰가 별도 로컬 state(editTarget 등)로 동일
+   * 정보를 중복 추적할 필요가 없어진다.
+   */
+  editingNode: { id: NodeId; target: string } | null;
   /** N-step 실행 시 현재 시각화 단계 (애니메이션용) */
   runFlash: RunFlashState | null;
 
@@ -121,7 +130,7 @@ export interface UIStore {
   ) => void;
   closeCanvasContextMenu: () => void;
 
-  setEditingNode: (id: NodeId | null) => void;
+  setEditingNode: (id: NodeId | null, target?: string) => void;
   setRunFlash: (s: RunFlashState | null) => void;
 }
 
@@ -136,7 +145,7 @@ export function createUIStore(): UIStoreInstance {
     functionPicker: null,
     unitInspector: null,
     canvasContextMenu: null,
-    editingNodeId: null,
+    editingNode: null,
     runFlash: null,
 
     setReadOnly: (v) => {
@@ -149,7 +158,7 @@ export function createUIStore(): UIStoreInstance {
           functionPicker: null,
           unitInspector: null,
           canvasContextMenu: null,
-          editingNodeId: null,
+          editingNode: null,
         });
       } else {
         set({ readOnly: false });
@@ -216,9 +225,9 @@ export function createUIStore(): UIStoreInstance {
     },
     closeCanvasContextMenu: () => set({ canvasContextMenu: null }),
 
-    setEditingNode: (id) => {
+    setEditingNode: (id, target = 'body') => {
       if (id !== null && get().readOnly) return;
-      set({ editingNodeId: id });
+      set({ editingNode: id === null ? null : { id, target } });
     },
     setRunFlash: (s) => set({ runFlash: s }),
   }));

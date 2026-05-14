@@ -56,7 +56,7 @@ function ValueNodeViewImpl({ id, incomingCount }: Props): JSX.Element | null {
   const playbackStep = modelStore((s) => s.playbackStep);
   const trajectoryLength = modelStore((s) => s.trajectory.length);
   const selectNode = uiStore((s) => s.selectNode);
-  const editingNodeId = uiStore((s) => s.editingNodeId);
+  const isEditing = uiStore((s) => s.editingNode?.id === id);
   const setEditingNode = uiStore((s) => s.setEditingNode);
   const openUnitInspector = uiStore((s) => s.openUnitInspector);
   const isSelected = uiStore(
@@ -195,7 +195,7 @@ function ValueNodeViewImpl({ id, incomingCount }: Props): JSX.Element | null {
             x={layout.textX}
             y={layout.labelY}
             width={width - (layout.textX - -halfW) * 2}
-            isEditing={editingNodeId === id}
+            isEditing={isEditing}
             onCommit={commitLabel}
             onCancel={cancelLabel}
           />
@@ -270,7 +270,7 @@ function ValueNodeViewImpl({ id, incomingCount }: Props): JSX.Element | null {
           />
         </>
       )}
-      {isInputNode && editingNodeId !== id && !hasSkin && (
+      {isInputNode && !isEditing && !hasSkin && (
         <NodeBorderTrack
           node={node}
           halfW={halfW}
