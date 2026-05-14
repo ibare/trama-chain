@@ -49,7 +49,7 @@ export default function Playground(): JSX.Element {
       </header>
 
       <div className="trama-playground-canvas">
-        <TramaEditor initialJson={initialJson} onChange={setCurrentJson} />
+        <TramaEditor value={currentJson} onChange={setCurrentJson} />
       </div>
 
       {previewOpen && (

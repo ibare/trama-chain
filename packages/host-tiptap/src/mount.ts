@@ -53,7 +53,7 @@ export function mountTramaEditor(
     if (destroyed) return;
     root.render(
       createElement(TramaEditor, {
-        initialJson: currentJson,
+        value: currentJson,
         onChange: opts.onChange,
         readOnly: !editable,
       }),

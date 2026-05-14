@@ -33,9 +33,9 @@ const packages: ReadonlyArray<PackageEntry> = [
     description:
       'React 컴포넌트로 노출되는 트라마 편집기. SVG 캔버스, 노드 인터랙션, shape 직접 조작, 식 편집, 상수 엣지, 실행 시각화를 모두 포함.',
     exports: [
-      'TramaEditor — 풀 캔버스 컴포넌트 (initialJson, onChange, readOnly)',
+      'TramaEditor — 풀 캔버스 컴포넌트 (value, onChange, readOnly)',
       'shapeRegistry / combinerRegistry — 등록된 함수·결합기 카탈로그',
-      'useModelStore / useUIStore — 내부 zustand 스토어 (고급 사용자용)',
+      'useTrama — TramaEditor Provider 안에서 인스턴스별 store에 접근',
     ],
     peer: ['react ^19', 'react-dom ^19'],
   },

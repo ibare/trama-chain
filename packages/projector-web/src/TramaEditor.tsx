@@ -27,7 +27,11 @@ export interface EditorOptions {
 }
 
 interface Props {
-  initialJson: string;
+  /**
+   * Controlled: 직렬화된 trama JSON. 변경 시 내부 모델이 다시 로드된다.
+   * onChange로 방금 발산한 echo와는 비교해 무시 — 외부 변경(호스트 undo 등)만 반영.
+   */
+  value: string;
   onChange?: (json: string) => void;
   options?: EditorOptions;
   /**
@@ -55,7 +59,7 @@ export function TramaEditor(props: Props): JSX.Element {
   );
 }
 
-function TramaEditorInner({ initialJson, onChange, options, readOnly = false }: Props): JSX.Element {
+function TramaEditorInner({ value, onChange, options, readOnly = false }: Props): JSX.Element {
   const { modelStore, uiStore } = useTrama();
   const setModel = modelStore((s) => s.setModel);
   const model = modelStore((s) => s.model);
@@ -68,24 +72,24 @@ function TramaEditorInner({ initialJson, onChange, options, readOnly = false }: 
     setReadOnly(readOnly);
   }, [readOnly, setReadOnly]);
 
-  // initialJson이 바뀌거나(라우트 id 변경) store가 교체될 때마다(HMR이 모듈을
-  // 재평가해 setModel 참조가 바뀔 때) 다시 로드한다. loadedRef로 영구 차단하면
-  // HMR 후 store가 새 빈 모델(새 id, question=null)로 리셋되고 그 상태가
-  // 디바운스 onChange를 통해 그대로 저장되어 새 "제목 없는 모델"이 매번 생긴다.
+  // controlled `value`를 source of truth로 둔다.
+  // - mount + 외부 변경 시 parse → setModel
+  // - 직전에 onChange로 발산한 echo는 lastEmittedRef와 동일하므로 skip (loop 차단)
+  const lastEmittedRef = useRef<string | null>(null);
   useEffect(() => {
+    if (value === lastEmittedRef.current) return;
     try {
-      const doc = parseTrama(initialJson, { shapeRegistry, combinerRegistry });
+      const doc = parseTrama(value, { shapeRegistry, combinerRegistry });
       setModel(documentToModel(doc));
     } catch (e) {
       if (e instanceof TramaParseError) {
         // eslint-disable-next-line no-console
-        console.warn('TramaEditor: failed to parse initial JSON', e);
+        console.warn('TramaEditor: failed to parse value', e);
       }
     }
-  }, [initialJson, setModel]);
+  }, [value, setModel]);
 
   const debounceMs = options?.autosaveDebounceMs ?? 1500;
-  const lastEmittedRef = useRef<string | null>(null);
   useEffect(() => {
     if (!onChange) return;
     const timer = setTimeout(() => {
