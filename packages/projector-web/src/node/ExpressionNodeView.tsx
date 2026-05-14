@@ -36,6 +36,53 @@ interface Props {
 const SOCKET_SIZE = parseFloat(tokens.spacing.socketSize);
 const CARD_CORNER = parseFloat(tokens.spacing.cardCornerRadius);
 
+/**
+ * 식 편집기 호스트 — fizzex EditorView를 노드 안에 띄울 때 캔버스 줌·노드 드래그와
+ * 이벤트가 충돌하지 않도록 격리한다. 휠은 캔버스의 native 'wheel' 리스너에 닿기 전에
+ * stopPropagation으로 막고, pointerdown은 React 합성 이벤트 단계에서 막아 NodeFrame
+ * 드래그가 발화하지 않게 한다. 키보드는 Cmd+Enter 커밋·Escape 취소.
+ */
+function EditorHost({
+  children,
+  onCommit,
+  onCancel,
+}: {
+  children: React.ReactNode;
+  onCommit: () => void;
+  onCancel: () => void;
+}): JSX.Element {
+  const hostRef = useRef<HTMLDivElement | null>(null);
+  useEffect(() => {
+    const el = hostRef.current;
+    if (!el) return undefined;
+    const stop = (e: WheelEvent): void => {
+      e.stopPropagation();
+    };
+    el.addEventListener('wheel', stop, { passive: true });
+    return () => el.removeEventListener('wheel', stop);
+  }, []);
+  return (
+    <div
+      ref={hostRef}
+      className="trama-expression-editor"
+      onPointerDown={(e) => e.stopPropagation()}
+      onKeyDown={(e) => {
+        if (e.key === 'Enter' && (e.metaKey || e.ctrlKey)) {
+          e.preventDefault();
+          onCommit();
+          return;
+        }
+        if (e.key === 'Escape') {
+          e.preventDefault();
+          onCancel();
+        }
+      }}
+    >
+      {children}
+    </div>
+  );
+}
+
 function formatInvalidReason(d: EvalDiagnosis & { ok: false }): string {
   switch (d.status) {
     case 'unbound':
@@ -238,19 +285,9 @@ function ExpressionNodeViewImpl({ id }: Props): JSX.Element | null {
 
       {isEditing && editorInitialState ? (
         <foreignObject x={body.x} y={body.y} width={body.w} height={body.h}>
-          <div
-            className="trama-expression-editor"
-            onPointerDown={(e) => e.stopPropagation()}
-            onKeyDown={(e) => {
-              if (e.key === 'Enter' && (e.metaKey || e.ctrlKey)) {
-                e.preventDefault();
-                commitLatex();
-              }
-              if (e.key === 'Escape') {
-                e.preventDefault();
-                setEditingNode(null);
-              }
-            }}
+          <EditorHost
+            onCommit={commitLatex}
+            onCancel={() => setEditingNode(null)}
           >
             <FizzexEditor
               initialState={editorInitialState}
@@ -263,7 +300,7 @@ function ExpressionNodeViewImpl({ id }: Props): JSX.Element | null {
               padding={4}
               displayMode="inline"
             />
-          </div>
+          </EditorHost>
         </foreignObject>
       ) : (
         <foreignObject x={body.x} y={body.y} width={body.w} height={body.h}>
