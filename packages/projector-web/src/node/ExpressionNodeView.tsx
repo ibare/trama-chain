@@ -52,6 +52,11 @@ function EditorHost({
   onCancel: () => void;
 }): JSX.Element {
   const hostRef = useRef<HTMLDivElement | null>(null);
+  // 최신 onCommit을 ref로 들고 들어가 focusout 리스너가 stale 클로저로 잘못 커밋하지
+  // 않게 한다. effect deps에 onCommit을 넣지 않는 이유 — 리스너 재부착이 마운트 직후
+  // 발생하는 첫 focusout(IME hidden input ↔ host 사이)을 놓치게 만들 수 있다.
+  const onCommitRef = useRef(onCommit);
+  onCommitRef.current = onCommit;
   useEffect(() => {
     const el = hostRef.current;
     if (!el) return undefined;
@@ -59,7 +64,18 @@ function EditorHost({
       e.stopPropagation();
     };
     el.addEventListener('wheel', stop, { passive: true });
-    return () => el.removeEventListener('wheel', stop);
+    // 포커스가 호스트 바깥으로 빠지면 커밋. relatedTarget이 호스트 안이면 fizzex 내부
+    // 포커스 이동(canvas ↔ hidden input)이므로 무시.
+    const onFocusOut = (e: FocusEvent): void => {
+      const next = e.relatedTarget as Node | null;
+      if (next && el.contains(next)) return;
+      onCommitRef.current();
+    };
+    el.addEventListener('focusout', onFocusOut);
+    return () => {
+      el.removeEventListener('wheel', stop);
+      el.removeEventListener('focusout', onFocusOut);
+    };
   }, []);
   return (
     <div
