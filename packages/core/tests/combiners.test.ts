@@ -43,9 +43,29 @@ describe('CombinerRegistry', () => {
   it('getOfKind narrows by valueKind and rejects mismatched kind', () => {
     const r = createDefaultCombinerRegistry();
     expect(r.getOfKind('sum', 'numeric')?.valueKind).toBe('numeric');
-    // 1단계엔 boolean combiner가 없으므로 같은 키도 boolean으로 조회되면 미스.
     expect(r.getOfKind('sum', 'boolean')).toBeUndefined();
+    expect(r.getOfKind('and', 'boolean')?.valueKind).toBe('boolean');
+    expect(r.getOfKind('and', 'numeric')).toBeUndefined();
     expect(r.listForKind('numeric').length).toBe(4);
-    expect(r.listForKind('boolean').length).toBe(0);
+    expect(r.listForKind('boolean').length).toBe(3);
+  });
+
+  it('boolean combiners produce expected truth tables', () => {
+    const r = createDefaultCombinerRegistry();
+    const and = r.getOfKind('and', 'boolean')!;
+    const or = r.getOfKind('or', 'boolean')!;
+    const xor = r.getOfKind('xor', 'boolean')!;
+    expect(and.combine([true, true, true])).toBe(true);
+    expect(and.combine([true, false, true])).toBe(false);
+    expect(or.combine([false, false, true])).toBe(true);
+    expect(or.combine([false, false, false])).toBe(false);
+    expect(xor.combine([true, false])).toBe(true);
+    expect(xor.combine([true, true])).toBe(false);
+    expect(xor.combine([true, false, true])).toBe(false);
+    expect(xor.combine([true, true, true])).toBe(true);
+    // 빈 입력은 모두 false (vacuous-truth 회피)
+    expect(and.combine([])).toBe(false);
+    expect(or.combine([])).toBe(false);
+    expect(xor.combine([])).toBe(false);
   });
 });

@@ -103,11 +103,43 @@ export const productCombiner: NumericCombinerDefinition = {
   combine: (xs) => (xs.length === 0 ? 0 : xs.reduce((a, b) => a * b, 1)),
 };
 
+// ---------------------------------------------------------------------------
+// Boolean combiners
+// ---------------------------------------------------------------------------
+
+// contributions.length === 0인 경우는 ValueNode propagate에서 already-invalid로
+// 처리되어 combine이 호출되지 않는다 — 빈 입력의 의미를 정하지 않아도 안전하다.
+// 그래도 vacuous truth(and=true)는 사용자 직관과 어긋나기 쉬워 모두 false로 둔다.
+
+export const andCombiner: BooleanCombinerDefinition = {
+  key: 'and',
+  valueKind: 'boolean',
+  labels: { ko: '모두 참', en: 'and' },
+  combine: (xs) => xs.length > 0 && xs.every((b) => b),
+};
+
+export const orCombiner: BooleanCombinerDefinition = {
+  key: 'or',
+  valueKind: 'boolean',
+  labels: { ko: '하나라도 참', en: 'or' },
+  combine: (xs) => xs.some((b) => b),
+};
+
+export const xorCombiner: BooleanCombinerDefinition = {
+  key: 'xor',
+  valueKind: 'boolean',
+  labels: { ko: '서로 달라야 참', en: 'xor' },
+  combine: (xs) => xs.filter((b) => b).length % 2 === 1,
+};
+
 export function createDefaultCombinerRegistry(): CombinerRegistry {
   const r = new CombinerRegistry();
   r.register(sumCombiner);
   r.register(averageCombiner);
   r.register(maxCombiner);
   r.register(productCombiner);
+  r.register(andCombiner);
+  r.register(orCombiner);
+  r.register(xorCombiner);
   return r;
 }

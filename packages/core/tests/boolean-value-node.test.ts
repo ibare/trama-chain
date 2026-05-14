@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import {
+  addEdge,
   addValueNode,
   applyFeedbackEdges,
   booleanValue,
@@ -64,6 +65,76 @@ describe('Boolean ValueNode', () => {
     expect(v).toBeDefined();
     expect(v!.kind).toBe('boolean');
     if (v && v.kind === 'boolean') expect(v.b).toBe(true);
+  });
+
+  it('combines incoming booleans with the configured combiner', () => {
+    let m = createEmptyModel(0);
+    m = addValueNode(
+      m,
+      { id: 'a', label: 'A', unitId: 'free', initialValue: booleanValue(true) },
+      0,
+    );
+    m = addValueNode(
+      m,
+      { id: 'b', label: 'B', unitId: 'free', initialValue: booleanValue(false) },
+      0,
+    );
+    m = addValueNode(
+      m,
+      {
+        id: 'sink',
+        label: 'Sink',
+        unitId: 'free',
+        initialValue: booleanValue(false),
+        combiner: 'and',
+      },
+      0,
+    );
+    m = addEdge(m, { from: 'a', to: 'sink', shape: { kind: 'none', params: {} } }, 0);
+    m = addEdge(m, { from: 'b', to: 'sink', shape: { kind: 'none', params: {} } }, 0);
+
+    const state0 = initializeFromInitialValues(m);
+    const next = propagateOneStep(state0, m, {
+      shapeRegistry: shapes,
+      combinerRegistry: combiners,
+      nodeKindRegistry: defaultNodeKindRegistry,
+      topology: buildTopology(m),
+    });
+    expect(next.values['sink']).toEqual(booleanValue(false));
+  });
+
+  it('respects edge.inverted on boolean edges', () => {
+    let m = createEmptyModel(0);
+    m = addValueNode(
+      m,
+      { id: 'src', label: 'S', unitId: 'free', initialValue: booleanValue(false) },
+      0,
+    );
+    m = addValueNode(
+      m,
+      {
+        id: 'sink',
+        label: 'Sink',
+        unitId: 'free',
+        initialValue: booleanValue(false),
+        combiner: 'or',
+      },
+      0,
+    );
+    m = addEdge(
+      m,
+      { from: 'src', to: 'sink', shape: { kind: 'none', params: {} }, inverted: true },
+      0,
+    );
+
+    const state0 = initializeFromInitialValues(m);
+    const next = propagateOneStep(state0, m, {
+      shapeRegistry: shapes,
+      combinerRegistry: combiners,
+      nodeKindRegistry: defaultNodeKindRegistry,
+      topology: buildTopology(m),
+    });
+    expect(next.values['sink']).toEqual(booleanValue(true));
   });
 
   it('feedback edges with no boolean source contributions leave target untouched', () => {
