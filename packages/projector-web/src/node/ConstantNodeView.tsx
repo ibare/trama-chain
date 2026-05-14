@@ -4,6 +4,7 @@ import { tokens } from '@trama/tokens';
 import { isConstantNode, type NodeId } from '@trama/core';
 import { useTrama } from '../store/index.js';
 import { NodeFrame } from './NodeFrame.js';
+import { NodeBody } from './NodeBody.js';
 import { Socket } from './Socket.js';
 import { useOutputConnected } from './use-socket-connections.js';
 import { useEdgeDraftSource } from '../canvas/use-edge-draft-source.js';
@@ -19,7 +20,6 @@ const LABEL_Y_FROM_TOP = 28;
 const VALUE_Y_FROM_TOP = 78;
 
 const SOCKET_SIZE = parseFloat(tokens.spacing.socketSize);
-const CARD_CORNER = parseFloat(tokens.spacing.cardCornerRadius);
 
 function formatConstantValue(v: number): string {
   if (!Number.isFinite(v)) return '·';
@@ -110,14 +110,11 @@ function ConstantNodeViewImpl({ id }: Props): JSX.Element | null {
       className="trama-constant-node"
       onBodyDoubleClick={onBodyDoubleClick}
     >
-      <rect
-        className={`trama-node-body ${stateClass}${isSelected ? ' is-selected' : ''}`}
-        x={-halfW}
-        y={-halfH}
+      <NodeBody
         width={CARD_W}
         height={CARD_H}
-        rx={CARD_CORNER}
-        ry={CARD_CORNER}
+        stateClass={stateClass}
+        isSelected={isSelected}
       />
 
       {isEditing ? (

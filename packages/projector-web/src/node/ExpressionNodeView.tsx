@@ -19,6 +19,7 @@ import {
 } from '../expression/use-fizzex-renderer.js';
 import { useExpressionMeasureStore } from '../expression/expression-measure-store.js';
 import { NodeFrame } from './NodeFrame.js';
+import { NodeBody } from './NodeBody.js';
 import { NodeLabel } from './NodeLabel.js';
 import { Socket } from './Socket.js';
 import {
@@ -34,7 +35,6 @@ interface Props {
 }
 
 const SOCKET_SIZE = parseFloat(tokens.spacing.socketSize);
-const CARD_CORNER = parseFloat(tokens.spacing.cardCornerRadius);
 
 /**
  * 식 편집기 호스트 — fizzex EditorView를 노드 안에 띄울 때 캔버스 줌·노드 드래그와
@@ -288,14 +288,11 @@ function ExpressionNodeViewImpl({ id }: Props): JSX.Element | null {
       {!isValid && invalidReason ? (
         <title>{formatInvalidReason(invalidReason)}</title>
       ) : null}
-      <rect
-        className={`trama-node-body ${stateClass}${isSelected ? ' is-selected' : ''}`}
-        x={-halfW}
-        y={-halfH}
+      <NodeBody
         width={width}
         height={height}
-        rx={CARD_CORNER}
-        ry={CARD_CORNER}
+        stateClass={stateClass}
+        isSelected={isSelected}
       />
       <NodeLabel
         text={node.label}

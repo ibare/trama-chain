@@ -8,6 +8,7 @@ import { resolveNodeUnit } from '../util/unit-resolver.js';
 import { useNodeLayout } from './use-node-layout.js';
 import { NodeBorderTrack } from './NodeBorderTrack.js';
 import { NodeFrame } from './NodeFrame.js';
+import { NodeBody } from './NodeBody.js';
 import { NodeLabel } from './NodeLabel.js';
 import { InteractiveArea } from './InteractiveArea.js';
 import { Socket } from './Socket.js';
@@ -22,7 +23,6 @@ interface Props {
   incomingCount: number;
 }
 
-const CARD_CORNER = parseFloat(tokens.spacing.cardCornerRadius);
 const SOCKET_SIZE = parseFloat(tokens.spacing.socketSize);
 
 function combinerSymbol(key: string): string {
@@ -181,14 +181,11 @@ function ValueNodeViewImpl({ id, incomingCount }: Props): JSX.Element | null {
         </>
       ) : (
         <>
-          <rect
-            className={`trama-node-body ${stateClass}${isSelected ? ' is-selected' : ''}`}
-            x={-halfW}
-            y={-halfH}
+          <NodeBody
             width={width}
             height={height}
-            rx={CARD_CORNER}
-            ry={CARD_CORNER}
+            stateClass={stateClass}
+            isSelected={isSelected}
           />
           <NodeLabel
             text={node.label}

@@ -13,6 +13,7 @@ import {
   getConditionalNodeLayout,
 } from './conditional-box.js';
 import { NodeFrame } from './NodeFrame.js';
+import { NodeBody } from './NodeBody.js';
 import { InteractiveArea } from './InteractiveArea.js';
 import { Socket } from './Socket.js';
 import { useInputConnectionMask, useOutputConnected } from './use-socket-connections.js';
@@ -27,7 +28,6 @@ const CARD_W = CONDITIONAL_CARD_W;
 const CARD_H = CONDITIONAL_CARD_H;
 const SLOT_LABEL_INSET = 20;
 const SOCKET_SIZE = parseFloat(tokens.spacing.socketSize);
-const CARD_CORNER = parseFloat(tokens.spacing.cardCornerRadius);
 
 const OPERATORS: ConditionalOperator[] = ['>', '==', '!='];
 
@@ -44,7 +44,7 @@ function ConditionalNodeViewImpl({ id }: Props): JSX.Element | null {
 
   const pos = node?.position ?? { x: 200, y: 200 };
   const layout = getConditionalNodeLayout();
-  const { halfW, halfH } = layout;
+  const { halfH } = layout;
 
   // 입력 슬롯 등록 — snap 후보가 된다. (A=0, B=1)
   useEffect(() => {
@@ -135,14 +135,12 @@ function ConditionalNodeViewImpl({ id }: Props): JSX.Element | null {
       height={CARD_H}
       className={`trama-conditional-node${isActive ? '' : ' is-invalid'}`}
     >
-      <rect
-        className={`trama-node-body trama-function-body ${stateClass}${isSelected ? ' is-selected' : ''}`}
-        x={-halfW}
-        y={-halfH}
+      <NodeBody
         width={CARD_W}
         height={CARD_H}
-        rx={CARD_CORNER}
-        ry={CARD_CORNER}
+        stateClass={stateClass}
+        isSelected={isSelected}
+        extraClassName="trama-function-body"
       />
 
       {/* 중앙: A {op} B — operator 클릭 시 순환. NodeFrame이 drag rect를 z-order
