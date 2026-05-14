@@ -203,6 +203,20 @@ export function createModelStore({
       result.newValue !== undefined && result.newValue !== prevValue;
     const validityChanged = wasValid !== isValid;
 
+    nodeFlashRegistry.trigger(pulse.targetNodeId);
+
+    // valid↔invalid 전이가 일어났다면 다운스트림 전체에 invalid가 전파되어야 한다.
+    // 펄스 체인은 valid source만 흘리는 시각·증분 경로라 invalid 전파를 표현하지
+    // 못한다. 이 경우엔 전체 재계산으로 정확한 그래프 상태를 한 번에 잡는다.
+    if (validityChanged) {
+      const recomputed = computeExecutionState(model);
+      store.setState({
+        executionState: recomputed.executionState,
+        trajectory: recomputed.trajectory,
+      });
+      return;
+    }
+
     store.setState((s) => {
       const newValues: Record<NodeId, number> = { ...s.executionState.values };
       if (result.newValue !== undefined) newValues[pulse.targetNodeId] = result.newValue;
@@ -215,9 +229,7 @@ export function createModelStore({
       };
     });
 
-    nodeFlashRegistry.trigger(pulse.targetNodeId);
-
-    if ((valueChanged || validityChanged) && result.newValue !== undefined) {
+    if (valueChanged && result.newValue !== undefined) {
       const latest = store.getState();
       spawnOutgoingPulses(latest.model, latest.executionState, pulse.targetNodeId);
     }

@@ -71,6 +71,8 @@ function NodeFrameImpl({
     dragged: boolean;
     zoom: number;
     incidents: EdgeHandle[];
+    pointerId: number;
+    captured: boolean;
   } | null>(null);
 
   const onPointerDown = useCallback(
@@ -81,9 +83,9 @@ function NodeFrameImpl({
       e.stopPropagation();
       selectNode(id);
       if (readOnly) return;
-      // pointerCapture는 outer `<g>` 위에서 잡는다 — capture된 element가 sibling으로
-      // 떠나도 pointermove/up이 동일 element에 도달하도록.
-      e.currentTarget.setPointerCapture(e.pointerId);
+      // pointerCapture는 드래그 임계치를 넘는 시점(pointermove)에 늦게 잡는다.
+      // pointerdown 즉시 capture를 잡으면 click/dblclick의 target이 outer `<g>`로
+      // redirect되어 자식 hit-rect(라벨·threshold)의 onDoubleClick이 발화하지 못한다.
       moveRef.current = {
         startClientX: e.clientX,
         startClientY: e.clientY,
@@ -94,6 +96,8 @@ function NodeFrameImpl({
         dragged: false,
         zoom: viewport.getCurrentZoom(),
         incidents: dragRegistry.getIncidentEdgeHandles(id),
+        pointerId: e.pointerId,
+        captured: false,
       };
     },
     [dragRegistry, id, isEditing, pos.x, pos.y, selectNode, uiStore, viewport],
@@ -108,6 +112,12 @@ function NodeFrameImpl({
       if (!m.dragged) {
         if (Math.hypot(dxClient, dyClient) < DRAG_THRESHOLD_PX) return;
         m.dragged = true;
+        // 임계치를 넘은 순간에만 capture — 노드가 빠르게 이동해 포인터가 element를
+        // 벗어나도 move/up이 outer `<g>`에 계속 도달하도록.
+        if (!m.captured) {
+          e.currentTarget.setPointerCapture(m.pointerId);
+          m.captured = true;
+        }
       }
       const dx = dxClient / m.zoom;
       const dy = dyClient / m.zoom;
@@ -130,7 +140,9 @@ function NodeFrameImpl({
     (e: React.PointerEvent<SVGGElement>) => {
       const m = moveRef.current;
       moveRef.current = null;
-      e.currentTarget.releasePointerCapture?.(e.pointerId);
+      if (m?.captured) {
+        e.currentTarget.releasePointerCapture?.(e.pointerId);
+      }
       if (m?.dragged && (m.lastDx !== 0 || m.lastDy !== 0)) {
         updateNode(id, {
           position: { x: m.startPosX + m.lastDx, y: m.startPosY + m.lastDy },

@@ -239,8 +239,10 @@ const conditionNodeDescriptor: NodeKindDescriptor<
   propagate: (node, ctx) => {
     let value: number | undefined;
     for (const edge of ctx.incoming) {
+      // 단일 슬롯 게이트 — slotIndex가 명시되지 않은 엣지(undefined)는 슬롯 0으로
+      // 간주한다. 명시된 경우엔 0만 허용.
       const slot = edge.slotIndex;
-      if (typeof slot !== 'number' || slot !== 0) continue;
+      if (typeof slot === 'number' && slot !== 0) continue;
       const source = ctx.model.nodes[edge.from];
       if (!source) continue;
       if (!isEdgeSourceValid(ctx, edge)) continue;

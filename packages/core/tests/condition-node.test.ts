@@ -104,6 +104,31 @@ describe('ConditionNode 게이트 시맨틱', () => {
     expect(isOutputValid(sGt, 'c', 0)).toBe(false);
   });
 
+  it('엣지의 slotIndex가 undefined여도 단일 게이트라 0으로 간주 (회귀 방지)', () => {
+    // 사용자 스크린샷 재현: 41.8 kg != 0 — 어떤 경로(라운드트립·구버전 데이터)로
+    // slotIndex가 빠진 엣지가 들어와도 조건이 정상 동작해야 한다.
+    let m = createEmptyModel();
+    m = addValueNode(m, {
+      id: 'v',
+      label: '무게',
+      unitId: 'kg',
+      initialValue: 41.8,
+    });
+    m = addConditionNode(m, { id: 'c', label: '조건', operator: '!=', threshold: 0 });
+    m = addEdge(m, {
+      from: 'v',
+      to: 'c',
+      shape: { kind: 'none', params: {} },
+      // slotIndex 의도적으로 누락
+    });
+    const s = propagateOneStep(initializeFromInitialValues(m), m, {
+      shapeRegistry: shapes,
+      combinerRegistry: combiners,
+    });
+    expect(isOutputValid(s, 'c', 0)).toBe(true);
+    expect(s.values.c).toBe(41.8);
+  });
+
   it('입력 미연결이면 출력 invalid', () => {
     let m = createEmptyModel();
     m = addConditionNode(m, { id: 'c', label: '조건', operator: '>', threshold: 0 });
