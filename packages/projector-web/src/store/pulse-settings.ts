@@ -1,4 +1,4 @@
-import { create } from 'zustand';
+import { create, type StoreApi, type UseBoundStore } from 'zustand';
 
 /**
  * 펄스 시각 효과 설정. 모델과 별도 — undo/redo·직렬화 대상이 아닌 세션 설정.
@@ -18,16 +18,24 @@ interface PulseSettingsActions {
   resetPulseSettings: () => void;
 }
 
+export type PulseSettingsState = PulseSettings & PulseSettingsActions;
+export type PulseSettingsStore = UseBoundStore<StoreApi<PulseSettingsState>>;
+
 const DEFAULT_SPEED = 1;
 
-export const usePulseSettingsStore = create<PulseSettings & PulseSettingsActions>((set) => ({
-  travelSpeedMultiplier: DEFAULT_SPEED,
-  setTravelSpeedMultiplier: (value) => {
-    if (!Number.isFinite(value) || value <= 0) return;
-    set({ travelSpeedMultiplier: value });
-  },
-  resetPulseSettings: () => set({ travelSpeedMultiplier: DEFAULT_SPEED }),
-}));
+export function createPulseSettingsStore(): PulseSettingsStore {
+  return create<PulseSettingsState>((set) => ({
+    travelSpeedMultiplier: DEFAULT_SPEED,
+    setTravelSpeedMultiplier: (value) => {
+      if (!Number.isFinite(value) || value <= 0) return;
+      set({ travelSpeedMultiplier: value });
+    },
+    resetPulseSettings: () => set({ travelSpeedMultiplier: DEFAULT_SPEED }),
+  }));
+}
+
+/** 호환 shim — Stage B 후반에 제거. */
+export const usePulseSettingsStore: PulseSettingsStore = createPulseSettingsStore();
 
 /** Non-reactive 조회 — spawn 시점에 박제용. */
 export function getCurrentTravelSpeedMultiplier(): number {

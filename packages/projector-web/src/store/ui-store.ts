@@ -1,4 +1,4 @@
-import { create } from 'zustand';
+import { create, type StoreApi, type UseBoundStore } from 'zustand';
 import type { EdgeId, NodeId } from '@trama/core';
 
 export type Selection =
@@ -125,98 +125,104 @@ export interface UIStore {
   setRunFlash: (s: RunFlashState | null) => void;
 }
 
-export const useUIStore = create<UIStore>((set, get) => ({
-  selection: { kind: 'none' },
-  readOnly: false,
-  edgeDraft: null,
-  insertNodeIntent: null,
-  functionPicker: null,
-  unitInspector: null,
-  canvasContextMenu: null,
-  editingNodeId: null,
-  runFlash: null,
+export type UIStoreInstance = UseBoundStore<StoreApi<UIStore>>;
 
-  setReadOnly: (v) => {
-    if (get().readOnly === v) return;
-    if (v) {
-      // 켤 때 진행 중이던 인터랙션 상태들을 청소. 안 그러면 잔여 패널이 떠 있을 수 있다.
+export function createUIStore(): UIStoreInstance {
+  return create<UIStore>((set, get) => ({
+    selection: { kind: 'none' },
+    readOnly: false,
+    edgeDraft: null,
+    insertNodeIntent: null,
+    functionPicker: null,
+    unitInspector: null,
+    canvasContextMenu: null,
+    editingNodeId: null,
+    runFlash: null,
+
+    setReadOnly: (v) => {
+      if (get().readOnly === v) return;
+      if (v) {
+        set({
+          readOnly: true,
+          edgeDraft: null,
+          insertNodeIntent: null,
+          functionPicker: null,
+          unitInspector: null,
+          canvasContextMenu: null,
+          editingNodeId: null,
+        });
+      } else {
+        set({ readOnly: false });
+      }
+    },
+
+    selectNode: (id) => set({ selection: { kind: 'node', id } }),
+    selectEdge: (id) => set({ selection: { kind: 'edge', id } }),
+    clearSelection: () => set({ selection: { kind: 'none' } }),
+
+    startEdgeDraft: ({
+      fromNodeId,
+      startPoint,
+      pointer,
+      lag = 0,
+      sourceSlotIndex,
+      detachingEdgeId,
+    }) => {
+      if (get().readOnly) return;
       set({
-        readOnly: true,
-        edgeDraft: null,
-        insertNodeIntent: null,
-        functionPicker: null,
-        unitInspector: null,
-        canvasContextMenu: null,
-        editingNodeId: null,
+        edgeDraft: {
+          fromNodeId,
+          startPoint,
+          pointer,
+          lag,
+          sourceSlotIndex,
+          snap: null,
+          detachingEdgeId: detachingEdgeId ?? null,
+        },
       });
-    } else {
-      set({ readOnly: false });
-    }
-  },
+    },
+    updateEdgeDraft: (patch) =>
+      set((s) => {
+        if (!s.edgeDraft) return {};
+        const next = { ...s.edgeDraft };
+        if (patch.pointer) next.pointer = patch.pointer;
+        if (patch.lag !== undefined) next.lag = patch.lag;
+        if (patch.snap !== undefined) next.snap = patch.snap;
+        return { edgeDraft: next };
+      }),
+    endEdgeDraft: () => set({ edgeDraft: null }),
 
-  selectNode: (id) => set({ selection: { kind: 'node', id } }),
-  selectEdge: (id) => set({ selection: { kind: 'edge', id } }),
-  clearSelection: () => set({ selection: { kind: 'none' } }),
+    startInsertNodeFromEdge: (edgeId, position) => {
+      if (get().readOnly) return;
+      set({ insertNodeIntent: { edgeId, position } });
+    },
+    clearInsertNodeIntent: () => set({ insertNodeIntent: null }),
 
-  startEdgeDraft: ({
-    fromNodeId,
-    startPoint,
-    pointer,
-    lag = 0,
-    sourceSlotIndex,
-    detachingEdgeId,
-  }) => {
-    if (get().readOnly) return;
-    set({
-      edgeDraft: {
-        fromNodeId,
-        startPoint,
-        pointer,
-        lag,
-        sourceSlotIndex,
-        snap: null,
-        detachingEdgeId: detachingEdgeId ?? null,
-      },
-    });
-  },
-  updateEdgeDraft: (patch) =>
-    set((s) => {
-      if (!s.edgeDraft) return {};
-      const next = { ...s.edgeDraft };
-      if (patch.pointer) next.pointer = patch.pointer;
-      if (patch.lag !== undefined) next.lag = patch.lag;
-      if (patch.snap !== undefined) next.snap = patch.snap;
-      return { edgeDraft: next };
-    }),
-  endEdgeDraft: () => set({ edgeDraft: null }),
+    openFunctionPicker: (edgeId, anchor) => {
+      if (get().readOnly) return;
+      set({ functionPicker: { edgeId, anchor } });
+    },
+    closeFunctionPicker: () => set({ functionPicker: null }),
 
-  startInsertNodeFromEdge: (edgeId, position) => {
-    if (get().readOnly) return;
-    set({ insertNodeIntent: { edgeId, position } });
-  },
-  clearInsertNodeIntent: () => set({ insertNodeIntent: null }),
+    openUnitInspector: (nodeId) => {
+      if (get().readOnly) return;
+      set({ unitInspector: { nodeId } });
+    },
+    closeUnitInspector: () => set({ unitInspector: null }),
 
-  openFunctionPicker: (edgeId, anchor) => {
-    if (get().readOnly) return;
-    set({ functionPicker: { edgeId, anchor } });
-  },
-  closeFunctionPicker: () => set({ functionPicker: null }),
+    openCanvasContextMenu: (screen, canvas) => {
+      if (get().readOnly) return;
+      set({ canvasContextMenu: { screen, canvas } });
+    },
+    closeCanvasContextMenu: () => set({ canvasContextMenu: null }),
 
-  openUnitInspector: (nodeId) => {
-    if (get().readOnly) return;
-    set({ unitInspector: { nodeId } });
-  },
-  closeUnitInspector: () => set({ unitInspector: null }),
+    setEditingNode: (id) => {
+      if (id !== null && get().readOnly) return;
+      set({ editingNodeId: id });
+    },
+    setRunFlash: (s) => set({ runFlash: s }),
+  }));
+}
 
-  openCanvasContextMenu: (screen, canvas) => {
-    if (get().readOnly) return;
-    set({ canvasContextMenu: { screen, canvas } });
-  },
-  closeCanvasContextMenu: () => set({ canvasContextMenu: null }),
-
-  setEditingNode: (id) => {
-    if (id !== null && get().readOnly) return;
-    set({ editingNodeId: id });
-  },
-  setRunFlash: (s) => set({ runFlash: s }),
-}));
+/** 호환 shim — Stage B 후반에 제거. 새 코드는 useTrama().uiStore 사용. */
+export const useUIStore: UIStoreInstance = createUIStore();

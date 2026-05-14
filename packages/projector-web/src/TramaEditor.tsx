@@ -14,6 +14,11 @@ import { UnitInspectorLayer } from './node/UnitInspectorLayer.js';
 import { ExecutionControl } from './execution-control/ExecutionControl.js';
 import { InsertNodeHandler } from './interactions/InsertNodeHandler.js';
 import { useModelStore, useUIStore } from './store/index.js';
+import {
+  TramaInstanceProvider,
+  createTramaInstance,
+  type TramaInstance,
+} from './store/trama-instance.js';
 import { combinerRegistry, shapeRegistry } from './store/registries.js';
 
 export interface EditorOptions {
@@ -33,7 +38,24 @@ interface Props {
   readOnly?: boolean;
 }
 
-export function TramaEditor({ initialJson, onChange, options, readOnly = false }: Props): JSX.Element {
+export function TramaEditor(props: Props): JSX.Element {
+  // 인스턴스별 store/registry 컨테이너를 생성하여 한 페이지 N개의 에디터가
+  // 서로 격리된 상태를 갖도록 한다. dispose는 unmount 시 RAF·구독을 정리.
+  const [instance] = useState<TramaInstance>(() => createTramaInstance());
+  useEffect(() => {
+    return () => {
+      instance.dispose();
+    };
+  }, [instance]);
+
+  return (
+    <TramaInstanceProvider instance={instance}>
+      <TramaEditorInner {...props} />
+    </TramaInstanceProvider>
+  );
+}
+
+function TramaEditorInner({ initialJson, onChange, options, readOnly = false }: Props): JSX.Element {
   const setModel = useModelStore((s) => s.setModel);
   const model = useModelStore((s) => s.model);
   const setQuestion = useModelStore((s) => s.setQuestion);

@@ -19,20 +19,6 @@ export interface InputSocketEntry {
   offset: { x: number; y: number };
 }
 
-const sockets = new Map<string, InputSocketEntry>();
-
-function keyFor(nodeId: NodeId, slotIndex: number | undefined): string {
-  return slotIndex === undefined ? `${nodeId}:*` : `${nodeId}:${slotIndex}`;
-}
-
-export function registerInputSocket(entry: InputSocketEntry): () => void {
-  const k = keyFor(entry.nodeId, entry.slotIndex);
-  sockets.set(k, entry);
-  return () => {
-    if (sockets.get(k) === entry) sockets.delete(k);
-  };
-}
-
 export interface SnapCandidate {
   entry: InputSocketEntry;
   /** 캔버스 좌표 — 노드 position + offset 결과 */
@@ -41,28 +27,64 @@ export interface SnapCandidate {
   distance: number;
 }
 
-/**
- * 주어진 캔버스 좌표에서 가장 가까운 입력 소켓 후보를 찾는다.
- * `nodePositions`는 호출자가 model에서 가져와 전달 (store 의존을 이 모듈에 두지 않기 위함).
- * `filter`는 후보를 추가 제외할 때(예: source 노드 자기 자신, 점유된 슬롯) 쓴다.
- */
+export interface SocketRegistry {
+  register(entry: InputSocketEntry): () => void;
+  findNearest(
+    canvasPoint: { x: number; y: number },
+    nodePositions: Record<NodeId, { x: number; y: number } | undefined>,
+    filter?: (entry: InputSocketEntry) => boolean,
+  ): SnapCandidate | null;
+}
+
+function keyFor(nodeId: NodeId, slotIndex: number | undefined): string {
+  return slotIndex === undefined ? `${nodeId}:*` : `${nodeId}:${slotIndex}`;
+}
+
+export function createSocketRegistry(): SocketRegistry {
+  const sockets = new Map<string, InputSocketEntry>();
+
+  return {
+    register(entry: InputSocketEntry): () => void {
+      const k = keyFor(entry.nodeId, entry.slotIndex);
+      sockets.set(k, entry);
+      return () => {
+        if (sockets.get(k) === entry) sockets.delete(k);
+      };
+    },
+    findNearest(
+      canvasPoint,
+      nodePositions,
+      filter,
+    ): SnapCandidate | null {
+      let best: SnapCandidate | null = null;
+      for (const entry of sockets.values()) {
+        if (filter && !filter(entry)) continue;
+        const nodePos = nodePositions[entry.nodeId];
+        if (!nodePos) continue;
+        const pt = { x: nodePos.x + entry.offset.x, y: nodePos.y + entry.offset.y };
+        const dx = pt.x - canvasPoint.x;
+        const dy = pt.y - canvasPoint.y;
+        const d = Math.hypot(dx, dy);
+        if (best === null || d < best.distance) {
+          best = { entry, point: pt, distance: d };
+        }
+      }
+      return best;
+    },
+  };
+}
+
+const defaultRegistry = createSocketRegistry();
+
+/** 호환 shim — Stage B 후반에 제거. */
+export function registerInputSocket(entry: InputSocketEntry): () => void {
+  return defaultRegistry.register(entry);
+}
+
 export function findNearestInputSocket(
   canvasPoint: { x: number; y: number },
   nodePositions: Record<NodeId, { x: number; y: number } | undefined>,
   filter?: (entry: InputSocketEntry) => boolean,
 ): SnapCandidate | null {
-  let best: SnapCandidate | null = null;
-  for (const entry of sockets.values()) {
-    if (filter && !filter(entry)) continue;
-    const nodePos = nodePositions[entry.nodeId];
-    if (!nodePos) continue;
-    const pt = { x: nodePos.x + entry.offset.x, y: nodePos.y + entry.offset.y };
-    const dx = pt.x - canvasPoint.x;
-    const dy = pt.y - canvasPoint.y;
-    const d = Math.hypot(dx, dy);
-    if (best === null || d < best.distance) {
-      best = { entry, point: pt, distance: d };
-    }
-  }
-  return best;
+  return defaultRegistry.findNearest(canvasPoint, nodePositions, filter);
 }

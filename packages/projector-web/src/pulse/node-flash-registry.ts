@@ -17,28 +17,51 @@ export const NODE_FLASH_DURATION_MS = parseFloat(tokens.motion.durationNodeFlash
 
 type Listener = () => void;
 
-const flashIds = new Map<NodeId, number>();
-const listenersByNode = new Map<NodeId, Set<Listener>>();
+export interface NodeFlashRegistry {
+  trigger(nodeId: NodeId): void;
+  getFlashId(nodeId: NodeId): number;
+  subscribe(nodeId: NodeId, listener: Listener): () => void;
+}
 
+export function createNodeFlashRegistry(): NodeFlashRegistry {
+  const flashIds = new Map<NodeId, number>();
+  const listenersByNode = new Map<NodeId, Set<Listener>>();
+
+  return {
+    trigger(nodeId): void {
+      flashIds.set(nodeId, (flashIds.get(nodeId) ?? 0) + 1);
+      const set = listenersByNode.get(nodeId);
+      if (set) for (const fn of set) fn();
+    },
+    getFlashId(nodeId): number {
+      return flashIds.get(nodeId) ?? 0;
+    },
+    subscribe(nodeId, listener): () => void {
+      let set = listenersByNode.get(nodeId);
+      if (!set) {
+        set = new Set();
+        listenersByNode.set(nodeId, set);
+      }
+      set.add(listener);
+      return () => {
+        set!.delete(listener);
+        if (set!.size === 0) listenersByNode.delete(nodeId);
+      };
+    },
+  };
+}
+
+const defaultRegistry = createNodeFlashRegistry();
+
+/** 호환 shim — Stage B 후반에 제거. */
 export function triggerNodeFlash(nodeId: NodeId): void {
-  flashIds.set(nodeId, (flashIds.get(nodeId) ?? 0) + 1);
-  const set = listenersByNode.get(nodeId);
-  if (set) for (const fn of set) fn();
+  defaultRegistry.trigger(nodeId);
 }
 
 export function getNodeFlashId(nodeId: NodeId): number {
-  return flashIds.get(nodeId) ?? 0;
+  return defaultRegistry.getFlashId(nodeId);
 }
 
 export function subscribeNodeFlash(nodeId: NodeId, listener: Listener): () => void {
-  let set = listenersByNode.get(nodeId);
-  if (!set) {
-    set = new Set();
-    listenersByNode.set(nodeId, set);
-  }
-  set.add(listener);
-  return () => {
-    set!.delete(listener);
-    if (set!.size === 0) listenersByNode.delete(nodeId);
-  };
+  return defaultRegistry.subscribe(nodeId, listener);
 }

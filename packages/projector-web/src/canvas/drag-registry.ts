@@ -18,19 +18,75 @@ export interface EdgeHandle {
   applyDrag(draggedNodeId: NodeId, dx: number, dy: number): void;
 }
 
-const nodeEls = new Map<NodeId, SVGGElement>();
-const edgeHandles = new Map<EdgeId, EdgeHandle>();
-const incidentEdgesByNode = new Map<NodeId, Set<EdgeId>>();
+export interface DragRegistry {
+  registerNodeEl(id: NodeId, el: SVGGElement): () => void;
+  getNodeEl(id: NodeId): SVGGElement | undefined;
+  registerEdgeHandle(
+    id: EdgeId,
+    fromId: NodeId,
+    toId: NodeId,
+    handle: EdgeHandle,
+  ): () => void;
+  getIncidentEdgeHandles(nodeId: NodeId): EdgeHandle[];
+}
 
-export function registerNodeEl(id: NodeId, el: SVGGElement): () => void {
-  nodeEls.set(id, el);
-  return () => {
-    if (nodeEls.get(id) === el) nodeEls.delete(id);
+export function createDragRegistry(): DragRegistry {
+  const nodeEls = new Map<NodeId, SVGGElement>();
+  const edgeHandles = new Map<EdgeId, EdgeHandle>();
+  const incidentEdgesByNode = new Map<NodeId, Set<EdgeId>>();
+
+  return {
+    registerNodeEl(id, el): () => void {
+      nodeEls.set(id, el);
+      return () => {
+        if (nodeEls.get(id) === el) nodeEls.delete(id);
+      };
+    },
+    getNodeEl(id): SVGGElement | undefined {
+      return nodeEls.get(id);
+    },
+    registerEdgeHandle(id, fromId, toId, handle): () => void {
+      edgeHandles.set(id, handle);
+      let fromSet = incidentEdgesByNode.get(fromId);
+      if (!fromSet) {
+        fromSet = new Set();
+        incidentEdgesByNode.set(fromId, fromSet);
+      }
+      fromSet.add(id);
+      let toSet = incidentEdgesByNode.get(toId);
+      if (!toSet) {
+        toSet = new Set();
+        incidentEdgesByNode.set(toId, toSet);
+      }
+      toSet.add(id);
+      return () => {
+        if (edgeHandles.get(id) === handle) edgeHandles.delete(id);
+        incidentEdgesByNode.get(fromId)?.delete(id);
+        incidentEdgesByNode.get(toId)?.delete(id);
+      };
+    },
+    getIncidentEdgeHandles(nodeId): EdgeHandle[] {
+      const set = incidentEdgesByNode.get(nodeId);
+      if (!set) return [];
+      const out: EdgeHandle[] = [];
+      for (const eid of set) {
+        const h = edgeHandles.get(eid);
+        if (h) out.push(h);
+      }
+      return out;
+    },
   };
 }
 
+const defaultRegistry = createDragRegistry();
+
+/** 호환 shim — Stage B 후반에 제거. */
+export function registerNodeEl(id: NodeId, el: SVGGElement): () => void {
+  return defaultRegistry.registerNodeEl(id, el);
+}
+
 export function getNodeEl(id: NodeId): SVGGElement | undefined {
-  return nodeEls.get(id);
+  return defaultRegistry.getNodeEl(id);
 }
 
 export function registerEdgeHandle(
@@ -39,34 +95,9 @@ export function registerEdgeHandle(
   toId: NodeId,
   handle: EdgeHandle,
 ): () => void {
-  edgeHandles.set(id, handle);
-  let fromSet = incidentEdgesByNode.get(fromId);
-  if (!fromSet) {
-    fromSet = new Set();
-    incidentEdgesByNode.set(fromId, fromSet);
-  }
-  fromSet.add(id);
-  // self-loop이면 같은 set이라 중복 add는 무해.
-  let toSet = incidentEdgesByNode.get(toId);
-  if (!toSet) {
-    toSet = new Set();
-    incidentEdgesByNode.set(toId, toSet);
-  }
-  toSet.add(id);
-  return () => {
-    if (edgeHandles.get(id) === handle) edgeHandles.delete(id);
-    incidentEdgesByNode.get(fromId)?.delete(id);
-    incidentEdgesByNode.get(toId)?.delete(id);
-  };
+  return defaultRegistry.registerEdgeHandle(id, fromId, toId, handle);
 }
 
 export function getIncidentEdgeHandles(nodeId: NodeId): EdgeHandle[] {
-  const set = incidentEdgesByNode.get(nodeId);
-  if (!set) return [];
-  const out: EdgeHandle[] = [];
-  for (const eid of set) {
-    const h = edgeHandles.get(eid);
-    if (h) out.push(h);
-  }
-  return out;
+  return defaultRegistry.getIncidentEdgeHandles(nodeId);
 }

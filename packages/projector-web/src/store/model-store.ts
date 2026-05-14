@@ -1,4 +1,4 @@
-import { create } from 'zustand';
+import { create, type StoreApi, type UseBoundStore } from 'zustand';
 import {
   OperationLog,
   addConditionalNode as addConditionalNodeOp,
@@ -44,12 +44,8 @@ import type {
 import { tokens } from '@trama/tokens';
 import { combinerRegistry, shapeRegistry } from './registries.js';
 import { fizzexExpressionEvaluator } from '../expression/fizzex-evaluator.js';
-import {
-  setArrivalHandler,
-  spawnPulse,
-  type Pulse,
-} from '../pulse/pulse-registry.js';
-import { triggerNodeFlash } from '../pulse/node-flash-registry.js';
+import type { PulseRegistry, Pulse } from '../pulse/pulse-registry.js';
+import type { NodeFlashRegistry } from '../pulse/node-flash-registry.js';
 
 const STEP_TICK_MS = parseFloat(tokens.motion.durationStepTick);
 
@@ -105,6 +101,13 @@ export interface ModelStore {
 
   undo: () => void;
   redo: () => void;
+}
+
+export type ModelStoreInstance = UseBoundStore<StoreApi<ModelStore>>;
+
+export interface ModelStoreDeps {
+  pulseRegistry: PulseRegistry;
+  nodeFlashRegistry: NodeFlashRegistry;
 }
 
 function record(
@@ -169,483 +172,498 @@ function computeExecutionState(model: Model): {
     });
     return { executionState: traj[traj.length - 1]!, trajectory: traj };
   } catch {
-    // 사이클 등 에러 시 초기값으로 폴백
     const init = initializeFromInitialValues(model);
     return { executionState: init, trajectory: [init] };
   }
 }
 
-const initial = createEmptyModel();
-const initialExec = computeExecutionState(initial);
+export function createModelStore({
+  pulseRegistry,
+  nodeFlashRegistry,
+}: ModelStoreDeps): ModelStoreInstance {
+  const initial = createEmptyModel();
+  const initialExec = computeExecutionState(initial);
+  let activePlaybackToken = 0;
 
-let activePlaybackToken = 0;
-
-/**
- * 주어진 source 노드의 lag=0 outgoing edges에 대해 펄스를 spawn.
- * lag=1 feedback 엣지는 제외 (방식 가). 출력 슬롯이 invalid면 skip.
- * playback 중이면 spawn 자체를 막는다.
- */
-function spawnOutgoingPulses(
-  model: Model,
-  executionState: ExecutionState,
-  sourceNodeId: NodeId,
-): void {
-  if (useModelStore.getState().playbackStep !== null) return;
-  for (const eid of model.edgeOrder) {
-    const e = model.edges[eid];
-    if (!e || e.from !== sourceNodeId) continue;
-    if ((e.lag ?? 0) !== 0) continue;
-    const slot = e.sourceSlotIndex ?? 0;
-    if (!executionState.validOutputs.has(outputKey(sourceNodeId, slot))) continue;
-    const sourceValue = executionState.values[sourceNodeId];
-    if (typeof sourceValue !== 'number') continue;
-    spawnPulse({
-      edgeId: eid,
-      sourceNodeId,
-      sourceSlotIndex: slot,
-      targetNodeId: e.to,
-      sourceValue,
-    });
-  }
-}
-
-/**
- * 펄스 도착 처리.
- * 1. target 재계산 (펄스의 source 값을 sourceValueOverrides로 박제)
- * 2. flash 트리거
- * 3. 결과값이 *바뀐 경우에만* outgoing edges로 펄스 전파
- *
- * playback 중에는 무시 (재생 모드와 충돌 방지).
- */
-function handlePulseArrival(pulse: Pulse): void {
-  const { model, executionState, playbackStep } = useModelStore.getState();
-  if (playbackStep !== null) return;
-
-  // target 또는 source 노드가 사라졌다면 무시 (편집 중 race).
-  if (!model.nodes[pulse.targetNodeId] || !model.nodes[pulse.sourceNodeId]) return;
-
-  const result = recomputeNode(pulse.targetNodeId, executionState, model, {
-    shapeRegistry,
-    combinerRegistry,
-    expressionEvaluator: fizzexExpressionEvaluator,
-    sourceValueOverrides: { [pulse.sourceNodeId]: pulse.sourceValue },
-  });
-
-  const prevValue = executionState.values[pulse.targetNodeId];
-  const wasValid = executionState.validOutputs.has(outputKey(pulse.targetNodeId, 0));
-  const isValid = result.isValid;
-  const valueChanged =
-    result.newValue !== undefined && result.newValue !== prevValue;
-  const validityChanged = wasValid !== isValid;
-
-  useModelStore.setState((s) => {
-    const newValues: Record<NodeId, number> = { ...s.executionState.values };
-    if (result.newValue !== undefined) newValues[pulse.targetNodeId] = result.newValue;
-    return {
-      executionState: {
-        values: newValues,
-        validOutputs: result.validOutputs,
-        invalidReasons: s.executionState.invalidReasons,
-      },
-    };
-  });
-
-  triggerNodeFlash(pulse.targetNodeId);
-
-  // 값이 실제 바뀐 경우만 하류 전파. validity만 바뀌었어도 전파 (출력이 켜졌다/꺼졌다는 변화).
-  if ((valueChanged || validityChanged) && result.newValue !== undefined) {
-    const latest = useModelStore.getState();
-    spawnOutgoingPulses(latest.model, latest.executionState, pulse.targetNodeId);
-  }
-}
-
-setArrivalHandler(handlePulseArrival);
-
-export const useModelStore = create<ModelStore>((set, get) => ({
-  model: initial,
-  executionState: initialExec.executionState,
-  trajectory: initialExec.trajectory,
-  playbackStep: null,
-  log: new OperationLog(),
-  canUndo: false,
-  canRedo: false,
-
-  setModel: (next) => {
-    const exec = computeExecutionState(next);
-    set({ model: next, ...exec });
-  },
-
-  recompute: () => {
-    const exec = computeExecutionState(get().model);
-    set(exec);
-  },
-
-  loadFromJson: (json) => {
-    try {
-      // dynamic require to avoid circular; we use serializeTrama for export only.
-      // Parsing is done by host (apps/web) via @trama/core; here we accept already-validated JSON string.
-      // Simplification: try to JSON.parse and then documentToModel via dynamic import is overkill;
-      // expose this method later when apps/web uses it.
-      const obj = JSON.parse(json);
-      // Minimal validation; full validation happens in apps/web layer.
-      if (typeof obj !== 'object' || obj == null) return false;
-      // Best-effort: trust caller to pass a serialized TramaDocument-shaped object.
-      // We avoid importing parser here to keep store narrow.
-      return false; // Implemented in apps/web via core parser.
-    } catch {
-      return false;
+  /**
+   * 주어진 source 노드의 lag=0 outgoing edges에 대해 펄스를 spawn.
+   * lag=1 feedback 엣지는 제외 (방식 가). 출력 슬롯이 invalid면 skip.
+   * playback 중이면 spawn 자체를 막는다.
+   */
+  function spawnOutgoingPulses(
+    model: Model,
+    executionState: ExecutionState,
+    sourceNodeId: NodeId,
+  ): void {
+    if (store.getState().playbackStep !== null) return;
+    for (const eid of model.edgeOrder) {
+      const e = model.edges[eid];
+      if (!e || e.from !== sourceNodeId) continue;
+      if ((e.lag ?? 0) !== 0) continue;
+      const slot = e.sourceSlotIndex ?? 0;
+      if (!executionState.validOutputs.has(outputKey(sourceNodeId, slot))) continue;
+      const sourceValue = executionState.values[sourceNodeId];
+      if (typeof sourceValue !== 'number') continue;
+      pulseRegistry.spawn({
+        edgeId: eid,
+        sourceNodeId,
+        sourceSlotIndex: slot,
+        targetNodeId: e.to,
+        sourceValue,
+      });
     }
-  },
+  }
 
-  exportToJson: () => {
-    return serializeTrama(modelToDocument(get().model));
-  },
+  /**
+   * 펄스 도착 처리.
+   * 1. target 재계산 (펄스의 source 값을 sourceValueOverrides로 박제)
+   * 2. flash 트리거
+   * 3. 결과값이 *바뀐 경우에만* outgoing edges로 펄스 전파
+   *
+   * playback 중에는 무시 (재생 모드와 충돌 방지).
+   */
+  function handlePulseArrival(pulse: Pulse): void {
+    const { model, executionState, playbackStep } = store.getState();
+    if (playbackStep !== null) return;
 
-  addNode: (input, opKind = 'add-node', label = '노드 추가') => {
-    const before = get().model;
-    const after = addValueNodeOp(before, input);
-    const newId = after.nodeOrder[after.nodeOrder.length - 1]!;
-    const node = after.nodes[newId]!;
-    const exec = computeExecutionState(after);
-    set((s) => {
-      record(s, before, after, opKind, label, { nodeId: newId, node });
+    if (!model.nodes[pulse.targetNodeId] || !model.nodes[pulse.sourceNodeId]) return;
+
+    const result = recomputeNode(pulse.targetNodeId, executionState, model, {
+      shapeRegistry,
+      combinerRegistry,
+      expressionEvaluator: fizzexExpressionEvaluator,
+      sourceValueOverrides: { [pulse.sourceNodeId]: pulse.sourceValue },
+    });
+
+    const prevValue = executionState.values[pulse.targetNodeId];
+    const wasValid = executionState.validOutputs.has(outputKey(pulse.targetNodeId, 0));
+    const isValid = result.isValid;
+    const valueChanged =
+      result.newValue !== undefined && result.newValue !== prevValue;
+    const validityChanged = wasValid !== isValid;
+
+    store.setState((s) => {
+      const newValues: Record<NodeId, number> = { ...s.executionState.values };
+      if (result.newValue !== undefined) newValues[pulse.targetNodeId] = result.newValue;
       return {
-        model: after,
-        ...exec,
-        canUndo: s.log.canUndo(),
-        canRedo: s.log.canRedo(),
+        executionState: {
+          values: newValues,
+          validOutputs: result.validOutputs,
+          invalidReasons: s.executionState.invalidReasons,
+        },
       };
     });
-    return node;
-  },
 
-  addConstantNode: (input, opKind = 'add-node', label = '상수 노드 추가') => {
-    const before = get().model;
-    const after = addConstantNodeOp(before, input);
-    const newId = after.nodeOrder[after.nodeOrder.length - 1]!;
-    const node = after.nodes[newId]!;
-    const exec = computeExecutionState(after);
-    set((s) => {
-      record(s, before, after, opKind, label, { nodeId: newId, node });
-      return {
-        model: after,
-        ...exec,
-        canUndo: s.log.canUndo(),
-        canRedo: s.log.canRedo(),
-      };
-    });
-    return node;
-  },
+    nodeFlashRegistry.trigger(pulse.targetNodeId);
 
-  addConditionalNode: (input, opKind = 'add-node', label = '조건 노드 추가') => {
-    const before = get().model;
-    const after = addConditionalNodeOp(before, input);
-    const newId = after.nodeOrder[after.nodeOrder.length - 1]!;
-    const node = after.nodes[newId]!;
-    const exec = computeExecutionState(after);
-    set((s) => {
-      record(s, before, after, opKind, label, { nodeId: newId, node });
-      return {
-        model: after,
-        ...exec,
-        canUndo: s.log.canUndo(),
-        canRedo: s.log.canRedo(),
-      };
-    });
-    return node;
-  },
+    if ((valueChanged || validityChanged) && result.newValue !== undefined) {
+      const latest = store.getState();
+      spawnOutgoingPulses(latest.model, latest.executionState, pulse.targetNodeId);
+    }
+  }
 
-  addExpressionNode: (input, opKind = 'add-node', label = '식 노드 추가') => {
-    const before = get().model;
-    const after = addExpressionNodeOp(before, input);
-    const newId = after.nodeOrder[after.nodeOrder.length - 1]!;
-    const node = after.nodes[newId]!;
-    const exec = computeExecutionState(after);
-    set((s) => {
-      record(s, before, after, opKind, label, { nodeId: newId, node });
-      return {
-        model: after,
-        ...exec,
-        canUndo: s.log.canUndo(),
-        canRedo: s.log.canRedo(),
-      };
-    });
-    return node;
-  },
+  const store = create<ModelStore>((set, get) => ({
+    model: initial,
+    executionState: initialExec.executionState,
+    trajectory: initialExec.trajectory,
+    playbackStep: null,
+    log: new OperationLog(),
+    canUndo: false,
+    canRedo: false,
 
-  updateNode: (id, rawPatch, kind = 'update-node', label = '노드 수정') => {
-    const before = get().model;
-    // 식 노드의 latex가 바뀌면 variables(슬롯 목록)도 fizzex 분석으로 동기화.
-    // 자유변수 + 등장 상수 union을 슬롯으로 노출한다 (상수도 ConstantNode 엣지 경유 정책).
-    const node = before.nodes[id];
-    const patch: NodePatch =
-      node &&
-      isExpressionNode(node) &&
-      typeof (rawPatch as { latex?: unknown }).latex === 'string'
-        ? (() => {
-            const nextLatex = (rawPatch as { latex: string }).latex;
-            const analysis = fizzexExpressionEvaluator.analyze(nextLatex);
-            return {
-              ...rawPatch,
-              variables: [...analysis.required, ...analysis.constants],
-            };
-          })()
-        : rawPatch;
-    const after = updateNodeOp(before, id, patch);
-    if (after === before) return;
+    setModel: (next) => {
+      const exec = computeExecutionState(next);
+      set({ model: next, ...exec });
+    },
 
-    const affectsValues = patchAffectsValues(patch);
-    const simpleValue = patchIsSimpleValueChange(patch);
-    // 단순 값 변경(initialValue/value 단독)은 펄스 경로로 — executionState는 펄스 도달 시 점진 갱신.
-    // 구조적 변경(unit/combiner/function 등)은 전체 재계산.
-    const shouldCoalesce = kind === 'move-node' || kind === 'rename-node';
-    const playbackActive = get().playbackStep !== null;
+    recompute: () => {
+      const exec = computeExecutionState(get().model);
+      set(exec);
+    },
 
-    if (simpleValue && !playbackActive) {
-      const recomputed = computeExecutionState(after);
-      const nextNodeValue =
-        'value' in patch && typeof patch.value === 'number'
-          ? patch.value
-          : 'initialValue' in patch && typeof patch.initialValue === 'number'
-            ? patch.initialValue
-            : undefined;
+    loadFromJson: (json) => {
+      try {
+        const obj = JSON.parse(json);
+        if (typeof obj !== 'object' || obj == null) return false;
+        return false;
+      } catch {
+        return false;
+      }
+    },
+
+    exportToJson: () => {
+      return serializeTrama(modelToDocument(get().model));
+    },
+
+    addNode: (input, opKind = 'add-node', label = '노드 추가') => {
+      const before = get().model;
+      const after = addValueNodeOp(before, input);
+      const newId = after.nodeOrder[after.nodeOrder.length - 1]!;
+      const node = after.nodes[newId]!;
+      const exec = computeExecutionState(after);
       set((s) => {
-        record(s, before, after, kind, label, { nodeId: id }, shouldCoalesce);
-        const newValues: Record<NodeId, number> = { ...s.executionState.values };
-        if (typeof nextNodeValue === 'number') newValues[id] = nextNodeValue;
-        const newValid = new Set(s.executionState.validOutputs);
-        newValid.add(outputKey(id, 0));
+        record(s, before, after, opKind, label, { nodeId: newId, node });
         return {
           model: after,
-          executionState: {
-            values: newValues,
-            validOutputs: newValid,
-            invalidReasons: s.executionState.invalidReasons,
-          },
+          ...exec,
+          canUndo: s.log.canUndo(),
+          canRedo: s.log.canRedo(),
+        };
+      });
+      return node;
+    },
+
+    addConstantNode: (input, opKind = 'add-node', label = '상수 노드 추가') => {
+      const before = get().model;
+      const after = addConstantNodeOp(before, input);
+      const newId = after.nodeOrder[after.nodeOrder.length - 1]!;
+      const node = after.nodes[newId]!;
+      const exec = computeExecutionState(after);
+      set((s) => {
+        record(s, before, after, opKind, label, { nodeId: newId, node });
+        return {
+          model: after,
+          ...exec,
+          canUndo: s.log.canUndo(),
+          canRedo: s.log.canRedo(),
+        };
+      });
+      return node;
+    },
+
+    addConditionalNode: (input, opKind = 'add-node', label = '조건 노드 추가') => {
+      const before = get().model;
+      const after = addConditionalNodeOp(before, input);
+      const newId = after.nodeOrder[after.nodeOrder.length - 1]!;
+      const node = after.nodes[newId]!;
+      const exec = computeExecutionState(after);
+      set((s) => {
+        record(s, before, after, opKind, label, { nodeId: newId, node });
+        return {
+          model: after,
+          ...exec,
+          canUndo: s.log.canUndo(),
+          canRedo: s.log.canRedo(),
+        };
+      });
+      return node;
+    },
+
+    addExpressionNode: (input, opKind = 'add-node', label = '식 노드 추가') => {
+      const before = get().model;
+      const after = addExpressionNodeOp(before, input);
+      const newId = after.nodeOrder[after.nodeOrder.length - 1]!;
+      const node = after.nodes[newId]!;
+      const exec = computeExecutionState(after);
+      set((s) => {
+        record(s, before, after, opKind, label, { nodeId: newId, node });
+        return {
+          model: after,
+          ...exec,
+          canUndo: s.log.canUndo(),
+          canRedo: s.log.canRedo(),
+        };
+      });
+      return node;
+    },
+
+    updateNode: (id, rawPatch, kind = 'update-node', label = '노드 수정') => {
+      const before = get().model;
+      const node = before.nodes[id];
+      const patch: NodePatch =
+        node &&
+        isExpressionNode(node) &&
+        typeof (rawPatch as { latex?: unknown }).latex === 'string'
+          ? (() => {
+              const nextLatex = (rawPatch as { latex: string }).latex;
+              const analysis = fizzexExpressionEvaluator.analyze(nextLatex);
+              return {
+                ...rawPatch,
+                variables: [...analysis.required, ...analysis.constants],
+              };
+            })()
+          : rawPatch;
+      const after = updateNodeOp(before, id, patch);
+      if (after === before) return;
+
+      const affectsValues = patchAffectsValues(patch);
+      const simpleValue = patchIsSimpleValueChange(patch);
+      const shouldCoalesce = kind === 'move-node' || kind === 'rename-node';
+      const playbackActive = get().playbackStep !== null;
+
+      if (simpleValue && !playbackActive) {
+        const recomputed = computeExecutionState(after);
+        const nextNodeValue =
+          'value' in patch && typeof patch.value === 'number'
+            ? patch.value
+            : 'initialValue' in patch && typeof patch.initialValue === 'number'
+              ? patch.initialValue
+              : undefined;
+        set((s) => {
+          record(s, before, after, kind, label, { nodeId: id }, shouldCoalesce);
+          const newValues: Record<NodeId, number> = { ...s.executionState.values };
+          if (typeof nextNodeValue === 'number') newValues[id] = nextNodeValue;
+          const newValid = new Set(s.executionState.validOutputs);
+          newValid.add(outputKey(id, 0));
+          return {
+            model: after,
+            executionState: {
+              values: newValues,
+              validOutputs: newValid,
+              invalidReasons: s.executionState.invalidReasons,
+            },
+            trajectory: recomputed.trajectory,
+            canUndo: s.log.canUndo(),
+            canRedo: s.log.canRedo(),
+          };
+        });
+        nodeFlashRegistry.trigger(id);
+        const latest = get();
+        spawnOutgoingPulses(latest.model, latest.executionState, id);
+        return;
+      }
+
+      const exec = affectsValues ? computeExecutionState(after) : null;
+      set((s) => {
+        record(s, before, after, kind, label, { nodeId: id }, shouldCoalesce);
+        return {
+          model: after,
+          ...(exec ?? {}),
+          canUndo: s.log.canUndo(),
+          canRedo: s.log.canRedo(),
+        };
+      });
+    },
+
+    removeNode: (id) => {
+      const before = get().model;
+      const after = removeNodeOp(before, id);
+      if (after === before) return;
+      const exec = computeExecutionState(after);
+      set((s) => {
+        record(s, before, after, 'remove-node', '노드 삭제', { nodeId: id });
+        return {
+          model: after,
+          ...exec,
+          canUndo: s.log.canUndo(),
+          canRedo: s.log.canRedo(),
+        };
+      });
+    },
+
+    addEdge: (input) => {
+      const before = get().model;
+      const targetNode = before.nodes[input.to];
+      if (targetNode && isExpressionNode(targetNode)) {
+        const arity = targetNode.variables.length;
+        const slot = input.slotIndex;
+        if (typeof slot !== 'number' || slot < 0 || slot >= arity) return null;
+        const occupied = before.edgeOrder
+          .map((eid) => before.edges[eid])
+          .filter((e) => e && e.to === input.to);
+        if (occupied.some((e) => e!.slotIndex === slot)) return null;
+      }
+      if (targetNode && isConditionalNode(targetNode)) {
+        const slot = input.slotIndex;
+        if (typeof slot !== 'number' || slot < 0 || slot > 1) return null;
+        const occupied = before.edgeOrder
+          .map((eid) => before.edges[eid])
+          .filter((e) => e && e.to === input.to);
+        if (occupied.some((e) => e!.slotIndex === slot)) return null;
+      }
+      const candidate = addEdgeOp(before, input);
+      if ((input.lag ?? 0) === 0) {
+        try {
+          buildTopology(candidate);
+        } catch {
+          return null;
+        }
+      }
+      const after = candidate;
+      const newId = after.edgeOrder[after.edgeOrder.length - 1]!;
+      const edge = after.edges[newId]!;
+      const exec = computeExecutionState(after);
+      set((s) => {
+        record(s, before, after, 'add-edge', '엣지 추가', { edgeId: newId, edge });
+        return {
+          model: after,
+          ...exec,
+          canUndo: s.log.canUndo(),
+          canRedo: s.log.canRedo(),
+        };
+      });
+      return edge;
+    },
+
+    updateEdge: (id, patch, kind = 'update-edge', label = '엣지 수정') => {
+      const before = get().model;
+      const candidate = updateEdgeOp(before, id, patch);
+      if (candidate === before) return;
+      if ('lag' in patch || 'from' in patch || 'to' in patch) {
+        try {
+          buildTopology(candidate);
+        } catch {
+          return;
+        }
+      }
+      const after = candidate;
+      const exec = computeExecutionState(after);
+      set((s) => {
+        record(s, before, after, kind, label, { edgeId: id });
+        return {
+          model: after,
+          ...exec,
+          canUndo: s.log.canUndo(),
+          canRedo: s.log.canRedo(),
+        };
+      });
+    },
+
+    removeEdge: (id) => {
+      const before = get().model;
+      const after = removeEdgeOp(before, id);
+      if (after === before) return;
+      const exec = computeExecutionState(after);
+      set((s) => {
+        record(s, before, after, 'remove-edge', '엣지 삭제', { edgeId: id });
+        return {
+          model: after,
+          ...exec,
+          canUndo: s.log.canUndo(),
+          canRedo: s.log.canRedo(),
+        };
+      });
+    },
+
+    setQuestion: (q) => {
+      const before = get().model;
+      const after = setQuestionOp(before, q);
+      set((s) => {
+        record(s, before, after, 'set-question', '질문 변경');
+        return { model: after, canUndo: s.log.canUndo(), canRedo: s.log.canRedo() };
+      });
+    },
+
+    setExecution: (e) => {
+      const before = get().model;
+      const after = setExecutionOp(before, e);
+      if (after === before) return;
+      const exec = computeExecutionState(after);
+      set((s) => {
+        record(s, before, after, 'set-execution', '실행 설정 변경');
+        return {
+          model: after,
+          ...exec,
+          canUndo: s.log.canUndo(),
+          canRedo: s.log.canRedo(),
+        };
+      });
+    },
+
+    scrubInitialValue: (id, nextValue) => {
+      const before = get().model;
+      const after = updateNodeOp(before, id, { initialValue: nextValue });
+      if (after === before) return;
+      const recomputed = computeExecutionState(after);
+      const playbackActive = get().playbackStep !== null;
+      set((s) => {
+        record(s, before, after, 'scrub-value', '값 변경', { nodeId: id }, true);
+        const nextValues: Record<NodeId, number> = playbackActive
+          ? s.executionState.values
+          : { ...s.executionState.values, [id]: nextValue };
+        const nextValid = playbackActive
+          ? s.executionState.validOutputs
+          : new Set(s.executionState.validOutputs);
+        if (!playbackActive) nextValid.add(outputKey(id, 0));
+        return {
+          model: after,
+          executionState: playbackActive
+            ? s.executionState
+            : {
+                values: nextValues,
+                validOutputs: nextValid,
+                invalidReasons: s.executionState.invalidReasons,
+              },
           trajectory: recomputed.trajectory,
           canUndo: s.log.canUndo(),
           canRedo: s.log.canRedo(),
         };
       });
-      triggerNodeFlash(id);
-      const latest = get();
-      spawnOutgoingPulses(latest.model, latest.executionState, id);
-      return;
-    }
-
-    const exec = affectsValues ? computeExecutionState(after) : null;
-    set((s) => {
-      record(s, before, after, kind, label, { nodeId: id }, shouldCoalesce);
-      return {
-        model: after,
-        ...(exec ?? {}),
-        canUndo: s.log.canUndo(),
-        canRedo: s.log.canRedo(),
-      };
-    });
-  },
-
-  removeNode: (id) => {
-    const before = get().model;
-    const after = removeNodeOp(before, id);
-    if (after === before) return;
-    const exec = computeExecutionState(after);
-    set((s) => {
-      record(s, before, after, 'remove-node', '노드 삭제', { nodeId: id });
-      return {
-        model: after,
-        ...exec,
-        canUndo: s.log.canUndo(),
-        canRedo: s.log.canRedo(),
-      };
-    });
-  },
-
-  addEdge: (input) => {
-    const before = get().model;
-    // 슬롯 검증: target이 ExpressionNode면 slotIndex가 variables 범위 안이고 비어 있어야.
-    const targetNode = before.nodes[input.to];
-    if (targetNode && isExpressionNode(targetNode)) {
-      const arity = targetNode.variables.length;
-      const slot = input.slotIndex;
-      if (typeof slot !== 'number' || slot < 0 || slot >= arity) return null;
-      const occupied = before.edgeOrder
-        .map((eid) => before.edges[eid])
-        .filter((e) => e && e.to === input.to);
-      if (occupied.some((e) => e!.slotIndex === slot)) return null;
-    }
-    // ConditionalNode 입력은 슬롯 0(A), 1(B) 두 칸. 각 슬롯에 하나씩.
-    if (targetNode && isConditionalNode(targetNode)) {
-      const slot = input.slotIndex;
-      if (typeof slot !== 'number' || slot < 0 || slot > 1) return null;
-      const occupied = before.edgeOrder
-        .map((eid) => before.edges[eid])
-        .filter((e) => e && e.to === input.to);
-      if (occupied.some((e) => e!.slotIndex === slot)) return null;
-    }
-    // 사이클 사전 검사: lag=0이면 instantaneous DAG가 유지되는지 확인
-    const candidate = addEdgeOp(before, input);
-    if ((input.lag ?? 0) === 0) {
-      try {
-        buildTopology(candidate);
-      } catch {
-        return null;
+      if (!playbackActive) {
+        nodeFlashRegistry.trigger(id);
+        const latest = get();
+        spawnOutgoingPulses(latest.model, latest.executionState, id);
       }
-    }
-    const after = candidate;
-    const newId = after.edgeOrder[after.edgeOrder.length - 1]!;
-    const edge = after.edges[newId]!;
-    const exec = computeExecutionState(after);
-    set((s) => {
-      record(s, before, after, 'add-edge', '엣지 추가', { edgeId: newId, edge });
-      return {
-        model: after,
-        ...exec,
-        canUndo: s.log.canUndo(),
-        canRedo: s.log.canRedo(),
-      };
-    });
-    return edge;
-  },
+    },
 
-  updateEdge: (id, patch, kind = 'update-edge', label = '엣지 수정') => {
-    const before = get().model;
-    const candidate = updateEdgeOp(before, id, patch);
-    if (candidate === before) return;
-    // lag/to/from/shape 변경이 lag=0 사이클을 만들면 거부
-    if ('lag' in patch || 'from' in patch || 'to' in patch) {
-      try {
-        buildTopology(candidate);
-      } catch {
-        return;
-      }
-    }
-    const after = candidate;
-    const exec = computeExecutionState(after);
-    set((s) => {
-      record(s, before, after, kind, label, { edgeId: id });
-      return {
-        model: after,
-        ...exec,
-        canUndo: s.log.canUndo(),
-        canRedo: s.log.canRedo(),
-      };
-    });
-  },
+    play: () => {
+      const { trajectory } = get();
+      if (trajectory.length <= 1) return;
+      const token = ++activePlaybackToken;
+      trajectory.forEach((s, i) => {
+        window.setTimeout(() => {
+          if (activePlaybackToken !== token) return;
+          const isLast = i === trajectory.length - 1;
+          const prev = get().executionState;
+          for (const nid of Object.keys(s.values)) {
+            if (s.values[nid] !== prev.values[nid]) nodeFlashRegistry.trigger(nid);
+          }
+          set({ executionState: s, playbackStep: isLast ? null : i });
+        }, i * STEP_TICK_MS);
+      });
+    },
 
-  removeEdge: (id) => {
-    const before = get().model;
-    const after = removeEdgeOp(before, id);
-    if (after === before) return;
-    const exec = computeExecutionState(after);
-    set((s) => {
-      record(s, before, after, 'remove-edge', '엣지 삭제', { edgeId: id });
-      return {
-        model: after,
-        ...exec,
-        canUndo: s.log.canUndo(),
-        canRedo: s.log.canRedo(),
-      };
-    });
-  },
+    undo: () => {
+      const log = get().log;
+      const prev = log.undo();
+      if (!prev) return;
+      const exec = computeExecutionState(prev);
+      set({ model: prev, ...exec, canUndo: log.canUndo(), canRedo: log.canRedo() });
+    },
 
-  setQuestion: (q) => {
-    const before = get().model;
-    const after = setQuestionOp(before, q);
-    set((s) => {
-      record(s, before, after, 'set-question', '질문 변경');
-      return { model: after, canUndo: s.log.canUndo(), canRedo: s.log.canRedo() };
-    });
-  },
+    redo: () => {
+      const log = get().log;
+      const next = log.redo();
+      if (!next) return;
+      const exec = computeExecutionState(next);
+      set({ model: next, ...exec, canUndo: log.canUndo(), canRedo: log.canRedo() });
+    },
+  }));
 
-  setExecution: (e) => {
-    const before = get().model;
-    const after = setExecutionOp(before, e);
-    if (after === before) return;
-    const exec = computeExecutionState(after);
-    set((s) => {
-      record(s, before, after, 'set-execution', '실행 설정 변경');
-      return {
-        model: after,
-        ...exec,
-        canUndo: s.log.canUndo(),
-        canRedo: s.log.canRedo(),
-      };
-    });
-  },
+  pulseRegistry.setArrivalHandler(handlePulseArrival);
 
-  scrubInitialValue: (id, nextValue) => {
-    const before = get().model;
-    const after = updateNodeOp(before, id, { initialValue: nextValue });
-    if (after === before) return;
-    // 트래잭토리는 playback용으로 갱신해두되, executionState는 펄스 도착 시점에만 변화.
-    // 소스 노드 본인의 값은 즉시 갱신 (펄스의 출발 표시) — 하류는 펄스 도달 시 갱신.
-    const recomputed = computeExecutionState(after);
-    const playbackActive = get().playbackStep !== null;
-    set((s) => {
-      record(s, before, after, 'scrub-value', '값 변경', { nodeId: id }, true);
-      const nextValues: Record<NodeId, number> = playbackActive
-        ? s.executionState.values
-        : { ...s.executionState.values, [id]: nextValue };
-      const nextValid = playbackActive
-        ? s.executionState.validOutputs
-        : new Set(s.executionState.validOutputs);
-      if (!playbackActive) nextValid.add(outputKey(id, 0));
-      return {
-        model: after,
-        executionState: playbackActive
-          ? s.executionState
-          : {
-              values: nextValues,
-              validOutputs: nextValid,
-              invalidReasons: s.executionState.invalidReasons,
-            },
-        trajectory: recomputed.trajectory,
-        canUndo: s.log.canUndo(),
-        canRedo: s.log.canRedo(),
-      };
-    });
-    if (!playbackActive) {
-      triggerNodeFlash(id);
-      const latest = get();
-      spawnOutgoingPulses(latest.model, latest.executionState, id);
-    }
-  },
+  return store;
+}
 
-  play: () => {
-    const { trajectory } = get();
-    if (trajectory.length <= 1) return;
-    const token = ++activePlaybackToken;
-    trajectory.forEach((s, i) => {
-      window.setTimeout(() => {
-        if (activePlaybackToken !== token) return;
-        const isLast = i === trajectory.length - 1;
-        // step 경계에서 값이 바뀐 노드만 flash (방식 2 — 케이블 펄스 없이 노드만 깜빡임)
-        const prev = get().executionState;
-        for (const nid of Object.keys(s.values)) {
-          if (s.values[nid] !== prev.values[nid]) triggerNodeFlash(nid);
-        }
-        set({ executionState: s, playbackStep: isLast ? null : i });
-      }, i * STEP_TICK_MS);
-    });
-  },
+/**
+ * 호환 shim — Stage B 후반에 제거. 새 코드는 useTrama().modelStore 사용.
+ * 기본 shim은 default pulse-registry / node-flash-registry에 wire-up되어
+ * "compat shim 환경"에서만 의미가 있다.
+ */
+import { setArrivalHandler as defaultSetArrivalHandler, spawnPulse } from '../pulse/pulse-registry.js';
+import { triggerNodeFlash } from '../pulse/node-flash-registry.js';
 
-  undo: () => {
-    const log = get().log;
-    const prev = log.undo();
-    if (!prev) return;
-    const exec = computeExecutionState(prev);
-    set({ model: prev, ...exec, canUndo: log.canUndo(), canRedo: log.canRedo() });
-  },
+const compatPulseRegistry: PulseRegistry = {
+  setArrivalHandler: defaultSetArrivalHandler,
+  spawn: spawnPulse,
+  pulseProgress: () => 0,
+  getActive: () => [],
+  subscribeList: () => () => {},
+  subscribeTick: () => () => {},
+  clearAll: () => {},
+  dispose: () => {},
+};
 
-  redo: () => {
-    const log = get().log;
-    const next = log.redo();
-    if (!next) return;
-    const exec = computeExecutionState(next);
-    set({ model: next, ...exec, canUndo: log.canUndo(), canRedo: log.canRedo() });
-  },
-}));
+const compatNodeFlashRegistry: NodeFlashRegistry = {
+  trigger: triggerNodeFlash,
+  getFlashId: () => 0,
+  subscribe: () => () => {},
+};
+
+export const useModelStore: ModelStoreInstance = createModelStore({
+  pulseRegistry: compatPulseRegistry,
+  nodeFlashRegistry: compatNodeFlashRegistry,
+});
 
 /** feedback 엣지 유무는 N-step 컨트롤 표시 결정에 사용. */
 export function selectHasFeedback(s: Pick<ModelStore, 'model'>): boolean {

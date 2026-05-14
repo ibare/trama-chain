@@ -1,7 +1,12 @@
 import type { EdgeId, NodeId } from '@trama/core';
 import { tokens } from '@trama/tokens';
+import type { AnimationLoop } from '../canvas/animation-loop.js';
 import { registerTicker } from '../canvas/animation-loop.js';
-import { getCurrentTravelSpeedMultiplier } from '../store/pulse-settings.js';
+import type { PulseSettingsStore } from '../store/pulse-settings.js';
+import {
+  getCurrentTravelSpeedMultiplier,
+  usePulseSettingsStore,
+} from '../store/pulse-settings.js';
 
 /**
  * 활성 펄스 lifecycle을 관리. spawn → 매 프레임 진행 → 도착 시 arrivalHandler 호출 → 제거.
@@ -33,126 +38,186 @@ export interface PulseSpawnArgs {
   sourceValue: number;
 }
 
-type ArrivalHandler = (pulse: Pulse) => void;
+export type ArrivalHandler = (pulse: Pulse) => void;
 type Listener = () => void;
 
-const pulses = new Map<string, Pulse>();
-const listSubscribers = new Set<Listener>();
-const tickSubscribers = new Set<Listener>();
-let arrivalHandler: ArrivalHandler | null = null;
-let unregisterTicker: (() => void) | null = null;
-let nextPulseSerial = 1;
-// useSyncExternalStore 안정성을 위해 스냅샷을 캐시. spawn/remove 시에만 무효화.
+export interface PulseRegistry {
+  setArrivalHandler(h: ArrivalHandler | null): void;
+  spawn(args: PulseSpawnArgs): Pulse;
+  pulseProgress(p: Pulse, now?: number): number;
+  getActive(): readonly Pulse[];
+  subscribeList(listener: Listener): () => void;
+  subscribeTick(listener: Listener): () => void;
+  clearAll(): void;
+  dispose(): void;
+}
+
+export interface PulseRegistryDeps {
+  animationLoop: AnimationLoop;
+  pulseSettingsStore: PulseSettingsStore;
+}
+
 const EMPTY_SNAPSHOT: readonly Pulse[] = Object.freeze([]);
-let cachedSnapshot: readonly Pulse[] = EMPTY_SNAPSHOT;
 
-function invalidateSnapshot(): void {
-  cachedSnapshot =
-    pulses.size === 0 ? EMPTY_SNAPSHOT : Object.freeze(Array.from(pulses.values()));
-}
+export function createPulseRegistry({
+  animationLoop,
+  pulseSettingsStore,
+}: PulseRegistryDeps): PulseRegistry {
+  const pulses = new Map<string, Pulse>();
+  const listSubscribers = new Set<Listener>();
+  const tickSubscribers = new Set<Listener>();
+  let arrivalHandler: ArrivalHandler | null = null;
+  let unregisterTicker: (() => void) | null = null;
+  let nextPulseSerial = 1;
+  let cachedSnapshot: readonly Pulse[] = EMPTY_SNAPSHOT;
 
-function ensureTicker(): void {
-  if (unregisterTicker !== null) return;
-  unregisterTicker = registerTicker(advance);
-}
-
-function maybeStopTicker(): void {
-  if (pulses.size === 0 && unregisterTicker !== null) {
-    unregisterTicker();
-    unregisterTicker = null;
-  }
-}
-
-function notifyList(): void {
-  for (const fn of listSubscribers) fn();
-}
-
-function notifyTick(): void {
-  for (const fn of tickSubscribers) fn();
-}
-
-function advance(): void {
-  const now = performance.now();
-  const arrived: Pulse[] = [];
-  for (const p of pulses.values()) {
-    if (now - p.startTime >= p.travelDurationMs) arrived.push(p);
+  function invalidateSnapshot(): void {
+    cachedSnapshot =
+      pulses.size === 0 ? EMPTY_SNAPSHOT : Object.freeze(Array.from(pulses.values()));
   }
 
-  if (arrived.length > 0) {
-    for (const p of arrived) pulses.delete(p.id);
-    // arrivalHandler 호출이 spawn을 더 만들 수 있다 — 그래도 안전 (pulses Map 직접 조작).
-    if (arrivalHandler) {
-      for (const p of arrived) arrivalHandler(p);
+  function ensureTicker(): void {
+    if (unregisterTicker !== null) return;
+    unregisterTicker = animationLoop.register(advance);
+  }
+
+  function maybeStopTicker(): void {
+    if (pulses.size === 0 && unregisterTicker !== null) {
+      unregisterTicker();
+      unregisterTicker = null;
     }
-    invalidateSnapshot();
-    notifyList();
-    maybeStopTicker();
   }
 
-  // 매 프레임 위치 갱신용 (도착 처리와 무관하게 호출).
-  notifyTick();
-}
+  function notifyList(): void {
+    for (const fn of listSubscribers) fn();
+  }
 
-export function setArrivalHandler(h: ArrivalHandler | null): void {
-  arrivalHandler = h;
-}
+  function notifyTick(): void {
+    for (const fn of tickSubscribers) fn();
+  }
 
-export function spawnPulse(args: PulseSpawnArgs): Pulse {
-  const multiplier = getCurrentTravelSpeedMultiplier();
-  const pulse: Pulse = {
-    id: `p-${nextPulseSerial++}`,
-    edgeId: args.edgeId,
-    sourceNodeId: args.sourceNodeId,
-    sourceSlotIndex: args.sourceSlotIndex,
-    targetNodeId: args.targetNodeId,
-    sourceValue: args.sourceValue,
-    startTime: performance.now(),
-    travelDurationMs: BASE_TRAVEL_MS * multiplier,
+  function advance(): void {
+    const now = performance.now();
+    const arrived: Pulse[] = [];
+    for (const p of pulses.values()) {
+      if (now - p.startTime >= p.travelDurationMs) arrived.push(p);
+    }
+
+    if (arrived.length > 0) {
+      for (const p of arrived) pulses.delete(p.id);
+      if (arrivalHandler) {
+        for (const p of arrived) arrivalHandler(p);
+      }
+      invalidateSnapshot();
+      notifyList();
+      maybeStopTicker();
+    }
+
+    notifyTick();
+  }
+
+  return {
+    setArrivalHandler(h): void {
+      arrivalHandler = h;
+    },
+    spawn(args): Pulse {
+      const multiplier = pulseSettingsStore.getState().travelSpeedMultiplier;
+      const pulse: Pulse = {
+        id: `p-${nextPulseSerial++}`,
+        edgeId: args.edgeId,
+        sourceNodeId: args.sourceNodeId,
+        sourceSlotIndex: args.sourceSlotIndex,
+        targetNodeId: args.targetNodeId,
+        sourceValue: args.sourceValue,
+        startTime: performance.now(),
+        travelDurationMs: BASE_TRAVEL_MS * multiplier,
+      };
+      pulses.set(pulse.id, pulse);
+      invalidateSnapshot();
+      ensureTicker();
+      notifyList();
+      return pulse;
+    },
+    pulseProgress(p, now = performance.now()): number {
+      const t = (now - p.startTime) / p.travelDurationMs;
+      if (!Number.isFinite(t) || t < 0) return 0;
+      if (t > 1) return 1;
+      return t;
+    },
+    getActive(): readonly Pulse[] {
+      return cachedSnapshot;
+    },
+    subscribeList(listener): () => void {
+      listSubscribers.add(listener);
+      return () => {
+        listSubscribers.delete(listener);
+      };
+    },
+    subscribeTick(listener): () => void {
+      tickSubscribers.add(listener);
+      return () => {
+        tickSubscribers.delete(listener);
+      };
+    },
+    clearAll(): void {
+      if (pulses.size === 0) return;
+      pulses.clear();
+      invalidateSnapshot();
+      notifyList();
+      maybeStopTicker();
+    },
+    dispose(): void {
+      if (unregisterTicker !== null) {
+        unregisterTicker();
+        unregisterTicker = null;
+      }
+      pulses.clear();
+      cachedSnapshot = EMPTY_SNAPSHOT;
+      listSubscribers.clear();
+      tickSubscribers.clear();
+      arrivalHandler = null;
+    },
   };
-  pulses.set(pulse.id, pulse);
-  invalidateSnapshot();
-  ensureTicker();
-  notifyList();
-  return pulse;
-}
-
-/** 도달 시점 진행도 t ∈ [0,1]. 펄스가 이미 제거되었거나 startTime이 미래면 0. */
-export function pulseProgress(p: Pulse, now: number = performance.now()): number {
-  const t = (now - p.startTime) / p.travelDurationMs;
-  if (!Number.isFinite(t) || t < 0) return 0;
-  if (t > 1) return 1;
-  return t;
 }
 
 /**
- * 활성 펄스 스냅샷. spawn/remove가 일어나기 전까지는 같은 배열 참조를 반환한다.
- * useSyncExternalStore가 안정적으로 비교할 수 있도록 캐싱.
+ * 호환 shim — Stage B 후반에 제거.
+ * defaultRegistry는 default animation-loop과 default pulse-settings를 사용한다.
+ * 이는 진정한 인스턴스 격리가 아니므로, 호출부가 Context를 통해 인스턴스의
+ * pulseRegistry를 사용하도록 마이그레이션될 때까지의 임시 호환층.
  */
+const defaultRegistry = createPulseRegistry({
+  animationLoop: { register: registerTicker, dispose: () => {} },
+  pulseSettingsStore: usePulseSettingsStore,
+});
+
+export function setArrivalHandler(h: ArrivalHandler | null): void {
+  defaultRegistry.setArrivalHandler(h);
+}
+
+export function spawnPulse(args: PulseSpawnArgs): Pulse {
+  return defaultRegistry.spawn(args);
+}
+
+export function pulseProgress(p: Pulse, now: number = performance.now()): number {
+  return defaultRegistry.pulseProgress(p, now);
+}
+
 export function getActivePulses(): readonly Pulse[] {
-  return cachedSnapshot;
+  return defaultRegistry.getActive();
 }
 
-/** 펄스 set 자체가 변할 때(spawn/remove) 호출되는 구독. */
 export function subscribePulseList(listener: Listener): () => void {
-  listSubscribers.add(listener);
-  return () => {
-    listSubscribers.delete(listener);
-  };
+  return defaultRegistry.subscribeList(listener);
 }
 
-/** 매 프레임 호출되는 구독 (위치 갱신용). */
 export function subscribePulseTick(listener: Listener): () => void {
-  tickSubscribers.add(listener);
-  return () => {
-    tickSubscribers.delete(listener);
-  };
+  return defaultRegistry.subscribeTick(listener);
 }
 
-/** 테스트·정리 용도. 모든 펄스 즉시 제거 (arrival handler 호출 없음). */
 export function clearAllPulses(): void {
-  if (pulses.size === 0) return;
-  pulses.clear();
-  invalidateSnapshot();
-  notifyList();
-  maybeStopTicker();
+  defaultRegistry.clearAll();
 }
+
+// 호환 shim 내부 의존 — `getCurrentTravelSpeedMultiplier` 호출이 코드 내 다른 곳에 있을 수 있어 export 유지.
+export { getCurrentTravelSpeedMultiplier };
