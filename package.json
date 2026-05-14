@@ -9,7 +9,9 @@
     "test": "pnpm -r --filter './packages/**' run test",
     "test:run": "pnpm -r --filter './packages/**' run test:run",
     "typecheck": "pnpm -r --filter './packages/**' run typecheck",
-    "dev": "pnpm --filter @trama/web run dev",
+    "dev": "pnpm --filter @trama/website run dev",
+    "dev:site": "pnpm --filter @trama/website run dev",
+    "build:site": "pnpm --filter @trama/website run build",
     "lint": "pnpm -r run lint",
     "postinstall": "pnpm --filter @trama/tokens run build"
   },
