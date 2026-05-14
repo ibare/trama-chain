@@ -1,17 +1,14 @@
-import { memo, Suspense, useCallback, useEffect } from 'react';
+import { memo, useCallback, useEffect } from 'react';
 import { tokens } from '@trama/tokens';
 import { isValueNode, type NodeId } from '@trama/core';
 import { useTrama } from '../store/index.js';
-import { combinerRegistry } from '../store/registries.js';
-import { formatNodeValue } from '../util/format.js';
 import { resolveNodeUnit } from '../util/unit-resolver.js';
 import { useNodeLayout } from './use-node-layout.js';
 import { NodeBorderTrack } from './NodeBorderTrack.js';
 import { NodeFrame } from './NodeFrame.js';
-import { NodeBody } from './NodeBody.js';
-import { NodeLabel } from './NodeLabel.js';
-import { InteractiveArea } from './InteractiveArea.js';
 import { Socket } from './Socket.js';
+import { ValueNodeCard } from './ValueNodeCard.js';
+import { ValueNodeSkin } from './ValueNodeSkin.js';
 import { useOutputConnected } from './use-socket-connections.js';
 import { slotColor } from './slot-palette.js';
 import { useEdgeDraftSource } from '../canvas/use-edge-draft-source.js';
@@ -25,24 +22,8 @@ interface Props {
 
 const SOCKET_SIZE = parseFloat(tokens.spacing.socketSize);
 
-function combinerSymbol(key: string): string {
-  switch (key) {
-    case 'sum':
-      return '+';
-    case 'product':
-      return '×';
-    case 'average':
-      return 'Ø';
-    case 'max':
-      return '↑';
-    default:
-      return '·';
-  }
-}
-
 function ValueNodeViewImpl({ id, incomingCount }: Props): JSX.Element | null {
-  const instance = useTrama();
-  const { modelStore, uiStore, socketRegistry } = instance;
+  const { modelStore, uiStore, socketRegistry } = useTrama();
   const node = modelStore((s) => s.model.nodes[id]);
   const currentValue = modelStore((s) => {
     const n = s.model.nodes[id];
@@ -80,8 +61,6 @@ function ValueNodeViewImpl({ id, incomingCount }: Props): JSX.Element | null {
     setEditingNode(id);
   }, [id, setEditingNode]);
 
-  // 좌측 핀(입력) snap 후보 등록. ValueNode는 slot 개념이 없고 combiner로 묶이므로
-  // slotIndex 없이 등록한다. 좌측 핀 중심은 항상 (-halfW, 0)로 incomingCount와 무관.
   useEffect(() => {
     if (!layout) return;
     const unreg = socketRegistry.register({
@@ -109,6 +88,16 @@ function ValueNodeViewImpl({ id, incomingCount }: Props): JSX.Element | null {
   );
   const cancelLabel = useCallback(() => setEditingNode(null), [setEditingNode]);
 
+  const onValueAreaClick = useCallback(() => {
+    selectNode(id);
+    openUnitInspector(id);
+  }, [id, openUnitInspector, selectNode]);
+
+  const onSkinLabelClick = useCallback(() => {
+    selectNode(id);
+    openUnitInspector(id);
+  }, [id, openUnitInspector, selectNode]);
+
   if (!node) return null;
   if (!isValueNode(node)) return null;
   if (!layout) return null;
@@ -122,11 +111,6 @@ function ValueNodeViewImpl({ id, incomingCount }: Props): JSX.Element | null {
   const isFocal = node.isFocal;
   const stateClass = isInputNode ? 'is-focal' : 'is-calm';
 
-  const formatted = formatNodeValue(currentValue, unit);
-  const combiner = combinerRegistry.get(node.combiner);
-  const combinerLabel = combiner?.labels.ko ?? node.combiner;
-  const combinerSym = combinerSymbol(node.combiner);
-
   const SkinLazy = node.skin ? getLazySkin(node.skin.kind) : null;
   const hasSkin = SkinLazy !== null;
   // 스킨 본체가 값 표시 + 슬라이더 핸들을 통합 표현한다. 외부 입력이 있으면
@@ -134,12 +118,6 @@ function ValueNodeViewImpl({ id, incomingCount }: Props): JSX.Element | null {
   const skinScrub = hasSkin && !hasLag0Incoming
     ? (v: number) => scrubInitialValue(id, v)
     : undefined;
-  // 라벨 영역 클릭 = 선택 + 단위/스킨 인스펙터 진입. 스킨이 라벨 InteractiveArea를
-  // 통해 호출한다.
-  const onSkinLabelClick = useCallback(() => {
-    selectNode(id);
-    openUnitInspector(id);
-  }, [id, openUnitInspector, selectNode]);
 
   return (
     <NodeFrame
@@ -150,87 +128,30 @@ function ValueNodeViewImpl({ id, incomingCount }: Props): JSX.Element | null {
       onBodyDoubleClick={onBodyDoubleClick}
     >
       {hasSkin && SkinLazy ? (
-        // 스킨 모드: 카드 배경·라벨·값·combiner·슬라이더 트랙 모두 그리지 않는다.
-        // 노드 영역 자체가 스킨의 시각 형상이고, NodeFrame이 잡은 drag-hit가
-        // 본문 영역을 점유한다.
-        <>
-          <Suspense fallback={null}>
-            <SkinLazy
-              node={node}
-              value={currentValue}
-              unit={unit}
-              halfW={halfW}
-              halfH={halfH}
-              onScrub={skinScrub}
-              disabled={hasLag0Incoming}
-              onLabelClick={onSkinLabelClick}
-            />
-          </Suspense>
-          {/* 공통 원형 보더 — 평소 invisible, 선택 시 stroke로 시각화.
-              엣지 앵커가 정렬되는 silhouette이고, 사용자가 노드 선택 상태를
-              인지하는 단일 진실. 모든 스킨에 동일 추상으로 적용된다. */}
-          {layout.skinBorder && (
-            <circle
-              className={`trama-skin-border${isSelected ? ' is-selected' : ''}`}
-              cx={layout.skinBorder.cx}
-              cy={layout.skinBorder.cy}
-              r={layout.skinBorder.r}
-              pointerEvents="none"
-            />
-          )}
-        </>
+        <ValueNodeSkin
+          node={node}
+          layout={layout}
+          isSelected={isSelected}
+          currentValue={currentValue}
+          unit={unit}
+          disabled={hasLag0Incoming}
+          onScrub={skinScrub}
+          onLabelClick={onSkinLabelClick}
+          SkinLazy={SkinLazy}
+        />
       ) : (
-        <>
-          <NodeBody
-            width={width}
-            height={height}
-            stateClass={stateClass}
-            isSelected={isSelected}
-          />
-          <NodeLabel
-            text={node.label}
-            x={layout.textX}
-            y={layout.labelY}
-            width={width - (layout.textX - -halfW) * 2}
-            isEditing={isEditing}
-            onCommit={commitLabel}
-            onCancel={cancelLabel}
-          />
-
-          <text
-            className="trama-node-value"
-            x={layout.textX}
-            y={layout.valueY}
-            textAnchor="start"
-          >
-            {formatted.primary}
-            {formatted.accessory && (
-              <tspan className="trama-node-unit" dx="6">
-                {formatted.accessory}
-              </tspan>
-            )}
-          </text>
-          {/* 값+단위 영역을 InteractiveArea로 — 클릭 시 단위 인스펙터, 선택은 직접 처리. */}
-          <InteractiveArea
-            x={layout.textX}
-            y={layout.valueY - 32}
-            width={width - 36}
-            height={44}
-            hitClassName="trama-node-value-hit"
-            onClick={() => {
-              selectNode(id);
-              openUnitInspector(id);
-            }}
-          />
-
-          {layout.hasCombiner && layout.combinerCenterY !== null && (
-            <CombinerChip
-              symbol={combinerSym}
-              label={combinerLabel}
-              cy={layout.combinerCenterY}
-            />
-          )}
-        </>
+        <ValueNodeCard
+          node={node}
+          layout={layout}
+          isSelected={isSelected}
+          isEditing={isEditing}
+          stateClass={stateClass}
+          currentValue={currentValue}
+          unit={unit}
+          onCommitLabel={commitLabel}
+          onCancelLabel={cancelLabel}
+          onValueAreaClick={onValueAreaClick}
+        />
       )}
 
       {isFocal && playbackStep !== null && (
@@ -239,7 +160,6 @@ function ValueNodeViewImpl({ id, incomingCount }: Props): JSX.Element | null {
         </text>
       )}
 
-      {/* 좌측 소켓은 incomingCount만큼 connected, 그 외(0 입력시 fallback 1개)는 비어있음. */}
       {layout.leftPin.sockets.map((s, i) => (
         <Socket
           key={`l${i}`}
@@ -279,38 +199,3 @@ function ValueNodeViewImpl({ id, incomingCount }: Props): JSX.Element | null {
 }
 
 export const ValueNodeView = memo(ValueNodeViewImpl);
-
-function CombinerChip({
-  symbol,
-  label,
-  cy,
-}: {
-  symbol: string;
-  label: string;
-  cy: number;
-}): JSX.Element {
-  const text = `${symbol} ${label}`;
-  const paddingX = parseFloat(tokens.spacing.combinerPaddingX);
-  const fontSize = parseFloat(tokens.typography.textNodeUnit) * 16;
-  const approxCharW = fontSize * 0.55;
-  const innerW = text.length * approxCharW;
-  const w = innerW + paddingX * 2;
-  const h = parseFloat(tokens.spacing.combinerPaddingY) * 2 + fontSize + 2;
-  const radius = Math.min(parseFloat(tokens.spacing.radiusCombiner), h / 2);
-  return (
-    <g pointerEvents="none">
-      <rect
-        className="trama-node-combiner"
-        x={-w / 2}
-        y={cy - h / 2}
-        width={w}
-        height={h}
-        rx={radius}
-        ry={radius}
-      />
-      <text className="trama-node-combiner-text" x={0} y={cy + fontSize / 3} textAnchor="middle">
-        {text}
-      </text>
-    </g>
-  );
-}
