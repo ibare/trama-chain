@@ -172,7 +172,9 @@ const valueNodeDescriptor: NodeKindDescriptor<Extract<Node, { kind: 'value' }>> 
     // 1단계는 numeric ValueNode만 지원 — boolean ValueNode는 5단계에서 별도 descriptor로.
     if (!isNumericValue(node.initialValue)) return;
 
-    const combiner = ctx.combinerRegistry.get(node.combiner);
+    // numeric ValueNode는 numeric combiner만 받는다. 키가 없거나 ValueKind가
+    // 맞지 않으면 동일한 에러로 떨어뜨려 등록 누락과 잘못된 매칭을 한 자리에서 잡는다.
+    const combiner = ctx.combinerRegistry.getOfKind(node.combiner, 'numeric');
     if (!combiner) throw new MissingCombinerError(node.combiner);
 
     const targetUnit = ctx.nodeKindRegistry.forNode(node)?.outputUnit(node, ctx.catalog) ?? FREE_FALLBACK;

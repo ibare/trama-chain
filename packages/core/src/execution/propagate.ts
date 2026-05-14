@@ -131,7 +131,7 @@ export function applyFeedbackEdges(
     const target = model.nodes[tid];
     if (!target || !isValueNode(target)) continue; // 현재 feedback target은 ValueNode뿐
     if (!isNumericValue(target.initialValue)) continue; // numeric만 1단계 지원
-    const combiner = options.combinerRegistry.get(target.combiner);
+    const combiner = options.combinerRegistry.getOfKind(target.combiner, 'numeric');
     if (!combiner) throw new MissingCombinerError(target.combiner);
     const baseVal = next[tid];
     const baseNumber =
