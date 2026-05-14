@@ -5,7 +5,7 @@ import { useTrama } from '../store/index.js';
 import { combinerRegistry } from '../store/registries.js';
 import { formatNodeValue } from '../util/format.js';
 import { resolveNodeUnit } from '../util/unit-resolver.js';
-import { getNodeLayout } from './box.js';
+import { useNodeLayout } from './use-node-layout.js';
 import { NodeBorderTrack } from './NodeBorderTrack.js';
 import { NodeFrame } from './NodeFrame.js';
 import { NodeLabel } from './NodeLabel.js';
@@ -74,6 +74,7 @@ function ValueNodeViewImpl({ id, incomingCount }: Props): JSX.Element | null {
   });
 
   const pos = node?.position ?? { x: 200, y: 200 };
+  const layout = useNodeLayout(node, { incomingCount });
 
   // 인라인 편집 중에는 drag 시작을 막아 input 포커스가 끊기지 않게.
   const canStartDrag = useCallback(() => editingNodeId !== id, [editingNodeId, id]);
@@ -85,25 +86,22 @@ function ValueNodeViewImpl({ id, incomingCount }: Props): JSX.Element | null {
   // 좌측 핀(입력) snap 후보 등록. ValueNode는 slot 개념이 없고 combiner로 묶이므로
   // slotIndex 없이 등록한다. 좌측 핀 중심은 항상 (-halfW, 0)로 incomingCount와 무관.
   useEffect(() => {
-    if (!node || !isValueNode(node)) return;
-    const layoutNow = getNodeLayout(node, { incomingCount });
+    if (!layout) return;
     const unreg = socketRegistry.register({
       nodeId: id,
-      offset: { x: layoutNow.leftPin.cx, y: layoutNow.leftPin.cy },
+      offset: { x: layout.leftPin.cx, y: layout.leftPin.cy },
     });
     return unreg;
-  }, [id, incomingCount, node, socketRegistry]);
+  }, [id, layout, socketRegistry]);
 
   const getOutputStartPoint = useCallback(() => {
-    if (!node) return { x: pos.x, y: pos.y };
-    const layoutNow = getNodeLayout(node, { incomingCount });
-    const out = layoutNow.rightPin.sockets[0];
+    const out = layout?.rightPin.sockets[0];
     return out
       ? { x: pos.x + out.x, y: pos.y + out.y }
       : { x: pos.x, y: pos.y };
-  }, [incomingCount, node, pos.x, pos.y]);
+  }, [layout, pos.x, pos.y]);
   const { onPointerDown: onSocketPointerDown, onPointerUp: onSocketPointerUp } =
-    useEdgeDraftSource(id, { enabled: !!node, getStartPoint: getOutputStartPoint });
+    useEdgeDraftSource(id, { enabled: !!layout, getStartPoint: getOutputStartPoint });
 
   const commitLabel = useCallback(
     (next: string) => {
@@ -116,8 +114,8 @@ function ValueNodeViewImpl({ id, incomingCount }: Props): JSX.Element | null {
 
   if (!node) return null;
   if (!isValueNode(node)) return null;
+  if (!layout) return null;
 
-  const layout = getNodeLayout(node, { incomingCount });
   const { halfW, halfH, width, height } = layout;
   const unit = resolveNodeUnit(node);
 

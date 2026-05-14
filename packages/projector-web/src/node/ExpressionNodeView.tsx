@@ -26,7 +26,7 @@ import {
   useOutputConnected,
 } from './use-socket-connections.js';
 import { useEdgeDraftSource } from '../canvas/use-edge-draft-source.js';
-import { getNodeLayout } from './box.js';
+import { useNodeLayout } from './use-node-layout.js';
 import { slotColor } from './slot-palette.js';
 
 interface Props {
@@ -149,18 +149,20 @@ function ExpressionNodeViewImpl({ id }: Props): JSX.Element | null {
   // 노드가 언마운트되면 측정값 기록 제거 — stale 측정값으로 EdgeView가 잘못 계산하지 않도록.
   useEffect(() => () => clearStoreMeasure(id), [id, clearStoreMeasure]);
 
+  const layout = useNodeLayout(node, {
+    incomingCount: variables.length,
+    expressionSize: measured,
+  });
+
   // 입력 슬롯 등록 — 변수 갯수만큼. 좌표는 공통 box.ts 레이아웃을 그대로 사용해
   // EdgeView가 부르는 좌표와 어긋나지 않게 단일 출처로 둔다.
   // measured 변경 시 노드 폭이 변하므로 좌측 핀 x좌표도 따라 움직여 재등록 필요.
   useEffect(() => {
-    if (!node || !isExpressionNode(node)) return;
-    const layoutNow = getNodeLayout(node, {
-      incomingCount: node.variables.length,
-      expressionSize: measured ?? undefined,
-    });
+    if (!layout || !node || !isExpressionNode(node)) return;
+    const varCount = node.variables.length;
     const unregs: Array<() => void> = [];
-    layoutNow.leftPin.sockets.forEach((s, i) => {
-      if (i >= node.variables.length) return;
+    layout.leftPin.sockets.forEach((s, i) => {
+      if (i >= varCount) return;
       unregs.push(
         socketRegistry.register({
           nodeId: id,
@@ -170,7 +172,7 @@ function ExpressionNodeViewImpl({ id }: Props): JSX.Element | null {
       );
     });
     return () => unregs.forEach((u) => u());
-  }, [id, node, measured, socketRegistry]);
+  }, [id, layout, node, socketRegistry]);
 
   const canStartDrag = useCallback(
     () => editingNodeId !== id,
@@ -197,19 +199,14 @@ function ExpressionNodeViewImpl({ id }: Props): JSX.Element | null {
   );
 
   const getOutputStartPoint = useCallback(() => {
-    if (!node) return { x: pos.x, y: pos.y };
-    const layoutNow = getNodeLayout(node, {
-      incomingCount: variables.length,
-      expressionSize: measured ?? undefined,
-    });
-    const out = layoutNow.rightPin.sockets[0];
+    const out = layout?.rightPin.sockets[0];
     return out
       ? { x: pos.x + out.x, y: pos.y + out.y }
       : { x: pos.x, y: pos.y };
-  }, [measured, node, pos.x, pos.y, variables.length]);
+  }, [layout, pos.x, pos.y]);
   const { onPointerDown: onSocketPointerDown, onPointerUp: onSocketPointerUp } =
     useEdgeDraftSource(id, {
-      enabled: isValid && !!node,
+      enabled: isValid && !!layout,
       getStartPoint: getOutputStartPoint,
     });
 
@@ -268,11 +265,8 @@ function ExpressionNodeViewImpl({ id }: Props): JSX.Element | null {
   );
 
   if (!node || !isExpressionNode(node)) return null;
+  if (!layout) return null;
 
-  const layout = getNodeLayout(node, {
-    incomingCount: variables.length,
-    expressionSize: measured ?? undefined,
-  });
   const { width, height, halfW, halfH, textX, labelY } = layout;
   const isSelected = selection.kind === 'node' && selection.id === id;
   const stateClass = isValid ? 'is-calm' : 'is-low';
