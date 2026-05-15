@@ -150,6 +150,7 @@ registerNodeKindUI({
  * - counter: 1,2,3... 등차수열
  * - uniform: [min,max] 균등분포 (모든 값이 동등 확률)
  * - normal: 평균 μ, 표준편차 σ의 정규분포 (종 모양)
+ * - sine: y = A·sin(ω·t + φ) + D 결정론 진동
  */
 registerNodeKindUI({
   kind: 'generator',
@@ -202,6 +203,25 @@ registerNodeKindUI({
             mean: 0,
             stdev: 1,
             seed: Math.floor(Math.random() * 0xffffffff),
+          },
+          position: canvasPos,
+        });
+      },
+    },
+    {
+      key: 'gen-sine',
+      label: '사인파 생성기',
+      symbol: 'Sin',
+      onSelect: (canvasPos) => {
+        const addGeneratorNode = instance.modelStore.getState().addGeneratorNode;
+        addGeneratorNode({
+          label: '사인파',
+          params: {
+            kind: 'sine',
+            amplitude: 1,
+            omega: (2 * Math.PI) / 20,
+            phase: 0,
+            offset: 0,
           },
           position: canvasPos,
         });

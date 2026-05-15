@@ -216,7 +216,13 @@ export type GeneratorParams =
    * 정규분포 랜덤. 평균 mean 근처에서 표준편차 stdev의 종 모양 분포.
    * Box-Muller 변환으로 균등→정규. min/max 같은 hard cutoff 없음.
    */
-  | { kind: 'normal'; mean: number; stdev: number; seed: number };
+  | { kind: 'normal'; mean: number; stdev: number; seed: number }
+  /**
+   * 사인파. y = offset + amplitude * sin(omega * t + phase). t는 emit step.
+   * omega는 emit당 라디안 (주기 T = 2π/omega). phase는 라디안. offset은 DC bias.
+   * 단진동·일주기·계절 변화 등 결정론적 진동 현상 모델링용. seed 불필요.
+   */
+  | { kind: 'sine'; amplitude: number; omega: number; phase: number; offset: number };
 
 export interface GeneratorNode {
   kind: 'generator';

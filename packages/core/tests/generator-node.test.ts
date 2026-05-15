@@ -14,6 +14,7 @@ import {
   normalParadigm,
   numericValue,
   propagateOneStep,
+  sineParadigm,
   TramaDocumentSchema,
   uniformParadigm,
 } from '../src/index.js';
@@ -344,6 +345,129 @@ describe('GeneratorNode — schema / serialization', () => {
   });
 });
 
+describe('GeneratorNode — sine paradigm', () => {
+  it('emit at step=0 equals offset + amplitude * sin(phase)', () => {
+    const params = {
+      kind: 'sine' as const,
+      amplitude: 2,
+      omega: (2 * Math.PI) / 20,
+      phase: Math.PI / 6,
+      offset: 5,
+    };
+    const cursor = sineParadigm.initCursor(params);
+    expect(cursor.step).toBe(0);
+    const r = sineParadigm.emit(params, cursor);
+    expect(r.value).toEqual(numericValue(5 + 2 * Math.sin(Math.PI / 6), 'free'));
+    expect(r.nextCursor).toEqual({ kind: 'sine', step: 1 });
+  });
+
+  it('one full period returns to start value (period = 2π/omega)', () => {
+    const period = 20;
+    const params = {
+      kind: 'sine' as const,
+      amplitude: 1,
+      omega: (2 * Math.PI) / period,
+      phase: 0,
+      offset: 0,
+    };
+    let cursor = sineParadigm.initCursor(params);
+    const first = sineParadigm.emit(params, cursor).value;
+    for (let i = 0; i < period - 1; i++) {
+      cursor = sineParadigm.emit(params, cursor).nextCursor;
+    }
+    // step=20 일 때 sin(2π) = sin(0) — 부동소수 오차 ε 이내.
+    const afterCycle = sineParadigm.peek(params, sineParadigm.emit(params, cursor).nextCursor);
+    expect(afterCycle.kind).toBe('numeric');
+    if (afterCycle.kind === 'numeric' && first.kind === 'numeric') {
+      expect(Math.abs(afterCycle.n - first.n)).toBeLessThan(1e-10);
+    }
+  });
+
+  it('values stay within [offset - amplitude, offset + amplitude]', () => {
+    const params = {
+      kind: 'sine' as const,
+      amplitude: 3,
+      omega: 0.37,
+      phase: 1.2,
+      offset: 10,
+    };
+    let cursor = sineParadigm.initCursor(params);
+    for (let i = 0; i < 200; i++) {
+      const r = sineParadigm.emit(params, cursor);
+      cursor = r.nextCursor;
+      expect(r.value.kind).toBe('numeric');
+      if (r.value.kind === 'numeric') {
+        expect(r.value.n).toBeGreaterThanOrEqual(10 - 3 - 1e-12);
+        expect(r.value.n).toBeLessThanOrEqual(10 + 3 + 1e-12);
+      }
+    }
+  });
+
+  it('peek returns the value that next emit would produce, without advancing', () => {
+    const params = {
+      kind: 'sine' as const,
+      amplitude: 1,
+      omega: 0.5,
+      phase: 0,
+      offset: 0,
+    };
+    let cursor = sineParadigm.initCursor(params);
+    cursor = sineParadigm.emit(params, cursor).nextCursor;
+    cursor = sineParadigm.emit(params, cursor).nextCursor;
+    const peeked = sineParadigm.peek(params, cursor);
+    const peekedAgain = sineParadigm.peek(params, cursor);
+    expect(peeked).toEqual(peekedAgain);
+    const emitted = sineParadigm.emit(params, cursor).value;
+    expect(emitted).toEqual(peeked);
+  });
+
+  it('same params produce identical sequences (deterministic, no seed)', () => {
+    const params = {
+      kind: 'sine' as const,
+      amplitude: 1.5,
+      omega: 0.21,
+      phase: 0.7,
+      offset: -2,
+    };
+    let a = sineParadigm.initCursor(params);
+    let b = sineParadigm.initCursor(params);
+    for (let i = 0; i < 30; i++) {
+      const ra = sineParadigm.emit(params, a);
+      const rb = sineParadigm.emit(params, b);
+      expect(ra.value).toEqual(rb.value);
+      a = ra.nextCursor;
+      b = rb.nextCursor;
+    }
+  });
+
+  it('round-trip: serialize·parse preserves sine params', () => {
+    let m = createEmptyModel(0);
+    m = addGeneratorNode(
+      m,
+      {
+        id: 'g',
+        label: '사인파',
+        params: { kind: 'sine', amplitude: 2, omega: 0.314, phase: 1, offset: -1 },
+      },
+      0,
+    );
+    const doc = modelToDocument(m);
+    const parsed = TramaDocumentSchema.parse(JSON.parse(JSON.stringify(doc)));
+    const m2 = documentToModel(parsed);
+    const n = m2.nodes['g']!;
+    expect(isGeneratorNode(n)).toBe(true);
+    if (isGeneratorNode(n)) {
+      expect(n.params).toEqual({
+        kind: 'sine',
+        amplitude: 2,
+        omega: 0.314,
+        phase: 1,
+        offset: -1,
+      });
+    }
+  });
+});
+
 describe('GeneratorRegistry', () => {
   it('routes by kind, throws on unknown', () => {
     const reg = createDefaultGeneratorRegistry();
@@ -353,6 +477,8 @@ describe('GeneratorRegistry', () => {
     expect(u.kind).toBe('uniform');
     const n = reg.initCursor({ kind: 'normal', mean: 0, stdev: 1, seed: 1 });
     expect(n.kind).toBe('normal');
+    const s = reg.initCursor({ kind: 'sine', amplitude: 1, omega: 0.1, phase: 0, offset: 0 });
+    expect(s.kind).toBe('sine');
     expect(() => reg.initCursor({ kind: 'bogus' as never, start: 0, step: 1 } as never)).toThrow();
   });
 

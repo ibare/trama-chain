@@ -29,6 +29,14 @@ const NORMAL_DEFAULTS = {
   stdev: 1,
   seed: 0,
 };
+/** 사인파 기본값 — 진폭 1, 주기 20 emit (ω = 2π/20), 위상 0, 영점 0. */
+const SINE_DEFAULTS = {
+  kind: 'sine' as const,
+  amplitude: 1,
+  omega: (2 * Math.PI) / 20,
+  phase: 0,
+  offset: 0,
+};
 
 function defaultsFor(kind: ParadigmKind): GeneratorParams {
   switch (kind) {
@@ -38,11 +46,13 @@ function defaultsFor(kind: ParadigmKind): GeneratorParams {
       return UNIFORM_DEFAULTS;
     case 'normal':
       return NORMAL_DEFAULTS;
+    case 'sine':
+      return SINE_DEFAULTS;
   }
 }
 
 function isParadigmKind(v: string): v is ParadigmKind {
-  return v === 'counter' || v === 'uniform' || v === 'normal';
+  return v === 'counter' || v === 'uniform' || v === 'normal' || v === 'sine';
 }
 
 /**
@@ -106,6 +116,9 @@ export function GeneratorInspector({ node }: Props): JSX.Element {
             <ToggleGroup.Item value="normal" className="trama-unit-inspector-chip">
               정규
             </ToggleGroup.Item>
+            <ToggleGroup.Item value="sine" className="trama-unit-inspector-chip">
+              사인
+            </ToggleGroup.Item>
           </ToggleGroup.Root>
         </div>
       </div>
@@ -121,8 +134,10 @@ export function GeneratorInspector({ node }: Props): JSX.Element {
           <CounterFields params={node.params} onChange={setParams} />
         ) : node.params.kind === 'uniform' ? (
           <UniformFields params={node.params} onChange={setParams} />
-        ) : (
+        ) : node.params.kind === 'normal' ? (
           <NormalFields params={node.params} onChange={setParams} />
+        ) : (
+          <SineFields params={node.params} onChange={setParams} />
         )}
       </div>
     </>
@@ -345,6 +360,98 @@ function NormalFields({ params, onChange }: NormalProps): JSX.Element {
             const v = parseInt(next, 10);
             if (Number.isFinite(v) && v !== params.seed) {
               onChange({ ...params, seed: v });
+            }
+          }}
+        />
+      </Form.Field>
+    </Form.Root>
+  );
+}
+
+interface SineProps {
+  params: Extract<GeneratorParams, { kind: 'sine' }>;
+  onChange: (next: GeneratorParams) => void;
+}
+
+function SineFields({ params, onChange }: SineProps): JSX.Element {
+  const [ampDraft, setAmpDraft] = useState(String(params.amplitude));
+  const [omegaDraft, setOmegaDraft] = useState(String(params.omega));
+  const [phaseDraft, setPhaseDraft] = useState(String(params.phase));
+  const [offsetDraft, setOffsetDraft] = useState(String(params.offset));
+  useEffect(() => setAmpDraft(String(params.amplitude)), [params.amplitude]);
+  useEffect(() => setOmegaDraft(String(params.omega)), [params.omega]);
+  useEffect(() => setPhaseDraft(String(params.phase)), [params.phase]);
+  useEffect(() => setOffsetDraft(String(params.offset)), [params.offset]);
+
+  return (
+    <Form.Root
+      className="trama-observe-inspector-size"
+      onSubmit={(e) => e.preventDefault()}
+    >
+      <Form.Field name="amplitude" className="trama-unit-inspector-range-row">
+        <Form.Label className="trama-unit-inspector-range-label">진폭 A</Form.Label>
+        <Form.Control
+          type="number"
+          value={ampDraft}
+          step="any"
+          className="trama-unit-inspector-range-input"
+          onChange={(e) => {
+            const next = e.currentTarget.value;
+            setAmpDraft(next);
+            const v = parseFloat(next);
+            if (Number.isFinite(v) && v !== params.amplitude) {
+              onChange({ ...params, amplitude: v });
+            }
+          }}
+        />
+      </Form.Field>
+      <Form.Field name="omega" className="trama-unit-inspector-range-row">
+        <Form.Label className="trama-unit-inspector-range-label">각속도 ω</Form.Label>
+        <Form.Control
+          type="number"
+          value={omegaDraft}
+          step="any"
+          className="trama-unit-inspector-range-input"
+          onChange={(e) => {
+            const next = e.currentTarget.value;
+            setOmegaDraft(next);
+            const v = parseFloat(next);
+            if (Number.isFinite(v) && v !== params.omega) {
+              onChange({ ...params, omega: v });
+            }
+          }}
+        />
+      </Form.Field>
+      <Form.Field name="phase" className="trama-unit-inspector-range-row">
+        <Form.Label className="trama-unit-inspector-range-label">위상 φ</Form.Label>
+        <Form.Control
+          type="number"
+          value={phaseDraft}
+          step="any"
+          className="trama-unit-inspector-range-input"
+          onChange={(e) => {
+            const next = e.currentTarget.value;
+            setPhaseDraft(next);
+            const v = parseFloat(next);
+            if (Number.isFinite(v) && v !== params.phase) {
+              onChange({ ...params, phase: v });
+            }
+          }}
+        />
+      </Form.Field>
+      <Form.Field name="offset" className="trama-unit-inspector-range-row">
+        <Form.Label className="trama-unit-inspector-range-label">영점 D</Form.Label>
+        <Form.Control
+          type="number"
+          value={offsetDraft}
+          step="any"
+          className="trama-unit-inspector-range-input"
+          onChange={(e) => {
+            const next = e.currentTarget.value;
+            setOffsetDraft(next);
+            const v = parseFloat(next);
+            if (Number.isFinite(v) && v !== params.offset) {
+              onChange({ ...params, offset: v });
             }
           }}
         />

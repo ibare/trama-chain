@@ -2,6 +2,7 @@ import type { GeneratorParams, Value } from '../model/index.js';
 import { counterParadigm } from './counter.js';
 import { uniformParadigm } from './uniform.js';
 import { normalParadigm } from './normal.js';
+import { sineParadigm } from './sine.js';
 import type { GeneratorCursor, GeneratorParadigm, GeneratorRuntime } from './types.js';
 
 /**
@@ -54,7 +55,8 @@ export function createDefaultGeneratorRegistry(): GeneratorRegistry {
   return new GeneratorRegistry()
     .register(counterParadigm)
     .register(uniformParadigm)
-    .register(normalParadigm);
+    .register(normalParadigm)
+    .register(sineParadigm);
 }
 
 /** 라이브러리 내부 폴백 — 옵션 미주입 경로에서 사용된다. */

@@ -145,6 +145,13 @@ export const GeneratorParamsSchema = z.discriminatedUnion('kind', [
     stdev: z.number(),
     seed: z.number(),
   }),
+  z.object({
+    kind: z.literal('sine'),
+    amplitude: z.number(),
+    omega: z.number(),
+    phase: z.number(),
+    offset: z.number(),
+  }),
 ]);
 
 export const GeneratorNodeSchema = z.object({
