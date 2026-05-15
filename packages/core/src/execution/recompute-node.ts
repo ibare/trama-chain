@@ -1,6 +1,10 @@
 import type { CombinerRegistry } from '../combiners/index.js';
 import type { ShapeRegistry } from '../functions/index.js';
 import type { Rng } from '../functions/types.js';
+import {
+  defaultGeneratorRegistry,
+  type GeneratorRegistry,
+} from '../generators/index.js';
 import type { Model, NodeId, Value } from '../model/index.js';
 import { defaultUnitCatalog, type UnitCatalog } from '../units/index.js';
 import {
@@ -24,6 +28,8 @@ export interface RecomputeNodeOptions {
   rng?: Rng;
   /** LaTeX 식 평가자. 미지정이면 noop (식 노드 결과는 항상 undefined). */
   expressionEvaluator?: ExpressionEvaluator;
+  /** Generator paradigm registry. 미지정 시 기본. */
+  generatorRegistry?: GeneratorRegistry;
   topology?: InstantaneousTopology;
   /**
    * 특정 source 노드의 값을 임시 대체. 펄스 도착 시 그 펄스가 운반한
@@ -135,6 +141,10 @@ export function recomputeNode(
     expressionEvaluator: options.expressionEvaluator ?? noopExpressionEvaluator,
     rng: options.rng ?? defaultRng,
     observeBuffers: seedBuffers,
+    // recomputeNode는 단일 target만 propagate — generator는 target이 될 수 없으니
+    // 빈 runtime + 기본 registry로 충분. ctx 인터페이스 만족을 위해 채워둔다.
+    generatorRuntime: {},
+    generatorRegistry: options.generatorRegistry ?? defaultGeneratorRegistry,
   };
 
   desc.propagate(node, ctx);

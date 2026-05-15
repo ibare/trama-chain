@@ -188,6 +188,40 @@ export interface ObserveNode {
   description?: string | null;
 }
 
+/**
+ * 생성기 노드 — 입력 없이 자신의 데이터를 생성해 출력으로 흘려보낸다.
+ *
+ * - 입력 0개 / 단일 numeric 출력. 데이터 생성 도메인 전문가.
+ * - `params`: 패러다임 + 매개변수. 패러다임이 곧 paradigm registry의 키이며
+ *   같은 sum type에서 매개변수 모양이 결정된다.
+ * - 시작/정지/리셋 컨트롤러는 UI에서 노드별로 노출되고 ExecutionState.
+ *   generatorRuntime이 enabled/cursor를 관리한다 (런타임 전용 — 직렬화 안 됨).
+ *
+ * 모델에 영속되는 것은 매개변수까지 — counter의 start/step, random의
+ * min/max/integer/seed. 시작/정지 상태, 현재 cursor는 세션 한정 런타임.
+ *
+ * 단위는 raw('free') — 생성기는 의미적 단위가 없는 raw 수치를 만든다.
+ * 단위가 필요하면 다운스트림 ValueNode가 입력으로 받아 흡수.
+ */
+export type GeneratorParams =
+  /** 1,2,3... 증가 카운터. emit마다 cursor += step. */
+  | { kind: 'counter'; start: number; step: number }
+  /**
+   * 랜덤 numeric. emit마다 PRNG로 [min, max) 또는 [min, max] 범위 (integer면 정수).
+   * seed는 모델에 영속 — 같은 seed로 리셋하면 같은 시퀀스 재현.
+   */
+  | { kind: 'random'; min: number; max: number; integer: boolean; seed: number };
+
+export interface GeneratorNode {
+  kind: 'generator';
+  id: NodeId;
+  label: string;
+  params: GeneratorParams;
+  position: { x: number; y: number } | null;
+  isFocal: boolean;
+  description?: string | null;
+}
+
 export type Node =
   | ValueNode
   | ConstantNode
@@ -195,7 +229,8 @@ export type Node =
   | ComparisonNode
   | LogicGateNode
   | ExpressionNode
-  | ObserveNode;
+  | ObserveNode
+  | GeneratorNode;
 
 export function isValueNode(n: Node): n is ValueNode {
   return n.kind === 'value';
@@ -217,6 +252,9 @@ export function isExpressionNode(n: Node): n is ExpressionNode {
 }
 export function isObserveNode(n: Node): n is ObserveNode {
   return n.kind === 'observe';
+}
+export function isGeneratorNode(n: Node): n is GeneratorNode {
+  return n.kind === 'generator';
 }
 
 export interface Edge {

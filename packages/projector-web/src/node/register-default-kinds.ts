@@ -7,6 +7,7 @@ import { ConditionNodeView } from './ConditionNodeView.js';
 import { ComparisonNodeView } from './ComparisonNodeView.js';
 import { LogicGateNodeView } from './LogicGateNodeView.js';
 import { ExpressionNodeView } from './ExpressionNodeView.js';
+import { GeneratorNodeView } from './GeneratorNodeView.js';
 import { ObserveNodeView } from './ObserveNodeView.js';
 import { fizzexExpressionEvaluator } from '../expression/fizzex-evaluator.js';
 import { registerNodeKindUI } from './kind-catalog.js';
@@ -142,6 +143,51 @@ registerNodeKindUI({
         });
       },
     })),
+});
+
+/**
+ * 생성기 메뉴 프리셋 — 데이터 생성 도메인 전문가.
+ * counter는 1,2,3... 증가, random은 [min,max] 균등분포.
+ */
+registerNodeKindUI({
+  kind: 'generator',
+  menuSectionLabel: '생성',
+  menuSectionOrder: 13.5,
+  View: GeneratorNodeView,
+  buildMenuItems: (instance) => [
+    {
+      key: 'gen-counter',
+      label: '카운터 생성기',
+      symbol: '1,2,3',
+      onSelect: (canvasPos) => {
+        const addGeneratorNode = instance.modelStore.getState().addGeneratorNode;
+        addGeneratorNode({
+          label: '카운터',
+          params: { kind: 'counter', start: 1, step: 1 },
+          position: canvasPos,
+        });
+      },
+    },
+    {
+      key: 'gen-random',
+      label: '랜덤 생성기',
+      symbol: 'rnd',
+      onSelect: (canvasPos) => {
+        const addGeneratorNode = instance.modelStore.getState().addGeneratorNode;
+        addGeneratorNode({
+          label: '랜덤',
+          params: {
+            kind: 'random',
+            min: 0,
+            max: 1,
+            integer: false,
+            seed: Math.floor(Math.random() * 0xffffffff),
+          },
+          position: canvasPos,
+        });
+      },
+    },
+  ],
 });
 
 registerNodeKindUI({

@@ -1,4 +1,10 @@
 import type { Model, NodeId, Value } from '../model/index.js';
+import { isGeneratorNode } from '../model/index.js';
+import {
+  defaultGeneratorRegistry,
+  type GeneratorRegistry,
+  type GeneratorRuntime,
+} from '../generators/index.js';
 import type { EvalDiagnosis } from './expression-evaluator.js';
 import { defaultNodeKindRegistry, type NodeKindRegistry } from './kinds.js';
 
@@ -24,6 +30,11 @@ export interface ExecutionState {
    * 시점에 적용되어 이 버퍼에 들어오는 시점부터 잘려있다.
    */
   observeBuffers: Record<NodeId, Value[]>;
+  /**
+   * GeneratorNode의 enabled 플래그와 cursor. runtime-only — 매개변수는 모델에
+   * 영속되지만 시작/정지 상태와 cursor 진행도는 세션 한정이다.
+   */
+  generatorRuntime: Record<NodeId, GeneratorRuntime>;
 }
 
 /** 출력 유효성 집합용 키 생성. */
@@ -34,9 +45,11 @@ export function outputKey(nodeId: NodeId, slot: number = 0): string {
 export function initializeFromInitialValues(
   model: Model,
   registry: NodeKindRegistry = defaultNodeKindRegistry,
+  generatorRegistry: GeneratorRegistry = defaultGeneratorRegistry,
 ): ExecutionState {
   const values: Record<NodeId, Value> = {};
   const validOutputs = new Set<string>();
+  const generatorRuntime: Record<NodeId, GeneratorRuntime> = {};
   for (const nid of model.nodeOrder) {
     const node = model.nodes[nid];
     if (!node) continue;
@@ -45,8 +58,22 @@ export function initializeFromInitialValues(
     const v = desc.initialValue(node);
     if (v !== undefined) values[nid] = v;
     if (desc.initialValid(node)) validOutputs.add(outputKey(nid, 0));
+    // GeneratorNode는 모델 매개변수로 cursor 초기화, enabled=false로 시작.
+    // 사용자가 ▶을 눌러야 emit이 시작된다.
+    if (isGeneratorNode(node)) {
+      generatorRuntime[nid] = {
+        enabled: false,
+        cursor: generatorRegistry.initCursor(node.params),
+      };
+    }
   }
-  return { values, validOutputs, invalidReasons: {}, observeBuffers: {} };
+  return {
+    values,
+    validOutputs,
+    invalidReasons: {},
+    observeBuffers: {},
+    generatorRuntime,
+  };
 }
 
 /**

@@ -6,6 +6,8 @@ import type {
   Edge,
   EdgeId,
   ExpressionNode,
+  GeneratorNode,
+  GeneratorParams,
   LogicGateNode,
   LogicGateOperator,
   Model,
@@ -285,6 +287,41 @@ export function addObserveNode(
     label: input.label,
     capacity: input.capacity ?? { kind: 'bounded', size: 30 },
     visualization: input.visualization ?? 'last-value',
+    position: input.position ?? null,
+    isFocal: input.isFocal ?? false,
+    description: input.description ?? null,
+  };
+  return touch(
+    {
+      ...model,
+      nodes: { ...model.nodes, [id]: node },
+      nodeOrder: [...model.nodeOrder, id],
+    },
+    now,
+  );
+}
+
+export interface AddGeneratorNodeInput {
+  label: string;
+  /** 패러다임 + 매개변수. 미지정이면 counter(start=1, step=1). */
+  params?: GeneratorParams;
+  position?: { x: number; y: number } | null;
+  isFocal?: boolean;
+  description?: string | null;
+  id?: NodeId;
+}
+
+export function addGeneratorNode(
+  model: Model,
+  input: AddGeneratorNodeInput,
+  now?: number,
+): Model {
+  const id = input.id ?? makeNodeId();
+  const node: GeneratorNode = {
+    kind: 'generator',
+    id,
+    label: input.label,
+    params: input.params ?? { kind: 'counter', start: 1, step: 1 },
     position: input.position ?? null,
     isFocal: input.isFocal ?? false,
     description: input.description ?? null,

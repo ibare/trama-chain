@@ -7,14 +7,17 @@ import {
   addConstantNode as addConstantNodeOp,
   addEdge as addEdgeOp,
   addExpressionNode as addExpressionNodeOp,
+  addGeneratorNode as addGeneratorNodeOp,
   addValueNode as addValueNodeOp,
   buildTopology,
   createEmptyModel,
+  defaultGeneratorRegistry,
   executeModel,
   hasFeedbackEdges,
   initializeFromInitialValues,
   isConditionNode,
   isExpressionNode,
+  isGeneratorNode,
   modelToDocument,
   outputKey,
   propagateOneStep,
@@ -35,10 +38,12 @@ import type {
   AddObserveNodeInput,
   AddEdgeInput,
   AddExpressionNodeInput,
+  AddGeneratorNodeInput,
   AddValueNodeInput,
   Edge,
   EdgeId,
   ExecutionState,
+  GeneratorRuntime,
   Model,
   Node,
   NodeId,
@@ -76,8 +81,14 @@ export interface ModelStore {
   addLogicGateNode: (input: AddLogicGateNodeInput) => Node;
   addObserveNode: (input: AddObserveNodeInput) => Node;
   addExpressionNode: (input: AddExpressionNodeInput) => Node;
+  addGeneratorNode: (input: AddGeneratorNodeInput) => Node;
   updateNode: (id: NodeId, patch: NodePatch) => void;
   removeNode: (id: NodeId) => void;
+
+  /** GeneratorNode 시작(true)/정지(false). cursor와 마지막 값은 그대로 유지. */
+  setGeneratorEnabled: (id: NodeId, enabled: boolean) => void;
+  /** GeneratorNode 초기 상태로. cursor를 params로 재초기화하고 enabled=false. */
+  resetGenerator: (id: NodeId) => void;
 
   addEdge: (input: AddEdgeInput) => Edge | null;
   updateEdge: (id: EdgeId, patch: Partial<Omit<Edge, 'id'>>) => void;
@@ -132,21 +143,58 @@ function patchIsSimpleValueChange(patch: NodePatch): boolean {
   return 'initialValue' in patch || 'value' in patch;
 }
 
-function computeExecutionState(model: Model): {
+function computeExecutionState(
+  model: Model,
+  prior?: ExecutionState,
+): {
   executionState: ExecutionState;
   trajectory: ExecutionState[];
 } {
+  let fresh: { executionState: ExecutionState; trajectory: ExecutionState[] };
   try {
     const traj = executeModel(model, {
       shapeRegistry,
       combinerRegistry,
       expressionEvaluator: fizzexExpressionEvaluator,
     });
-    return { executionState: traj[traj.length - 1]!, trajectory: traj };
+    fresh = { executionState: traj[traj.length - 1]!, trajectory: traj };
   } catch {
     const init = initializeFromInitialValues(model);
-    return { executionState: init, trajectory: [init] };
+    fresh = { executionState: init, trajectory: [init] };
   }
+  if (!prior) return fresh;
+  // 생성기 런타임(enabled·cursor)과 마지막 emit 값은 모델 편집으로 리셋되면 안 된다.
+  // paradigm kind가 바뀌었다면 fresh가 params에 맞게 초기화한 cursor를 쓴다.
+  const mergedRuntime: Record<NodeId, GeneratorRuntime> = {};
+  const mergedValues: Record<NodeId, Value> = { ...fresh.executionState.values };
+  const mergedValid = new Set(fresh.executionState.validOutputs);
+  for (const nid in fresh.executionState.generatorRuntime) {
+    const node = model.nodes[nid];
+    if (!node || !isGeneratorNode(node)) continue;
+    const priorRt = prior.generatorRuntime[nid];
+    const freshRt = fresh.executionState.generatorRuntime[nid]!;
+    if (priorRt && priorRt.cursor.kind === freshRt.cursor.kind) {
+      mergedRuntime[nid] = priorRt;
+      const priorVal = prior.values[nid];
+      if (priorVal) {
+        mergedValues[nid] = priorVal;
+        if (prior.validOutputs.has(outputKey(nid, 0))) {
+          mergedValid.add(outputKey(nid, 0));
+        }
+      }
+    } else {
+      mergedRuntime[nid] = freshRt;
+    }
+  }
+  return {
+    executionState: {
+      ...fresh.executionState,
+      values: mergedValues,
+      validOutputs: mergedValid,
+      generatorRuntime: mergedRuntime,
+    },
+    trajectory: fresh.trajectory,
+  };
 }
 
 export function createModelStore({
@@ -156,6 +204,72 @@ export function createModelStore({
   const initial = createEmptyModel();
   const initialExec = computeExecutionState(initial);
   let activePlaybackToken = 0;
+
+  /**
+   * GeneratorNode step ticker — enabled가 1개라도 있으면 STEP_TICK_MS 주기로
+   * 모든 enabled generator를 한 칸씩 진행시킨다. 트라마 전역 step과 동기.
+   *
+   * propagateOneStep을 거치지 않고 paradigm.emit으로 cursor만 진행한 뒤 펄스를
+   * spawn — 다운스트림 갱신은 기존 펄스 hot-path가 담당하므로 펄스 시각화·flash가
+   * 자연스럽게 흐른다.
+   */
+  let generatorTicker: number | null = null;
+  function hasAnyEnabledGenerator(): boolean {
+    const rt = store.getState().executionState.generatorRuntime;
+    for (const id in rt) {
+      if (rt[id]?.enabled) return true;
+    }
+    return false;
+  }
+  function tickGenerators(): void {
+    const { model, executionState, playbackStep } = store.getState();
+    if (playbackStep !== null) return;
+    const newValues: Record<NodeId, Value> = { ...executionState.values };
+    const newValid = new Set(executionState.validOutputs);
+    const newRuntime: Record<NodeId, GeneratorRuntime> = {
+      ...executionState.generatorRuntime,
+    };
+    const emittedIds: NodeId[] = [];
+    for (const nid in executionState.generatorRuntime) {
+      const rt = executionState.generatorRuntime[nid];
+      if (!rt || !rt.enabled) continue;
+      const node = model.nodes[nid];
+      if (!node || !isGeneratorNode(node)) continue;
+      const { value, nextCursor } = defaultGeneratorRegistry.emit(node.params, rt.cursor);
+      newValues[nid] = value;
+      newValid.add(outputKey(nid, 0));
+      newRuntime[nid] = { enabled: true, cursor: nextCursor };
+      emittedIds.push(nid);
+    }
+    if (emittedIds.length === 0) {
+      stopGeneratorTicker();
+      return;
+    }
+    store.setState((s) => ({
+      executionState: {
+        ...s.executionState,
+        values: newValues,
+        validOutputs: newValid,
+        generatorRuntime: newRuntime,
+      },
+    }));
+    const latest = store.getState();
+    for (const nid of emittedIds) {
+      nodeFlashRegistry.trigger(nid);
+      spawnOutgoingPulses(latest.model, latest.executionState, nid);
+    }
+  }
+  function startGeneratorTickerIfNeeded(): void {
+    if (generatorTicker !== null) return;
+    if (!hasAnyEnabledGenerator()) return;
+    generatorTicker = window.setInterval(tickGenerators, STEP_TICK_MS);
+  }
+  function stopGeneratorTicker(): void {
+    if (generatorTicker !== null) {
+      window.clearInterval(generatorTicker);
+      generatorTicker = null;
+    }
+  }
 
   /**
    * 주어진 source 노드의 lag=0 outgoing edges에 대해 펄스를 spawn.
@@ -238,6 +352,7 @@ export function createModelStore({
           validOutputs: result.validOutputs,
           invalidReasons: s.executionState.invalidReasons,
           observeBuffers: result.newObserveBuffers,
+          generatorRuntime: s.executionState.generatorRuntime,
         },
       };
     });
@@ -255,12 +370,13 @@ export function createModelStore({
     playbackStep: null,
 
     setModel: (next) => {
-      const exec = computeExecutionState(next);
+      const exec = computeExecutionState(next, get().executionState);
       set({ model: next, ...exec });
     },
 
     recompute: () => {
-      const exec = computeExecutionState(get().model);
+      const s = get();
+      const exec = computeExecutionState(s.model, s.executionState);
       set(exec);
     },
 
@@ -279,73 +395,127 @@ export function createModelStore({
     },
 
     addNode: (input) => {
-      const before = get().model;
-      const after = addValueNodeOp(before, input);
+      const s = get();
+      const after = addValueNodeOp(s.model, input);
       const newId = after.nodeOrder[after.nodeOrder.length - 1]!;
       const node = after.nodes[newId]!;
-      const exec = computeExecutionState(after);
+      const exec = computeExecutionState(after, s.executionState);
       set({ model: after, ...exec });
       return node;
     },
 
     addConstantNode: (input) => {
-      const before = get().model;
-      const after = addConstantNodeOp(before, input);
+      const s = get();
+      const after = addConstantNodeOp(s.model, input);
       const newId = after.nodeOrder[after.nodeOrder.length - 1]!;
       const node = after.nodes[newId]!;
-      const exec = computeExecutionState(after);
+      const exec = computeExecutionState(after, s.executionState);
       set({ model: after, ...exec });
       return node;
     },
 
     addConditionNode: (input) => {
-      const before = get().model;
-      const after = addConditionNodeOp(before, input);
+      const s = get();
+      const after = addConditionNodeOp(s.model, input);
       const newId = after.nodeOrder[after.nodeOrder.length - 1]!;
       const node = after.nodes[newId]!;
-      const exec = computeExecutionState(after);
+      const exec = computeExecutionState(after, s.executionState);
       set({ model: after, ...exec });
       return node;
     },
 
     addComparisonNode: (input) => {
-      const before = get().model;
-      const after = addComparisonNodeOp(before, input);
+      const s = get();
+      const after = addComparisonNodeOp(s.model, input);
       const newId = after.nodeOrder[after.nodeOrder.length - 1]!;
       const node = after.nodes[newId]!;
-      const exec = computeExecutionState(after);
+      const exec = computeExecutionState(after, s.executionState);
       set({ model: after, ...exec });
       return node;
     },
 
     addLogicGateNode: (input) => {
-      const before = get().model;
-      const after = addLogicGateNodeOp(before, input);
+      const s = get();
+      const after = addLogicGateNodeOp(s.model, input);
       const newId = after.nodeOrder[after.nodeOrder.length - 1]!;
       const node = after.nodes[newId]!;
-      const exec = computeExecutionState(after);
+      const exec = computeExecutionState(after, s.executionState);
       set({ model: after, ...exec });
       return node;
     },
 
     addObserveNode: (input) => {
-      const before = get().model;
-      const after = addObserveNodeOp(before, input);
+      const s = get();
+      const after = addObserveNodeOp(s.model, input);
       const newId = after.nodeOrder[after.nodeOrder.length - 1]!;
       const node = after.nodes[newId]!;
-      const exec = computeExecutionState(after);
+      const exec = computeExecutionState(after, s.executionState);
       set({ model: after, ...exec });
       return node;
     },
 
     addExpressionNode: (input) => {
-      const before = get().model;
-      const after = addExpressionNodeOp(before, input);
+      const s = get();
+      const after = addExpressionNodeOp(s.model, input);
       const newId = after.nodeOrder[after.nodeOrder.length - 1]!;
       const node = after.nodes[newId]!;
-      const exec = computeExecutionState(after);
+      const exec = computeExecutionState(after, s.executionState);
       set({ model: after, ...exec });
       return node;
+    },
+
+    addGeneratorNode: (input) => {
+      const s = get();
+      const after = addGeneratorNodeOp(s.model, input);
+      const newId = after.nodeOrder[after.nodeOrder.length - 1]!;
+      const node = after.nodes[newId]!;
+      const exec = computeExecutionState(after, s.executionState);
+      set({ model: after, ...exec });
+      return node;
+    },
+
+    setGeneratorEnabled: (id, enabled) => {
+      const s = get();
+      const node = s.model.nodes[id];
+      if (!node || !isGeneratorNode(node)) return;
+      const current = s.executionState.generatorRuntime[id];
+      // 노드는 있는데 runtime이 비어 있는 경우(레이스) — params로 새 cursor 생성.
+      const cursor = current?.cursor ?? defaultGeneratorRegistry.initCursor(node.params);
+      if (current?.enabled === enabled) return;
+      set({
+        executionState: {
+          ...s.executionState,
+          generatorRuntime: {
+            ...s.executionState.generatorRuntime,
+            [id]: { enabled, cursor },
+          },
+        },
+      });
+      if (enabled) startGeneratorTickerIfNeeded();
+      else if (!hasAnyEnabledGenerator()) stopGeneratorTicker();
+    },
+
+    resetGenerator: (id) => {
+      const s = get();
+      const node = s.model.nodes[id];
+      if (!node || !isGeneratorNode(node)) return;
+      const cursor = defaultGeneratorRegistry.initCursor(node.params);
+      const newValues: Record<NodeId, Value> = { ...s.executionState.values };
+      delete newValues[id];
+      const newValid = new Set(s.executionState.validOutputs);
+      newValid.delete(outputKey(id, 0));
+      set({
+        executionState: {
+          ...s.executionState,
+          values: newValues,
+          validOutputs: newValid,
+          generatorRuntime: {
+            ...s.executionState.generatorRuntime,
+            [id]: { enabled: false, cursor },
+          },
+        },
+      });
+      if (!hasAnyEnabledGenerator()) stopGeneratorTicker();
     },
 
     updateNode: (id, rawPatch) => {
@@ -372,7 +542,7 @@ export function createModelStore({
       const playbackActive = get().playbackStep !== null;
 
       if (simpleValue && !playbackActive) {
-        const recomputed = computeExecutionState(after);
+        const recomputed = computeExecutionState(after, get().executionState);
         const nextNodeValue: Value | undefined =
           'value' in patch && patch.value && typeof patch.value === 'object' && 'kind' in patch.value
             ? (patch.value as Value)
@@ -391,6 +561,7 @@ export function createModelStore({
               validOutputs: newValid,
               invalidReasons: s.executionState.invalidReasons,
               observeBuffers: s.executionState.observeBuffers,
+              generatorRuntime: s.executionState.generatorRuntime,
             },
             trajectory: recomputed.trajectory,
           };
@@ -401,16 +572,18 @@ export function createModelStore({
         return;
       }
 
-      const exec = affectsValues ? computeExecutionState(after) : null;
+      const exec = affectsValues ? computeExecutionState(after, get().executionState) : null;
       set({ model: after, ...(exec ?? {}) });
     },
 
     removeNode: (id) => {
-      const before = get().model;
-      const after = removeNodeOp(before, id);
-      if (after === before) return;
-      const exec = computeExecutionState(after);
+      const s = get();
+      const after = removeNodeOp(s.model, id);
+      if (after === s.model) return;
+      const exec = computeExecutionState(after, s.executionState);
       set({ model: after, ...exec });
+      // 제거된 노드가 enabled 생성기였다면 ticker 중지.
+      if (!hasAnyEnabledGenerator()) stopGeneratorTicker();
     },
 
     addEdge: (input) => {
@@ -444,15 +617,15 @@ export function createModelStore({
       const after = candidate;
       const newId = after.edgeOrder[after.edgeOrder.length - 1]!;
       const edge = after.edges[newId]!;
-      const exec = computeExecutionState(after);
+      const exec = computeExecutionState(after, get().executionState);
       set({ model: after, ...exec });
       return edge;
     },
 
     updateEdge: (id, patch) => {
-      const before = get().model;
-      const candidate = updateEdgeOp(before, id, patch);
-      if (candidate === before) return;
+      const s = get();
+      const candidate = updateEdgeOp(s.model, id, patch);
+      if (candidate === s.model) return;
       if ('lag' in patch || 'from' in patch || 'to' in patch) {
         try {
           buildTopology(candidate);
@@ -461,15 +634,15 @@ export function createModelStore({
         }
       }
       const after = candidate;
-      const exec = computeExecutionState(after);
+      const exec = computeExecutionState(after, s.executionState);
       set({ model: after, ...exec });
     },
 
     removeEdge: (id) => {
-      const before = get().model;
-      const after = removeEdgeOp(before, id);
-      if (after === before) return;
-      const exec = computeExecutionState(after);
+      const s = get();
+      const after = removeEdgeOp(s.model, id);
+      if (after === s.model) return;
+      const exec = computeExecutionState(after, s.executionState);
       set({ model: after, ...exec });
     },
 
@@ -480,10 +653,10 @@ export function createModelStore({
     },
 
     setExecution: (e) => {
-      const before = get().model;
-      const after = setExecutionOp(before, e);
-      if (after === before) return;
-      const exec = computeExecutionState(after);
+      const s = get();
+      const after = setExecutionOp(s.model, e);
+      if (after === s.model) return;
+      const exec = computeExecutionState(after, s.executionState);
       set({ model: after, ...exec });
     },
 
@@ -504,7 +677,7 @@ export function createModelStore({
       }
       const after = updateNodeOp(before, id, { initialValue: nextValueRecord });
       if (after === before) return;
-      const recomputed = computeExecutionState(after);
+      const recomputed = computeExecutionState(after, get().executionState);
       const playbackActive = get().playbackStep !== null;
       set((s) => {
         const nextValues: Record<NodeId, Value> = playbackActive
@@ -523,6 +696,7 @@ export function createModelStore({
                 validOutputs: nextValid,
                 invalidReasons: s.executionState.invalidReasons,
                 observeBuffers: s.executionState.observeBuffers,
+                generatorRuntime: s.executionState.generatorRuntime,
               },
           trajectory: recomputed.trajectory,
         };

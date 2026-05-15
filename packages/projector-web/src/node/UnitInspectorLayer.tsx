@@ -1,9 +1,15 @@
 import { useMemo, useSyncExternalStore } from 'react';
-import { getInputPortType, isObserveNode, isValueNode } from '@trama/core';
+import {
+  getInputPortType,
+  isGeneratorNode,
+  isObserveNode,
+  isValueNode,
+} from '@trama/core';
 import { useTrama } from '../store/index.js';
 import { getNodeLayout } from './box.js';
 import { UnitInspector } from './UnitInspector.js';
 import { ObserveInspector } from './ObserveInspector.js';
+import { GeneratorInspector } from './GeneratorInspector.js';
 import { TramaPopover } from '../util/TramaPopover.js';
 
 /**
@@ -49,7 +55,7 @@ export function UnitInspectorLayer(): JSX.Element | null {
   }, [node, model]);
 
   if (!node || !anchor) return null;
-  if (!isValueNode(node) && !isObserveNode(node)) return null;
+  if (!isValueNode(node) && !isObserveNode(node) && !isGeneratorNode(node)) return null;
 
   return (
     <TramaPopover
@@ -63,6 +69,8 @@ export function UnitInspectorLayer(): JSX.Element | null {
     >
       {isObserveNode(node) ? (
         <ObserveInspector node={node} inferredKind={inferredKind} />
+      ) : isGeneratorNode(node) ? (
+        <GeneratorInspector node={node} />
       ) : isValueNode(node) ? (
         <UnitInspector node={node} />
       ) : null}

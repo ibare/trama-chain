@@ -126,6 +126,31 @@ export const ExpressionNodeSchema = z.object({
   description: z.string().nullable().optional(),
 });
 
+export const GeneratorParamsSchema = z.discriminatedUnion('kind', [
+  z.object({
+    kind: z.literal('counter'),
+    start: z.number(),
+    step: z.number(),
+  }),
+  z.object({
+    kind: z.literal('random'),
+    min: z.number(),
+    max: z.number(),
+    integer: z.boolean(),
+    seed: z.number(),
+  }),
+]);
+
+export const GeneratorNodeSchema = z.object({
+  kind: z.literal('generator'),
+  id: z.string(),
+  label: z.string(),
+  params: GeneratorParamsSchema,
+  position: z.object({ x: z.number(), y: z.number() }).nullable(),
+  isFocal: z.boolean(),
+  description: z.string().nullable().optional(),
+});
+
 export const NodeSchema = z.discriminatedUnion('kind', [
   ValueNodeSchema,
   ConstantNodeSchema,
@@ -134,6 +159,7 @@ export const NodeSchema = z.discriminatedUnion('kind', [
   LogicGateNodeSchema,
   ObserveNodeSchema,
   ExpressionNodeSchema,
+  GeneratorNodeSchema,
 ]);
 
 export const EdgeSchema = z.object({
@@ -177,4 +203,5 @@ export type TramaComparisonNode = z.infer<typeof ComparisonNodeSchema>;
 export type TramaLogicGateNode = z.infer<typeof LogicGateNodeSchema>;
 export type TramaObserveNode = z.infer<typeof ObserveNodeSchema>;
 export type TramaExpressionNode = z.infer<typeof ExpressionNodeSchema>;
+export type TramaGeneratorNode = z.infer<typeof GeneratorNodeSchema>;
 export type TramaEdge = z.infer<typeof EdgeSchema>;

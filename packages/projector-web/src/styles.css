@@ -1389,6 +1389,30 @@
   cursor: text;
 }
 
+/* Generator node --------------------------------------------------------- */
+/* 컨트롤러 버튼(▶/■/↺) — hit-rect는 평소 투명, hover 시 어렴풋한 강조.
+   현재 상태와 일치하는 버튼은 .is-active 클래스로 채워서 토글 표시. */
+[data-trama-root] .trama-generator-btn {
+  fill: transparent;
+  stroke: var(--color-node-stroke-calm);
+  stroke-width: 1;
+  cursor: pointer;
+}
+[data-trama-root] .trama-generator-btn:hover {
+  fill: var(--color-node-fill-low);
+}
+[data-trama-root] .trama-generator-btn.is-active {
+  fill: var(--color-node-fill-focal);
+  stroke: var(--color-node-stroke-focal);
+}
+[data-trama-root] .trama-generator-btn-glyph {
+  font-family: var(--typography-font-sans-default);
+  font-size: 16px;
+  fill: var(--color-node-text-primary);
+  pointer-events: none;
+  user-select: none;
+}
+
 /* Canvas context menu ---------------------------------------------------- */
 .trama-context-menu {
   background: var(--color-node-fill-calm);

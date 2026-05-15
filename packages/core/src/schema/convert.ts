@@ -4,6 +4,7 @@ import type {
   ConstantNode,
   Edge,
   ExpressionNode,
+  GeneratorNode,
   LogicGateNode,
   Model,
   Node,
@@ -15,6 +16,7 @@ import {
   isConditionNode,
   isConstantNode,
   isExpressionNode,
+  isGeneratorNode,
   isLogicGateNode,
   isObserveNode,
   isValueNode,
@@ -26,6 +28,7 @@ import type {
   TramaDocument,
   TramaEdge,
   TramaExpressionNode,
+  TramaGeneratorNode,
   TramaLogicGateNode,
   TramaNode,
   TramaObserveNode,
@@ -134,6 +137,18 @@ function nodeToDoc(n: Node): TramaNode {
     };
     return doc;
   }
+  if (isGeneratorNode(n)) {
+    const doc: TramaGeneratorNode = {
+      kind: 'generator',
+      id: n.id,
+      label: n.label,
+      params: n.params,
+      position: n.position,
+      isFocal: n.isFocal,
+      description: n.description ?? null,
+    };
+    return doc;
+  }
   if (!isExpressionNode(n)) throw new Error(`Unknown node kind`);
   const doc: TramaExpressionNode = {
     kind: 'expression',
@@ -235,6 +250,17 @@ export function documentToModel(doc: TramaDocument): Model {
         label: n.label,
         capacity: n.capacity,
         visualization: n.visualization,
+        position: n.position,
+        isFocal: n.isFocal,
+        description: n.description ?? null,
+      };
+      nodes[n.id] = node;
+    } else if (n.kind === 'generator') {
+      const node: GeneratorNode = {
+        kind: 'generator',
+        id: n.id,
+        label: n.label,
+        params: n.params,
         position: n.position,
         isFocal: n.isFocal,
         description: n.description ?? null,

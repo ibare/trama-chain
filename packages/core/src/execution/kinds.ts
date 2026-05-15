@@ -3,6 +3,7 @@ import type { ShapeRegistry } from '../functions/index.js';
 import type { Rng } from '../functions/types.js';
 import type { Edge, Model, Node, NodeId, Value, ValueKind } from '../model/index.js';
 import { booleanValue, isValueNode, isNumericValue, numericValue } from '../model/index.js';
+import type { GeneratorRegistry, GeneratorRuntime } from '../generators/index.js';
 import {
   clamp01,
   clampToUnit,
@@ -108,6 +109,13 @@ export interface PropagateContext {
    * runtime-only — 직렬화되지 않는다.
    */
   observeBuffers: Record<NodeId, Value[]>;
+  /**
+   * GeneratorNode의 enabled 플래그와 cursor. propagate가 emit할 때 mutate한다.
+   * runtime-only — 직렬화되지 않는다.
+   */
+  generatorRuntime: Record<NodeId, GeneratorRuntime>;
+  /** 등록된 패러다임 모음. emit 라우팅에 사용. */
+  generatorRegistry: GeneratorRegistry;
 }
 
 /**
@@ -749,6 +757,47 @@ const observeNodeDescriptor: NodeKindDescriptor<Extract<Node, { kind: 'observe' 
   },
 };
 
+/**
+ * GeneratorNode 디스크립터 — 입력 없이 cursor를 진행하며 자신의 numeric을 emit.
+ *
+ * - propagate: ctx.generatorRuntime[node.id]를 보고 enabled=true면 paradigm.emit으로
+ *   한 칸 진행해 ctx.next 갱신. enabled=false면 ctx.next는 건드리지 않아 기존 값
+ *   (마지막 emit한 값)이 유지된다 — validOutputs도 유지.
+ * - 첫 propagate에서 runtime이 비어 있으면 paradigm.initCursor로 lazy init하지만
+ *   initializeFromInitialValues가 미리 채워둬 이 경로는 거의 안 탄다.
+ *
+ * 출력은 raw('free') — 단위는 다운스트림 ValueNode가 흡수.
+ */
+const generatorNodeDescriptor: NodeKindDescriptor<
+  Extract<Node, { kind: 'generator' }>
+> = {
+  kind: 'generator',
+  outputsRaw: true,
+  canBeFeedbackTarget: false,
+  initialValue: () => undefined,
+  initialValid: () => false,
+  inputPortType: () => null,
+  outputPortType: () => 'numeric',
+  outputUnit: () => FREE_FALLBACK,
+  propagate: (node, ctx) => {
+    const existing = ctx.generatorRuntime[node.id];
+    const runtime: GeneratorRuntime = existing ?? {
+      enabled: false,
+      cursor: ctx.generatorRegistry.initCursor(node.params),
+    };
+    if (!runtime.enabled) {
+      // 정지 상태 — 마지막 값을 그대로 유지. ctx.next에 이미 기존 값이 들어 있고
+      // validOutputs도 보존되므로 손대지 않는다.
+      if (!existing) ctx.generatorRuntime[node.id] = runtime;
+      return;
+    }
+    const { value, nextCursor } = ctx.generatorRegistry.emit(node.params, runtime.cursor);
+    ctx.next[node.id] = value;
+    ctx.validOutputs.add(outputKey(node.id, 0));
+    ctx.generatorRuntime[node.id] = { enabled: true, cursor: nextCursor };
+  },
+};
+
 export function createDefaultNodeKindRegistry(): NodeKindRegistry {
   return createNodeKindRegistry()
     .register(valueNodeDescriptor)
@@ -757,7 +806,8 @@ export function createDefaultNodeKindRegistry(): NodeKindRegistry {
     .register(comparisonNodeDescriptor)
     .register(logicGateNodeDescriptor)
     .register(observeNodeDescriptor)
-    .register(expressionNodeDescriptor);
+    .register(expressionNodeDescriptor)
+    .register(generatorNodeDescriptor);
 }
 
 /**

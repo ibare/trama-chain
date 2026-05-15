@@ -1,5 +1,11 @@
 import { tokens } from '@trama/tokens';
-import { isExpressionNode, isObserveNode, isValueNode, type Node } from '@trama/core';
+import {
+  isExpressionNode,
+  isGeneratorNode,
+  isObserveNode,
+  isValueNode,
+  type Node,
+} from '@trama/core';
 
 const CARD_W = 240;
 const BASE_H = 124;
@@ -129,6 +135,8 @@ export interface NodeLayout {
   expressionBody: { x: number; y: number; w: number; h: number } | null;
   /** Observe 노드의 시각화 본문 영역(노드 중심 기준). ObserveNode가 아니면 null. */
   observeBody: { x: number; y: number; w: number; h: number } | null;
+  /** Generator 노드의 컨트롤러(▶/■/↺) 슬롯 영역. GeneratorNode가 아니면 null. */
+  generatorBody: { x: number; y: number; w: number; h: number } | null;
 }
 
 function buildPin(cx: number, cy: number, nSockets: number): PinLayout {
@@ -158,6 +166,13 @@ const OBSERVE_W = 240;
 const OBSERVE_H = 148;
 const OBSERVE_LABEL_FROM_TOP = 28;
 const OBSERVE_BODY_INSET = 16;
+
+/** GeneratorNode 본문 — 사각형 카드. 라벨 + 현재값 + 컨트롤러(▶/■/↺) 슬롯. */
+const GENERATOR_W = 200;
+const GENERATOR_H = 144;
+const GENERATOR_BODY_INSET = 16;
+const GENERATOR_CONTROLS_H = 32;
+const GENERATOR_CONTROLS_BOTTOM_PAD = 18;
 
 /** 식 노드 폭 견적용 — 변수 라벨 평균 글자 폭(px). 정확한 측정은 과함. */
 const EXPR_VAR_CHAR_W = 8;
@@ -217,6 +232,7 @@ export function getNodeLayout(
         skinBorder: { cx: 0, cy: spec.circleCy, r: spec.circleR },
         expressionBody: null,
         observeBody: null,
+        generatorBody: null,
       };
     }
   }
@@ -274,6 +290,7 @@ export function getNodeLayout(
       skinBorder: null,
       expressionBody: { x: bodyX, y: bodyY, w: bodyW, h: bodyH },
       observeBody: null,
+      generatorBody: null,
     };
   }
 
@@ -304,6 +321,42 @@ export function getNodeLayout(
       skinBorder: null,
       expressionBody: null,
       observeBody: { x: bodyX, y: bodyY, w: bodyW, h: bodyH },
+      generatorBody: null,
+    };
+  }
+
+  // GeneratorNode — 입력 없음, 단일 출력. 본문에 라벨 + 현재값 + 컨트롤러 슬롯.
+  if (isGeneratorNode(node)) {
+    const halfW = GENERATOR_W / 2;
+    const halfH = GENERATOR_H / 2;
+    const cardTop = -halfH;
+    // 좌측 핀 미사용 — 시각적으로 렌더하지 않지만 인터페이스 충족을 위해 0-socket 핀.
+    const leftPin = buildPin(-halfW, 0, 0);
+    const rightPin = buildPin(halfW, 0, 1);
+    const controlsBottom = halfH - GENERATOR_CONTROLS_BOTTOM_PAD;
+    const controlsTop = controlsBottom - GENERATOR_CONTROLS_H;
+    return {
+      width: GENERATOR_W,
+      height: GENERATOR_H,
+      halfW,
+      halfH,
+      textX: -halfW + GENERATOR_BODY_INSET,
+      labelY: cardTop + NAME_FROM_TOP,
+      valueY: cardTop + VALUE_FROM_TOP,
+      trackY: halfH,
+      combinerCenterY: null,
+      hasCombiner: false,
+      leftPin,
+      rightPin,
+      skinBorder: null,
+      expressionBody: null,
+      observeBody: null,
+      generatorBody: {
+        x: -halfW + GENERATOR_BODY_INSET,
+        y: controlsTop,
+        w: GENERATOR_W - GENERATOR_BODY_INSET * 2,
+        h: GENERATOR_CONTROLS_H,
+      },
     };
   }
 
@@ -353,5 +406,6 @@ export function getNodeLayout(
     skinBorder: null,
     expressionBody: null,
     observeBody: null,
+    generatorBody: null,
   };
 }

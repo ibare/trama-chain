@@ -1,8 +1,13 @@
 import type { CombinerRegistry } from '../combiners/index.js';
-import type { Model, Value } from '../model/index.js';
+import type { Model, NodeId, Value } from '../model/index.js';
 import { booleanValue, isNumericValue, isValueNode, numericValue } from '../model/index.js';
 import type { ShapeRegistry } from '../functions/index.js';
 import type { Rng } from '../functions/types.js';
+import {
+  defaultGeneratorRegistry,
+  type GeneratorRegistry,
+  type GeneratorRuntime,
+} from '../generators/index.js';
 import {
   clampToUnit,
   defaultUnitCatalog,
@@ -35,6 +40,8 @@ export interface PropagateOptions {
   rng?: Rng;
   /** LaTeX 식 평가자. 미지정이면 noop (식 노드 출력은 항상 invalid). */
   expressionEvaluator?: ExpressionEvaluator;
+  /** Generator paradigm registry. 미지정 시 기본 (counter·random). */
+  generatorRegistry?: GeneratorRegistry;
   /** 이미 계산된 위상을 재사용하려면 전달 */
   topology?: InstantaneousTopology;
 }
@@ -65,6 +72,12 @@ export function propagateOneStep(
   for (const [nid, buf] of Object.entries(state.observeBuffers ?? {})) {
     observeBuffers[nid] = [...buf];
   }
+  // GeneratorRuntime도 step 간에 이어진다 — clone-in/out으로 caller state는 안전.
+  const generatorRuntime: Record<NodeId, GeneratorRuntime> = {};
+  for (const [nid, rt] of Object.entries(state.generatorRuntime ?? {})) {
+    generatorRuntime[nid] = { enabled: rt.enabled, cursor: { ...rt.cursor } };
+  }
+  const generatorRegistry = options.generatorRegistry ?? defaultGeneratorRegistry;
 
   for (const nid of topology.order) {
     const node = model.nodes[nid];
@@ -86,11 +99,19 @@ export function propagateOneStep(
         options.expressionEvaluator ?? noopExpressionEvaluator,
       rng,
       observeBuffers,
+      generatorRuntime,
+      generatorRegistry,
     };
     desc.propagate(node, ctx);
   }
 
-  return { values: next, validOutputs, invalidReasons, observeBuffers };
+  return {
+    values: next,
+    validOutputs,
+    invalidReasons,
+    observeBuffers,
+    generatorRuntime,
+  };
 }
 
 /**
@@ -180,5 +201,6 @@ export function applyFeedbackEdges(
     validOutputs,
     invalidReasons: { ...state.invalidReasons },
     observeBuffers: { ...state.observeBuffers },
+    generatorRuntime: { ...state.generatorRuntime },
   };
 }
