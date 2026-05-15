@@ -112,7 +112,7 @@ describe('GeneratorNode — random paradigm', () => {
 });
 
 describe('GeneratorNode — propagate integration', () => {
-  it('enabled=false: ctx.values unchanged across step (default initial state)', () => {
+  it('enabled=false (idle): exposes peek value so downstream wiring stays attached', () => {
     let m = createEmptyModel(0);
     m = addGeneratorNode(
       m,
@@ -120,12 +120,16 @@ describe('GeneratorNode — propagate integration', () => {
       0,
     );
     let state = initializeFromInitialValues(m);
-    expect(state.values['g']).toBeUndefined();
+    expect(state.values['g']).toEqual(numericValue(10, 'free'));
+    expect(state.validOutputs.has('g:0')).toBe(true);
     expect(state.generatorRuntime['g']?.enabled).toBe(false);
+    // cursor는 아직 진행되지 않았다 — 다음 emit이 그대로 10을 낸다.
+    expect(state.generatorRuntime['g']?.cursor).toEqual({ kind: 'counter', nextValue: 10 });
+    // step을 돌려도 idle 상태면 cursor·값 그대로.
     state = step(state, m);
-    // 정지 상태 → 값이 생기지 않는다.
-    expect(state.values['g']).toBeUndefined();
-    expect(state.validOutputs.has('g:0')).toBe(false);
+    expect(state.values['g']).toEqual(numericValue(10, 'free'));
+    expect(state.validOutputs.has('g:0')).toBe(true);
+    expect(state.generatorRuntime['g']?.cursor).toEqual({ kind: 'counter', nextValue: 10 });
   });
 
   it('enabled=true: emits per step, cursor advances', () => {
@@ -187,6 +191,46 @@ describe('GeneratorNode — propagate integration', () => {
     };
     state = step(state, m);
     expect(state.values['g']).toEqual(numericValue(3, 'free'));
+  });
+
+  it('downstream ValueNode receives idle peek value (no emit yet)', () => {
+    // ▶ 누르기 전에도 generator output이 valid라 케이블이 자연스레 붙고 값이 전파된다.
+    let m = createEmptyModel(0);
+    m = addGeneratorNode(
+      m,
+      { id: 'g', label: 'gen', params: { kind: 'counter', start: 7, step: 3 } },
+      0,
+    );
+    m = addValueNode(m, { id: 'v', label: 'v', unitId: 'free', initialNumber: 0 }, 0);
+    m = addEdge(m, { from: 'g', to: 'v', shape: { kind: 'none', params: {} } }, 0);
+
+    let state = initializeFromInitialValues(m);
+    // idle 상태에서 peek가 다운스트림으로 자연 전파.
+    state = step(state, m);
+    expect(state.values['v']).toEqual(numericValue(7, 'free'));
+    // cursor는 advance하지 않음 — 다시 step 돌려도 동일.
+    state = step(state, m);
+    expect(state.values['v']).toEqual(numericValue(7, 'free'));
+  });
+
+  it('peek and emit agree on the next value (cursor advances only on emit)', () => {
+    const params = { kind: 'counter' as const, start: 42, step: 7 };
+    const cursor = counterParadigm.initCursor(params);
+    const peeked = counterParadigm.peek(params, cursor);
+    const emitted = counterParadigm.emit(params, cursor);
+    expect(peeked).toEqual(emitted.value);
+    // peek는 cursor를 진행하지 않음.
+    expect(counterParadigm.peek(params, cursor)).toEqual(peeked);
+    // emit은 진행.
+    expect(emitted.nextCursor.nextValue).toBe(49);
+  });
+
+  it('random peek matches the next emit for the same cursor', () => {
+    const params = { kind: 'random' as const, min: 0, max: 1, integer: false, seed: 123 };
+    const cursor = randomParadigm.initCursor(params);
+    const peeked = randomParadigm.peek(params, cursor);
+    const emitted = randomParadigm.emit(params, cursor);
+    expect(peeked).toEqual(emitted.value);
   });
 
   it('downstream ValueNode receives generator output', () => {

@@ -30,19 +30,30 @@ export const randomParadigm: GeneratorParadigm<
   initCursor: (params) => ({ kind: 'random', prngState: params.seed | 0 }),
   emit: (params, cursor) => {
     const { r, nextState } = nextMulberry(cursor.prngState);
-    let n: number;
-    if (params.integer) {
-      // max 포함 정수 균등분포. min/max swap 안전.
-      const lo = Math.min(params.min, params.max);
-      const hi = Math.max(params.min, params.max);
-      n = Math.floor(lo + r * (hi - lo + 1));
-      if (n > hi) n = hi; // r==1-epsilon 경계 케이스 안전망
-    } else {
-      n = params.min + r * (params.max - params.min);
-    }
+    const n = mapR(r, params);
     return {
       value: numericValue(n, 'free'),
       nextCursor: { kind: 'random', prngState: nextState },
     };
   },
+  peek: (params, cursor) => {
+    // emit과 동일한 r을 뽑되 cursor는 진행시키지 않는다 — 결과만 본다.
+    const { r } = nextMulberry(cursor.prngState);
+    return numericValue(mapR(r, params), 'free');
+  },
 };
+
+/** [0,1) r을 params 범위로 매핑. emit·peek 공통 경로. */
+function mapR(
+  r: number,
+  params: { min: number; max: number; integer: boolean },
+): number {
+  if (params.integer) {
+    // max 포함 정수 균등분포. min/max swap 안전.
+    const lo = Math.min(params.min, params.max);
+    const hi = Math.max(params.min, params.max);
+    const n = Math.floor(lo + r * (hi - lo + 1));
+    return n > hi ? hi : n; // r==1-epsilon 경계 케이스 안전망
+  }
+  return params.min + r * (params.max - params.min);
+}

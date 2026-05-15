@@ -39,6 +39,14 @@ export class GeneratorRegistry {
     const c = cursor.kind === params.kind ? cursor : p.initCursor(params as never);
     return p.emit(params as never, c as never);
   }
+
+  /** cursor를 진행시키지 않고 다음 emit 값만 본다. emit과 동일 라우팅. */
+  peek(params: GeneratorParams, cursor: GeneratorCursor): Value {
+    const p = this.map.get(params.kind);
+    if (!p) throw new Error(`GeneratorRegistry: unknown paradigm "${params.kind}"`);
+    const c = cursor.kind === params.kind ? cursor : p.initCursor(params as never);
+    return p.peek(params as never, c as never);
+  }
 }
 
 export function createDefaultGeneratorRegistry(): GeneratorRegistry {

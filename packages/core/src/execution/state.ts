@@ -59,12 +59,13 @@ export function initializeFromInitialValues(
     if (v !== undefined) values[nid] = v;
     if (desc.initialValid(node)) validOutputs.add(outputKey(nid, 0));
     // GeneratorNode는 모델 매개변수로 cursor 초기화, enabled=false로 시작.
-    // 사용자가 ▶을 눌러야 emit이 시작된다.
+    // 사용자가 ▶을 눌러야 emit이 시작된다. 다만 idle 상태에서도 "다음 emit하면
+    // 나올 값"을 peek로 미리 노출해 다운스트림 케이블이 떨어지지 않도록 한다.
     if (isGeneratorNode(node)) {
-      generatorRuntime[nid] = {
-        enabled: false,
-        cursor: generatorRegistry.initCursor(node.params),
-      };
+      const cursor = generatorRegistry.initCursor(node.params);
+      generatorRuntime[nid] = { enabled: false, cursor };
+      values[nid] = generatorRegistry.peek(node.params, cursor);
+      validOutputs.add(outputKey(nid, 0));
     }
   }
   return {

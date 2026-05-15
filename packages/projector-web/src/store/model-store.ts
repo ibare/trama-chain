@@ -123,7 +123,8 @@ function patchAffectsValues(patch: NodePatch): boolean {
     'isFocal' in p ||
     'latex' in p ||
     'variables' in p ||
-    'operator' in p
+    'operator' in p ||
+    'params' in p
   );
 }
 
@@ -500,10 +501,12 @@ export function createModelStore({
       const node = s.model.nodes[id];
       if (!node || !isGeneratorNode(node)) return;
       const cursor = defaultGeneratorRegistry.initCursor(node.params);
+      // 값은 비우지 않는다 — idle peek로 다시 "다음 emit 값"을 노출.
+      // (cursor를 origin으로 되돌렸으니 peek 결과는 counter.start / random(seed) 첫 샘플).
       const newValues: Record<NodeId, Value> = { ...s.executionState.values };
-      delete newValues[id];
+      newValues[id] = defaultGeneratorRegistry.peek(node.params, cursor);
       const newValid = new Set(s.executionState.validOutputs);
-      newValid.delete(outputKey(id, 0));
+      newValid.add(outputKey(id, 0));
       set({
         executionState: {
           ...s.executionState,

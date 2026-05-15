@@ -17,4 +17,5 @@ export const counterParadigm: GeneratorParadigm<
     value: numericValue(cursor.nextValue, 'free'),
     nextCursor: { kind: 'counter', nextValue: cursor.nextValue + params.step },
   }),
+  peek: (_params, cursor) => numericValue(cursor.nextValue, 'free'),
 };

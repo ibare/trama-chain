@@ -32,6 +32,9 @@ export interface GeneratorRuntime {
  * - `initCursor`: params로 cursor 초기 상태 생성. seed/start 등이 여기서 cursor로 들어간다.
  * - `emit`: 현재 cursor로 한 번 출력값을 만들고, 다음 cursor를 함께 반환.
  *   결정성: 동일 params + 동일 cursor면 동일 결과.
+ * - `peek`: cursor를 진행시키지 않고 "지금 emit하면 나올 값"만 미리 본다. ▶ 누르기
+ *   전 idle 상태 디스플레이와 다운스트림 자연 전파용. peek의 결과는 다음 emit의
+ *   value와 일치해야 한다.
  *
  * GeneratorParams는 sum type이라 paradigm은 `kind`로만 매핑되며, registry가 타입을
  * 좁혀 해당 paradigm으로 라우팅한다.
@@ -43,4 +46,5 @@ export interface GeneratorParadigm<
   kind: P['kind'];
   initCursor(params: P): C;
   emit(params: P, cursor: C): { value: Value; nextCursor: C };
+  peek(params: P, cursor: C): Value;
 }
