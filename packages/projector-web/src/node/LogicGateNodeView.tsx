@@ -25,12 +25,15 @@ interface Props {
 
 const SOCKET_SIZE = parseFloat(tokens.spacing.socketSize);
 
+// NOT은 단항이라 슬롯 수가 다르고, AND↔NOT 토글로 입력 엣지가 잘려나가는
+// 사고를 막기 위해 클릭 순환에서 제외한다. NOT 노드는 메뉴에서 별도 항목으로 추가.
 const OPERATORS: LogicGateOperator[] = ['and', 'or', 'xor'];
 
 const OPERATOR_LABEL: Record<LogicGateOperator, string> = {
   and: 'AND',
   or: 'OR',
   xor: 'XOR',
+  not: 'NOT',
 };
 
 /**
@@ -90,6 +93,8 @@ function LogicGateNodeViewImpl({ id, incomingCount }: Props): JSX.Element | null
   const onOperatorClick = useCallback(() => {
     if (uiStore.getState().readOnly) return;
     if (!node || !isLogicGateNode(node)) return;
+    // NOT은 단항이라 N항 게이트와 슬롯 수가 다르므로 클릭 순환의 일부가 아니다.
+    if (node.operator === 'not') return;
     const idx = OPERATORS.indexOf(node.operator);
     const next = OPERATORS[(idx + 1) % OPERATORS.length]!;
     updateNode(id, { operator: next });

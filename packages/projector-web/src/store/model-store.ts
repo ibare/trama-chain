@@ -18,6 +18,7 @@ import {
   isConditionNode,
   isExpressionNode,
   isGeneratorNode,
+  isLogicGateNode,
   modelToDocument,
   outputKey,
   propagateOneStep,
@@ -679,6 +680,17 @@ export function createModelStore({
           .map((eid) => before.edges[eid])
           .filter((e) => e && e.to === input.to);
         if (occupied.some((e) => e!.slotIndex === slot)) return null;
+      }
+      // NOT 게이트는 단항 — 두 번째 엣지를 기록 단계에서 거부해 의미와 슬롯 수를 일치시킨다.
+      if (
+        targetNode &&
+        isLogicGateNode(targetNode) &&
+        targetNode.operator === 'not'
+      ) {
+        const occupied = before.edgeOrder
+          .map((eid) => before.edges[eid])
+          .filter((e) => e && e.to === input.to);
+        if (occupied.length >= 1) return null;
       }
       const candidate = addEdgeOp(before, input);
       if ((input.lag ?? 0) === 0) {

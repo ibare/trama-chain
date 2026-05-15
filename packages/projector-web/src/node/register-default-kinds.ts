@@ -129,6 +129,7 @@ const LOGIC_GATE_PRESETS: Array<{
   { operator: 'and', label: 'AND 노드', symbol: '⋀' },
   { operator: 'or', label: 'OR 노드', symbol: '⋁' },
   { operator: 'xor', label: 'XOR 노드', symbol: '⊕' },
+  { operator: 'not', label: 'NOT 노드', symbol: '¬' },
 ];
 
 registerNodeKindUI({

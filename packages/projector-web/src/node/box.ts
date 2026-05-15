@@ -366,6 +366,8 @@ export function getNodeLayout(
   // 대신 같은 box 경로에서 노드 종류에 따른 baseH 분기만 추가 — 좌·우 핀과
   // labelY/valueY 등 모든 좌표는 그대로 공유한다.
   const isLogicGate = node.kind === 'logic-gate';
+  // NOT 게이트는 단항 — 입력 슬롯이 항상 1로 고정.
+  const isUnaryLogicGate = isLogicGate && node.operator === 'not';
   const hasCombiner = !isLogicGate && incomingCount > 1;
   const baseH = isLogicGate
     ? LOGIC_GATE_BASE_H
@@ -373,7 +375,7 @@ export function getNodeLayout(
       ? BASE_H + COMBINER_ADD_H
       : BASE_H;
 
-  const inSockets = Math.max(1, incomingCount);
+  const inSockets = isUnaryLogicGate ? 1 : Math.max(1, incomingCount);
   const inMinH = PIN_PAD * 2 + inSockets * SOCKET_SIZE + Math.max(0, inSockets - 1) * PIN_SOCKET_GAP;
   const pinDemand = Math.max(PIN_W, inMinH) + 12;
   const height = Math.max(baseH, pinDemand);

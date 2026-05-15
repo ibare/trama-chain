@@ -129,7 +129,7 @@ describe('LogicGateNode', () => {
       topology: buildTopology(m),
     });
     expect(next.values['g']).toBeUndefined();
-    expect(next.validOutputs.has('g#0')).toBe(false);
+    expect(next.validOutputs.has('g:0')).toBe(false);
   });
 
   it('PortType compatibility: boolean→gate ok, numeric→gate rejected', () => {
@@ -152,6 +152,82 @@ describe('LogicGateNode', () => {
     expect(
       checkEdgeCompatibility(m.nodes['numSrc']!, m.nodes['g']!).compatible,
     ).toBe(false);
+  });
+
+  it('NOT inverts a single boolean source', () => {
+    const cases: Array<[boolean, boolean]> = [
+      [true, false],
+      [false, true],
+    ];
+    for (const [a, expected] of cases) {
+      let m = createEmptyModel(0);
+      m = addConstantNode(m, { id: 'a', label: 'A', value: booleanValue(a) }, 0);
+      m = addLogicGateNode(m, { id: 'g', label: 'NOT', operator: 'not' }, 0);
+      m = addEdge(m, { from: 'a', to: 'g', shape: { kind: 'none', params: {} } }, 0);
+
+      const state0 = initializeFromInitialValues(m);
+      const next = propagateOneStep(state0, m, {
+        shapeRegistry: shapes,
+        combinerRegistry: combiners,
+        nodeKindRegistry: defaultNodeKindRegistry,
+        topology: buildTopology(m),
+      });
+      expect(next.values['g']).toEqual(booleanValue(expected));
+      expect(next.validOutputs.has('g:0')).toBe(true);
+    }
+  });
+
+  it('NOT with no incoming source yields invalid output', () => {
+    let m = createEmptyModel(0);
+    m = addLogicGateNode(m, { id: 'g', label: 'NOT', operator: 'not' }, 0);
+    const state0 = initializeFromInitialValues(m);
+    const next = propagateOneStep(state0, m, {
+      shapeRegistry: shapes,
+      combinerRegistry: combiners,
+      nodeKindRegistry: defaultNodeKindRegistry,
+      topology: buildTopology(m),
+    });
+    expect(next.values['g']).toBeUndefined();
+    expect(next.validOutputs.has('g:0')).toBe(false);
+  });
+
+  it('NOT with two incoming sources is invalid (unary only)', () => {
+    let m = createEmptyModel(0);
+    m = addConstantNode(m, { id: 'a', label: 'A', value: booleanValue(true) }, 0);
+    m = addConstantNode(m, { id: 'b', label: 'B', value: booleanValue(false) }, 0);
+    m = addLogicGateNode(m, { id: 'g', label: 'NOT', operator: 'not' }, 0);
+    m = addEdge(m, { from: 'a', to: 'g', shape: { kind: 'none', params: {} } }, 0);
+    m = addEdge(m, { from: 'b', to: 'g', shape: { kind: 'none', params: {} } }, 0);
+
+    const state0 = initializeFromInitialValues(m);
+    const next = propagateOneStep(state0, m, {
+      shapeRegistry: shapes,
+      combinerRegistry: combiners,
+      nodeKindRegistry: defaultNodeKindRegistry,
+      topology: buildTopology(m),
+    });
+    expect(next.validOutputs.has('g:0')).toBe(false);
+  });
+
+  it('NOT with inverted edge applies edge inversion before NOT', () => {
+    let m = createEmptyModel(0);
+    m = addConstantNode(m, { id: 'a', label: 'A', value: booleanValue(true) }, 0);
+    m = addLogicGateNode(m, { id: 'g', label: 'NOT', operator: 'not' }, 0);
+    m = addEdge(
+      m,
+      { from: 'a', to: 'g', shape: { kind: 'none', params: {} }, inverted: true },
+      0,
+    );
+
+    const state0 = initializeFromInitialValues(m);
+    const next = propagateOneStep(state0, m, {
+      shapeRegistry: shapes,
+      combinerRegistry: combiners,
+      nodeKindRegistry: defaultNodeKindRegistry,
+      topology: buildTopology(m),
+    });
+    // a=true → inverted edge → false 기여 → NOT(false) = true
+    expect(next.values['g']).toEqual(booleanValue(true));
   });
 
   it('inverted edge negates contribution', () => {

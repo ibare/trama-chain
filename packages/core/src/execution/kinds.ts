@@ -620,11 +620,14 @@ const expressionNodeDescriptor: NodeKindDescriptor<
 };
 
 /**
- * LogicGateNode 디스크립터 — boolean 입력 N개를 operator로 결합.
+ * LogicGateNode 디스크립터 — boolean 입력을 operator로 결합.
  *
- * boolean ValueNode의 결합 경로와 동일한 combiner registry 함수에 위임 —
- * `node.operator`(and/or/xor)가 곧 combiner key. 단일 출처에서 평가하기 때문에
- * boolean ValueNode와 결과가 자동으로 정합한다.
+ * 이항/N항(and/or/xor)은 combiner registry에 위임 — `node.operator`가 곧 key.
+ * boolean ValueNode의 결합 경로와 같은 함수를 쓰므로 결과가 자동으로 정합.
+ *
+ * NOT은 단항. 입력 1개일 때만 유효하고, 0개·2개+는 모두 invalid —
+ * boolean algebra의 표준 정의에 따라 다중 입력의 NOT은 정의하지 않는다
+ * (NOR/NAND 시맨틱을 묻어가지 않도록).
  *
  * 입력 0개이거나 모든 입력이 invalid면 출력 invalid — 게이트는 입력이 필수.
  */
@@ -640,9 +643,6 @@ const logicGateNodeDescriptor: NodeKindDescriptor<
   outputPortType: () => 'boolean',
   outputUnit: () => FREE_FALLBACK,
   propagate: (node, ctx) => {
-    const combiner = ctx.combinerRegistry.getOfKind(node.operator, 'boolean');
-    if (!combiner) throw new MissingCombinerError(node.operator);
-
     const contributions: boolean[] = [];
     for (const edge of ctx.incoming) {
       const source = ctx.model.nodes[edge.from];
@@ -652,6 +652,19 @@ const logicGateNodeDescriptor: NodeKindDescriptor<
       if (b === undefined) continue;
       contributions.push(edge.inverted ? !b : b);
     }
+
+    if (node.operator === 'not') {
+      if (contributions.length !== 1) {
+        ctx.validOutputs.delete(outputKey(node.id, 0));
+        return;
+      }
+      ctx.next[node.id] = booleanValue(!contributions[0]);
+      ctx.validOutputs.add(outputKey(node.id, 0));
+      return;
+    }
+
+    const combiner = ctx.combinerRegistry.getOfKind(node.operator, 'boolean');
+    if (!combiner) throw new MissingCombinerError(node.operator);
 
     if (contributions.length === 0) {
       ctx.validOutputs.delete(outputKey(node.id, 0));

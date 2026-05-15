@@ -137,7 +137,7 @@ export interface ExpressionNode {
  * ValueNode는 입력성 신호이고 결합은 부수 행동인 반면, LogicGateNode는 결합
  * 그 자체가 정체성.
  */
-export type LogicGateOperator = 'and' | 'or' | 'xor';
+export type LogicGateOperator = 'and' | 'or' | 'xor' | 'not';
 
 /**
  * 논리 게이트 노드 — boolean 입력 N개를 operator로 결합해 boolean을 출력.

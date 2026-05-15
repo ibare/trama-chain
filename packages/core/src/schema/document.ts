@@ -86,7 +86,7 @@ export const ComparisonNodeSchema = z.object({
   description: z.string().nullable().optional(),
 });
 
-export const LogicGateOperatorSchema = z.enum(['and', 'or', 'xor']);
+export const LogicGateOperatorSchema = z.enum(['and', 'or', 'xor', 'not']);
 
 export const LogicGateNodeSchema = z.object({
   kind: z.literal('logic-gate'),
