@@ -1,0 +1,103 @@
+# Rule Registry — 트리거 조건에 따라 로드할 규칙 결정
+#
+# Trigger types:
+#   paths:    파일 경로 glob 패턴
+#   patterns: 코드에서 발견되는 문자열/정규식
+#   imports:  import 문에 포함된 모듈명
+#   events:   작업 유형 (create-file, rename-file 등)
+
+# ─────────────────────────────────────
+# Always loaded
+# ─────────────────────────────────────
+always:
+  - file: principles.md
+    description: 모든 코드에 적용되는 핵심 원칙 (Projector 분리 / 단일 책임 / 레지스트리 확장 / 스코프된 표면 / 타입·스키마 정합 / 결정론)
+
+# ─────────────────────────────────────
+# Concerns (Cross-cutting)
+# ─────────────────────────────────────
+concerns:
+  - id: C1
+    file: concerns/C1-projector-separation.md
+    description: 도메인(@trama/core)은 React/zustand에 의존하지 않는다
+    triggers:
+      paths:
+        - "packages/core/**/*.ts"
+        - "packages/projector-web/**/*.{ts,tsx}"
+        - "packages/projector-embed/**/*.{ts,tsx}"
+      imports: ["react", "react-dom", "zustand", "@radix-ui/*"]
+      patterns: ["from ['\"]@trama/core['\"]"]
+
+  - id: C2
+    file: concerns/C2-scoped-styles.md
+    description: 글로벌 CSS·Tailwind 금지. 토큰과 스타일은 [data-trama-root] 스코프 내에서만
+    triggers:
+      paths: ["**/*.css"]
+      patterns: ["^:root", "@tailwind", "html, body", "\\* \\{"]
+
+  - id: C3
+    file: concerns/C3-descriptor-registry.md
+    description: 새 노드 종류·shape·combiner·constant·generator는 디스크립터 + sum type case로 추가
+    triggers:
+      paths:
+        - "packages/core/src/{functions,combiners,constants,generators}/**/*.ts"
+        - "packages/projector-web/src/node/register-default-kinds.ts"
+        - "packages/projector-web/src/node/kind-catalog.ts"
+      patterns: ["registerNodeKindUI", "register\\(", "Registry"]
+      events: ["create-file"]
+
+  - id: C4
+    file: concerns/C4-sum-type-routing.md
+    description: kind-tagged sum type은 모든 경로(라우팅·schema·view·테스트)에서 동기 유지
+    triggers:
+      paths:
+        - "packages/core/src/model/types.ts"
+        - "packages/core/src/schema/document.ts"
+        - "packages/core/src/generators/**/*.ts"
+        - "packages/core/src/execution/**/*.ts"
+      patterns: ["kind: '", "kind === ", "switch \\(.*\\.kind", "discriminator"]
+
+  - id: C5
+    file: concerns/C5-schema-model-parity.md
+    description: Zod schema와 TS model 타입은 정합. round-trip 결정성 보장
+    triggers:
+      paths:
+        - "packages/core/src/schema/**/*.ts"
+        - "packages/core/src/model/**/*.ts"
+      imports: ["zod"]
+      patterns: ["z\\.object", "z\\.discriminatedUnion", "schemaVersion"]
+
+  - id: C6
+    file: concerns/C6-testing.md
+    description: 테스트는 결정론적이고 vitest --run으로 일회성 실행. 마이그레이션·하위호환 테스트 금지
+    triggers:
+      paths: ["**/tests/**/*.test.{ts,tsx}", "**/*.test.{ts,tsx}"]
+      imports: ["vitest"]
+
+# ─────────────────────────────────────
+# Specifics (Domain-specific)
+# ─────────────────────────────────────
+specifics:
+  - id: S-node
+    file: specifics/S-node.md
+    description: NodeView 위 인터랙티브 자식은 hit-rect + stopPropagation 패턴 필수
+    triggers:
+      paths: ["packages/projector-web/src/node/**/*.{ts,tsx}"]
+      patterns: ["NodeBody", "InteractiveArea", "pointerdown", "onClick"]
+
+  - id: S-skin
+    file: specifics/S-skin.md
+    description: Skin 시각·앵커·도메인 전문성 규약
+    triggers:
+      paths: ["packages/projector-web/src/skin/**/*.{ts,tsx}"]
+      patterns: ["SkinDescriptor", "domain", "<g pointer-events"]
+
+  - id: S-expression
+    file: specifics/S-expression.md
+    description: ExpressionNode는 fizzex 평가 + 상수를 ConstantNode 엣지로만 받음
+    triggers:
+      paths:
+        - "packages/projector-web/src/expression/**/*.ts"
+        - "packages/projector-web/src/node/ExpressionNodeView.tsx"
+        - "packages/core/src/execution/expression-evaluator.ts"
+      imports: ["fizzex"]
