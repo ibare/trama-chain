@@ -1,8 +1,9 @@
 import { useMemo, useSyncExternalStore } from 'react';
-import { isValueNode } from '@trama/core';
+import { getInputPortType, isObserveNode, isValueNode } from '@trama/core';
 import { useTrama } from '../store/index.js';
 import { getNodeLayout } from './box.js';
 import { UnitInspector } from './UnitInspector.js';
+import { ObserveInspector } from './ObserveInspector.js';
 import { TramaPopover } from '../util/TramaPopover.js';
 
 /**
@@ -41,8 +42,14 @@ export function UnitInspectorLayer(): JSX.Element | null {
     };
   }, [node, incomingCount, viewport.panX, viewport.panY, viewport.zoom]);
 
+  const model = modelStore((s) => s.model);
+  const inferredKind = useMemo(() => {
+    if (!node || !isObserveNode(node)) return null;
+    return getInputPortType(node, undefined, model);
+  }, [node, model]);
+
   if (!node || !anchor) return null;
-  if (!isValueNode(node)) return null;
+  if (!isValueNode(node) && !isObserveNode(node)) return null;
 
   return (
     <TramaPopover
@@ -54,7 +61,11 @@ export function UnitInspectorLayer(): JSX.Element | null {
       placement={{ kind: 'side', gap: { x: 14, y: 0 } }}
       className="trama-unit-inspector"
     >
-      <UnitInspector node={node} />
+      {isObserveNode(node) ? (
+        <ObserveInspector node={node} inferredKind={inferredKind} />
+      ) : isValueNode(node) ? (
+        <UnitInspector node={node} />
+      ) : null}
     </TramaPopover>
   );
 }

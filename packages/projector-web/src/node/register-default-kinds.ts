@@ -7,6 +7,7 @@ import { ConditionNodeView } from './ConditionNodeView.js';
 import { ComparisonNodeView } from './ComparisonNodeView.js';
 import { LogicGateNodeView } from './LogicGateNodeView.js';
 import { ExpressionNodeView } from './ExpressionNodeView.js';
+import { ObserveNodeView } from './ObserveNodeView.js';
 import { fizzexExpressionEvaluator } from '../expression/fizzex-evaluator.js';
 import { registerNodeKindUI } from './kind-catalog.js';
 
@@ -141,6 +142,27 @@ registerNodeKindUI({
         });
       },
     })),
+});
+
+registerNodeKindUI({
+  kind: 'observe',
+  menuSectionLabel: '관찰',
+  menuSectionOrder: 14,
+  View: ObserveNodeView,
+  buildMenuItems: (instance) => [
+    {
+      key: 'observe',
+      label: '관찰 노드',
+      symbol: '👁',
+      onSelect: (canvasPos) => {
+        const addObserveNode = instance.modelStore.getState().addObserveNode;
+        addObserveNode({
+          label: '관찰',
+          position: canvasPos,
+        });
+      },
+    },
+  ],
 });
 
 registerNodeKindUI({

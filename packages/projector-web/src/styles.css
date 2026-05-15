@@ -1754,3 +1754,43 @@
 [data-trama-root] .trama-skin-oven-dial.is-disabled {
   opacity: 0.6;
 }
+
+/* ObserveNode 시각화 ------------------------------------------------ */
+[data-trama-root] .trama-observe-last-value {
+  font-size: 2rem;
+  fill: var(--color-node-text-primary);
+  font-variant-numeric: tabular-nums;
+  font-weight: 700;
+  letter-spacing: -0.01em;
+  pointer-events: none;
+}
+[data-trama-root] .trama-observe-last-value.is-empty {
+  fill: var(--color-node-text-low);
+}
+[data-trama-root] .trama-observe-halo-value {
+  fill: var(--color-node-text-low);
+  font-variant-numeric: tabular-nums;
+  font-weight: 500;
+  pointer-events: none;
+}
+[data-trama-root] .trama-observe-sparkline-line {
+  stroke: var(--color-node-text-primary);
+  stroke-width: 1.5;
+  fill: none;
+  pointer-events: none;
+}
+[data-trama-root] .trama-observe-sparkline-rail {
+  stroke: var(--color-divider-subtle);
+  stroke-width: 1;
+  stroke-dasharray: 2 3;
+  pointer-events: none;
+}
+[data-trama-root] .trama-observe-sparkline-marker {
+  fill: var(--color-node-text-primary);
+  pointer-events: none;
+}
+[data-trama-root] .trama-observe-empty-label {
+  font-size: 0.85rem;
+  fill: var(--color-node-text-low);
+  pointer-events: none;
+}

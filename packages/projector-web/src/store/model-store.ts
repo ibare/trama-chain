@@ -3,6 +3,7 @@ import {
   addComparisonNode as addComparisonNodeOp,
   addConditionNode as addConditionNodeOp,
   addLogicGateNode as addLogicGateNodeOp,
+  addObserveNode as addObserveNodeOp,
   addConstantNode as addConstantNodeOp,
   addEdge as addEdgeOp,
   addExpressionNode as addExpressionNodeOp,
@@ -31,6 +32,7 @@ import type {
   AddConditionNodeInput,
   AddConstantNodeInput,
   AddLogicGateNodeInput,
+  AddObserveNodeInput,
   AddEdgeInput,
   AddExpressionNodeInput,
   AddValueNodeInput,
@@ -72,6 +74,7 @@ export interface ModelStore {
   addConditionNode: (input: AddConditionNodeInput) => Node;
   addComparisonNode: (input: AddComparisonNodeInput) => Node;
   addLogicGateNode: (input: AddLogicGateNodeInput) => Node;
+  addObserveNode: (input: AddObserveNodeInput) => Node;
   addExpressionNode: (input: AddExpressionNodeInput) => Node;
   updateNode: (id: NodeId, patch: NodePatch) => void;
   removeNode: (id: NodeId) => void;
@@ -202,6 +205,7 @@ export function createModelStore({
       combinerRegistry,
       expressionEvaluator: fizzexExpressionEvaluator,
       sourceValueOverrides: { [pulse.sourceNodeId]: pulse.sourceValue },
+      observeBuffers: executionState.observeBuffers,
     });
 
     const prevValue = executionState.values[pulse.targetNodeId];
@@ -233,6 +237,7 @@ export function createModelStore({
           values: newValues,
           validOutputs: result.validOutputs,
           invalidReasons: s.executionState.invalidReasons,
+          observeBuffers: result.newObserveBuffers,
         },
       };
     });
@@ -323,6 +328,16 @@ export function createModelStore({
       return node;
     },
 
+    addObserveNode: (input) => {
+      const before = get().model;
+      const after = addObserveNodeOp(before, input);
+      const newId = after.nodeOrder[after.nodeOrder.length - 1]!;
+      const node = after.nodes[newId]!;
+      const exec = computeExecutionState(after);
+      set({ model: after, ...exec });
+      return node;
+    },
+
     addExpressionNode: (input) => {
       const before = get().model;
       const after = addExpressionNodeOp(before, input);
@@ -375,6 +390,7 @@ export function createModelStore({
               values: newValues,
               validOutputs: newValid,
               invalidReasons: s.executionState.invalidReasons,
+              observeBuffers: s.executionState.observeBuffers,
             },
             trajectory: recomputed.trajectory,
           };
@@ -506,6 +522,7 @@ export function createModelStore({
                 values: nextValues,
                 validOutputs: nextValid,
                 invalidReasons: s.executionState.invalidReasons,
+                observeBuffers: s.executionState.observeBuffers,
               },
           trajectory: recomputed.trajectory,
         };

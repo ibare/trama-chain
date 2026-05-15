@@ -1,5 +1,5 @@
 import { tokens } from '@trama/tokens';
-import { isExpressionNode, isValueNode, type Node } from '@trama/core';
+import { isExpressionNode, isObserveNode, isValueNode, type Node } from '@trama/core';
 
 const CARD_W = 240;
 const BASE_H = 124;
@@ -127,6 +127,8 @@ export interface NodeLayout {
   /** 식 노드의 fizzex 캔버스 본문 영역(노드 중심 기준). 측정 전이면 fallback
    *  좌표. ExpressionNode가 아니면 null. */
   expressionBody: { x: number; y: number; w: number; h: number } | null;
+  /** Observe 노드의 시각화 본문 영역(노드 중심 기준). ObserveNode가 아니면 null. */
+  observeBody: { x: number; y: number; w: number; h: number } | null;
 }
 
 function buildPin(cx: number, cy: number, nSockets: number): PinLayout {
@@ -150,6 +152,12 @@ function buildPin(cx: number, cy: number, nSockets: number): PinLayout {
     sockets,
   };
 }
+
+/** ObserveNode 본문 — 사각형 카드. 라벨 슬롯 + 본문 영역(시각화 슬롯). */
+const OBSERVE_W = 240;
+const OBSERVE_H = 148;
+const OBSERVE_LABEL_FROM_TOP = 28;
+const OBSERVE_BODY_INSET = 16;
 
 /** 식 노드 폭 견적용 — 변수 라벨 평균 글자 폭(px). 정확한 측정은 과함. */
 const EXPR_VAR_CHAR_W = 8;
@@ -208,6 +216,7 @@ export function getNodeLayout(
         rightPin,
         skinBorder: { cx: 0, cy: spec.circleCy, r: spec.circleR },
         expressionBody: null,
+        observeBody: null,
       };
     }
   }
@@ -264,6 +273,37 @@ export function getNodeLayout(
       rightPin,
       skinBorder: null,
       expressionBody: { x: bodyX, y: bodyY, w: bodyW, h: bodyH },
+      observeBody: null,
+    };
+  }
+
+  // ObserveNode — 본문은 시각화 슬롯. 단일 입력/단일 출력 핀.
+  if (isObserveNode(node)) {
+    const halfW = OBSERVE_W / 2;
+    const halfH = OBSERVE_H / 2;
+    const cardTop = -halfH;
+    const bodyX = -halfW + OBSERVE_BODY_INSET;
+    const bodyY = cardTop + OBSERVE_LABEL_FROM_TOP + 8;
+    const bodyW = OBSERVE_W - OBSERVE_BODY_INSET * 2;
+    const bodyH = OBSERVE_H - OBSERVE_LABEL_FROM_TOP - 8 - 12;
+    const leftPin = buildPin(-halfW, 0, 1);
+    const rightPin = buildPin(halfW, 0, 1);
+    return {
+      width: OBSERVE_W,
+      height: OBSERVE_H,
+      halfW,
+      halfH,
+      textX: -halfW + SIDE_INSET,
+      labelY: cardTop + OBSERVE_LABEL_FROM_TOP,
+      valueY: 0,
+      trackY: halfH,
+      combinerCenterY: null,
+      hasCombiner: false,
+      leftPin,
+      rightPin,
+      skinBorder: null,
+      expressionBody: null,
+      observeBody: { x: bodyX, y: bodyY, w: bodyW, h: bodyH },
     };
   }
 
@@ -312,5 +352,6 @@ export function getNodeLayout(
     rightPin,
     skinBorder: null,
     expressionBody: null,
+    observeBody: null,
   };
 }
