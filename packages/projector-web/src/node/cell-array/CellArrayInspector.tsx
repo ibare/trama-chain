@@ -229,7 +229,7 @@ function CellRow({ cell, canRemove, onChange, onRemove }: CellRowProps): JSX.Ele
           onClick={onRemove}
           disabled={!canRemove}
         >
-          −
+          삭제
         </button>
       </div>
     );

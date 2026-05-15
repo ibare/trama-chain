@@ -1315,17 +1315,12 @@
   background: transparent;
   border: 1px dashed var(--color-node-stroke-calm);
   border-radius: var(--spacing-radius-pill);
-  padding: 4px 10px;
+  padding: 3px 10px;
   font-family: inherit;
   font-size: var(--typography-text-picker-label);
   color: var(--color-node-text-low);
   cursor: pointer;
   align-self: flex-start;
-}
-
-[data-trama-root] .trama-cell-array-add:hover {
-  color: var(--color-node-text-primary);
-  border-style: solid;
 }
 
 [data-trama-root] .trama-cell-row {
@@ -1363,17 +1358,15 @@
 
 [data-trama-root] .trama-cell-row-remove {
   background: transparent;
-  border: 1px solid var(--color-node-stroke-calm);
-  border-radius: var(--spacing-radius-pill);
-  width: 22px;
-  height: 22px;
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
+  border: none;
   font-family: inherit;
-  font-size: 14px;
+  font-size: 11px;
   color: var(--color-node-text-low);
   cursor: pointer;
+  padding: 2px 4px;
+  text-decoration: underline;
+  text-decoration-style: dotted;
+  text-underline-offset: 2px;
   flex-shrink: 0;
 }
 
