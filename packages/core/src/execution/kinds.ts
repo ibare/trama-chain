@@ -102,6 +102,24 @@ export interface PropagateContext {
   nodeKindRegistry: NodeKindRegistry;
   expressionEvaluator: ExpressionEvaluator;
   rng: Rng;
+  /**
+   * ObserveNode가 통과한 값을 시간순으로 누적해 두는 버퍼.
+   * 디스크립터가 mutate하며, propagateOneStep이 결과를 ExecutionState로 회수한다.
+   * runtime-only — 직렬화되지 않는다.
+   */
+  observeBuffers: Record<NodeId, Value[]>;
+}
+
+/**
+ * PortType 해석에 필요한 컨텍스트. ObserveNode처럼 입력 엣지의 source PortType을
+ * 따라가는 passthrough 노드만 사용한다. 다른 노드는 인자를 무시.
+ *
+ * 정적 시점(메뉴 후보 계산 등)에서는 ctx 없이 호출될 수 있어 optional —
+ * ctx가 없으면 디스크립터는 정적 폴백을 반환한다.
+ */
+export interface PortTypeContext {
+  model: Model;
+  registry: NodeKindRegistry;
 }
 
 /**
@@ -121,10 +139,21 @@ export interface NodeKindDescriptor<N extends Node = Node> {
    * 이 노드의 입력 PortType. null이면 이 노드는 입력을 받지 않는다
    * (예: Constant). 현재는 노드 전체가 단일 PortType — 슬롯별 분기 필요해지면
    * 별도 슬롯 인자 시그니처로 확장한다.
+   *
+   * ObserveNode처럼 passthrough성 노드는 입력 엣지의 source PortType을 따라가야
+   * 하므로 optional ctx로 모델과 레지스트리를 전달받는다. 정적 시점에 ctx 없이
+   * 호출되면 보수적인 폴백(예: 'numeric')을 반환.
    */
-  inputPortType(node: N): ValueKind | null;
-  /** 이 노드 출력의 PortType. 단출력 전제. */
-  outputPortType(node: N): ValueKind;
+  inputPortType(node: N, ctx?: PortTypeContext): ValueKind | null;
+  /** 이 노드 출력의 PortType. 단출력 전제. ctx 시맨틱은 [[inputPortType]]과 동일. */
+  outputPortType(node: N, ctx?: PortTypeContext): ValueKind;
+  /**
+   * 입력 PortType이 비결정적(passthrough 노드 + 입력 미연결 등)일 때 어떤 source든
+   * 받아주겠다는 신호. ObserveNode가 입력 엣지가 없을 때 true를 반환해
+   * 첫 연결을 자유롭게 허용한다. 일단 연결되면 false로 떨어져 inputPortType이
+   * 잠긴 PortType을 반환한다. 미정의면 false 취급.
+   */
+  acceptsAnyInput?(node: N, ctx?: PortTypeContext): boolean;
   /**
    * 이 노드를 source로 두는 엣지가 raw passthrough인지.
    * true면 ValueNode 타깃의 normalize/shape/denormalize 파이프라인이 우회되고
@@ -625,6 +654,101 @@ const logicGateNodeDescriptor: NodeKindDescriptor<
   },
 };
 
+/**
+ * 단일 source 노드의 현재 Value를 ctx에서 꺼낸다 (numeric·boolean 공통).
+ * 노드의 kind에 따라 ValueNode의 initialValue로 폴백 — ObserveNode 같은
+ * 정체불명 source의 폴백은 ValueNode 한정으로만 안전.
+ */
+function getAnyNext(ctx: PropagateContext, id: NodeId): Value | undefined {
+  const v = ctx.next[id];
+  if (v) return v;
+  const source = ctx.model.nodes[id];
+  if (source && isValueNode(source)) return source.initialValue;
+  return undefined;
+}
+
+/**
+ * ObserveNode 디스크립터 — 입력값을 그대로 출력으로 통과시키는 모니터.
+ *
+ * 본체는 passthrough이고 부가 효과는 `ctx.observeBuffers[node.id]`에 통과한 값을
+ * 누적하는 것. capacity 정책에 따라 큐 길이를 자른다. 버퍼는 runtime-only —
+ * propagateOneStep이 ExecutionState로 회수하지만 직렬화 단계에서는 빠진다.
+ *
+ * PortType은 입력 엣지 source의 outputPortType을 그대로 거울처럼 따라가며,
+ * 입력이 없으면 acceptsAnyInput=true로 어떤 source든 첫 연결을 허용한다.
+ * 초기 구현은 단일 입력만 — 첫 번째 incoming edge를 본다.
+ *
+ * "데이터 흐름 도메인 전문가" — ValueNode + Skin이 단위 도메인 전문가인 것과
+ * 평행한 구조. 본체는 단순하고 paradigm이 표현을 책임진다.
+ */
+function firstIncomingEdgeForNode(model: Model, id: NodeId): Edge | undefined {
+  for (const eid of model.edgeOrder) {
+    const e = model.edges[eid];
+    if (e && e.to === id && e.lag === 0) return e;
+  }
+  return undefined;
+}
+
+const observeNodeDescriptor: NodeKindDescriptor<Extract<Node, { kind: 'observe' }>> = {
+  kind: 'observe',
+  outputsRaw: true, // passthrough — source의 raw성을 그대로 유지
+  canBeFeedbackTarget: false,
+  initialValue: () => undefined,
+  initialValid: () => false,
+  inputPortType: (node, ctx) => {
+    if (!ctx) return 'numeric'; // 정적 폴백
+    const edge = firstIncomingEdgeForNode(ctx.model, node.id);
+    if (!edge) return 'numeric';
+    const source = ctx.model.nodes[edge.from];
+    if (!source) return 'numeric';
+    return getOutputPortType(source, ctx.registry, ctx.model);
+  },
+  outputPortType: (node, ctx) => {
+    if (!ctx) return 'numeric';
+    const edge = firstIncomingEdgeForNode(ctx.model, node.id);
+    if (!edge) return 'numeric';
+    const source = ctx.model.nodes[edge.from];
+    if (!source) return 'numeric';
+    return getOutputPortType(source, ctx.registry, ctx.model);
+  },
+  acceptsAnyInput: (node, ctx) => {
+    if (!ctx) return false;
+    return firstIncomingEdgeForNode(ctx.model, node.id) === undefined;
+  },
+  outputUnit: () => FREE_FALLBACK,
+  propagate: (node, ctx) => {
+    const edge = ctx.incoming[0];
+    if (!edge) {
+      ctx.validOutputs.delete(outputKey(node.id, 0));
+      return;
+    }
+    if (!isEdgeSourceValid(ctx, edge)) {
+      ctx.validOutputs.delete(outputKey(node.id, 0));
+      return;
+    }
+    const v = getAnyNext(ctx, edge.from);
+    if (!v) {
+      ctx.validOutputs.delete(outputKey(node.id, 0));
+      return;
+    }
+    const passed: Value =
+      edge.inverted && v.kind === 'boolean'
+        ? booleanValue(!v.b)
+        : edge.inverted && v.kind === 'numeric'
+          ? numericValue(-v.n, v.unitId)
+          : v;
+    ctx.next[node.id] = passed;
+    ctx.validOutputs.add(outputKey(node.id, 0));
+
+    const buf = ctx.observeBuffers[node.id] ? [...ctx.observeBuffers[node.id]!] : [];
+    buf.push(passed);
+    if (node.capacity.kind === 'bounded') {
+      while (buf.length > node.capacity.size) buf.shift();
+    }
+    ctx.observeBuffers[node.id] = buf;
+  },
+};
+
 export function createDefaultNodeKindRegistry(): NodeKindRegistry {
   return createNodeKindRegistry()
     .register(valueNodeDescriptor)
@@ -632,6 +756,7 @@ export function createDefaultNodeKindRegistry(): NodeKindRegistry {
     .register(conditionNodeDescriptor)
     .register(comparisonNodeDescriptor)
     .register(logicGateNodeDescriptor)
+    .register(observeNodeDescriptor)
     .register(expressionNodeDescriptor);
 }
 
@@ -674,23 +799,34 @@ export function canBeFeedbackTarget(
 /**
  * 노드의 입력 PortType. null이면 입력을 받지 않는다.
  * 미등록 종류는 null로 안전 폴백.
+ *
+ * `model`을 주면 passthrough 노드(ObserveNode 등)가 입력 엣지의 source PortType을
+ * 따라가 동적으로 PortType을 해석한다. 없으면 디스크립터의 정적 폴백.
  */
 export function getInputPortType(
   node: Node,
   registry: NodeKindRegistry = defaultNodeKindRegistry,
+  model?: Model,
 ): ValueKind | null {
-  return registry.forNode(node)?.inputPortType(node) ?? null;
+  const desc = registry.forNode(node);
+  if (!desc) return null;
+  return desc.inputPortType(node, model ? { model, registry } : undefined) ?? null;
 }
 
 /**
  * 노드의 출력 PortType. 미등록 종류는 'numeric'으로 안전 폴백 —
  * 1단계 호환성 검사가 통과하도록.
+ *
+ * `model`을 주면 passthrough 노드가 입력 엣지를 보고 동적으로 PortType을 해석.
  */
 export function getOutputPortType(
   node: Node,
   registry: NodeKindRegistry = defaultNodeKindRegistry,
+  model?: Model,
 ): ValueKind {
-  return registry.forNode(node)?.outputPortType(node) ?? 'numeric';
+  const desc = registry.forNode(node);
+  if (!desc) return 'numeric';
+  return desc.outputPortType(node, model ? { model, registry } : undefined);
 }
 
 export type EdgeCompatibility =
@@ -711,15 +847,26 @@ export function checkEdgeCompatibility(
   source: Node,
   target: Node,
   registry: NodeKindRegistry = defaultNodeKindRegistry,
+  model?: Model,
 ): EdgeCompatibility {
-  const targetIn = getInputPortType(target, registry);
+  // target이 입력 PortType이 비결정적인 passthrough(ObserveNode 미연결 상태 등)면
+  // 어떤 source든 받아준다 — acceptsAnyInput=true 케이스. 첫 연결을 자유롭게 허용해
+  // 이후 PortType이 그 source로 잠긴다.
+  const targetDesc = registry.forNode(target);
+  if (
+    targetDesc?.acceptsAnyInput &&
+    targetDesc.acceptsAnyInput(target, model ? { model, registry } : undefined)
+  ) {
+    return { compatible: true };
+  }
+  const targetIn = getInputPortType(target, registry, model);
   if (targetIn === null) {
     return {
       compatible: false,
       reason: `target node "${target.kind}" does not accept inputs`,
     };
   }
-  const sourceOut = getOutputPortType(source, registry);
+  const sourceOut = getOutputPortType(source, registry, model);
   if (sourceOut !== targetIn) {
     return {
       compatible: false,

@@ -98,6 +98,22 @@ export const LogicGateNodeSchema = z.object({
   description: z.string().nullable().optional(),
 });
 
+export const ObserveCapacitySchema = z.discriminatedUnion('kind', [
+  z.object({ kind: z.literal('bounded'), size: z.number().int().positive() }),
+  z.object({ kind: z.literal('unbounded') }),
+]);
+
+export const ObserveNodeSchema = z.object({
+  kind: z.literal('observe'),
+  id: z.string(),
+  label: z.string(),
+  capacity: ObserveCapacitySchema,
+  visualization: z.string(),
+  position: z.object({ x: z.number(), y: z.number() }).nullable(),
+  isFocal: z.boolean(),
+  description: z.string().nullable().optional(),
+});
+
 export const ExpressionNodeSchema = z.object({
   kind: z.literal('expression'),
   id: z.string(),
@@ -116,6 +132,7 @@ export const NodeSchema = z.discriminatedUnion('kind', [
   ConditionNodeSchema,
   ComparisonNodeSchema,
   LogicGateNodeSchema,
+  ObserveNodeSchema,
   ExpressionNodeSchema,
 ]);
 
@@ -158,5 +175,6 @@ export type TramaConstantNode = z.infer<typeof ConstantNodeSchema>;
 export type TramaConditionNode = z.infer<typeof ConditionNodeSchema>;
 export type TramaComparisonNode = z.infer<typeof ComparisonNodeSchema>;
 export type TramaLogicGateNode = z.infer<typeof LogicGateNodeSchema>;
+export type TramaObserveNode = z.infer<typeof ObserveNodeSchema>;
 export type TramaExpressionNode = z.infer<typeof ExpressionNodeSchema>;
 export type TramaEdge = z.infer<typeof EdgeSchema>;

@@ -7,6 +7,7 @@ import type {
   LogicGateNode,
   Model,
   Node,
+  ObserveNode,
   ValueNode,
 } from '../model/index.js';
 import {
@@ -15,6 +16,7 @@ import {
   isConstantNode,
   isExpressionNode,
   isLogicGateNode,
+  isObserveNode,
   isValueNode,
 } from '../model/index.js';
 import type {
@@ -26,6 +28,7 @@ import type {
   TramaExpressionNode,
   TramaLogicGateNode,
   TramaNode,
+  TramaObserveNode,
   TramaValueNode,
 } from './document.js';
 
@@ -112,6 +115,19 @@ function nodeToDoc(n: Node): TramaNode {
       id: n.id,
       label: n.label,
       operator: n.operator,
+      position: n.position,
+      isFocal: n.isFocal,
+      description: n.description ?? null,
+    };
+    return doc;
+  }
+  if (isObserveNode(n)) {
+    const doc: TramaObserveNode = {
+      kind: 'observe',
+      id: n.id,
+      label: n.label,
+      capacity: n.capacity,
+      visualization: n.visualization,
       position: n.position,
       isFocal: n.isFocal,
       description: n.description ?? null,
@@ -207,6 +223,18 @@ export function documentToModel(doc: TramaDocument): Model {
         id: n.id,
         label: n.label,
         operator: n.operator,
+        position: n.position,
+        isFocal: n.isFocal,
+        description: n.description ?? null,
+      };
+      nodes[n.id] = node;
+    } else if (n.kind === 'observe') {
+      const node: ObserveNode = {
+        kind: 'observe',
+        id: n.id,
+        label: n.label,
+        capacity: n.capacity,
+        visualization: n.visualization,
         position: n.position,
         isFocal: n.isFocal,
         description: n.description ?? null,

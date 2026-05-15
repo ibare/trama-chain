@@ -31,6 +31,13 @@ export interface RecomputeNodeOptions {
    * 현재 state 그대로 사용.
    */
   sourceValueOverrides?: Readonly<Record<NodeId, Value>>;
+  /**
+   * ObserveNode 누적 버퍼의 시작 상태. 미지정이면 빈 버퍼로 시작해 hot-path
+   * 단발 호출에서 누적을 버릴 수 있다. 펄스 도착 시 누적이 *유지*되어야 하면
+   * 호출자가 현재 `state.observeBuffers`를 전달하고 결과의 `newObserveBuffers`
+   * 를 다시 state에 반영한다.
+   */
+  observeBuffers?: Readonly<Record<NodeId, Value[]>>;
 }
 
 export interface RecomputeNodeResult {
@@ -42,6 +49,12 @@ export interface RecomputeNodeResult {
   validOutputs: Set<string>;
   /** target의 모든 출력 슬롯 키. 호출자가 변경 비교에 쓰기 좋게 같이 반환. */
   outputSlotKeys: string[];
+  /**
+   * 재계산 후의 ObserveNode 누적 버퍼. 호출자가 `observeBuffers`를 넘긴 경우
+   * 그 버퍼에 push된 결과가 새 reference로 반환된다 (caller의 입력은 mutate
+   * 되지 않음 — 내부에서 clone 후 사용). 미입력이었으면 빈 객체.
+   */
+  newObserveBuffers: Record<NodeId, Value[]>;
 }
 
 /**
@@ -59,12 +72,21 @@ export function recomputeNode(
   options: RecomputeNodeOptions,
 ): RecomputeNodeResult {
   const node = model.nodes[nodeId];
+  // 입력 버퍼는 clone — descriptor가 mutate해도 caller의 source는 건드리지 않는다.
+  const seedBuffers: Record<NodeId, Value[]> = {};
+  if (options.observeBuffers) {
+    for (const [nid, buf] of Object.entries(options.observeBuffers)) {
+      seedBuffers[nid] = [...buf];
+    }
+  }
+
   if (!node) {
     return {
       newValue: undefined,
       isValid: false,
       validOutputs: new Set(state.validOutputs),
       outputSlotKeys: [],
+      newObserveBuffers: seedBuffers,
     };
   }
 
@@ -76,6 +98,7 @@ export function recomputeNode(
       isValid: state.validOutputs.has(outputKey(nodeId, 0)),
       validOutputs: new Set(state.validOutputs),
       outputSlotKeys: [outputKey(nodeId, 0)],
+      newObserveBuffers: seedBuffers,
     };
   }
 
@@ -111,6 +134,7 @@ export function recomputeNode(
     nodeKindRegistry,
     expressionEvaluator: options.expressionEvaluator ?? noopExpressionEvaluator,
     rng: options.rng ?? defaultRng,
+    observeBuffers: seedBuffers,
   };
 
   desc.propagate(node, ctx);
@@ -123,5 +147,6 @@ export function recomputeNode(
     isValid: workingValid.has(outputKey(nodeId, 0)),
     validOutputs: workingValid,
     outputSlotKeys,
+    newObserveBuffers: seedBuffers,
   };
 }

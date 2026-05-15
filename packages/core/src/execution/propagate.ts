@@ -59,6 +59,12 @@ export function propagateOneStep(
   const invalidReasons: ExecutionState['invalidReasons'] = {
     ...state.invalidReasons,
   };
+  // ObserveNode 누적 버퍼는 step 간에 이어진다 — 직전 step의 버퍼를 그대로
+  // 카피해 디스크립터가 새 값을 push하면 잘림 정책까지 디스크립터가 적용한다.
+  const observeBuffers: Record<string, Value[]> = {};
+  for (const [nid, buf] of Object.entries(state.observeBuffers ?? {})) {
+    observeBuffers[nid] = [...buf];
+  }
 
   for (const nid of topology.order) {
     const node = model.nodes[nid];
@@ -79,11 +85,12 @@ export function propagateOneStep(
       expressionEvaluator:
         options.expressionEvaluator ?? noopExpressionEvaluator,
       rng,
+      observeBuffers,
     };
     desc.propagate(node, ctx);
   }
 
-  return { values: next, validOutputs, invalidReasons };
+  return { values: next, validOutputs, invalidReasons, observeBuffers };
 }
 
 /**
@@ -168,5 +175,10 @@ export function applyFeedbackEdges(
     validOutputs.add(outputKey(tid, 0));
   }
 
-  return { values: next, validOutputs, invalidReasons: { ...state.invalidReasons } };
+  return {
+    values: next,
+    validOutputs,
+    invalidReasons: { ...state.invalidReasons },
+    observeBuffers: { ...state.observeBuffers },
+  };
 }

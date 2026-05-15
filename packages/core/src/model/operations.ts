@@ -11,6 +11,8 @@ import type {
   Model,
   Node,
   NodeId,
+  ObserveCapacity,
+  ObserveNode,
   ValueNode,
 } from './types.js';
 import { makeEdgeId, makeModelId, makeNodeId } from './ids.js';
@@ -247,6 +249,42 @@ export function addLogicGateNode(
     id,
     label: input.label,
     operator: input.operator ?? 'and',
+    position: input.position ?? null,
+    isFocal: input.isFocal ?? false,
+    description: input.description ?? null,
+  };
+  return touch(
+    {
+      ...model,
+      nodes: { ...model.nodes, [id]: node },
+      nodeOrder: [...model.nodeOrder, id],
+    },
+    now,
+  );
+}
+
+export interface AddObserveNodeInput {
+  label: string;
+  capacity?: ObserveCapacity;
+  visualization?: string;
+  position?: { x: number; y: number } | null;
+  isFocal?: boolean;
+  description?: string | null;
+  id?: NodeId;
+}
+
+export function addObserveNode(
+  model: Model,
+  input: AddObserveNodeInput,
+  now?: number,
+): Model {
+  const id = input.id ?? makeNodeId();
+  const node: ObserveNode = {
+    kind: 'observe',
+    id,
+    label: input.label,
+    capacity: input.capacity ?? { kind: 'bounded', size: 30 },
+    visualization: input.visualization ?? 'last-value',
     position: input.position ?? null,
     isFocal: input.isFocal ?? false,
     description: input.description ?? null,

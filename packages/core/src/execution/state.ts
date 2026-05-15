@@ -18,6 +18,12 @@ export interface ExecutionState {
   values: Record<NodeId, Value>;
   validOutputs: Set<string>;
   invalidReasons: Record<NodeId, EvalDiagnosis & { ok: false }>;
+  /**
+   * ObserveNode가 통과한 값을 시간순으로 누적한 버퍼. runtime-only — 직렬화되지
+   * 않고 세션이 끝나면 사라진다. capacity 정책(bounded/unbounded)은 propagate
+   * 시점에 적용되어 이 버퍼에 들어오는 시점부터 잘려있다.
+   */
+  observeBuffers: Record<NodeId, Value[]>;
 }
 
 /** 출력 유효성 집합용 키 생성. */
@@ -40,7 +46,7 @@ export function initializeFromInitialValues(
     if (v !== undefined) values[nid] = v;
     if (desc.initialValid(node)) validOutputs.add(outputKey(nid, 0));
   }
-  return { values, validOutputs, invalidReasons: {} };
+  return { values, validOutputs, invalidReasons: {}, observeBuffers: {} };
 }
 
 /**

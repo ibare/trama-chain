@@ -7,6 +7,7 @@ import type {
   TramaExpressionNode,
   TramaLogicGateNode,
   TramaNode,
+  TramaObserveNode,
   TramaValueNode,
 } from './document.js';
 
@@ -76,6 +77,17 @@ const LOGIC_GATE_NODE_KEY_ORDER: (keyof TramaLogicGateNode)[] = [
   'description',
 ];
 
+const OBSERVE_NODE_KEY_ORDER: (keyof TramaObserveNode)[] = [
+  'kind',
+  'id',
+  'label',
+  'capacity',
+  'visualization',
+  'position',
+  'isFocal',
+  'description',
+];
+
 const EXPRESSION_NODE_KEY_ORDER: (keyof TramaExpressionNode)[] = [
   'kind',
   'id',
@@ -125,6 +137,7 @@ function orderNode(n: TramaNode): TramaNode {
   if (n.kind === 'condition') return orderObject(n, CONDITION_NODE_KEY_ORDER);
   if (n.kind === 'comparison') return orderObject(n, COMPARISON_NODE_KEY_ORDER);
   if (n.kind === 'logic-gate') return orderObject(n, LOGIC_GATE_NODE_KEY_ORDER);
+  if (n.kind === 'observe') return orderObject(n, OBSERVE_NODE_KEY_ORDER);
   return orderObject(n, EXPRESSION_NODE_KEY_ORDER);
 }
 

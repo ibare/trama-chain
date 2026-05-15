@@ -157,13 +157,45 @@ export interface LogicGateNode {
   description?: string | null;
 }
 
+/**
+ * Observe 노드 — 입력값을 그대로 출력으로 통과시키는 모니터.
+ *
+ * - 본체: passthrough. 모델 그래프 계산에는 영향이 없다.
+ * - 부가: 통과한 값을 시간순으로 누적해 시각화에 제공. 누적 버퍼는 모델 외부
+ *   (`ExecutionState.observeBuffers`)에서 runtime-only로 관리하며 직렬화되지 않는다.
+ * - `capacity`: 큐 정책. bounded면 최근 `size`개만, unbounded면 무제한.
+ * - `visualization`: 시각화 paradigm key (registry에 등록된 표현 방식).
+ *
+ * "데이터 흐름 도메인 전문가" — ValueNode + Skin이 단위 도메인 전문가인 것과
+ * 평행한 구조. 본체는 단순하고 paradigm이 표현을 책임진다.
+ *
+ * 입출력은 향후 N:N으로 확장 가능한 구조를 전제로 설계하지만 초기 구현은
+ * 1입력 1출력에 한정.
+ */
+export type ObserveCapacity =
+  | { kind: 'bounded'; size: number }
+  | { kind: 'unbounded' };
+
+export interface ObserveNode {
+  kind: 'observe';
+  id: NodeId;
+  label: string;
+  capacity: ObserveCapacity;
+  /** Visualization paradigm key, registered in projector-web visualization registry */
+  visualization: string;
+  position: { x: number; y: number } | null;
+  isFocal: boolean;
+  description?: string | null;
+}
+
 export type Node =
   | ValueNode
   | ConstantNode
   | ConditionNode
   | ComparisonNode
   | LogicGateNode
-  | ExpressionNode;
+  | ExpressionNode
+  | ObserveNode;
 
 export function isValueNode(n: Node): n is ValueNode {
   return n.kind === 'value';
@@ -182,6 +214,9 @@ export function isLogicGateNode(n: Node): n is LogicGateNode {
 }
 export function isExpressionNode(n: Node): n is ExpressionNode {
   return n.kind === 'expression';
+}
+export function isObserveNode(n: Node): n is ObserveNode {
+  return n.kind === 'observe';
 }
 
 export interface Edge {
