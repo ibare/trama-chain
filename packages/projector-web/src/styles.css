@@ -1413,42 +1413,75 @@
   user-select: none;
 }
 
-/* Canvas context menu ---------------------------------------------------- */
-.trama-context-menu {
+/* Node picker (radix Dialog) -------------------------------------------- */
+/* 노드 추가 통합 패널. 좌측 칩 그리드 + 우측 설명 프리뷰 + 하단 추가/취소 액션.
+   Dialog 자체는 Portal 없이 [data-trama-root] 안에서 렌더되어 토큰을 상속한다. */
+[data-trama-root] .trama-node-picker {
   background: var(--color-node-fill-calm);
   border: 1px solid var(--color-node-stroke-calm);
   border-radius: var(--spacing-radius-picker);
-  padding: 10px;
-  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.12);
+  box-shadow: 0 12px 32px rgba(0, 0, 0, 0.16);
   font-family: var(--typography-font-sans-default);
   font-size: var(--typography-text-picker-label);
   color: var(--color-node-text-primary);
   display: flex;
   flex-direction: column;
-  gap: 4px;
+  overflow: hidden;
+  z-index: 1100;
 }
 
-.trama-context-menu-section {
+[data-trama-root] .trama-node-picker-title {
+  font-size: 12px;
+  color: var(--color-node-text-low);
+  letter-spacing: 0.02em;
+  padding: 10px 14px 0;
+}
+
+[data-trama-root] .trama-node-picker-sr {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  overflow: hidden;
+  clip: rect(0 0 0 0);
+}
+
+[data-trama-root] .trama-node-picker-body {
+  flex: 1;
+  display: grid;
+  grid-template-columns: 2fr 1fr;
+  min-height: 0;
+}
+
+[data-trama-root] .trama-node-picker-chips {
+  padding: 10px 14px;
+  overflow-y: auto;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  border-right: 1px solid var(--color-node-stroke-calm);
+}
+
+[data-trama-root] .trama-node-picker-section {
   display: flex;
   flex-direction: column;
   gap: 6px;
 }
 
-.trama-context-menu-section-label {
+[data-trama-root] .trama-node-picker-section-label {
   font-size: 11px;
   color: var(--color-node-text-low);
   padding: 2px 4px 2px;
   letter-spacing: 0.02em;
 }
 
-.trama-context-menu-grid {
+[data-trama-root] .trama-node-picker-grid {
   display: flex;
   flex-wrap: wrap;
   gap: 6px 8px;
   padding: 0 2px 4px;
 }
 
-.trama-context-menu-chip {
+[data-trama-root] .trama-node-picker-chip {
   background: transparent;
   border: 1px solid var(--color-node-stroke-calm);
   outline: none;
@@ -1467,11 +1500,16 @@
   transition: background-color 80ms ease, border-color 80ms ease;
 }
 
-.trama-context-menu-chip:hover {
+[data-trama-root] .trama-node-picker-chip:hover {
   background: var(--color-node-fill-calm);
 }
 
-.trama-context-menu-symbol {
+[data-trama-root] .trama-node-picker-chip.is-active {
+  background: var(--color-node-fill-calm);
+  border-color: var(--color-node-text-primary);
+}
+
+[data-trama-root] .trama-node-picker-symbol {
   display: inline-flex;
   align-items: center;
   justify-content: center;
@@ -1480,15 +1518,85 @@
   color: var(--color-node-text-primary);
 }
 
-.trama-context-menu-label {
+[data-trama-root] .trama-node-picker-label {
   color: inherit;
 }
 
-.trama-context-menu-divider {
+[data-trama-root] .trama-node-picker-divider {
   height: 1px;
   background: var(--color-node-stroke-calm);
   opacity: 0.3;
   margin: 6px 2px;
+}
+
+[data-trama-root] .trama-node-picker-preview {
+  padding: 14px 16px;
+  overflow-y: auto;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+[data-trama-root] .trama-node-picker-preview-heading {
+  font-size: 14px;
+  font-weight: 600;
+  color: var(--color-node-text-primary);
+}
+
+[data-trama-root] .trama-node-picker-preview-body {
+  font-size: 12px;
+  line-height: 1.5;
+  color: var(--color-node-text-low);
+}
+
+[data-trama-root] .trama-node-picker-preview-empty {
+  font-size: 12px;
+  color: var(--color-node-text-low);
+  opacity: 0.7;
+}
+
+[data-trama-root] .trama-node-picker-actions {
+  border-top: 1px solid var(--color-node-stroke-calm);
+  padding: 10px 14px;
+  display: flex;
+  justify-content: flex-end;
+  gap: 8px;
+}
+
+[data-trama-root] .trama-node-picker-btn {
+  border: 1px solid var(--color-node-stroke-calm);
+  outline: none;
+  padding: 6px 14px;
+  border-radius: 999px;
+  cursor: pointer;
+  font-family: inherit;
+  font-size: 12px;
+  line-height: 1.2;
+  transition: background-color 80ms ease, border-color 80ms ease, opacity 80ms ease;
+}
+
+[data-trama-root] .trama-node-picker-btn--ghost {
+  background: transparent;
+  color: var(--color-node-text-primary);
+}
+
+[data-trama-root] .trama-node-picker-btn--ghost:hover {
+  background: var(--color-node-fill-calm);
+}
+
+[data-trama-root] .trama-node-picker-btn--primary {
+  background: var(--color-node-text-primary);
+  color: var(--color-node-fill-calm);
+  border-color: var(--color-node-text-primary);
+}
+
+[data-trama-root] .trama-node-picker-btn--primary:hover {
+  opacity: 0.9;
+}
+
+[data-trama-root] .trama-node-picker-btn:disabled {
+  opacity: 0.4;
+  cursor: not-allowed;
 }
 
 /* Pulse propagation ----------------------------------------------------- */

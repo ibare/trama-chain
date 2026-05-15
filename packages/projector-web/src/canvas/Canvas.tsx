@@ -5,7 +5,7 @@ import { EdgeView } from '../edge/EdgeView.js';
 import { NodeView } from '../node/NodeView.js';
 import { PulseLayer } from '../pulse/PulseLayer.js';
 import { EdgeDraftView } from './EdgeDraftView.js';
-import { CanvasContextMenu } from './CanvasContextMenu.js';
+import { NodePicker } from './NodePicker.js';
 import { isConditionNode, isExpressionNode } from '@trama/core';
 
 const ZOOM_MIN = 0.2;
@@ -24,14 +24,10 @@ export function Canvas(): JSX.Element {
   const edgeOrder = modelStore((s) => s.model.edgeOrder);
   const edges = modelStore((s) => s.model.edges);
   const nodes = modelStore((s) => s.model.nodes);
-  const nodeCount = nodeOrder.length;
 
-  const addNode = modelStore((s) => s.addNode);
-  const setEditingNode = uiStore((s) => s.setEditingNode);
   const clearSelection = uiStore((s) => s.clearSelection);
-  const clearInsertIntent = uiStore((s) => s.clearInsertNodeIntent);
-  const openCanvasContextMenu = uiStore((s) => s.openCanvasContextMenu);
-  const closeCanvasContextMenu = uiStore((s) => s.closeCanvasContextMenu);
+  const openNodePickerAtCanvas = uiStore((s) => s.openNodePickerAtCanvas);
+  const closeNodePicker = uiStore((s) => s.closeNodePicker);
   const edgeDraft = uiStore((s) => s.edgeDraft);
   const updateEdgeDraft = uiStore((s) => s.updateEdgeDraft);
   const endEdgeDraft = uiStore((s) => s.endEdgeDraft);
@@ -103,11 +99,10 @@ export function Canvas(): JSX.Element {
       const isBackground =
         e.target === e.currentTarget || target.classList?.contains?.('trama-canvas-bg');
       if (!isBackground) return;
-      // 빈 영역 클릭: 선택·메뉴 등 정리. 패널(picker·inspector)은 자기
+      // 빈 영역 클릭: 선택·NodePicker 등 정리. 패널(picker·inspector)은 자기
       // 외부 클릭을 document-level로 직접 감지해 닫는다.
       clearSelection();
-      clearInsertIntent();
-      closeCanvasContextMenu();
+      closeNodePicker();
       // 좌클릭만 패닝.
       if (e.button !== 0) return;
       e.currentTarget.setPointerCapture?.(e.pointerId);
@@ -121,20 +116,20 @@ export function Canvas(): JSX.Element {
         pointerId: e.pointerId,
       };
     },
-    [clearSelection, clearInsertIntent, closeCanvasContextMenu],
+    [clearSelection, closeNodePicker],
   );
 
   const onCanvasContextMenu = useCallback(
     (e: React.MouseEvent<SVGSVGElement>) => {
-      // 빈 영역에서만 컨텍스트 메뉴를 띄운다 — 노드·엣지 위 우클릭은 기본 동작
+      // 빈 영역에서만 NodePicker를 띄운다 — 노드·엣지 위 우클릭은 기본 동작
       // 또는 추후 각자의 메뉴로 위임.
       const target = e.target as Element;
       if (target !== e.currentTarget && !target.classList?.contains?.('trama-canvas-bg')) return;
       e.preventDefault();
       const canvasPos = toCanvasCoords(e.clientX, e.clientY);
-      openCanvasContextMenu({ x: e.clientX, y: e.clientY }, canvasPos);
+      openNodePickerAtCanvas({ x: e.clientX, y: e.clientY }, canvasPos);
     },
-    [openCanvasContextMenu, toCanvasCoords],
+    [openNodePickerAtCanvas, toCanvasCoords],
   );
 
   const onCanvasDoubleClick = useCallback(
@@ -142,17 +137,10 @@ export function Canvas(): JSX.Element {
       if (uiStore.getState().readOnly) return;
       const target = e.target as Element;
       if (target !== e.currentTarget && !target.classList?.contains?.('trama-canvas-bg')) return;
-      const pos = toCanvasCoords(e.clientX, e.clientY);
-      const node = addNode({
-        label: '새 변수',
-        unitId: 'rating-10',
-        initialNumber: 5,
-        position: pos,
-        isFocal: nodeCount === 0,
-      });
-      setEditingNode(node.id);
+      const canvasPos = toCanvasCoords(e.clientX, e.clientY);
+      openNodePickerAtCanvas({ x: e.clientX, y: e.clientY }, canvasPos);
     },
-    [addNode, nodeCount, setEditingNode, toCanvasCoords, uiStore],
+    [openNodePickerAtCanvas, toCanvasCoords, uiStore],
   );
 
   const onPointerMove = useCallback(
@@ -325,7 +313,7 @@ export function Canvas(): JSX.Element {
       {/* 떠 있는 패널 — 모든 노드 위에 그려져 z-order 보장. 노드 그룹 안에서
           렌더하면 그 노드보다 뒤에 그려진 다른 노드에 의해 가려진다. */}
     </svg>
-    <CanvasContextMenu />
+    <NodePicker />
     </>
   );
 }

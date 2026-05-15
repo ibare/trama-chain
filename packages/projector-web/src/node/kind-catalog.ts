@@ -3,16 +3,19 @@ import type { Node, NodeId } from '@trama/core';
 import type { TramaInstance } from '../store/trama-instance.js';
 
 /**
- * 컨텍스트 메뉴에 노출될 단일 항목.
+ * NodePicker에 노출될 단일 항목.
  * - `symbol`: 좌측에 짧게 표시되는 심볼 (예: "+", "×", "π").
  * - `label`: 사용자에게 보이는 한국어 라벨.
- * - `onSelect(canvasPos)`: 클릭 시 노드 생성 액션. 호출 측에서 캔버스 좌표를 넘긴다.
+ * - `description`: 우측 프리뷰에 표시할 설명 (선택). 향후 풍부한 설명으로 확장.
+ * - `createNode(canvasPos)`: 사용자가 "추가"로 확정한 순간 호출. 생성된 노드의 id를 반환해야 한다 —
+ *   엣지-분할 같은 후속 작업이 새 노드 id를 받아 단일 트랜잭션처럼 마무리할 수 있도록.
  */
 export interface NodeMenuItem {
   key: string;
   label: string;
   symbol?: string;
-  onSelect: (canvasPos: { x: number; y: number }) => void;
+  description?: string;
+  createNode: (canvasPos: { x: number; y: number }) => NodeId;
 }
 
 export interface NodeViewProps {

@@ -33,12 +33,6 @@ export interface EdgeDraft {
   detachingEdgeId: EdgeId | null;
 }
 
-export interface InsertNodeFromEdgeIntent {
-  edgeId: EdgeId;
-  /** 클릭 위치 (캔버스 좌표) */
-  position: { x: number; y: number };
-}
-
 export interface FunctionPickerState {
   edgeId: EdgeId;
   /** 캔버스 좌표 — 화면에 띄울 위치 결정용 */
@@ -49,12 +43,27 @@ export interface UnitInspectorState {
   nodeId: NodeId;
 }
 
-export interface CanvasContextMenuState {
-  /** 화면 좌표 — 메뉴 div 배치용 */
-  screen: { x: number; y: number };
-  /** 캔버스(SVG) 좌표 — 새로 만드는 노드의 position에 쓰임 */
-  canvas: { x: number; y: number };
-}
+/**
+ * NodePicker — 빈 캔버스 dblclick·우클릭·엣지 중간 클릭 3가지 진입을 통합한다.
+ * 사용자가 칩을 고르고 "추가"를 누르기 전엔 노드도 엣지 분할도 실제로 일어나지 않는다.
+ *
+ * - `canvas` 진입: 단일 노드 생성. 새 노드 position = canvasPos.
+ * - `edge-split` 진입: 새 노드 생성 + 원래 엣지를 두 갈래로 분할. edgeId 필수.
+ */
+export type NodePickerIntent =
+  | {
+      origin: 'canvas';
+      /** 화면 좌표 — Dialog 패널 배치용 */
+      screenPos: { x: number; y: number };
+      /** 캔버스(SVG) 좌표 — 새 노드 position에 쓰임 */
+      canvasPos: { x: number; y: number };
+    }
+  | {
+      origin: 'edge-split';
+      screenPos: { x: number; y: number };
+      canvasPos: { x: number; y: number };
+      edgeId: EdgeId;
+    };
 
 export interface RunFlashState {
   step: number;
@@ -72,14 +81,12 @@ export interface UIStore {
   readOnly: boolean;
   /** 진행 중인 엣지 드래그 */
   edgeDraft: EdgeDraft | null;
-  /** 엣지에 새 노드 끼워넣기 의도 */
-  insertNodeIntent: InsertNodeFromEdgeIntent | null;
+  /** 노드 추가 패널(NodePicker) 열림 의도. 캔버스/엣지-분할 진입을 단일 상태로 통합. */
+  nodePickerIntent: NodePickerIntent | null;
   /** 함수 picker 열림 상태 */
   functionPicker: FunctionPickerState | null;
   /** 단위 인스펙터 열림 상태 (선택된 노드의 단위·범위 편집) */
   unitInspector: UnitInspectorState | null;
-  /** 캔버스 우클릭 컨텍스트 메뉴 */
-  canvasContextMenu: CanvasContextMenuState | null;
   /**
    * 인라인 편집 중인 노드와 그 안의 어떤 영역을 편집 중인지.
    *
@@ -115,20 +122,22 @@ export interface UIStore {
   }) => void;
   endEdgeDraft: () => void;
 
-  startInsertNodeFromEdge: (edgeId: EdgeId, position: { x: number; y: number }) => void;
-  clearInsertNodeIntent: () => void;
+  openNodePickerAtCanvas: (
+    screenPos: { x: number; y: number },
+    canvasPos: { x: number; y: number },
+  ) => void;
+  openNodePickerAtEdge: (
+    edgeId: EdgeId,
+    screenPos: { x: number; y: number },
+    canvasPos: { x: number; y: number },
+  ) => void;
+  closeNodePicker: () => void;
 
   openFunctionPicker: (edgeId: EdgeId, anchor: { x: number; y: number }) => void;
   closeFunctionPicker: () => void;
 
   openUnitInspector: (nodeId: NodeId) => void;
   closeUnitInspector: () => void;
-
-  openCanvasContextMenu: (
-    screen: { x: number; y: number },
-    canvas: { x: number; y: number },
-  ) => void;
-  closeCanvasContextMenu: () => void;
 
   setEditingNode: (id: NodeId | null, target?: string) => void;
   setRunFlash: (s: RunFlashState | null) => void;
@@ -141,10 +150,9 @@ export function createUIStore(): UIStoreInstance {
     selection: { kind: 'none' },
     readOnly: false,
     edgeDraft: null,
-    insertNodeIntent: null,
+    nodePickerIntent: null,
     functionPicker: null,
     unitInspector: null,
-    canvasContextMenu: null,
     editingNode: null,
     runFlash: null,
 
@@ -154,10 +162,9 @@ export function createUIStore(): UIStoreInstance {
         set({
           readOnly: true,
           edgeDraft: null,
-          insertNodeIntent: null,
+          nodePickerIntent: null,
           functionPicker: null,
           unitInspector: null,
-          canvasContextMenu: null,
           editingNode: null,
         });
       } else {
@@ -201,11 +208,17 @@ export function createUIStore(): UIStoreInstance {
       }),
     endEdgeDraft: () => set({ edgeDraft: null }),
 
-    startInsertNodeFromEdge: (edgeId, position) => {
+    openNodePickerAtCanvas: (screenPos, canvasPos) => {
       if (get().readOnly) return;
-      set({ insertNodeIntent: { edgeId, position } });
+      set({ nodePickerIntent: { origin: 'canvas', screenPos, canvasPos } });
     },
-    clearInsertNodeIntent: () => set({ insertNodeIntent: null }),
+    openNodePickerAtEdge: (edgeId, screenPos, canvasPos) => {
+      if (get().readOnly) return;
+      set({
+        nodePickerIntent: { origin: 'edge-split', edgeId, screenPos, canvasPos },
+      });
+    },
+    closeNodePicker: () => set({ nodePickerIntent: null }),
 
     openFunctionPicker: (edgeId, anchor) => {
       if (get().readOnly) return;
@@ -218,12 +231,6 @@ export function createUIStore(): UIStoreInstance {
       set({ unitInspector: { nodeId } });
     },
     closeUnitInspector: () => set({ unitInspector: null }),
-
-    openCanvasContextMenu: (screen, canvas) => {
-      if (get().readOnly) return;
-      set({ canvasContextMenu: { screen, canvas } });
-    },
-    closeCanvasContextMenu: () => set({ canvasContextMenu: null }),
 
     setEditingNode: (id, target = 'body') => {
       if (id !== null && get().readOnly) return;

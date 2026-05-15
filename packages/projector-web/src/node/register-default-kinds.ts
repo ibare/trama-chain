@@ -15,12 +15,15 @@ import { registerNodeKindUI } from './kind-catalog.js';
 /**
  * 기본 노드 종류(value·constant·condition·expression) UI 디스크립터 등록.
  *
- * Side-effect import: NodeView·CanvasContextMenu가 카탈로그를 조회하기 전에
+ * Side-effect import: NodeView·NodePicker가 카탈로그를 조회하기 전에
  * 등록이 끝나도록, 모듈 최상위에서 즉시 register 호출.
  *
  * buildMenuItems은 호출 시점에 `TramaInstance`를 인자로 받아 그 인스턴스의
  * store만 만지도록 한다 — 모듈 최상위 register는 디스크립터 형상만 정의하고
- * 실제 액션은 메뉴 클릭 시 인스턴스를 캡처해 실행된다.
+ * 실제 노드 생성은 NodePicker가 "추가"로 확정하는 순간 인스턴스를 캡처해 실행된다.
+ *
+ * createNode는 생성된 노드의 id를 반환해야 한다 — 엣지-분할 같은 후속 단계가
+ * 새 노드 id를 받아 같은 트랜잭션처럼 마무리할 수 있도록.
  */
 
 registerNodeKindUI({
@@ -32,7 +35,7 @@ registerNodeKindUI({
     {
       key: 'value',
       label: '값 노드',
-      onSelect: (canvasPos) => {
+      createNode: (canvasPos) => {
         const addNode = instance.modelStore.getState().addNode;
         const setEditingNode = instance.uiStore.getState().setEditingNode;
         const node = addNode({
@@ -42,13 +45,14 @@ registerNodeKindUI({
           position: canvasPos,
         });
         setEditingNode(node.id);
+        return node.id;
       },
     },
     {
       key: 'value-boolean',
       label: '참/거짓 값 노드',
       symbol: '⊤',
-      onSelect: (canvasPos) => {
+      createNode: (canvasPos) => {
         const addNode = instance.modelStore.getState().addNode;
         const setEditingNode = instance.uiStore.getState().setEditingNode;
         const node = addNode({
@@ -59,6 +63,7 @@ registerNodeKindUI({
           position: canvasPos,
         });
         setEditingNode(node.id);
+        return node.id;
       },
     },
   ],
@@ -74,14 +79,15 @@ registerNodeKindUI({
       key: 'condition',
       label: '조건 노드',
       symbol: 'If',
-      onSelect: (canvasPos) => {
+      createNode: (canvasPos) => {
         const addConditionNode = instance.modelStore.getState().addConditionNode;
-        addConditionNode({
+        const node = addConditionNode({
           label: '조건',
           operator: '>',
           threshold: 0,
           position: canvasPos,
         });
+        return node.id;
       },
     },
   ],
@@ -97,15 +103,16 @@ registerNodeKindUI({
       key: 'comparison',
       label: '비교 노드',
       symbol: '⊤?',
-      onSelect: (canvasPos) => {
+      createNode: (canvasPos) => {
         const addComparisonNode =
           instance.modelStore.getState().addComparisonNode;
-        addComparisonNode({
+        const node = addComparisonNode({
           label: '비교',
           operator: '>',
           threshold: 0,
           position: canvasPos,
         });
+        return node.id;
       },
     },
   ],
@@ -134,13 +141,14 @@ registerNodeKindUI({
       key: `logic-${preset.operator}`,
       label: preset.label,
       symbol: preset.symbol,
-      onSelect: (canvasPos) => {
+      createNode: (canvasPos) => {
         const addLogicGateNode = instance.modelStore.getState().addLogicGateNode;
-        addLogicGateNode({
+        const node = addLogicGateNode({
           label: preset.operator.toUpperCase(),
           operator: preset.operator,
           position: canvasPos,
         });
+        return node.id;
       },
     })),
 });
@@ -162,22 +170,23 @@ registerNodeKindUI({
       key: 'gen-counter',
       label: '카운터 생성기',
       symbol: '1,2,3',
-      onSelect: (canvasPos) => {
+      createNode: (canvasPos) => {
         const addGeneratorNode = instance.modelStore.getState().addGeneratorNode;
-        addGeneratorNode({
+        const node = addGeneratorNode({
           label: '카운터',
           params: { kind: 'counter', start: 1, step: 1 },
           position: canvasPos,
         });
+        return node.id;
       },
     },
     {
       key: 'gen-uniform',
       label: '균등 랜덤 생성기',
       symbol: 'unif',
-      onSelect: (canvasPos) => {
+      createNode: (canvasPos) => {
         const addGeneratorNode = instance.modelStore.getState().addGeneratorNode;
-        addGeneratorNode({
+        const node = addGeneratorNode({
           label: '균등 랜덤',
           params: {
             kind: 'uniform',
@@ -188,15 +197,16 @@ registerNodeKindUI({
           },
           position: canvasPos,
         });
+        return node.id;
       },
     },
     {
       key: 'gen-normal',
       label: '정규 랜덤 생성기',
       symbol: 'norm',
-      onSelect: (canvasPos) => {
+      createNode: (canvasPos) => {
         const addGeneratorNode = instance.modelStore.getState().addGeneratorNode;
-        addGeneratorNode({
+        const node = addGeneratorNode({
           label: '정규 랜덤',
           params: {
             kind: 'normal',
@@ -206,15 +216,16 @@ registerNodeKindUI({
           },
           position: canvasPos,
         });
+        return node.id;
       },
     },
     {
       key: 'gen-sine',
       label: '사인파 생성기',
       symbol: 'Sin',
-      onSelect: (canvasPos) => {
+      createNode: (canvasPos) => {
         const addGeneratorNode = instance.modelStore.getState().addGeneratorNode;
-        addGeneratorNode({
+        const node = addGeneratorNode({
           label: '사인파',
           params: {
             kind: 'sine',
@@ -225,6 +236,7 @@ registerNodeKindUI({
           },
           position: canvasPos,
         });
+        return node.id;
       },
     },
   ],
@@ -232,20 +244,21 @@ registerNodeKindUI({
 
 registerNodeKindUI({
   kind: 'observe',
-  menuSectionLabel: '관찰',
-  menuSectionOrder: 14,
+  menuSectionLabel: '노드',
+  menuSectionOrder: 10.5,
   View: ObserveNodeView,
   buildMenuItems: (instance) => [
     {
       key: 'observe',
       label: '관찰 노드',
       symbol: '👁',
-      onSelect: (canvasPos) => {
+      createNode: (canvasPos) => {
         const addObserveNode = instance.modelStore.getState().addObserveNode;
-        addObserveNode({
+        const node = addObserveNode({
           label: '관찰',
           position: canvasPos,
         });
+        return node.id;
       },
     },
   ],
@@ -263,7 +276,7 @@ registerNodeKindUI({
         key: `const-${def.key}`,
         label: def.labels.ko,
         symbol: def.symbol,
-        onSelect: (canvasPos) => {
+        createNode: (canvasPos) => {
           const addConstantNode = instance.modelStore.getState().addConstantNode;
           const setEditingNode = instance.uiStore.getState().setEditingNode;
           const value =
@@ -277,6 +290,7 @@ registerNodeKindUI({
             position: canvasPos,
           });
           if (isCustom) setEditingNode(node.id);
+          return node.id;
         },
       };
     }),
@@ -318,7 +332,7 @@ registerNodeKindUI({
         key: `expr-${preset.key}`,
         label: preset.label,
         symbol: preset.symbol,
-        onSelect: (canvasPos) => {
+        createNode: (canvasPos) => {
           const addExpressionNode = instance.modelStore.getState().addExpressionNode;
           const setEditingNode = instance.uiStore.getState().setEditingNode;
           const latex = isCustom ? 'a + b' : preset.latex;
@@ -331,6 +345,7 @@ registerNodeKindUI({
             position: canvasPos,
           });
           if (isCustom) setEditingNode(node.id);
+          return node.id;
         },
       };
     }),

@@ -100,7 +100,7 @@ function EdgeViewImpl({
   });
 
   const openFunctionPicker = uiStore((s) => s.openFunctionPicker);
-  const startInsertNodeFromEdge = uiStore((s) => s.startInsertNodeFromEdge);
+  const openNodePickerAtEdge = uiStore((s) => s.openNodePickerAtEdge);
   const selectEdge = uiStore((s) => s.selectEdge);
   const startEdgeDraft = uiStore((s) => s.startEdgeDraft);
   const isDetaching = uiStore((s) => s.edgeDraft?.detachingEdgeId === edgeId);
@@ -359,7 +359,7 @@ function EdgeViewImpl({
         onClick={(e) => {
           e.stopPropagation();
           const mid = cableMidpoint(cableRef.current!);
-          startInsertNodeFromEdge(edge.id, mid);
+          openNodePickerAtEdge(edge.id, { x: e.clientX, y: e.clientY }, mid);
         }}
       />
       <g

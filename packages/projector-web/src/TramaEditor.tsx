@@ -12,7 +12,6 @@ import { Canvas } from './canvas/Canvas.js';
 import { FunctionPicker } from './function-picker/FunctionPicker.js';
 import { UnitInspectorLayer } from './node/UnitInspectorLayer.js';
 import { ExecutionControl } from './execution-control/ExecutionControl.js';
-import { InsertNodeHandler } from './interactions/InsertNodeHandler.js';
 import {
   TramaInstanceProvider,
   createTramaInstance,
@@ -146,7 +145,6 @@ function TramaEditorInner({ value, onChange, options, readOnly = false }: Props)
       {!isReadOnly && <FunctionPicker />}
       {!isReadOnly && <UnitInspectorLayer />}
       {!isReadOnly && <ExecutionControl />}
-      {!isReadOnly && <InsertNodeHandler />}
     </div>
   );
 }
