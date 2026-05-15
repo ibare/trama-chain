@@ -1,9 +1,21 @@
 import { registerSkin } from './registry.js';
+import { defaultCellArrayParams } from './skins/cell-array.js';
 
 /**
  * 기본 스킨 메타 등록. 실제 컴포넌트 모듈은 사용자가 노드에 스킨을 적용한
  * 시점에서만 dynamic import로 로드된다. 메인 번들에는 메타만 포함된다.
  */
+
+registerSkin({
+  key: 'cell-array',
+  labels: { ko: '셀 표시' },
+  domain: {
+    valueKind: 'numeric-any-unit',
+    intent: '셀 배열로 값을 표현 — 게이지·세그먼트·단계·라이트를 한 패러다임으로',
+  },
+  load: () => import('./skins/cell-array.js').then((m) => ({ Skin: m.CellArray })),
+  defaultParams: () => defaultCellArrayParams() as unknown as Record<string, unknown>,
+});
 
 registerSkin({
   key: 'thermometer-mercury',

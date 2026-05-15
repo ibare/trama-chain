@@ -18,21 +18,45 @@ export function listAllSkins(): SkinDefinition[] {
 }
 
 /**
- * 주어진 numeric ResolvedUnit에 적용 가능한 스킨 목록. 스킨의 valueKind가
- * 'numeric'이고 unitId가 노드 단위와 일치해야 후보가 된다.
+ * 스킨이 주어진 단위에 적용 가능한지 — 모든 호출처가 이 헬퍼만 거치도록 한다.
+ *
+ * 매직 비교(`unitId === '...'`)가 여러 곳에 흩어지지 않게 SkinDomain의
+ * discriminated union을 exhaustive하게 다룬다.
+ */
+export function isSkinApplicableToUnit(
+  def: SkinDefinition,
+  unit: ResolvedUnit,
+): boolean {
+  const d = def.domain;
+  switch (d.valueKind) {
+    case 'numeric':
+      return d.unitId === unit.id;
+    case 'numeric-any-unit':
+      return true;
+    case 'boolean':
+      return false;
+  }
+}
+
+/**
+ * 주어진 numeric ResolvedUnit에 적용 가능한 스킨 목록. 단위 한정 스킨은
+ * unitId가 일치해야 하고, 단위 무관(numeric-any-unit) 스킨은 항상 포함된다.
  */
 export function listSkinsForUnit(unit: ResolvedUnit): SkinDefinition[] {
-  return Array.from(map.values()).filter(
-    (s) => s.domain.valueKind === 'numeric' && s.domain.unitId === unit.id,
-  );
+  return Array.from(map.values()).filter((s) => isSkinApplicableToUnit(s, unit));
 }
 
 /**
  * 주어진 ValueKind에 적용 가능한 스킨 목록. boolean ValueNode가 사용한다 —
- * boolean 스킨은 단위 개념이 없어 unitId 매칭이 불필요하다.
+ * boolean 스킨은 단위 개념이 없어 unitId 매칭이 불필요하다. numeric 쪽 후보는
+ * numeric과 numeric-any-unit을 모두 포함한다.
  */
 export function listSkinsForValueKind(kind: ValueKind): SkinDefinition[] {
-  return Array.from(map.values()).filter((s) => s.domain.valueKind === kind);
+  return Array.from(map.values()).filter((s) => {
+    const v = s.domain.valueKind;
+    if (kind === 'boolean') return v === 'boolean';
+    return v === 'numeric' || v === 'numeric-any-unit';
+  });
 }
 
 /**

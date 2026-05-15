@@ -10,9 +10,15 @@ import type { ResolvedUnit, ValueKind, ValueNode } from '@trama/core';
  * - numeric: 같은 단위(예: celsius)에도 영역이 다른 여러 스킨이 공존한다.
  *     상온 온도계(−50..50 °C), 조리 온도계(0..200 °C), 절대온도 디스플레이(−273..0 °C).
  *     사용자가 적용하면 노드의 unitOverride.min/max/step이 이 range로 역제안된다.
+ * - numeric-any-unit: 단위를 가리지 않는 일반 표현 도구(셀 배열 등).
+ *     사용자가 params로 직접 범위·셀을 정의하므로 노드 단위·범위에 역제안하지 않는다.
+ *     도메인 전문가 원칙의 예외 — "표현 도구" 카테고리로 명시.
  * - boolean: 단위·범위 개념이 없다. 토글·전구·체크 등 표현 paradigm만 다양.
  */
-export type SkinDomain = NumericSkinDomain | BooleanSkinDomain;
+export type SkinDomain =
+  | NumericSkinDomain
+  | NumericAnyUnitSkinDomain
+  | BooleanSkinDomain;
 
 export interface NumericSkinDomain {
   valueKind: 'numeric';
@@ -21,6 +27,12 @@ export interface NumericSkinDomain {
   /** 이 스킨이 권장하는 노드 unit.min/max/step. 적용 시 자동 적용. */
   range: { min: number; max: number; step: number };
   /** 도메인 의도. 사용자가 스킨 카드를 볼 때 보이는 한 줄 설명. */
+  intent: string;
+}
+
+export interface NumericAnyUnitSkinDomain {
+  valueKind: 'numeric-any-unit';
+  /** 도메인 의도. 단위·범위 역제안 없이 표현만 책임지는 일반 도구. */
   intent: string;
 }
 
@@ -77,13 +89,25 @@ export interface SkinDefinition {
   /**
    * 도메인 영역 선언. 노드의 ValueKind와 domain.valueKind가 일치해야 후보가
    * 되고, numeric이면 추가로 unitId가 노드의 단위와 매치돼야 한다.
+   * numeric-any-unit은 단위 무관하게 모든 numeric ValueNode의 후보가 된다.
    */
   domain: SkinDomain;
   /** dynamic import — vite가 자동으로 별도 chunk로 분리한다. */
   load: () => Promise<{ Skin: SkinComponent }>;
+  /**
+   * 새로 적용 시 초기 params. 비어 있으면 빈 객체로 시작.
+   * params 형태는 스킨이 자체 검증한다 — core schema는 unknown record로 통과시킨다.
+   */
+  defaultParams?: () => Record<string, unknown>;
 }
 
 /** 스킨이 다루는 ValueKind. registry 필터에 자주 쓰여 별도 헬퍼로 둔다. */
 export function skinValueKind(def: SkinDefinition): ValueKind {
-  return def.domain.valueKind;
+  switch (def.domain.valueKind) {
+    case 'numeric':
+    case 'numeric-any-unit':
+      return 'numeric';
+    case 'boolean':
+      return 'boolean';
+  }
 }

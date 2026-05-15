@@ -14,9 +14,10 @@ import {
 } from '@trama/core';
 import { useTrama } from '../store/index.js';
 import { resolveNodeUnit } from '../util/unit-resolver.js';
-import { listSkinsForUnit } from '../skin/registry.js';
+import { getSkin, listSkinsForUnit } from '../skin/registry.js';
 import type { SkinDefinition } from '../skin/types.js';
 import { TramaCarousel } from '../util/TramaCarousel.js';
+import { CellArrayInspector } from './cell-array/CellArrayInspector.js';
 import '../skin/register-default-skins.js';
 
 interface Props {
@@ -100,9 +101,14 @@ export function UnitInspector({ node }: Props): JSX.Element {
     });
   }, [currentDef, currentUnitId, node.id, updateNode]);
 
-  // 스킨이 적용된 동안엔 range editor를 숨긴다 — 스킨이 도메인 권위로 범위를 결정.
+  // 단위 한정 스킨(numeric)이 적용된 동안에만 range editor를 숨긴다 — 그
+  // 스킨이 도메인 권위로 범위를 결정하기 때문. 단위 무관(numeric-any-unit)
+  // 스킨은 노드의 unit/range를 그대로 사용하므로 편집기를 유지.
+  const skinClaimsRange = node.skin
+    ? getSkin(node.skin.kind)?.domain.valueKind === 'numeric'
+    : false;
   const showRangeEditor =
-    (unit.kind === 'number' || unit.kind === 'scale') && !node.skin;
+    (unit.kind === 'number' || unit.kind === 'scale') && !skinClaimsRange;
 
   const skinCandidates = useMemo<SkinDefinition[]>(
     () => listSkinsForUnit(unit),
@@ -114,15 +120,30 @@ export function UnitInspector({ node }: Props): JSX.Element {
     (key: string) => {
       const def = skinCandidates.find((d) => d.key === key);
       if (!def) return;
-      // UnitInspector는 numeric ValueNode 전용 — 후보 스킨도 numeric 도메인뿐.
-      if (def.domain.valueKind !== 'numeric') return;
-      const r = def.domain.range;
-      const newInitial = Math.max(r.min, Math.min(currentInitialNumber, r.max));
-      updateNode(node.id, {
-        skin: { kind: def.key, params: {} },
-        unitOverride: { min: r.min, max: r.max, step: r.step },
-        initialValue: numericValue(newInitial, currentUnitId),
-      });
+      const initialParams = def.defaultParams ? def.defaultParams() : {};
+      const domain = def.domain;
+      switch (domain.valueKind) {
+        case 'numeric': {
+          const r = domain.range;
+          const newInitial = Math.max(r.min, Math.min(currentInitialNumber, r.max));
+          updateNode(node.id, {
+            skin: { kind: def.key, params: initialParams },
+            unitOverride: { min: r.min, max: r.max, step: r.step },
+            initialValue: numericValue(newInitial, currentUnitId),
+          });
+          return;
+        }
+        case 'numeric-any-unit': {
+          // 단위·범위 역제안 없음 — 노드의 기존 unit/range를 그대로 사용.
+          updateNode(node.id, {
+            skin: { kind: def.key, params: initialParams },
+          });
+          return;
+        }
+        case 'boolean':
+          // UnitInspector는 numeric ValueNode 전용. boolean 스킨은 무시.
+          return;
+      }
     },
     [currentInitialNumber, currentUnitId, node.id, skinCandidates, updateNode],
   );
@@ -219,6 +240,8 @@ export function UnitInspector({ node }: Props): JSX.Element {
           </div>
         </>
       )}
+
+      {node.skin?.kind === 'cell-array' && <CellArrayInspector node={node} />}
 
       {showRangeEditor && (
         <>
