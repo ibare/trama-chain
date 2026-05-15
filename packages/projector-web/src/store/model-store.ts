@@ -2,6 +2,7 @@ import { create, type StoreApi, type UseBoundStore } from 'zustand';
 import {
   addComparisonNode as addComparisonNodeOp,
   addConditionNode as addConditionNodeOp,
+  addLogicGateNode as addLogicGateNodeOp,
   addConstantNode as addConstantNodeOp,
   addEdge as addEdgeOp,
   addExpressionNode as addExpressionNodeOp,
@@ -29,6 +30,7 @@ import type {
   AddComparisonNodeInput,
   AddConditionNodeInput,
   AddConstantNodeInput,
+  AddLogicGateNodeInput,
   AddEdgeInput,
   AddExpressionNodeInput,
   AddValueNodeInput,
@@ -41,7 +43,7 @@ import type {
   NodePatch,
   Value,
 } from '@trama/core';
-import { isNumericValue, isValueNode, numericValue } from '@trama/core';
+import { booleanValue, isNumericValue, isValueNode, numericValue } from '@trama/core';
 import { tokens } from '@trama/tokens';
 import { combinerRegistry, shapeRegistry } from './registries.js';
 import { fizzexExpressionEvaluator } from '../expression/fizzex-evaluator.js';
@@ -69,6 +71,7 @@ export interface ModelStore {
   addConstantNode: (input: AddConstantNodeInput) => Node;
   addConditionNode: (input: AddConditionNodeInput) => Node;
   addComparisonNode: (input: AddComparisonNodeInput) => Node;
+  addLogicGateNode: (input: AddLogicGateNodeInput) => Node;
   addExpressionNode: (input: AddExpressionNodeInput) => Node;
   updateNode: (id: NodeId, patch: NodePatch) => void;
   removeNode: (id: NodeId) => void;
@@ -81,7 +84,7 @@ export interface ModelStore {
   setExecution: (e: Partial<Model['execution']>) => void;
 
   /** 노드 값 스크럽: 펄스 spawn 트리거 + 즉시 값 반영. */
-  scrubInitialValue: (id: NodeId, nextValue: number) => void;
+  scrubInitialValue: (id: NodeId, nextValue: number | boolean) => void;
 
   /** trajectory를 step-by-step 애니메이션 재생 (§ 11.7). feedback 모델에서만 의미. */
   play: () => void;
@@ -310,6 +313,16 @@ export function createModelStore({
       return node;
     },
 
+    addLogicGateNode: (input) => {
+      const before = get().model;
+      const after = addLogicGateNodeOp(before, input);
+      const newId = after.nodeOrder[after.nodeOrder.length - 1]!;
+      const node = after.nodes[newId]!;
+      const exec = computeExecutionState(after);
+      set({ model: after, ...exec });
+      return node;
+    },
+
     addExpressionNode: (input) => {
       const before = get().model;
       const after = addExpressionNodeOp(before, input);
@@ -461,17 +474,26 @@ export function createModelStore({
     scrubInitialValue: (id, nextValue) => {
       const before = get().model;
       const node = before.nodes[id];
-      // 스크럽은 numeric ValueNode 전용 — boolean은 토글 UI라 별도 경로를 가질 예정.
-      if (!node || !isValueNode(node) || !isNumericValue(node.initialValue)) return;
-      const nextNumeric = numericValue(nextValue, node.initialValue.unitId);
-      const after = updateNodeOp(before, id, { initialValue: nextNumeric });
+      if (!node || !isValueNode(node)) return;
+      let nextValueRecord: Value;
+      if (typeof nextValue === 'number' && isNumericValue(node.initialValue)) {
+        nextValueRecord = numericValue(nextValue, node.initialValue.unitId);
+      } else if (
+        typeof nextValue === 'boolean' &&
+        node.initialValue.kind === 'boolean'
+      ) {
+        nextValueRecord = booleanValue(nextValue);
+      } else {
+        return;
+      }
+      const after = updateNodeOp(before, id, { initialValue: nextValueRecord });
       if (after === before) return;
       const recomputed = computeExecutionState(after);
       const playbackActive = get().playbackStep !== null;
       set((s) => {
         const nextValues: Record<NodeId, Value> = playbackActive
           ? s.executionState.values
-          : { ...s.executionState.values, [id]: nextNumeric };
+          : { ...s.executionState.values, [id]: nextValueRecord };
         const nextValid = playbackActive
           ? s.executionState.validOutputs
           : new Set(s.executionState.validOutputs);

@@ -7,6 +7,7 @@ import { useNodeLayout } from './use-node-layout.js';
 import { NodeBody } from './NodeBody.js';
 import { NodeFrame } from './NodeFrame.js';
 import { NodeLabel } from './NodeLabel.js';
+import { InteractiveArea } from './InteractiveArea.js';
 import { Socket } from './Socket.js';
 import { useOutputConnected } from './use-socket-connections.js';
 import { slotColor } from './slot-palette.js';
@@ -22,9 +23,13 @@ const SOCKET_SIZE = parseFloat(tokens.spacing.socketSize);
 /**
  * boolean ValueNode 전용 view.
  *
- * 단위·스킨·슬라이더 트랙·scrub은 의미가 없으므로 모두 제거하고, 본문에 "참"/
- * "거짓" 텍스트만 표시한다. combiner chip을 클릭하면 boolean combiner
- * (and/or/xor) 사이를 순환해 인스펙터 진입 없이도 의도를 바꿀 수 있다.
+ * 본문 좌측에 결과 아이콘(✓/✗), 우측에 토글 스위치를 둔다. 토글 클릭으로
+ * 참/거짓을 뒤집어 `scrubInitialValue`로 모델에 반영 — numeric ValueNode의
+ * 슬라이더 scrub과 동일 채널.
+ *
+ * 외부 입력(lag=0 incoming)이 연결되면 사용자의 직접 조작은 의미를 잃으므로
+ * 토글을 숨긴다. 이건 numeric 슬라이더 트랙이 입력 연결 시 사라지는 것과 같은
+ * 패턴 — boolean도 동일하게 맞춘다. 아이콘은 propagation 값을 그대로 보여준다.
  *
  * ValueNodeView가 dispatcher 역할로 initialValue.kind에 따라 이 컴포넌트로
  * 라우팅한다 — 모델은 같은 'value' kind를 공유하고 view 레이어에서만 ValueKind
@@ -44,6 +49,7 @@ function BooleanValueNodeViewImpl({ id, incomingCount }: Props): JSX.Element | n
     return fallback;
   });
   const updateNode = modelStore((s) => s.updateNode);
+  const scrubInitialValue = modelStore((s) => s.scrubInitialValue);
   const outputConnected = useOutputConnected(id);
   const selectNode = uiStore((s) => s.selectNode);
   const readOnly = uiStore((s) => s.readOnly);
@@ -52,6 +58,16 @@ function BooleanValueNodeViewImpl({ id, incomingCount }: Props): JSX.Element | n
   const isSelected = uiStore(
     (s) => s.selection.kind === 'node' && s.selection.id === id,
   );
+
+  // numeric ValueNode와 동일 — lag=0 입력 엣지가 있으면 사용자가 직접 토글할
+  // 의미가 사라지므로 토글 UI 자체를 숨긴다.
+  const hasLag0Incoming = modelStore((s) => {
+    for (const eid of s.model.edgeOrder) {
+      const e = s.model.edges[eid];
+      if (e && e.to === id && e.lag === 0) return true;
+    }
+    return false;
+  });
 
   // 좌표 폴백 — hook 순서를 위해 노드/위치 가드 전에 호출.
   const posX = node?.position?.x ?? 0;
@@ -103,14 +119,22 @@ function BooleanValueNodeViewImpl({ id, incomingCount }: Props): JSX.Element | n
     updateNode(id, { combiner: next.key });
   }, [id, node, readOnly, selectNode, updateNode]);
 
+  const onToggleClick = useCallback(() => {
+    if (readOnly) return;
+    scrubInitialValue(id, !currentBoolean);
+  }, [id, currentBoolean, readOnly, scrubInitialValue]);
+
   if (!node || !isValueNode(node) || !node.position || !layout) return null;
   if (node.initialValue.kind !== 'boolean') return null;
 
-  const { halfW, width, height, textX, labelY, valueY } = layout;
-  const valueText = currentBoolean ? '참' : '거짓';
+  const { halfW, width, height, valueY } = layout;
   const stateClass = currentBoolean ? 'is-focal' : 'is-calm';
   const combiner = combinerRegistry.getOfKind(node.combiner, 'boolean');
   const combinerLabel = combiner?.labels.ko ?? node.combiner;
+  const isInputNode = !hasLag0Incoming;
+
+  const iconCx = -halfW + 32;
+  const toggleCx = halfW - 40;
 
   return (
     <NodeFrame
@@ -128,21 +152,24 @@ function BooleanValueNodeViewImpl({ id, incomingCount }: Props): JSX.Element | n
       />
       <NodeLabel
         text={node.label}
-        x={textX}
-        y={labelY}
-        width={width - (textX - -halfW) * 2}
+        x={layout.textX}
+        y={layout.labelY}
+        width={width - (layout.textX - -halfW) * 2}
         isEditing={isEditing}
         onCommit={commitLabel}
         onCancel={cancelLabel}
       />
-      <text
-        className="trama-node-value"
-        x={textX}
-        y={valueY}
-        textAnchor="start"
-      >
-        {valueText}
-      </text>
+
+      <BooleanStateIcon cx={iconCx} cy={valueY} on={currentBoolean} />
+
+      {isInputNode && (
+        <BooleanToggleSwitch
+          cx={toggleCx}
+          cy={valueY}
+          on={currentBoolean}
+          onClick={onToggleClick}
+        />
+      )}
 
       {layout.hasCombiner && layout.combinerCenterY !== null && (
         <BooleanCombinerChip
@@ -184,6 +211,89 @@ function BooleanValueNodeViewImpl({ id, incomingCount }: Props): JSX.Element | n
 }
 
 export const BooleanValueNodeView = memo(BooleanValueNodeViewImpl);
+
+/**
+ * 참=✓ / 거짓=✗ 상태 아이콘. 본문 좌측에 큰 글리프로 표시.
+ */
+function BooleanStateIcon({
+  cx,
+  cy,
+  on,
+}: {
+  cx: number;
+  cy: number;
+  on: boolean;
+}): JSX.Element {
+  const cls = on
+    ? 'trama-boolean-state-icon is-on'
+    : 'trama-boolean-state-icon is-off';
+  return (
+    <text
+      className={cls}
+      x={cx}
+      y={cy + 10}
+      textAnchor="middle"
+      pointerEvents="none"
+    >
+      {on ? '✓' : '✗'}
+    </text>
+  );
+}
+
+/**
+ * 토글 스위치 — 캡슐 track + 원형 handle. 클릭 시 onClick 발화.
+ *
+ * 노드 본문과 다른 인터랙션이므로 InteractiveArea로 hit-area를 분리한다.
+ * pointerdown/pointermove stopPropagation·시각 자식 pointer-events:none이
+ * 자동 적용되어 본체 drag 핸들러로 이벤트가 새지 않는다.
+ */
+function BooleanToggleSwitch({
+  cx,
+  cy,
+  on,
+  onClick,
+}: {
+  cx: number;
+  cy: number;
+  on: boolean;
+  onClick: () => void;
+}): JSX.Element {
+  const w = 44;
+  const h = 22;
+  const handleR = 8;
+  const handleCx = on ? cx + w / 2 - handleR - 3 : cx - w / 2 + handleR + 3;
+  const trackCls = on
+    ? 'trama-boolean-toggle-track is-on'
+    : 'trama-boolean-toggle-track is-off';
+  return (
+    <InteractiveArea
+      x={cx - w / 2}
+      y={cy - h / 2}
+      width={w}
+      height={h}
+      rx={h / 2}
+      ry={h / 2}
+      hitClassName="trama-boolean-toggle-hit"
+      onClick={onClick}
+    >
+      <rect
+        className={trackCls}
+        x={cx - w / 2}
+        y={cy - h / 2}
+        width={w}
+        height={h}
+        rx={h / 2}
+        ry={h / 2}
+      />
+      <circle
+        className="trama-boolean-toggle-handle"
+        cx={handleCx}
+        cy={cy}
+        r={handleR}
+      />
+    </InteractiveArea>
+  );
+}
 
 function BooleanCombinerChip({
   label,

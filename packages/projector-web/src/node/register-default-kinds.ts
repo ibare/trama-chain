@@ -1,9 +1,11 @@
 import { booleanValue, numericValue } from '@trama/core';
+import type { LogicGateOperator } from '@trama/core';
 import { constantRegistry } from '../store/registries.js';
 import { ValueNodeView } from './ValueNodeView.js';
 import { ConstantNodeView } from './ConstantNodeView.js';
 import { ConditionNodeView } from './ConditionNodeView.js';
 import { ComparisonNodeView } from './ComparisonNodeView.js';
+import { LogicGateNodeView } from './LogicGateNodeView.js';
 import { ExpressionNodeView } from './ExpressionNodeView.js';
 import { fizzexExpressionEvaluator } from '../expression/fizzex-evaluator.js';
 import { registerNodeKindUI } from './kind-catalog.js';
@@ -105,6 +107,40 @@ registerNodeKindUI({
       },
     },
   ],
+});
+
+/**
+ * 논리 게이트 메뉴 프리셋 — 각 항목이 operator만 다른 LogicGateNode를 생성한다.
+ */
+const LOGIC_GATE_PRESETS: Array<{
+  operator: LogicGateOperator;
+  label: string;
+  symbol: string;
+}> = [
+  { operator: 'and', label: 'AND 노드', symbol: '⋀' },
+  { operator: 'or', label: 'OR 노드', symbol: '⋁' },
+  { operator: 'xor', label: 'XOR 노드', symbol: '⊕' },
+];
+
+registerNodeKindUI({
+  kind: 'logic-gate',
+  menuSectionLabel: '노드',
+  menuSectionOrder: 13,
+  View: LogicGateNodeView,
+  buildMenuItems: (instance) =>
+    LOGIC_GATE_PRESETS.map((preset) => ({
+      key: `logic-${preset.operator}`,
+      label: preset.label,
+      symbol: preset.symbol,
+      onSelect: (canvasPos) => {
+        const addLogicGateNode = instance.modelStore.getState().addLogicGateNode;
+        addLogicGateNode({
+          label: preset.operator.toUpperCase(),
+          operator: preset.operator,
+          position: canvasPos,
+        });
+      },
+    })),
 });
 
 registerNodeKindUI({
