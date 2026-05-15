@@ -15,8 +15,8 @@ interface Props {
 }
 
 const SOCKET_SIZE = parseFloat(tokens.spacing.socketSize);
-const BUTTON_W = 36;
-const BUTTON_GAP = 8;
+const BUTTON_SIZE = 32;
+const BUTTON_GAP = 10;
 
 function formatGeneratorValue(v: number): string {
   if (!Number.isFinite(v)) return '·';
@@ -56,12 +56,9 @@ function GeneratorNodeViewImpl({ id }: Props): JSX.Element | null {
       getStartPoint: getOutputStartPoint,
     });
 
-  const onPlay = useCallback(() => {
-    setGeneratorEnabled(id, true);
-  }, [id, setGeneratorEnabled]);
-  const onStop = useCallback(() => {
-    setGeneratorEnabled(id, false);
-  }, [id, setGeneratorEnabled]);
+  const onToggle = useCallback(() => {
+    setGeneratorEnabled(id, !enabled);
+  }, [enabled, id, setGeneratorEnabled]);
   const onReset = useCallback(() => {
     resetGenerator(id);
   }, [id, resetGenerator]);
@@ -84,12 +81,16 @@ function GeneratorNodeViewImpl({ id }: Props): JSX.Element | null {
       ? formatGeneratorValue(currentValue.n)
       : '—';
 
-  // 컨트롤러 3개를 가로로 배치 — body 영역 중앙 정렬.
-  const totalButtonsW = BUTTON_W * 3 + BUTTON_GAP * 2;
+  // 원형 토글 ▶/⏸ + ↺ 리셋 2버튼을 가로로 배치 — body 영역 중앙 정렬.
+  // 미니플레이어와 동일 결: 재생/정지는 한 자리에서 글리프만 토글.
+  const totalButtonsW = BUTTON_SIZE * 2 + BUTTON_GAP;
   const buttonsStartX = generatorBody
     ? generatorBody.x + (generatorBody.w - totalButtonsW) / 2
     : 0;
-  const buttonsY = generatorBody ? generatorBody.y : 0;
+  const buttonY = generatorBody
+    ? generatorBody.y + (generatorBody.h - BUTTON_SIZE) / 2
+    : 0;
+  const buttonRadius = BUTTON_SIZE / 2;
 
   return (
     <NodeFrame
@@ -122,63 +123,42 @@ function GeneratorNodeViewImpl({ id }: Props): JSX.Element | null {
 
       {generatorBody && (
         <>
-          {/* ▶ 시작 */}
+          {/* ▶/⏸ 토글 — enabled에 따라 글리프만 바뀜. 원형 hit-area. */}
           <InteractiveArea
             x={buttonsStartX}
-            y={buttonsY}
-            width={BUTTON_W}
-            height={generatorBody.h}
-            rx={6}
-            ry={6}
-            hitClassName={`trama-generator-btn${enabled ? ' is-active' : ''}`}
-            onClick={onPlay}
+            y={buttonY}
+            width={BUTTON_SIZE}
+            height={BUTTON_SIZE}
+            rx={buttonRadius}
+            ry={buttonRadius}
+            hitClassName="trama-generator-btn"
+            onClick={onToggle}
           >
             <text
               className="trama-generator-btn-glyph"
-              x={buttonsStartX + BUTTON_W / 2}
-              y={buttonsY + generatorBody.h / 2 + 5}
+              x={buttonsStartX + BUTTON_SIZE / 2}
+              y={buttonY + BUTTON_SIZE / 2 + 5}
               textAnchor="middle"
             >
-              {'▶'}
+              {enabled ? '⏸' : '▶'}
             </text>
           </InteractiveArea>
 
-          {/* ■ 정지 */}
+          {/* ↺ 리셋 — 원형 hit-area. */}
           <InteractiveArea
-            x={buttonsStartX + BUTTON_W + BUTTON_GAP}
-            y={buttonsY}
-            width={BUTTON_W}
-            height={generatorBody.h}
-            rx={6}
-            ry={6}
-            hitClassName={`trama-generator-btn${!enabled ? ' is-active' : ''}`}
-            onClick={onStop}
-          >
-            <text
-              className="trama-generator-btn-glyph"
-              x={buttonsStartX + BUTTON_W + BUTTON_GAP + BUTTON_W / 2}
-              y={buttonsY + generatorBody.h / 2 + 5}
-              textAnchor="middle"
-            >
-              {'■'}
-            </text>
-          </InteractiveArea>
-
-          {/* ↺ 리셋 */}
-          <InteractiveArea
-            x={buttonsStartX + (BUTTON_W + BUTTON_GAP) * 2}
-            y={buttonsY}
-            width={BUTTON_W}
-            height={generatorBody.h}
-            rx={6}
-            ry={6}
+            x={buttonsStartX + BUTTON_SIZE + BUTTON_GAP}
+            y={buttonY}
+            width={BUTTON_SIZE}
+            height={BUTTON_SIZE}
+            rx={buttonRadius}
+            ry={buttonRadius}
             hitClassName="trama-generator-btn"
             onClick={onReset}
           >
             <text
               className="trama-generator-btn-glyph"
-              x={buttonsStartX + (BUTTON_W + BUTTON_GAP) * 2 + BUTTON_W / 2}
-              y={buttonsY + generatorBody.h / 2 + 5}
+              x={buttonsStartX + BUTTON_SIZE + BUTTON_GAP + BUTTON_SIZE / 2}
+              y={buttonY + BUTTON_SIZE / 2 + 5}
               textAnchor="middle"
             >
               {'↺'}
