@@ -12,6 +12,7 @@ import { NodeBody } from './NodeBody.js';
 import { NodeFrame } from './NodeFrame.js';
 import { NodeLabel } from './NodeLabel.js';
 import { InteractiveArea } from './InteractiveArea.js';
+import { BooleanStateIcon } from './BooleanStateIcon.js';
 import { Socket } from './Socket.js';
 import { slotColor } from './slot-palette.js';
 import { useOutputConnected } from './use-socket-connections.js';
@@ -26,22 +27,26 @@ const SOCKET_SIZE = parseFloat(tokens.spacing.socketSize);
 
 const OPERATORS: LogicGateOperator[] = ['and', 'or', 'xor'];
 
-const OPERATOR_GLYPH: Record<LogicGateOperator, string> = {
-  and: '⋀',
-  or: '⋁',
-  xor: '⊕',
+const OPERATOR_LABEL: Record<LogicGateOperator, string> = {
+  and: 'AND',
+  or: 'OR',
+  xor: 'XOR',
 };
 
 /**
  * LogicGateNode 뷰 — boolean 입력 N개를 operator로 결합해 boolean을 출력한다.
  *
- * ComparisonNode와 평행한 boolean 출력 노드 — 우측 상단 ⊤/⊥ 마커로 결과를
- * 시각화한다. 입력은 가변(엣지 연결에 따라 동적으로 좌측 핀이 늘어남) — 카드
- * 폭은 일반 ValueNode와 같은 box.ts 경로를 그대로 쓰고 좌측 핀의 N-슬롯 동작이
- * 그대로 적용된다.
+ * 본문 구성(시안 기준):
+ *   - 상단: 사용자 라벨 (의미 표현; 예: "영어 OK?")
+ *   - 중앙: operator 큰 텍스트(AND/OR/XOR) — 게이트 종류 명시. 클릭 시 순환.
+ *   - 하단: 결과 아이콘 (BooleanStateIcon — boolean ValueNode와 같은 ✓/✗)
  *
- * 본문 중앙의 큰 게이트 심볼(⋀/⋁/⊕)을 클릭하면 operator가 순환한다 —
- * ComparisonNode의 operator cycle과 같은 패턴.
+ * "라벨로 게이트 종류를 외우게 하지 않는다" — 라벨과 operator를 시각적으로
+ * 분리해 사용자 라벨은 의미를 담고 게이트 종류는 본문 큰 텍스트가 명시한다.
+ * 라벨/operator가 어긋날 여지 자체를 없애는 디자인.
+ *
+ * 결과 아이콘은 boolean ValueNode와 동일한 [[BooleanStateIcon]] — boolean을
+ * 보여주는 모든 노드가 단일 시각 컴포넌트를 공유한다.
  */
 function LogicGateNodeViewImpl({ id, incomingCount }: Props): JSX.Element | null {
   const { modelStore, uiStore, socketRegistry } = useTrama();
@@ -113,10 +118,12 @@ function LogicGateNodeViewImpl({ id, incomingCount }: Props): JSX.Element | null
   const isActive = outputValid;
   const stateClass = !isActive ? 'is-low' : outputValue ? 'is-focal' : 'is-calm';
 
-  const opGlyph = OPERATOR_GLYPH[node.operator];
-  const resultMark = !isActive ? '·' : outputValue ? '⊤' : '⊥';
+  const opLabel = OPERATOR_LABEL[node.operator];
+  const resultBoolean = isActive ? !!outputValue : false;
 
-  const { halfW, halfH, width, height, valueY } = layout;
+  const { halfW, width, height, valueY } = layout;
+  const operatorY = valueY;
+  const resultY = valueY + 36;
 
   return (
     <NodeFrame
@@ -136,9 +143,10 @@ function LogicGateNodeViewImpl({ id, incomingCount }: Props): JSX.Element | null
 
       <NodeLabel
         text={node.label}
-        x={layout.textX}
+        x={0}
         y={layout.labelY}
-        width={width - (layout.textX - -halfW) * 2}
+        width={width - 24}
+        textAnchor="middle"
         isEditing={editTarget === 'label'}
         onCommit={commitLabel}
         onCancel={cancelEdit}
@@ -146,35 +154,28 @@ function LogicGateNodeViewImpl({ id, incomingCount }: Props): JSX.Element | null
       />
 
       <InteractiveArea
-        x={-32}
-        y={valueY - 28}
-        width={64}
-        height={52}
+        x={-halfW + 12}
+        y={operatorY - 28}
+        width={width - 24}
+        height={48}
         rx={8}
         ry={8}
-        hitClassName="trama-condition-operator-hit"
+        hitClassName="trama-logic-gate-operator-hit"
         onClick={onOperatorClick}
       >
         <text
-          className="trama-function-symbol"
+          className="trama-logic-gate-operator"
           x={0}
-          y={valueY + 10}
+          y={operatorY + 8}
           textAnchor="middle"
         >
-          {opGlyph}
+          {opLabel}
         </text>
       </InteractiveArea>
 
-      {/* boolean 출력 마커 — ComparisonNode와 동일 패턴으로 우측 상단에 ⊤/⊥ */}
-      <text
-        className="trama-comparison-output-mark"
-        x={halfW - 12}
-        y={-halfH + 16}
-        textAnchor="end"
-        pointerEvents="none"
-      >
-        {resultMark}
-      </text>
+      {isActive && (
+        <BooleanStateIcon cx={0} cy={resultY} on={resultBoolean} />
+      )}
 
       {layout.leftPin.sockets.map((s, i) => (
         <Socket

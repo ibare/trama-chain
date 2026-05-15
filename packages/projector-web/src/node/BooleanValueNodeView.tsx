@@ -8,6 +8,7 @@ import { NodeBody } from './NodeBody.js';
 import { NodeFrame } from './NodeFrame.js';
 import { NodeLabel } from './NodeLabel.js';
 import { InteractiveArea } from './InteractiveArea.js';
+import { BooleanStateIcon } from './BooleanStateIcon.js';
 import { Socket } from './Socket.js';
 import { useOutputConnected } from './use-socket-connections.js';
 import { slotColor } from './slot-palette.js';
@@ -211,34 +212,6 @@ function BooleanValueNodeViewImpl({ id, incomingCount }: Props): JSX.Element | n
 }
 
 export const BooleanValueNodeView = memo(BooleanValueNodeViewImpl);
-
-/**
- * 참=✓ / 거짓=✗ 상태 아이콘. 본문 좌측에 큰 글리프로 표시.
- */
-function BooleanStateIcon({
-  cx,
-  cy,
-  on,
-}: {
-  cx: number;
-  cy: number;
-  on: boolean;
-}): JSX.Element {
-  const cls = on
-    ? 'trama-boolean-state-icon is-on'
-    : 'trama-boolean-state-icon is-off';
-  return (
-    <text
-      className={cls}
-      x={cx}
-      y={cy + 10}
-      textAnchor="middle"
-      pointerEvents="none"
-    >
-      {on ? '✓' : '✗'}
-    </text>
-  );
-}
 
 /**
  * 토글 스위치 — 캡슐 track + 원형 handle. 클릭 시 onClick 발화.

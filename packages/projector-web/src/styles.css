@@ -239,6 +239,20 @@
   cursor: pointer;
 }
 
+/* LogicGateNode — operator 큰 텍스트(AND/OR/XOR).
+   본문 중앙에 게이트 종류를 명시. 클릭으로 순환되며 hit-area는 InteractiveArea. */
+[data-trama-root] .trama-logic-gate-operator {
+  font-size: 1.75rem;
+  font-weight: 700;
+  fill: var(--color-node-stroke-focal);
+  letter-spacing: 0.04em;
+  pointer-events: none;
+}
+
+[data-trama-root] .trama-logic-gate-operator-hit {
+  cursor: pointer;
+}
+
 /* Combiner 칩 ------------------------------------------------------- */
 [data-trama-root] .trama-node-combiner {
   fill: var(--color-combiner-fill);

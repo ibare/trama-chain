@@ -3,6 +3,10 @@ import { isExpressionNode, isValueNode, type Node } from '@trama/core';
 
 const CARD_W = 240;
 const BASE_H = 124;
+// LogicGateNode 본문은 라벨(상단) / 큰 operator 텍스트(중앙) / 결과 아이콘(하단)
+// 3단 — 일반 ValueNode 1단 본문보다 세로 여유가 더 필요하다. combiner 칩이
+// 들어가는 ValueNode(BASE_H + COMBINER_ADD_H = 168)와 비슷한 키.
+const LOGIC_GATE_BASE_H = 172;
 
 /**
  * 스킨별 레이아웃 스펙.
@@ -264,8 +268,17 @@ export function getNodeLayout(
   }
 
   const incomingCount = Math.max(0, opts.incomingCount);
-  const hasCombiner = incomingCount > 1;
-  const baseH = hasCombiner ? BASE_H + COMBINER_ADD_H : BASE_H;
+  // LogicGateNode는 본문에 (라벨/operator 큰 텍스트/결과 아이콘) 3단을 쌓아
+  // 일반 ValueNode 본문보다 세로 여유가 더 필요하다. 별도 layout 함수를 두는
+  // 대신 같은 box 경로에서 노드 종류에 따른 baseH 분기만 추가 — 좌·우 핀과
+  // labelY/valueY 등 모든 좌표는 그대로 공유한다.
+  const isLogicGate = node.kind === 'logic-gate';
+  const hasCombiner = !isLogicGate && incomingCount > 1;
+  const baseH = isLogicGate
+    ? LOGIC_GATE_BASE_H
+    : hasCombiner
+      ? BASE_H + COMBINER_ADD_H
+      : BASE_H;
 
   const inSockets = Math.max(1, incomingCount);
   const inMinH = PIN_PAD * 2 + inSockets * SOCKET_SIZE + Math.max(0, inSockets - 1) * PIN_SOCKET_GAP;
