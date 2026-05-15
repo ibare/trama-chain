@@ -4,6 +4,7 @@ import type {
   ConstantNode,
   Edge,
   ExpressionNode,
+  LogicGateNode,
   Model,
   Node,
   ValueNode,
@@ -13,6 +14,7 @@ import {
   isConditionNode,
   isConstantNode,
   isExpressionNode,
+  isLogicGateNode,
   isValueNode,
 } from '../model/index.js';
 import type {
@@ -22,6 +24,7 @@ import type {
   TramaDocument,
   TramaEdge,
   TramaExpressionNode,
+  TramaLogicGateNode,
   TramaNode,
   TramaValueNode,
 } from './document.js';
@@ -97,6 +100,18 @@ function nodeToDoc(n: Node): TramaNode {
       label: n.label,
       operator: n.operator,
       threshold: n.threshold,
+      position: n.position,
+      isFocal: n.isFocal,
+      description: n.description ?? null,
+    };
+    return doc;
+  }
+  if (isLogicGateNode(n)) {
+    const doc: TramaLogicGateNode = {
+      kind: 'logic-gate',
+      id: n.id,
+      label: n.label,
+      operator: n.operator,
       position: n.position,
       isFocal: n.isFocal,
       description: n.description ?? null,
@@ -181,6 +196,17 @@ export function documentToModel(doc: TramaDocument): Model {
         label: n.label,
         operator: n.operator,
         threshold: n.threshold,
+        position: n.position,
+        isFocal: n.isFocal,
+        description: n.description ?? null,
+      };
+      nodes[n.id] = node;
+    } else if (n.kind === 'logic-gate') {
+      const node: LogicGateNode = {
+        kind: 'logic-gate',
+        id: n.id,
+        label: n.label,
+        operator: n.operator,
         position: n.position,
         isFocal: n.isFocal,
         description: n.description ?? null,

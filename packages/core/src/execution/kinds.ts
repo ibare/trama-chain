@@ -582,12 +582,56 @@ const expressionNodeDescriptor: NodeKindDescriptor<
   },
 };
 
+/**
+ * LogicGateNode 디스크립터 — boolean 입력 N개를 operator로 결합.
+ *
+ * boolean ValueNode의 결합 경로와 동일한 combiner registry 함수에 위임 —
+ * `node.operator`(and/or/xor)가 곧 combiner key. 단일 출처에서 평가하기 때문에
+ * boolean ValueNode와 결과가 자동으로 정합한다.
+ *
+ * 입력 0개이거나 모든 입력이 invalid면 출력 invalid — 게이트는 입력이 필수.
+ */
+const logicGateNodeDescriptor: NodeKindDescriptor<
+  Extract<Node, { kind: 'logic-gate' }>
+> = {
+  kind: 'logic-gate',
+  outputsRaw: false,
+  canBeFeedbackTarget: false,
+  initialValue: () => undefined,
+  initialValid: () => false,
+  inputPortType: () => 'boolean',
+  outputPortType: () => 'boolean',
+  outputUnit: () => FREE_FALLBACK,
+  propagate: (node, ctx) => {
+    const combiner = ctx.combinerRegistry.getOfKind(node.operator, 'boolean');
+    if (!combiner) throw new MissingCombinerError(node.operator);
+
+    const contributions: boolean[] = [];
+    for (const edge of ctx.incoming) {
+      const source = ctx.model.nodes[edge.from];
+      if (!source) continue;
+      if (!isEdgeSourceValid(ctx, edge)) continue;
+      const b = getBooleanNext(ctx, edge.from);
+      if (b === undefined) continue;
+      contributions.push(edge.inverted ? !b : b);
+    }
+
+    if (contributions.length === 0) {
+      ctx.validOutputs.delete(outputKey(node.id, 0));
+      return;
+    }
+    ctx.next[node.id] = booleanValue(combiner.combine(contributions));
+    ctx.validOutputs.add(outputKey(node.id, 0));
+  },
+};
+
 export function createDefaultNodeKindRegistry(): NodeKindRegistry {
   return createNodeKindRegistry()
     .register(valueNodeDescriptor)
     .register(constantNodeDescriptor)
     .register(conditionNodeDescriptor)
     .register(comparisonNodeDescriptor)
+    .register(logicGateNodeDescriptor)
     .register(expressionNodeDescriptor);
 }
 

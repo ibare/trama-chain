@@ -6,6 +6,8 @@ import type {
   Edge,
   EdgeId,
   ExpressionNode,
+  LogicGateNode,
+  LogicGateOperator,
   Model,
   Node,
   NodeId,
@@ -211,6 +213,40 @@ export function addComparisonNode(
     label: input.label,
     operator: input.operator ?? '>',
     threshold: input.threshold ?? 0,
+    position: input.position ?? null,
+    isFocal: input.isFocal ?? false,
+    description: input.description ?? null,
+  };
+  return touch(
+    {
+      ...model,
+      nodes: { ...model.nodes, [id]: node },
+      nodeOrder: [...model.nodeOrder, id],
+    },
+    now,
+  );
+}
+
+export interface AddLogicGateNodeInput {
+  label: string;
+  operator?: LogicGateOperator;
+  position?: { x: number; y: number } | null;
+  isFocal?: boolean;
+  description?: string | null;
+  id?: NodeId;
+}
+
+export function addLogicGateNode(
+  model: Model,
+  input: AddLogicGateNodeInput,
+  now?: number,
+): Model {
+  const id = input.id ?? makeNodeId();
+  const node: LogicGateNode = {
+    kind: 'logic-gate',
+    id,
+    label: input.label,
+    operator: input.operator ?? 'and',
     position: input.position ?? null,
     isFocal: input.isFocal ?? false,
     description: input.description ?? null,

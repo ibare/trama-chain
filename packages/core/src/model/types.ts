@@ -129,11 +129,40 @@ export interface ExpressionNode {
   description?: string | null;
 }
 
+/**
+ * 논리 게이트 연산자 — boolean 입력 N개를 결합해 boolean 출력을 만든다.
+ *
+ * boolean combiner 레지스트리의 키와 의미가 동일하지만, "노드 자체가 결합
+ * 의도를 일급 시맨틱으로 갖는다"는 점에서 ValueNode의 combiner 옵션과 구분된다.
+ * ValueNode는 입력성 신호이고 결합은 부수 행동인 반면, LogicGateNode는 결합
+ * 그 자체가 정체성.
+ */
+export type LogicGateOperator = 'and' | 'or' | 'xor';
+
+/**
+ * 논리 게이트 노드 — boolean 입력 N개를 operator로 결합해 boolean을 출력.
+ *
+ * - 입력 슬롯 수는 가변. 입력이 0개면 출력 invalid(게이트는 입력이 필수 시맨틱).
+ * - 평가는 boolean combiner registry의 동일 함수에 위임 — and/or/xor 계산을
+ *   ValueNode의 combiner 경로와 단일 출처에서 공유한다.
+ * - ConditionNode/ComparisonNode와 평행한 구조 — boolean 출력 노드 군.
+ */
+export interface LogicGateNode {
+  kind: 'logic-gate';
+  id: NodeId;
+  label: string;
+  operator: LogicGateOperator;
+  position: { x: number; y: number } | null;
+  isFocal: boolean;
+  description?: string | null;
+}
+
 export type Node =
   | ValueNode
   | ConstantNode
   | ConditionNode
   | ComparisonNode
+  | LogicGateNode
   | ExpressionNode;
 
 export function isValueNode(n: Node): n is ValueNode {
@@ -147,6 +176,9 @@ export function isConditionNode(n: Node): n is ConditionNode {
 }
 export function isComparisonNode(n: Node): n is ComparisonNode {
   return n.kind === 'comparison';
+}
+export function isLogicGateNode(n: Node): n is LogicGateNode {
+  return n.kind === 'logic-gate';
 }
 export function isExpressionNode(n: Node): n is ExpressionNode {
   return n.kind === 'expression';
