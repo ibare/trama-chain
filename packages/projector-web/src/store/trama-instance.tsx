@@ -7,6 +7,7 @@ import { createCableRegistry, type CableRegistry } from '../edge/cable-points-re
 import { createNodeFlashRegistry, type NodeFlashRegistry } from '../pulse/node-flash-registry.js';
 import { createPulseRegistry, type PulseRegistry } from '../pulse/pulse-registry.js';
 import { createPulseSettingsStore, type PulseSettingsStore } from './pulse-settings.js';
+import { createTimeSettingsStore, type TimeSettingsStore } from './time-settings.js';
 import { createModelStore, type ModelStoreInstance } from './model-store.js';
 import { createUIStore, type UIStoreInstance } from './ui-store.js';
 
@@ -24,6 +25,7 @@ export interface TramaInstance {
   nodeFlashRegistry: NodeFlashRegistry;
   pulseRegistry: PulseRegistry;
   pulseSettingsStore: PulseSettingsStore;
+  timeSettingsStore: TimeSettingsStore;
   modelStore: ModelStoreInstance;
   uiStore: UIStoreInstance;
   dispose(): void;
@@ -37,8 +39,13 @@ export function createTramaInstance(): TramaInstance {
   const cableRegistry = createCableRegistry();
   const nodeFlashRegistry = createNodeFlashRegistry();
   const pulseSettingsStore = createPulseSettingsStore();
-  const pulseRegistry = createPulseRegistry({ animationLoop, pulseSettingsStore });
-  const modelStore = createModelStore({ pulseRegistry, nodeFlashRegistry });
+  const timeSettingsStore = createTimeSettingsStore();
+  const pulseRegistry = createPulseRegistry({
+    animationLoop,
+    pulseSettingsStore,
+    timeSettingsStore,
+  });
+  const modelStore = createModelStore({ pulseRegistry, nodeFlashRegistry, timeSettingsStore });
   const uiStore = createUIStore();
 
   return {
@@ -50,6 +57,7 @@ export function createTramaInstance(): TramaInstance {
     nodeFlashRegistry,
     pulseRegistry,
     pulseSettingsStore,
+    timeSettingsStore,
     modelStore,
     uiStore,
     dispose(): void {

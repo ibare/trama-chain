@@ -56,6 +56,7 @@ import { combinerRegistry, shapeRegistry } from './registries.js';
 import { fizzexExpressionEvaluator } from '../expression/fizzex-evaluator.js';
 import type { PulseRegistry, Pulse } from '../pulse/pulse-registry.js';
 import type { NodeFlashRegistry } from '../pulse/node-flash-registry.js';
+import type { TimeSettingsStore } from './time-settings.js';
 
 const STEP_TICK_MS = parseFloat(tokens.motion.durationStepTick);
 
@@ -109,6 +110,7 @@ export type ModelStoreInstance = UseBoundStore<StoreApi<ModelStore>>;
 export interface ModelStoreDeps {
   pulseRegistry: PulseRegistry;
   nodeFlashRegistry: NodeFlashRegistry;
+  timeSettingsStore: TimeSettingsStore;
 }
 
 /** Node patch가 propagation 결과에 영향을 줄 수 있는 필드를 포함하는지. */
@@ -201,10 +203,12 @@ function computeExecutionState(
 export function createModelStore({
   pulseRegistry,
   nodeFlashRegistry,
+  timeSettingsStore,
 }: ModelStoreDeps): ModelStoreInstance {
   const initial = createEmptyModel();
   const initialExec = computeExecutionState(initial);
   let activePlaybackToken = 0;
+  let playbackTimeoutId: number | null = null;
 
   /**
    * GeneratorNode step ticker — enabled가 1개라도 있으면 STEP_TICK_MS 주기로
@@ -260,10 +264,15 @@ export function createModelStore({
       spawnOutgoingPulses(latest.model, latest.executionState, nid);
     }
   }
+  function currentStepIntervalMs(): number {
+    const m = timeSettingsStore.getState().stepSpeedMultiplier;
+    return STEP_TICK_MS / (m > 0 ? m : 1);
+  }
   function startGeneratorTickerIfNeeded(): void {
     if (generatorTicker !== null) return;
+    if (timeSettingsStore.getState().paused) return;
     if (!hasAnyEnabledGenerator()) return;
-    generatorTicker = window.setInterval(tickGenerators, STEP_TICK_MS);
+    generatorTicker = window.setInterval(tickGenerators, currentStepIntervalMs());
   }
   function stopGeneratorTicker(): void {
     if (generatorTicker !== null) {
@@ -271,6 +280,68 @@ export function createModelStore({
       generatorTicker = null;
     }
   }
+  function restartGeneratorTickerIfRunning(): void {
+    // multiplier 변경: 돌고 있던 ticker만 새 주기로 재시작. 정지 상태면 그대로.
+    if (generatorTicker === null) return;
+    stopGeneratorTicker();
+    startGeneratorTickerIfNeeded();
+  }
+
+  /**
+   * N-step playback. 자가 reschedule 패턴 — 다음 step 하나만 setTimeout으로 예약하고
+   * 발화 시 다음 step을 다시 예약한다. 이렇게 하면 multiplier 변경이 자연스럽게
+   * 다음 간격에 반영되고, pause는 timer 한 개만 끊으면 끝.
+   */
+  function applyStep(s: ExecutionState, stepIndex: number, isLast: boolean): void {
+    const prev = store.getState().executionState;
+    for (const nid of Object.keys(s.values)) {
+      if (s.values[nid] !== prev.values[nid]) nodeFlashRegistry.trigger(nid);
+    }
+    store.setState({ executionState: s, playbackStep: isLast ? null : stepIndex });
+  }
+  function stopPlaybackTimer(): void {
+    if (playbackTimeoutId !== null) {
+      window.clearTimeout(playbackTimeoutId);
+      playbackTimeoutId = null;
+    }
+  }
+  function schedulePlaybackStep(token: number, nextIndex: number): void {
+    if (activePlaybackToken !== token) return;
+    if (timeSettingsStore.getState().paused) return;
+    const traj = store.getState().trajectory;
+    if (nextIndex >= traj.length) return;
+    playbackTimeoutId = window.setTimeout(() => {
+      playbackTimeoutId = null;
+      if (activePlaybackToken !== token) return;
+      const trajNow = store.getState().trajectory;
+      if (nextIndex >= trajNow.length) return;
+      const s = trajNow[nextIndex]!;
+      const isLast = nextIndex === trajNow.length - 1;
+      applyStep(s, nextIndex, isLast);
+      if (!isLast) schedulePlaybackStep(token, nextIndex + 1);
+    }, currentStepIntervalMs());
+  }
+
+  // timeSettings 변경 구독 — multiplier·paused 변화에 ticker·playback 반영.
+  timeSettingsStore.subscribe((state, prev) => {
+    if (state.paused !== prev.paused) {
+      if (state.paused) {
+        stopGeneratorTicker();
+        stopPlaybackTimer();
+      } else {
+        startGeneratorTickerIfNeeded();
+        const playbackStep = store.getState().playbackStep;
+        if (playbackStep !== null) {
+          schedulePlaybackStep(activePlaybackToken, playbackStep + 1);
+        }
+      }
+      return;
+    }
+    if (state.stepSpeedMultiplier !== prev.stepSpeedMultiplier) {
+      restartGeneratorTickerIfRunning();
+      // playback 진행 중이면 다음 간격에 새 multiplier 자동 반영 — 별도 처리 불필요.
+    }
+  });
 
   /**
    * 주어진 source 노드의 lag=0 outgoing edges에 대해 펄스를 spawn.
@@ -714,18 +785,11 @@ export function createModelStore({
     play: () => {
       const { trajectory } = get();
       if (trajectory.length <= 1) return;
+      stopPlaybackTimer();
       const token = ++activePlaybackToken;
-      trajectory.forEach((s, i) => {
-        window.setTimeout(() => {
-          if (activePlaybackToken !== token) return;
-          const isLast = i === trajectory.length - 1;
-          const prev = get().executionState;
-          for (const nid of Object.keys(s.values)) {
-            if (s.values[nid] !== prev.values[nid]) nodeFlashRegistry.trigger(nid);
-          }
-          set({ executionState: s, playbackStep: isLast ? null : i });
-        }, i * STEP_TICK_MS);
-      });
+      // step 0은 즉시 적용, 1+는 self-rescheduling으로 진행.
+      applyStep(trajectory[0]!, 0, false);
+      schedulePlaybackStep(token, 1);
     },
   }));
 

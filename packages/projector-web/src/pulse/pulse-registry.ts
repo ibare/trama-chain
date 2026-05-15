@@ -2,6 +2,7 @@ import type { EdgeId, NodeId, Value } from '@trama/core';
 import { tokens } from '@trama/tokens';
 import type { AnimationLoop } from '../canvas/animation-loop.js';
 import type { PulseSettingsStore } from '../store/pulse-settings.js';
+import type { TimeSettingsStore } from '../store/time-settings.js';
 
 /**
  * 활성 펄스 lifecycle을 관리. spawn → 매 프레임 진행 → 도착 시 arrivalHandler 호출 → 제거.
@@ -50,6 +51,7 @@ export interface PulseRegistry {
 export interface PulseRegistryDeps {
   animationLoop: AnimationLoop;
   pulseSettingsStore: PulseSettingsStore;
+  timeSettingsStore: TimeSettingsStore;
 }
 
 const EMPTY_SNAPSHOT: readonly Pulse[] = Object.freeze([]);
@@ -57,6 +59,7 @@ const EMPTY_SNAPSHOT: readonly Pulse[] = Object.freeze([]);
 export function createPulseRegistry({
   animationLoop,
   pulseSettingsStore,
+  timeSettingsStore,
 }: PulseRegistryDeps): PulseRegistry {
   const pulses = new Map<string, Pulse>();
   const listSubscribers = new Set<Listener>();
@@ -65,6 +68,24 @@ export function createPulseRegistry({
   let unregisterTicker: (() => void) | null = null;
   let nextPulseSerial = 1;
   let cachedSnapshot: readonly Pulse[] = EMPTY_SNAPSHOT;
+  // paused 동안 시간 흐름을 통째로 멈춘다. unpause 시점에 각 활성 pulse의
+  // startTime을 paused 지속시간만큼 += 보정해 freeze된 그 자리에서 이어 진행한다.
+  let pausedAt: number | null = timeSettingsStore.getState().paused
+    ? performance.now()
+    : null;
+  const unsubscribeTimeSettings = timeSettingsStore.subscribe((state, prev) => {
+    if (state.paused === prev.paused) return;
+    const now = performance.now();
+    if (state.paused) {
+      pausedAt = now;
+    } else if (pausedAt !== null) {
+      const delta = now - pausedAt;
+      pausedAt = null;
+      for (const p of pulses.values()) {
+        (p as { startTime: number }).startTime += delta;
+      }
+    }
+  });
 
   function invalidateSnapshot(): void {
     cachedSnapshot =
@@ -92,6 +113,9 @@ export function createPulseRegistry({
   }
 
   function advance(): void {
+    // paused면 도착 검사·notifyTick까지 모두 skip — PulseLayer가 subscribeTick에
+    // 묶여 있어 DOM 위치 갱신이 자동으로 freeze되고, 도착 chain도 차단된다.
+    if (pausedAt !== null) return;
     const now = performance.now();
     const arrived: Pulse[] = [];
     for (const p of pulses.values()) {
@@ -117,6 +141,9 @@ export function createPulseRegistry({
     },
     spawn(args): Pulse {
       const multiplier = pulseSettingsStore.getState().travelSpeedMultiplier;
+      // paused 중 spawn된 펄스는 pausedAt 시점부터 시작해 freeze 상태로 0 progress.
+      // unpause 시 startTime이 += delta로 보정되며 그제야 진행을 시작한다.
+      const startTime = pausedAt !== null ? pausedAt : performance.now();
       const pulse: Pulse = {
         id: `p-${nextPulseSerial++}`,
         edgeId: args.edgeId,
@@ -124,7 +151,7 @@ export function createPulseRegistry({
         sourceSlotIndex: args.sourceSlotIndex,
         targetNodeId: args.targetNodeId,
         sourceValue: args.sourceValue,
-        startTime: performance.now(),
+        startTime,
         travelDurationMs: BASE_TRAVEL_MS * multiplier,
       };
       pulses.set(pulse.id, pulse);
@@ -166,6 +193,7 @@ export function createPulseRegistry({
         unregisterTicker();
         unregisterTicker = null;
       }
+      unsubscribeTimeSettings();
       pulses.clear();
       cachedSnapshot = EMPTY_SNAPSHOT;
       listSubscribers.clear();
