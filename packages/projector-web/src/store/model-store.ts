@@ -178,7 +178,13 @@ function computeExecutionState(
     const priorRt = prior.generatorRuntime[nid];
     const freshRt = fresh.executionState.generatorRuntime[nid]!;
     if (priorRt && priorRt.cursor.kind === freshRt.cursor.kind) {
-      mergedRuntime[nid] = priorRt;
+      // cursor·enabled는 prior에서 유지(사용자 토글/진행 상태 보존), gateOpen은
+      // 모델 편집 후 새 source 토폴로지를 반영한 fresh 쪽을 채택.
+      mergedRuntime[nid] = {
+        enabled: priorRt.enabled,
+        cursor: priorRt.cursor,
+        gateOpen: freshRt.gateOpen,
+      };
       const priorVal = prior.values[nid];
       if (priorVal) {
         mergedValues[nid] = priorVal;
@@ -220,10 +226,38 @@ export function createModelStore({
    * 자연스럽게 흐른다.
    */
   let generatorTicker: number | null = null;
+
+  /**
+   * 한 generator가 실제로 이번 tick에 emit해야 하는지.
+   *
+   * 시맨틱은 [[generatorNodeDescriptor]] propagate와 동일:
+   *  - 입력 미연결: runtime.enabled (사용자 ▶ 토글) 사용
+   *  - 입력 연결: incoming boolean이 true여야 emit. invalid·boolean 아님이면 freeze
+   *
+   * 입력 미연결: 사용자 토글(`rt.enabled`).
+   * 입력 연결: `rt.gateOpen` 캐시만 본다 — `executionState.values[source]`를
+   * 직접 읽으면 펄스 도착 전에 ticker가 그래프 변화를 감지해 효과가 사후 펄스보다
+   * 먼저 발현되는 비대칭 버그가 생긴다. 캐시는 펄스 도착 시점에만 갱신된다.
+   */
+  function isGeneratorEffectivelyEnabled(
+    model: ReturnType<typeof store.getState>['model'],
+    executionState: ReturnType<typeof store.getState>['executionState'],
+    nid: NodeId,
+  ): boolean {
+    const rt = executionState.generatorRuntime[nid];
+    if (!rt) return false;
+    const hasIncoming = model.edgeOrder.some((eid) => {
+      const e = model.edges[eid];
+      return !!e && e.to === nid && e.lag === 0;
+    });
+    if (!hasIncoming) return rt.enabled;
+    return rt.gateOpen === true;
+  }
+
   function hasAnyEnabledGenerator(): boolean {
-    const rt = store.getState().executionState.generatorRuntime;
-    for (const id in rt) {
-      if (rt[id]?.enabled) return true;
+    const { model, executionState } = store.getState();
+    for (const nid in executionState.generatorRuntime) {
+      if (isGeneratorEffectivelyEnabled(model, executionState, nid)) return true;
     }
     return false;
   }
@@ -238,13 +272,17 @@ export function createModelStore({
     const emittedIds: NodeId[] = [];
     for (const nid in executionState.generatorRuntime) {
       const rt = executionState.generatorRuntime[nid];
-      if (!rt || !rt.enabled) continue;
+      if (!rt) continue;
+      if (!isGeneratorEffectivelyEnabled(model, executionState, nid)) continue;
       const node = model.nodes[nid];
       if (!node || !isGeneratorNode(node)) continue;
       const { value, nextCursor } = defaultGeneratorRegistry.emit(node.params, rt.cursor);
       newValues[nid] = value;
       newValid.add(outputKey(nid, 0));
-      newRuntime[nid] = { enabled: true, cursor: nextCursor };
+      // runtime.enabled는 사용자 토글 의도를 보존. gateOpen 캐시는 펄스로만
+      // 갱신되는 단일 진입 — ticker tick에서 드롭하면 다음 tick에 게이트 false로
+      // 평가돼 ticker가 즉시 멈춘다.
+      newRuntime[nid] = { enabled: rt.enabled, cursor: nextCursor, gateOpen: rt.gateOpen };
       emittedIds.push(nid);
     }
     if (emittedIds.length === 0) {
@@ -286,6 +324,16 @@ export function createModelStore({
     if (generatorTicker === null) return;
     stopGeneratorTicker();
     startGeneratorTickerIfNeeded();
+  }
+  /**
+   * 모델·실행상태 변이 후 ticker 상태를 reconcile.
+   *
+   * boolean 입력으로 제어되는 generator는 source 값/연결 변화로 effective enabled가
+   * 바뀌므로, 변이 후 매번 ticker를 재평가해야 freeze 시맨틱이 깨지지 않는다.
+   */
+  function reconcileGeneratorTicker(): void {
+    if (hasAnyEnabledGenerator()) startGeneratorTickerIfNeeded();
+    else stopGeneratorTicker();
   }
 
   /**
@@ -385,7 +433,48 @@ export function createModelStore({
     const { model, executionState, playbackStep } = store.getState();
     if (playbackStep !== null) return;
 
-    if (!model.nodes[pulse.targetNodeId] || !model.nodes[pulse.sourceNodeId]) return;
+    const targetNode = model.nodes[pulse.targetNodeId];
+    if (!targetNode || !model.nodes[pulse.sourceNodeId]) return;
+
+    // Generator는 boolean gate 입력을 받지만 자기 값은 ticker가 만든다.
+    // 펄스 도착 시 (a) gateOpen 캐시를 펄스 source 값으로 갱신, (b) ticker
+    // reconcile만 수행. 즉시 emit은 ticker가 다음 틱에 처리 → 인과 시점 일치.
+    if (isGeneratorNode(targetNode)) {
+      const edge = model.edgeOrder
+        .map((eid) => model.edges[eid])
+        .find(
+          (e): e is Edge =>
+            !!e &&
+            e.to === pulse.targetNodeId &&
+            e.from === pulse.sourceNodeId &&
+            e.lag === 0,
+        );
+      let gateOpen: boolean | undefined;
+      if (edge && pulse.sourceValue.kind === 'boolean') {
+        gateOpen = edge.inverted ? !pulse.sourceValue.b : pulse.sourceValue.b;
+      }
+      store.setState((s) => {
+        const prev = s.executionState.generatorRuntime[pulse.targetNodeId];
+        if (!prev) return s;
+        const newRuntime = {
+          ...s.executionState.generatorRuntime,
+          [pulse.targetNodeId]: {
+            enabled: prev.enabled,
+            cursor: prev.cursor,
+            gateOpen,
+          },
+        };
+        return {
+          executionState: {
+            ...s.executionState,
+            generatorRuntime: newRuntime,
+          },
+        };
+      });
+      nodeFlashRegistry.trigger(pulse.targetNodeId);
+      reconcileGeneratorTicker();
+      return;
+    }
 
     const result = recomputeNode(pulse.targetNodeId, executionState, model, {
       shapeRegistry,
@@ -560,7 +649,7 @@ export function createModelStore({
           ...s.executionState,
           generatorRuntime: {
             ...s.executionState.generatorRuntime,
-            [id]: { enabled, cursor },
+            [id]: { enabled, cursor, gateOpen: current?.gateOpen },
           },
         },
       });
@@ -586,7 +675,11 @@ export function createModelStore({
           validOutputs: newValid,
           generatorRuntime: {
             ...s.executionState.generatorRuntime,
-            [id]: { enabled: false, cursor },
+            [id]: {
+              enabled: false,
+              cursor,
+              gateOpen: s.executionState.generatorRuntime[id]?.gateOpen,
+            },
           },
         },
       });
@@ -644,11 +737,13 @@ export function createModelStore({
         nodeFlashRegistry.trigger(id);
         const latest = get();
         spawnOutgoingPulses(latest.model, latest.executionState, id);
+        reconcileGeneratorTicker();
         return;
       }
 
       const exec = affectsValues ? computeExecutionState(after, get().executionState) : null;
       set({ model: after, ...(exec ?? {}) });
+      reconcileGeneratorTicker();
     },
 
     removeNode: (id) => {
@@ -692,6 +787,13 @@ export function createModelStore({
           .filter((e) => e && e.to === input.to);
         if (occupied.length >= 1) return null;
       }
+      // GeneratorNode는 boolean gate 단항 입력 — 두 번째 엣지 거부.
+      if (targetNode && isGeneratorNode(targetNode)) {
+        const occupied = before.edgeOrder
+          .map((eid) => before.edges[eid])
+          .filter((e) => e && e.to === input.to);
+        if (occupied.length >= 1) return null;
+      }
       const candidate = addEdgeOp(before, input);
       if ((input.lag ?? 0) === 0) {
         try {
@@ -705,6 +807,7 @@ export function createModelStore({
       const edge = after.edges[newId]!;
       const exec = computeExecutionState(after, get().executionState);
       set({ model: after, ...exec });
+      reconcileGeneratorTicker();
       return edge;
     },
 
@@ -722,6 +825,7 @@ export function createModelStore({
       const after = candidate;
       const exec = computeExecutionState(after, s.executionState);
       set({ model: after, ...exec });
+      reconcileGeneratorTicker();
     },
 
     removeEdge: (id) => {
@@ -730,6 +834,7 @@ export function createModelStore({
       if (after === s.model) return;
       const exec = computeExecutionState(after, s.executionState);
       set({ model: after, ...exec });
+      reconcileGeneratorTicker();
     },
 
     setQuestion: (q) => {

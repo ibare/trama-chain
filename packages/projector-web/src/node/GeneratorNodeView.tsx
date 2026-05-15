@@ -1,4 +1,4 @@
-import { memo, useCallback } from 'react';
+import { memo, useCallback, useEffect } from 'react';
 import { tokens } from '@trama/tokens';
 import { isGeneratorNode, isNumericValue, type NodeId } from '@trama/core';
 import { useTrama } from '../store/index.js';
@@ -12,6 +12,7 @@ import { useEdgeDraftSource } from '../canvas/use-edge-draft-source.js';
 
 interface Props {
   id: NodeId;
+  incomingCount: number;
 }
 
 const SOCKET_SIZE = parseFloat(tokens.spacing.socketSize);
@@ -26,8 +27,8 @@ function formatGeneratorValue(v: number): string {
   return v.toFixed(3);
 }
 
-function GeneratorNodeViewImpl({ id }: Props): JSX.Element | null {
-  const { modelStore, uiStore } = useTrama();
+function GeneratorNodeViewImpl({ id, incomingCount }: Props): JSX.Element | null {
+  const { modelStore, uiStore, socketRegistry } = useTrama();
   const node = modelStore((s) => s.model.nodes[id]);
   const enabled = modelStore(
     (s) => s.executionState.generatorRuntime[id]?.enabled ?? false,
@@ -44,7 +45,16 @@ function GeneratorNodeViewImpl({ id }: Props): JSX.Element | null {
 
   const posX = node?.position?.x ?? 0;
   const posY = node?.position?.y ?? 0;
-  const layout = useNodeLayout(node, { incomingCount: 0 });
+  const layout = useNodeLayout(node, { incomingCount });
+
+  // 좌측 입력 socket을 socket registry에 등록 — 엣지 드롭이 이 위치로 맞춰 들어온다.
+  useEffect(() => {
+    if (!layout) return;
+    return socketRegistry.register({
+      nodeId: id,
+      offset: { x: layout.leftPin.cx, y: layout.leftPin.cy },
+    });
+  }, [id, layout, socketRegistry]);
 
   const getOutputStartPoint = useCallback(() => {
     const out = layout?.rightPin.sockets[0];
@@ -121,7 +131,17 @@ function GeneratorNodeViewImpl({ id }: Props): JSX.Element | null {
         {valueText}
       </text>
 
-      {generatorBody && (
+      {/* 좌측 입력 socket — boolean gate. incoming이 있으면 connected 표시. */}
+      {layout.leftPin.sockets[0] && (
+        <Socket
+          cx={layout.leftPin.sockets[0].x}
+          cy={layout.leftPin.sockets[0].y}
+          connected={incomingCount > 0}
+        />
+      )}
+
+      {/* 입력 연결되면 사용자 토글 컨트롤은 의미를 잃으므로 숨김 — gate가 emit을 결정. */}
+      {generatorBody && incomingCount === 0 && (
         <>
           {/* ▶/⏸ 토글 — enabled에 따라 글리프만 바뀜. 원형 hit-area. */}
           <InteractiveArea

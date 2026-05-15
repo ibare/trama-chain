@@ -325,13 +325,13 @@ export function getNodeLayout(
     };
   }
 
-  // GeneratorNode — 입력 없음, 단일 출력. 본문에 라벨 + 현재값 + 컨트롤러 슬롯.
+  // GeneratorNode — 단일 boolean 입력(emit gate), 단일 출력. 본문에 라벨 + 현재값 + 컨트롤러 슬롯.
   if (isGeneratorNode(node)) {
     const halfW = GENERATOR_W / 2;
     const halfH = GENERATOR_H / 2;
     const cardTop = -halfH;
-    // 좌측 핀 미사용 — 시각적으로 렌더하지 않지만 인터페이스 충족을 위해 0-socket 핀.
-    const leftPin = buildPin(-halfW, 0, 0);
+    // 좌측 핀 — boolean gate 입력 단항. incomingCount와 무관하게 1로 고정.
+    const leftPin = buildPin(-halfW, 0, 1);
     const rightPin = buildPin(halfW, 0, 1);
     const controlsBottom = halfH - GENERATOR_CONTROLS_BOTTOM_PAD;
     const controlsTop = controlsBottom - GENERATOR_CONTROLS_H;

@@ -28,6 +28,18 @@ export type GeneratorCursor =
 export interface GeneratorRuntime {
   enabled: boolean;
   cursor: GeneratorCursor;
+  /**
+   * 입력 boolean gate 캐시. 미연결이면 undefined.
+   *
+   * **인과 모델**: ticker는 이 캐시만 보고 emit 여부를 결정한다. source의
+   * 현재 state.values를 직접 읽으면 펄스가 엣지를 통과하기도 전에 효과가
+   * 발현되어 시각·논리가 어긋난다. 이 캐시는 펄스 도착 시점(또는 모델
+   * 변경에 따른 propagate 시점)에만 갱신된다.
+   *
+   * - 비연결 generator는 이 필드를 사용하지 않는다 (`enabled`가 게이트 역할).
+   * - 연결 직후, 첫 펄스가 도달하기 전까지는 undefined → freeze로 수렴.
+   */
+  gateOpen?: boolean;
 }
 
 /**

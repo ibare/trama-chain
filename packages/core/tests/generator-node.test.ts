@@ -1,8 +1,11 @@
 import { describe, expect, it } from 'vitest';
 import {
+  addComparisonNode,
+  addConstantNode,
   addEdge,
   addGeneratorNode,
   addValueNode,
+  booleanValue,
   counterParadigm,
   createDefaultCombinerRegistry,
   createDefaultGeneratorRegistry,
@@ -312,6 +315,183 @@ describe('GeneratorNode — propagate integration', () => {
     expect(state.values['v']).toEqual(numericValue(10, 'free'));
     state = step(state, m);
     expect(state.values['v']).toEqual(numericValue(15, 'free'));
+  });
+});
+
+describe('GeneratorNode — boolean gate input', () => {
+  // 입력이 연결되면 generator는 boolean gate가 emit을 결정 — runtime.enabled를 덮어쓴다.
+  // true=emit / false=freeze / source invalid=freeze. 미연결이면 기존 runtime.enabled 경로.
+  it('input=true → emit advances cursor (overrides runtime.enabled=false)', () => {
+    let m = createEmptyModel(0);
+    m = addConstantNode(m, { id: 'gate', label: 'on', value: booleanValue(true) }, 0);
+    m = addGeneratorNode(
+      m,
+      { id: 'g', label: 'gen', params: { kind: 'counter', start: 1, step: 1 } },
+      0,
+    );
+    m = addEdge(m, { from: 'gate', to: 'g', shape: { kind: 'none', params: {} } }, 0);
+
+    let state = initializeFromInitialValues(m);
+    // runtime.enabled를 명시적으로 false로 둬도 입력 true가 우선.
+    state = {
+      ...state,
+      generatorRuntime: {
+        ...state.generatorRuntime,
+        g: { ...state.generatorRuntime['g']!, enabled: false },
+      },
+    };
+    state = step(state, m);
+    expect(state.values['g']).toEqual(numericValue(1, 'free'));
+    state = step(state, m);
+    expect(state.values['g']).toEqual(numericValue(2, 'free'));
+  });
+
+  it('input=false → freeze (last value preserved, runtime.enabled ignored)', () => {
+    let m = createEmptyModel(0);
+    m = addConstantNode(m, { id: 'gate', label: 'off', value: booleanValue(false) }, 0);
+    m = addGeneratorNode(
+      m,
+      { id: 'g', label: 'gen', params: { kind: 'counter', start: 5, step: 5 } },
+      0,
+    );
+    m = addEdge(m, { from: 'gate', to: 'g', shape: { kind: 'none', params: {} } }, 0);
+
+    let state = initializeFromInitialValues(m);
+    // runtime.enabled=true여도 입력 false가 우선 — freeze.
+    state = {
+      ...state,
+      generatorRuntime: {
+        ...state.generatorRuntime,
+        g: { ...state.generatorRuntime['g']!, enabled: true },
+      },
+    };
+    const beforeValue = state.values['g'];
+    state = step(state, m);
+    expect(state.values['g']).toEqual(beforeValue);
+    state = step(state, m);
+    expect(state.values['g']).toEqual(beforeValue);
+  });
+
+  it('input source invalid → freeze', () => {
+    // ComparisonNode는 입력이 없으면 출력이 invalid — generator는 그 invalid source를 보고 freeze.
+    let m = createEmptyModel(0);
+    m = addComparisonNode(m, { id: 'cmp', label: 'cmp', operator: '>', threshold: 0 }, 0);
+    m = addGeneratorNode(m, { id: 'g', label: 'gen' }, 0);
+    m = addEdge(m, { from: 'cmp', to: 'g', shape: { kind: 'none', params: {} } }, 0);
+
+    let state = initializeFromInitialValues(m);
+    state = {
+      ...state,
+      generatorRuntime: {
+        ...state.generatorRuntime,
+        g: { ...state.generatorRuntime['g']!, enabled: true },
+      },
+    };
+    const beforeValue = state.values['g'];
+    state = step(state, m);
+    expect(state.values['g']).toEqual(beforeValue);
+  });
+
+  it('no incoming edge → runtime.enabled path preserved', () => {
+    // 입력 미연결 — 기존처럼 사용자 ▶ 토글이 emit을 결정.
+    let m = createEmptyModel(0);
+    m = addGeneratorNode(m, { id: 'g', label: 'gen' }, 0);
+
+    let state = initializeFromInitialValues(m);
+    // enabled=false → freeze
+    const before = state.values['g'];
+    state = step(state, m);
+    expect(state.values['g']).toEqual(before);
+
+    // enabled=true → emit
+    state = {
+      ...state,
+      generatorRuntime: {
+        ...state.generatorRuntime,
+        g: { ...state.generatorRuntime['g']!, enabled: true },
+      },
+    };
+    state = step(state, m);
+    expect(state.values['g']).toEqual(numericValue(1, 'free'));
+    state = step(state, m);
+    expect(state.values['g']).toEqual(numericValue(2, 'free'));
+  });
+
+  it('toggle false→true keeps cursor — freeze 구간이 cursor를 진행시키지 않음', () => {
+    // gate를 인위적으로 토글하는 시나리오. boolean ValueNode를 통해 source를 바꿔본다.
+    // 모델은 동일하고 propagate를 두 번 돌리되 사이에 source value를 뒤집는다.
+    let m = createEmptyModel(0);
+    m = addValueNode(
+      m,
+      { id: 'gate', label: 'gate', unitId: 'free', initialValue: booleanValue(true), combiner: 'or' },
+      0,
+    );
+    m = addGeneratorNode(
+      m,
+      { id: 'g', label: 'gen', params: { kind: 'counter', start: 10, step: 1 } },
+      0,
+    );
+    m = addEdge(m, { from: 'gate', to: 'g', shape: { kind: 'none', params: {} } }, 0);
+
+    let state = initializeFromInitialValues(m);
+    // gate=true → emit
+    state = step(state, m);
+    expect(state.values['g']).toEqual(numericValue(10, 'free'));
+
+    // gate=false로 전환 (직접 state 갱신)
+    state = { ...state, values: { ...state.values, gate: booleanValue(false) } };
+    state = step(state, m);
+    // freeze — 값 그대로
+    expect(state.values['g']).toEqual(numericValue(10, 'free'));
+
+    // 다시 true → 다음 cursor 값 (11) 진행
+    state = { ...state, values: { ...state.values, gate: booleanValue(true) } };
+    state = step(state, m);
+    expect(state.values['g']).toEqual(numericValue(11, 'free'));
+  });
+
+  // gateOpen 캐시는 ticker(웹) 경로가 보는 단일 source-of-truth. propagate는
+  // 매 step source state로부터 캐시를 재동기화해야 한다.
+  it('propagate syncs runtime.gateOpen from source state (true)', () => {
+    let m = createEmptyModel(0);
+    m = addConstantNode(m, { id: 'gate', label: 'on', value: booleanValue(true) }, 0);
+    m = addGeneratorNode(m, { id: 'g', label: 'gen' }, 0);
+    m = addEdge(m, { from: 'gate', to: 'g', shape: { kind: 'none', params: {} } }, 0);
+    let state = initializeFromInitialValues(m);
+    state = step(state, m);
+    expect(state.generatorRuntime['g']!.gateOpen).toBe(true);
+  });
+
+  it('propagate syncs runtime.gateOpen from source state (false)', () => {
+    let m = createEmptyModel(0);
+    m = addConstantNode(m, { id: 'gate', label: 'off', value: booleanValue(false) }, 0);
+    m = addGeneratorNode(m, { id: 'g', label: 'gen' }, 0);
+    m = addEdge(m, { from: 'gate', to: 'g', shape: { kind: 'none', params: {} } }, 0);
+    let state = initializeFromInitialValues(m);
+    state = step(state, m);
+    expect(state.generatorRuntime['g']!.gateOpen).toBe(false);
+  });
+
+  it('propagate respects edge.inverted when syncing gateOpen', () => {
+    let m = createEmptyModel(0);
+    m = addConstantNode(m, { id: 'gate', label: 'on', value: booleanValue(true) }, 0);
+    m = addGeneratorNode(m, { id: 'g', label: 'gen' }, 0);
+    m = addEdge(
+      m,
+      { from: 'gate', to: 'g', shape: { kind: 'none', params: {} }, inverted: true },
+      0,
+    );
+    let state = initializeFromInitialValues(m);
+    state = step(state, m);
+    expect(state.generatorRuntime['g']!.gateOpen).toBe(false);
+  });
+
+  it('no incoming edge → gateOpen stays undefined', () => {
+    let m = createEmptyModel(0);
+    m = addGeneratorNode(m, { id: 'g', label: 'gen' }, 0);
+    let state = initializeFromInitialValues(m);
+    state = step(state, m);
+    expect(state.generatorRuntime['g']!.gateOpen).toBeUndefined();
   });
 });
 

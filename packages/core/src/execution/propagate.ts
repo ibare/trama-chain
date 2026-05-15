@@ -75,7 +75,11 @@ export function propagateOneStep(
   // GeneratorRuntime도 step 간에 이어진다 — clone-in/out으로 caller state는 안전.
   const generatorRuntime: Record<NodeId, GeneratorRuntime> = {};
   for (const [nid, rt] of Object.entries(state.generatorRuntime ?? {})) {
-    generatorRuntime[nid] = { enabled: rt.enabled, cursor: { ...rt.cursor } };
+    generatorRuntime[nid] = {
+      enabled: rt.enabled,
+      cursor: { ...rt.cursor },
+      gateOpen: rt.gateOpen,
+    };
   }
   const generatorRegistry = options.generatorRegistry ?? defaultGeneratorRegistry;
 

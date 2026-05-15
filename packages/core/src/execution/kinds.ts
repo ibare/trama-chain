@@ -771,11 +771,16 @@ const observeNodeDescriptor: NodeKindDescriptor<Extract<Node, { kind: 'observe' 
 };
 
 /**
- * GeneratorNode 디스크립터 — 입력 없이 cursor를 진행하며 자신의 numeric을 emit.
+ * GeneratorNode 디스크립터 — cursor를 진행하며 자신의 numeric을 emit.
  *
- * - propagate: ctx.generatorRuntime[node.id]를 보고 enabled=true면 paradigm.emit으로
- *   한 칸 진행해 ctx.next 갱신. enabled=false면 ctx.next는 건드리지 않아 기존 값
- *   (마지막 emit한 값)이 유지된다 — validOutputs도 유지.
+ * 단일 boolean 입력 슬롯이 있다:
+ *  - 미연결: 사용자 ▶/⏸로 토글되는 `generatorRuntime.enabled`가 emit을 결정 (기본 모드).
+ *  - 연결: 입력 boolean이 emit gate를 결정 — true=emit, false=freeze. source가
+ *    invalid거나 boolean이 아니면 freeze로 수렴(안전한 정지).
+ *  - 입력이 있는 한 사용자 토글은 의미를 잃는다 (NodeView는 컨트롤을 숨김).
+ *
+ * - propagate: 위 시맨틱으로 effectivelyEnabled를 산출 후 paradigm.emit. freeze면
+ *   ctx.next/validOutputs를 건드리지 않아 마지막 값이 유지된다.
  * - 첫 propagate에서 runtime이 비어 있으면 paradigm.initCursor로 lazy init하지만
  *   initializeFromInitialValues가 미리 채워둬 이 경로는 거의 안 탄다.
  *
@@ -789,7 +794,7 @@ const generatorNodeDescriptor: NodeKindDescriptor<
   canBeFeedbackTarget: false,
   initialValue: () => undefined,
   initialValid: () => false,
-  inputPortType: () => null,
+  inputPortType: () => 'boolean',
   outputPortType: () => 'numeric',
   outputUnit: () => FREE_FALLBACK,
   propagate: (node, ctx) => {
@@ -797,17 +802,44 @@ const generatorNodeDescriptor: NodeKindDescriptor<
     const runtime: GeneratorRuntime = existing ?? {
       enabled: false,
       cursor: ctx.generatorRegistry.initCursor(node.params),
+      gateOpen: undefined,
     };
-    if (!runtime.enabled) {
-      // 정지 상태 — 마지막 값을 그대로 유지. ctx.next에 이미 기존 값이 들어 있고
-      // validOutputs도 보존되므로 손대지 않는다.
-      if (!existing) ctx.generatorRuntime[node.id] = runtime;
+
+    // 입력 boolean gate 캐시 동기화 — propagate는 모델 변경/전체 재계산 시점이라
+    // 이 자리에서 source state로부터 gateOpen을 새로 채운다. ticker는 이후 이
+    // 캐시만 본다(state.values 직접 조회 금지).
+    let gateOpen: boolean | undefined;
+    if (ctx.incoming.length > 0) {
+      for (const edge of ctx.incoming) {
+        if (!isEdgeSourceValid(ctx, edge)) continue;
+        const b = getBooleanNext(ctx, edge.from);
+        if (b === undefined) continue;
+        gateOpen = edge.inverted ? !b : b;
+        break;
+      }
+    }
+
+    const effectivelyEnabled =
+      ctx.incoming.length === 0 ? runtime.enabled : gateOpen === true;
+
+    if (!effectivelyEnabled) {
+      // 비활성(freeze)이어도 gateOpen은 최신 source 상태로 갱신해 둔다.
+      ctx.generatorRuntime[node.id] = {
+        enabled: runtime.enabled,
+        cursor: runtime.cursor,
+        gateOpen,
+      };
       return;
     }
     const { value, nextCursor } = ctx.generatorRegistry.emit(node.params, runtime.cursor);
     ctx.next[node.id] = value;
     ctx.validOutputs.add(outputKey(node.id, 0));
-    ctx.generatorRuntime[node.id] = { enabled: true, cursor: nextCursor };
+    // runtime.enabled는 사용자 토글 의도를 보존 — 입력 모드에서도 덮어쓰지 않는다.
+    ctx.generatorRuntime[node.id] = {
+      enabled: runtime.enabled,
+      cursor: nextCursor,
+      gateOpen,
+    };
   },
 };
 
