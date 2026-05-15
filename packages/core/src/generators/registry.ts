@@ -1,10 +1,11 @@
 import type { GeneratorParams, Value } from '../model/index.js';
 import { counterParadigm } from './counter.js';
-import { randomParadigm } from './random.js';
+import { uniformParadigm } from './uniform.js';
+import { normalParadigm } from './normal.js';
 import type { GeneratorCursor, GeneratorParadigm, GeneratorRuntime } from './types.js';
 
 /**
- * 패러다임 레지스트리 — kind('counter'·'random'·...)로 paradigm을 조회.
+ * 패러다임 레지스트리 — kind('counter'·'uniform'·'normal'·...)로 paradigm을 조회.
  *
  * 새 패러다임 추가 시 paradigm 객체 한 개 + GeneratorParams sum type에 case 추가 +
  * GeneratorCursor sum type에 cursor case 추가만으로 라우팅이 완성된다.
@@ -50,7 +51,10 @@ export class GeneratorRegistry {
 }
 
 export function createDefaultGeneratorRegistry(): GeneratorRegistry {
-  return new GeneratorRegistry().register(counterParadigm).register(randomParadigm);
+  return new GeneratorRegistry()
+    .register(counterParadigm)
+    .register(uniformParadigm)
+    .register(normalParadigm);
 }
 
 /** 라이브러리 내부 폴백 — 옵션 미주입 경로에서 사용된다. */

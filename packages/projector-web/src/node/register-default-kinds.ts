@@ -147,7 +147,9 @@ registerNodeKindUI({
 
 /**
  * 생성기 메뉴 프리셋 — 데이터 생성 도메인 전문가.
- * counter는 1,2,3... 증가, random은 [min,max] 균등분포.
+ * - counter: 1,2,3... 등차수열
+ * - uniform: [min,max] 균등분포 (모든 값이 동등 확률)
+ * - normal: 평균 μ, 표준편차 σ의 정규분포 (종 모양)
  */
 registerNodeKindUI({
   kind: 'generator',
@@ -169,18 +171,36 @@ registerNodeKindUI({
       },
     },
     {
-      key: 'gen-random',
-      label: '랜덤 생성기',
-      symbol: 'rnd',
+      key: 'gen-uniform',
+      label: '균등 랜덤 생성기',
+      symbol: 'unif',
       onSelect: (canvasPos) => {
         const addGeneratorNode = instance.modelStore.getState().addGeneratorNode;
         addGeneratorNode({
-          label: '랜덤',
+          label: '균등 랜덤',
           params: {
-            kind: 'random',
+            kind: 'uniform',
             min: 0,
             max: 1,
             integer: false,
+            seed: Math.floor(Math.random() * 0xffffffff),
+          },
+          position: canvasPos,
+        });
+      },
+    },
+    {
+      key: 'gen-normal',
+      label: '정규 랜덤 생성기',
+      symbol: 'norm',
+      onSelect: (canvasPos) => {
+        const addGeneratorNode = instance.modelStore.getState().addGeneratorNode;
+        addGeneratorNode({
+          label: '정규 랜덤',
+          params: {
+            kind: 'normal',
+            mean: 0,
+            stdev: 1,
             seed: Math.floor(Math.random() * 0xffffffff),
           },
           position: canvasPos,

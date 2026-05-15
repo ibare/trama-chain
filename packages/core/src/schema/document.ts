@@ -133,10 +133,16 @@ export const GeneratorParamsSchema = z.discriminatedUnion('kind', [
     step: z.number(),
   }),
   z.object({
-    kind: z.literal('random'),
+    kind: z.literal('uniform'),
     min: z.number(),
     max: z.number(),
     integer: z.boolean(),
+    seed: z.number(),
+  }),
+  z.object({
+    kind: z.literal('normal'),
+    mean: z.number(),
+    stdev: z.number(),
     seed: z.number(),
   }),
 ]);

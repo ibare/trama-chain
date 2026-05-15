@@ -10,8 +10,10 @@ import type { GeneratorParams, Value } from '../model/index.js';
 export type GeneratorCursor =
   /** counter: 다음 emit 시 출력할 값. start로 초기화, emit마다 += step. */
   | { kind: 'counter'; nextValue: number }
-  /** random: PRNG의 현재 state. seed로 초기화. */
-  | { kind: 'random'; prngState: number };
+  /** uniform: PRNG의 현재 state. seed로 초기화. */
+  | { kind: 'uniform'; prngState: number }
+  /** normal: PRNG의 현재 state. Box-Muller가 emit마다 2칸 진행. */
+  | { kind: 'normal'; prngState: number };
 
 /**
  * 노드별 런타임 상태. enabled=true인 동안 propagate 단계마다 emit한다.

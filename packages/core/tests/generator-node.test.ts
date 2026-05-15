@@ -11,10 +11,11 @@ import {
   initializeFromInitialValues,
   isGeneratorNode,
   modelToDocument,
+  normalParadigm,
   numericValue,
   propagateOneStep,
-  randomParadigm,
   TramaDocumentSchema,
+  uniformParadigm,
 } from '../src/index.js';
 import { createDefaultShapeRegistry } from '../src/functions/index.js';
 
@@ -65,16 +66,16 @@ describe('GeneratorNode — counter paradigm', () => {
   });
 });
 
-describe('GeneratorNode — random paradigm', () => {
+describe('GeneratorNode — uniform paradigm', () => {
   it('same seed produces same sequence (deterministic)', () => {
-    const params = { kind: 'random' as const, min: 0, max: 100, integer: false, seed: 42 };
+    const params = { kind: 'uniform' as const, min: 0, max: 100, integer: false, seed: 42 };
     const a: number[] = [];
     const b: number[] = [];
-    let ca = randomParadigm.initCursor(params);
-    let cb = randomParadigm.initCursor(params);
+    let ca = uniformParadigm.initCursor(params);
+    let cb = uniformParadigm.initCursor(params);
     for (let i = 0; i < 5; i++) {
-      const ra = randomParadigm.emit(params, ca);
-      const rb = randomParadigm.emit(params, cb);
+      const ra = uniformParadigm.emit(params, ca);
+      const rb = uniformParadigm.emit(params, cb);
       if (ra.value.kind === 'numeric') a.push(ra.value.n);
       if (rb.value.kind === 'numeric') b.push(rb.value.n);
       ca = ra.nextCursor;
@@ -84,10 +85,10 @@ describe('GeneratorNode — random paradigm', () => {
   });
 
   it('values stay within [min, max]', () => {
-    const params = { kind: 'random' as const, min: 10, max: 20, integer: false, seed: 7 };
-    let cursor = randomParadigm.initCursor(params);
+    const params = { kind: 'uniform' as const, min: 10, max: 20, integer: false, seed: 7 };
+    let cursor = uniformParadigm.initCursor(params);
     for (let i = 0; i < 100; i++) {
-      const r = randomParadigm.emit(params, cursor);
+      const r = uniformParadigm.emit(params, cursor);
       if (r.value.kind === 'numeric') {
         expect(r.value.n).toBeGreaterThanOrEqual(10);
         expect(r.value.n).toBeLessThanOrEqual(20);
@@ -97,10 +98,10 @@ describe('GeneratorNode — random paradigm', () => {
   });
 
   it('integer mode produces only integers', () => {
-    const params = { kind: 'random' as const, min: 1, max: 6, integer: true, seed: 99 };
-    let cursor = randomParadigm.initCursor(params);
+    const params = { kind: 'uniform' as const, min: 1, max: 6, integer: true, seed: 99 };
+    let cursor = uniformParadigm.initCursor(params);
     for (let i = 0; i < 50; i++) {
-      const r = randomParadigm.emit(params, cursor);
+      const r = uniformParadigm.emit(params, cursor);
       if (r.value.kind === 'numeric') {
         expect(Number.isInteger(r.value.n)).toBe(true);
         expect(r.value.n).toBeGreaterThanOrEqual(1);
@@ -108,6 +109,64 @@ describe('GeneratorNode — random paradigm', () => {
       }
       cursor = r.nextCursor;
     }
+  });
+});
+
+describe('GeneratorNode — normal paradigm', () => {
+  it('same seed produces same sequence (deterministic)', () => {
+    const params = { kind: 'normal' as const, mean: 0, stdev: 1, seed: 42 };
+    const a: number[] = [];
+    const b: number[] = [];
+    let ca = normalParadigm.initCursor(params);
+    let cb = normalParadigm.initCursor(params);
+    for (let i = 0; i < 5; i++) {
+      const ra = normalParadigm.emit(params, ca);
+      const rb = normalParadigm.emit(params, cb);
+      if (ra.value.kind === 'numeric') a.push(ra.value.n);
+      if (rb.value.kind === 'numeric') b.push(rb.value.n);
+      ca = ra.nextCursor;
+      cb = rb.nextCursor;
+    }
+    expect(a).toEqual(b);
+  });
+
+  it('large sample: mean·stdev approximate target within tolerance', () => {
+    // N=2000 표본의 표본평균·표본표준편차가 모수 근처에 떨어지는지 검사.
+    // 단순 검증 — 정밀 통계 테스트가 아니라 변환이 깨졌을 때 잡는 가드.
+    const params = { kind: 'normal' as const, mean: 5, stdev: 2, seed: 12345 };
+    let cursor = normalParadigm.initCursor(params);
+    const samples: number[] = [];
+    for (let i = 0; i < 2000; i++) {
+      const r = normalParadigm.emit(params, cursor);
+      if (r.value.kind === 'numeric') samples.push(r.value.n);
+      cursor = r.nextCursor;
+    }
+    const mean = samples.reduce((s, v) => s + v, 0) / samples.length;
+    const variance =
+      samples.reduce((s, v) => s + (v - mean) ** 2, 0) / samples.length;
+    const stdev = Math.sqrt(variance);
+    // 모표준편차 2, N=2000 → 평균 SE ≈ 0.045. 0.3 허용은 매우 넉넉.
+    expect(Math.abs(mean - 5)).toBeLessThan(0.3);
+    expect(Math.abs(stdev - 2)).toBeLessThan(0.3);
+  });
+
+  it('stdev=0 collapses to dirac at mean (no noise)', () => {
+    const params = { kind: 'normal' as const, mean: 7, stdev: 0, seed: 1 };
+    let cursor = normalParadigm.initCursor(params);
+    for (let i = 0; i < 20; i++) {
+      const r = normalParadigm.emit(params, cursor);
+      if (r.value.kind === 'numeric') expect(r.value.n).toBe(7);
+      cursor = r.nextCursor;
+    }
+  });
+
+  it('peek matches the next emit (cursor preserved)', () => {
+    const params = { kind: 'normal' as const, mean: 0, stdev: 1, seed: 77 };
+    const cursor = normalParadigm.initCursor(params);
+    const peeked = normalParadigm.peek(params, cursor);
+    const emitted = normalParadigm.emit(params, cursor);
+    expect(peeked).toEqual(emitted.value);
+    expect(normalParadigm.peek(params, cursor)).toEqual(peeked);
   });
 });
 
@@ -225,11 +284,11 @@ describe('GeneratorNode — propagate integration', () => {
     expect(emitted.nextCursor.nextValue).toBe(49);
   });
 
-  it('random peek matches the next emit for the same cursor', () => {
-    const params = { kind: 'random' as const, min: 0, max: 1, integer: false, seed: 123 };
-    const cursor = randomParadigm.initCursor(params);
-    const peeked = randomParadigm.peek(params, cursor);
-    const emitted = randomParadigm.emit(params, cursor);
+  it('uniform peek matches the next emit for the same cursor', () => {
+    const params = { kind: 'uniform' as const, min: 0, max: 1, integer: false, seed: 123 };
+    const cursor = uniformParadigm.initCursor(params);
+    const peeked = uniformParadigm.peek(params, cursor);
+    const emitted = uniformParadigm.emit(params, cursor);
     expect(peeked).toEqual(emitted.value);
   });
 
@@ -263,7 +322,7 @@ describe('GeneratorNode — schema / serialization', () => {
       {
         id: 'g',
         label: 'gen',
-        params: { kind: 'random', min: -5, max: 5, integer: true, seed: 13 },
+        params: { kind: 'uniform', min: -5, max: 5, integer: true, seed: 13 },
       },
       0,
     );
@@ -271,7 +330,7 @@ describe('GeneratorNode — schema / serialization', () => {
     const parsed = TramaDocumentSchema.parse(doc);
     expect(parsed.nodes[0]).toMatchObject({
       kind: 'generator',
-      params: { kind: 'random', min: -5, max: 5, integer: true, seed: 13 },
+      params: { kind: 'uniform', min: -5, max: 5, integer: true, seed: 13 },
     });
     expect(JSON.stringify(doc)).not.toContain('generatorRuntime');
     expect(JSON.stringify(doc)).not.toContain('cursor');
@@ -280,7 +339,7 @@ describe('GeneratorNode — schema / serialization', () => {
     const n = round.nodes['g']!;
     expect(isGeneratorNode(n)).toBe(true);
     if (isGeneratorNode(n)) {
-      expect(n.params).toEqual({ kind: 'random', min: -5, max: 5, integer: true, seed: 13 });
+      expect(n.params).toEqual({ kind: 'uniform', min: -5, max: 5, integer: true, seed: 13 });
     }
   });
 });
@@ -290,17 +349,19 @@ describe('GeneratorRegistry', () => {
     const reg = createDefaultGeneratorRegistry();
     const c = reg.initCursor({ kind: 'counter', start: 0, step: 1 });
     expect(c.kind).toBe('counter');
-    const r = reg.initCursor({ kind: 'random', min: 0, max: 1, integer: false, seed: 1 });
-    expect(r.kind).toBe('random');
+    const u = reg.initCursor({ kind: 'uniform', min: 0, max: 1, integer: false, seed: 1 });
+    expect(u.kind).toBe('uniform');
+    const n = reg.initCursor({ kind: 'normal', mean: 0, stdev: 1, seed: 1 });
+    expect(n.kind).toBe('normal');
     expect(() => reg.initCursor({ kind: 'bogus' as never, start: 0, step: 1 } as never)).toThrow();
   });
 
   it('reinitializes cursor when paradigm kind mismatches', () => {
     const reg = createDefaultGeneratorRegistry();
-    // counter params + random cursor → cursor 재초기화.
+    // counter params + uniform cursor → cursor 재초기화.
     const out = reg.emit(
       { kind: 'counter', start: 100, step: 0 },
-      { kind: 'random', prngState: 12345 },
+      { kind: 'uniform', prngState: 12345 },
     );
     expect(out.value).toEqual(numericValue(100, 'free'));
   });
