@@ -186,10 +186,11 @@ function ConstantNodeViewImpl({ id }: Props): JSX.Element | null {
         <BooleanStateIcon cx={panelCx} cy={valueY} on={constantBoolean} />
       ) : (
         <text
-          className="trama-node-value"
+          className={`trama-node-value${currentMode === 'compact' ? ' is-compact' : ''}`}
           x={layout.labelAnchor === 'middle' ? panelCx : layout.textX}
-          y={valueY}
+          y={panelCy}
           textAnchor={layout.labelAnchor}
+          dominantBaseline="central"
         >
           {valueText}
         </text>

@@ -46,7 +46,7 @@ export interface BooleanSkinDomain {
  * 스킨 컴포넌트가 받는 props.
  *
  * 스킨은 노드 본문(label/value/combiner chip)을 대체하는 SVG group을 그린다.
- * 소켓·NodeFrame·NodeBorderTrack은 ValueNodeView가 계속 책임진다.
+ * 소켓·NodeFrame·ValueNodeSlider는 ValueNodeView가 계속 책임진다.
  *
  * 영역: (-halfW, -halfH) ~ (halfW, halfH). NodeFrame 안에서 좌표 (0,0)이
  * 노드 중심에 오도록 transform이 이미 걸려 있다.

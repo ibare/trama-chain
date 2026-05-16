@@ -6,8 +6,8 @@ import { resolveNodeUnit } from '../util/unit-resolver.js';
 interface Props {
   node: ValueNode;
   halfW: number;
-  /** 트랙(슬라이더)의 y 좌표. 노드 안쪽 하단 padding 지점. */
-  trackY: number;
+  /** 슬라이더의 y 좌표. 노드 카드 안쪽 하단 padding 지점. */
+  sliderY: number;
 }
 
 const TRACK_INSET = 18;
@@ -39,7 +39,7 @@ function snap(v: number, step: number): number {
   return Math.round(v / step) * step;
 }
 
-export function NodeBorderTrack({ node, halfW, trackY }: Props): JSX.Element | null {
+export function ValueNodeSlider({ node, halfW, sliderY }: Props): JSX.Element | null {
   const { modelStore, viewport } = useTrama();
   const scrubInitialValue = modelStore((s) => s.scrubInitialValue);
   const unit = resolveNodeUnit(node);
@@ -104,31 +104,31 @@ export function NodeBorderTrack({ node, halfW, trackY }: Props): JSX.Element | n
   if (numericInitial === null || range <= 0 || trackLen <= 0) return null;
 
   return (
-    <g className="trama-node-track" pointerEvents="auto">
+    <g className="trama-value-slider" pointerEvents="auto">
       <line
-        className="trama-node-track-rest"
+        className="trama-value-slider-rest"
         x1={trackLeft}
         x2={trackRight}
-        y1={trackY}
-        y2={trackY}
+        y1={sliderY}
+        y2={sliderY}
       />
       <line
-        className="trama-node-track-fill"
+        className="trama-value-slider-fill"
         x1={trackLeft}
         x2={handleX}
-        y1={trackY}
-        y2={trackY}
+        y1={sliderY}
+        y2={sliderY}
       />
       <circle
-        className="trama-node-track-handle"
+        className="trama-value-slider-handle"
         cx={handleX}
-        cy={trackY}
+        cy={sliderY}
         r={HANDLE_RADIUS}
       />
       <rect
-        className="trama-node-track-hit"
+        className="trama-value-slider-hit"
         x={trackLeft - HANDLE_RADIUS}
-        y={trackY - HIT_HEIGHT / 2}
+        y={sliderY - HIT_HEIGHT / 2}
         width={trackLen + HANDLE_RADIUS * 2}
         height={HIT_HEIGHT}
         onPointerDown={onPointerDown}

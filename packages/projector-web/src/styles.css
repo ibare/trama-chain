@@ -136,12 +136,16 @@
 }
 
 [data-trama-root] .trama-node-value {
-  font-size: 2.25rem;
+  font-size: 1.75rem;
   fill: var(--color-node-text-primary);
   pointer-events: none;
   font-variant-numeric: tabular-nums;
   font-weight: 700;
   letter-spacing: -0.01em;
+}
+
+[data-trama-root] .trama-node-value.is-compact {
+  font-size: 1.25rem;
 }
 
 [data-trama-root] .trama-node-unit {
@@ -273,29 +277,29 @@
   pointer-events: none;
 }
 
-/* 입력 노드 하단 보더를 트랙으로. body 위에 덮어 그려 보더 자리를 대체한다. */
-[data-trama-root] .trama-node-track-rest {
+/* numeric ValueNode의 값 조절 슬라이더 — 카드 안쪽 하단 패딩 지점에 그린다. */
+[data-trama-root] .trama-value-slider-rest {
   stroke: var(--color-node-stroke-calm);
   stroke-width: 4px;
   stroke-linecap: round;
   pointer-events: none;
 }
 
-[data-trama-root] .trama-node-track-fill {
+[data-trama-root] .trama-value-slider-fill {
   stroke: var(--color-node-stroke-focal);
   stroke-width: 4.5px;
   stroke-linecap: round;
   pointer-events: none;
 }
 
-[data-trama-root] .trama-node-track-handle {
+[data-trama-root] .trama-value-slider-handle {
   fill: var(--color-node-fill-focal);
   stroke: var(--color-node-stroke-focal);
   stroke-width: 1.25px;
   pointer-events: none;
 }
 
-[data-trama-root] .trama-node-track-hit {
+[data-trama-root] .trama-value-slider-hit {
   fill: transparent;
   cursor: ew-resize;
 }
@@ -1911,7 +1915,7 @@
 /* Skins ----------------------------------------------------------------- */
 /* 노드 시각 스킨. ValueNodeView가 node.skin이 있을 때 본문(label/value/combiner)
    대신 스킨 컴포넌트를 SVG group으로 렌더한다. 스킨은 자체 표현(말풍선·곡선
-   surface 등)을 책임지고, 소켓·NodeFrame·NodeBorderTrack은 그대로 유지된다. */
+   surface 등)을 책임지고, 소켓·NodeFrame·ValueNodeSlider는 그대로 유지된다. */
 
 /* 모든 스킨에 공통으로 씌우는 silhouette outline. 평소 invisible, 노드가 선택됐을 때
    stroke로 시각화 — 사용자가 "안 보이던 원형 보더가 보인다"는 단일 진실의 선택 시각. */

@@ -67,7 +67,12 @@ export function resolveDisplayMode(node: Node): NodeDisplayMode {
  */
 export function supportsDisplayModeToggle(node: Node): boolean {
   if (isValueNode(node)) {
-    return node.initialValue.kind === 'boolean';
+    // 스킨이 적용된 ValueNode는 본문이 스킨으로 통째 대체되므로 compact 의미가
+    // 없다 — 토글 노출 대상에서 제외.
+    if (node.skin) return false;
+    return (
+      node.initialValue.kind === 'boolean' || node.initialValue.kind === 'numeric'
+    );
   }
   return isConstantNode(node) || isGeneratorNode(node) || isLogicGateNode(node);
 }

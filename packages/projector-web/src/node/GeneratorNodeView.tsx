@@ -143,7 +143,7 @@ function GeneratorNodeViewImpl({ id, incomingCount }: Props): JSX.Element | null
       </text>
 
       <text
-        className="trama-node-value"
+        className={`trama-node-value${currentMode === 'compact' ? ' is-compact' : ''}`}
         x={0}
         y={valueY}
         textAnchor="middle"

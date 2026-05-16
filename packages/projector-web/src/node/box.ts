@@ -147,8 +147,8 @@ export interface NodeLayout {
   /** 라벨 정렬 — standard는 'start'(좌측 정렬), compact는 'middle'(중앙 정렬). */
   labelAnchor: 'start' | 'middle';
   valueY: number;
-  /** 입력성 ValueNode의 슬라이더 트랙 y 좌표 (노드 안쪽 하단). */
-  trackY: number;
+  /** 입력성 ValueNode의 슬라이더 y 좌표 (노드 카드 안쪽 하단). */
+  sliderY: number;
   combinerCenterY: number | null;
   hasCombiner: boolean;
   leftPin: PinLayout;
@@ -262,6 +262,13 @@ const COMPACT_SPEC_CONSTANT: CompactSpec = {
   panelH: 56,
   hasOuterControls: false,
 };
+// numeric ValueNode — 패널 안 현재값+단위, 외곽 컨트롤 슬롯에 슬라이더(또는
+// combiner 칩). GeneratorNode와 동일 폭으로 가로 그리드 정렬.
+const COMPACT_SPEC_VALUE_NUMERIC: CompactSpec = {
+  panelW: 128,
+  panelH: 56,
+  hasOuterControls: true,
+};
 
 /**
  * compact 모드의 공통 layout 계산. 라벨 슬롯(위) + 패널 + (옵션) 컨트롤 슬롯(아래)을
@@ -337,6 +344,14 @@ function buildCompactLayout(
         }
       : null;
 
+  // numeric ValueNode compact — 외곽 컨트롤 슬롯을 슬라이더와 combiner 칩이 공유한다.
+  // lag=0 입력 2개 이상이면 슬라이더가 의미 잃고 combiner 칩으로 자리 교체.
+  const isNumericValueNode =
+    node.kind === 'value' && node.initialValue.kind === 'numeric';
+  const hasCombiner = isNumericValueNode && incomingCount > 1;
+  const sliderY = outerControlSlot && isNumericValueNode ? outerControlSlot.cy : halfH;
+  const combinerCenterY = hasCombiner && outerControlSlot ? outerControlSlot.cy : null;
+
   return {
     width: totalW,
     height: totalH,
@@ -350,9 +365,9 @@ function buildCompactLayout(
     labelY,
     labelAnchor: 'middle',
     valueY: panelCy,
-    trackY: halfH,
-    combinerCenterY: null,
-    hasCombiner: false,
+    sliderY,
+    combinerCenterY,
+    hasCombiner,
     leftPin,
     rightPin,
     skinBorder: null,
@@ -383,6 +398,9 @@ export function getNodeLayout(
   if (opts.displayMode === 'compact') {
     if (isValueNode(node) && !node.skin && node.initialValue.kind === 'boolean') {
       return buildCompactLayout(node, COMPACT_SPEC_BOOLEAN, opts);
+    }
+    if (isValueNode(node) && !node.skin && node.initialValue.kind === 'numeric') {
+      return buildCompactLayout(node, COMPACT_SPEC_VALUE_NUMERIC, opts);
     }
     if (isGeneratorNode(node)) {
       return buildCompactLayout(node, COMPACT_SPEC_GENERATOR, opts);
@@ -420,7 +438,7 @@ export function getNodeLayout(
         labelY: 0,
         labelAnchor: 'start',
         valueY: 0,
-        trackY: halfH,
+        sliderY: halfH,
         combinerCenterY: null,
         hasCombiner: false,
         leftPin,
@@ -484,7 +502,7 @@ export function getNodeLayout(
       labelY,
       labelAnchor: 'start',
       valueY: bodyY,
-      trackY: halfH,
+      sliderY: halfH,
       combinerCenterY: null,
       hasCombiner: false,
       leftPin,
@@ -521,7 +539,7 @@ export function getNodeLayout(
       labelY: cardTop + OBSERVE_LABEL_FROM_TOP,
       labelAnchor: 'start',
       valueY: 0,
-      trackY: halfH,
+      sliderY: halfH,
       combinerCenterY: null,
       hasCombiner: false,
       leftPin,
@@ -557,7 +575,7 @@ export function getNodeLayout(
       labelY: cardTop + NAME_FROM_TOP,
       labelAnchor: 'start',
       valueY: cardTop + VALUE_FROM_TOP,
-      trackY: halfH,
+      sliderY: halfH,
       combinerCenterY: null,
       hasCombiner: false,
       leftPin,
@@ -602,7 +620,7 @@ export function getNodeLayout(
   const labelY = cardTop + NAME_FROM_TOP;
   const valueY = cardTop + VALUE_FROM_TOP;
   const combinerCenterY = hasCombiner ? cardTop + COMBINER_CENTER_FROM_TOP : null;
-  const trackY = halfH - TRACK_FROM_BOTTOM;
+  const sliderY = halfH - TRACK_FROM_BOTTOM;
 
   const leftPin = buildPin(-halfW, 0, inSockets);
   const rightPin = buildPin(halfW, 0, 1);
@@ -620,7 +638,7 @@ export function getNodeLayout(
     labelY,
     labelAnchor: 'start',
     valueY,
-    trackY,
+    sliderY,
     combinerCenterY,
     hasCombiner,
     leftPin,
