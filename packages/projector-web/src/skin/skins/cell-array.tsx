@@ -80,7 +80,7 @@ export function CellArray({
           const cell = params.cells[i]!;
           const fill = computeFill(cell, value, cellTolerance);
           const active = resolveSwatch(cell.color);
-          const inactive = dimSwatch(cell.color, params.dim);
+          const inactive = dimSwatch(cell.color, INACTIVE_DIM);
           return (
             <CellShape
               key={i}
@@ -138,16 +138,19 @@ export interface CellArrayParams {
   cells: Cell[];
   shape: CellShapeKind;
   direction: CellDirection;
-  /** 0..1. 비활성 셀의 옅은 정도 (shade 시프트 양). */
-  dim: number;
 }
+
+/**
+ * 비활성 셀의 옅은 정도(0..1, 클수록 옅음).
+ * 사용자 노출 옵션이 아닌 내부 상수 — 셀이 "거의 꺼진 듯" 보이도록 고정.
+ */
+const INACTIVE_DIM = 0.9;
 
 export function defaultCellArrayParams(): CellArrayParams {
   return {
     cells: [{ kind: 'range', lo: 0, hi: 100, color: { primitive: 'green', shade: '500' } }],
     shape: 'capsule',
     direction: 'vertical',
-    dim: 0.65,
   };
 }
 
@@ -164,9 +167,6 @@ function normalizeParams(raw: unknown): CellArrayParams {
     cells: cells.length > 0 ? cells : fallback.cells,
     shape: r.shape === 'circle' ? 'circle' : 'capsule',
     direction: r.direction === 'horizontal' ? 'horizontal' : 'vertical',
-    dim: typeof r.dim === 'number' && Number.isFinite(r.dim)
-      ? Math.max(0, Math.min(1, r.dim))
-      : fallback.dim,
   };
 }
 

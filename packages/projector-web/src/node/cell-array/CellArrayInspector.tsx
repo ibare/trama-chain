@@ -96,11 +96,6 @@ export function CellArrayInspector({ node }: Props): JSX.Element {
     commit({ cells: [...params.cells, next] });
   }, [commit, params.cells]);
 
-  const onDimChange = useCallback(
-    (v: number) => commit({ dim: v }),
-    [commit],
-  );
-
   return (
     <div className="trama-cell-array-inspector">
       <Separator.Root className="trama-unit-inspector-sep" decorative orientation="horizontal" />
@@ -170,22 +165,6 @@ export function CellArrayInspector({ node }: Props): JSX.Element {
         </div>
       </div>
 
-      <div className="trama-cell-array-section">
-        <label className="trama-unit-inspector-section-label" htmlFor={`dim-${node.id}`}>
-          비활성 정도
-        </label>
-        <input
-          id={`dim-${node.id}`}
-          type="range"
-          min={0}
-          max={1}
-          step={0.05}
-          value={params.dim}
-          className="trama-cell-array-dim"
-          onChange={(e) => onDimChange(parseFloat(e.currentTarget.value))}
-        />
-        <span className="trama-cell-array-dim-value">{params.dim.toFixed(2)}</span>
-      </div>
     </div>
   );
 }

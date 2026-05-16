@@ -1379,17 +1379,6 @@
   cursor: not-allowed;
 }
 
-[data-trama-root] .trama-cell-array-dim {
-  width: 100%;
-}
-
-[data-trama-root] .trama-cell-array-dim-value {
-  font-size: var(--typography-text-step-count);
-  color: var(--color-node-text-low);
-  font-variant-numeric: tabular-nums;
-  align-self: flex-end;
-}
-
 /* cell-array 컬러 피커 -------------------------------------------- */
 [data-trama-root] .trama-cell-color-trigger {
   width: 22px;
