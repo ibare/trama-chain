@@ -4,6 +4,7 @@ import { isNumericValue, isValueNode, type NodeId } from '@trama/core';
 import { useTrama } from '../store/index.js';
 import { resolveNodeUnit } from '../util/unit-resolver.js';
 import { useNodeLayout } from './use-node-layout.js';
+import { getDefaultDisplayMode } from './display-mode.js';
 import { NodeBorderTrack } from './NodeBorderTrack.js';
 import { NodeFrame } from './NodeFrame.js';
 import { Socket } from './Socket.js';
@@ -61,7 +62,10 @@ function ValueNodeViewImpl({ id, incomingCount }: Props): JSX.Element | null {
   // hook 순서를 깨지 않기 위한 primitive 폴백 — 화면에는 도달하지 않는다.
   const posX = node?.position?.x ?? 0;
   const posY = node?.position?.y ?? 0;
-  const layout = useNodeLayout(node, { incomingCount });
+  const layout = useNodeLayout(node, {
+    incomingCount,
+    displayMode: node ? getDefaultDisplayMode(node) : undefined,
+  });
 
   const onBodyDoubleClick = useCallback(() => {
     setEditingNode(id);

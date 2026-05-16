@@ -3,6 +3,7 @@ import { tokens } from '@trama/tokens';
 import { isGeneratorNode, isNumericValue, type NodeId } from '@trama/core';
 import { useTrama } from '../store/index.js';
 import { useNodeLayout } from './use-node-layout.js';
+import { getDefaultDisplayMode } from './display-mode.js';
 import { NodeFrame } from './NodeFrame.js';
 import { NodeBody } from './NodeBody.js';
 import { InteractiveArea } from './InteractiveArea.js';
@@ -45,7 +46,10 @@ function GeneratorNodeViewImpl({ id, incomingCount }: Props): JSX.Element | null
 
   const posX = node?.position?.x ?? 0;
   const posY = node?.position?.y ?? 0;
-  const layout = useNodeLayout(node, { incomingCount });
+  const layout = useNodeLayout(node, {
+    incomingCount,
+    displayMode: node ? getDefaultDisplayMode(node) : undefined,
+  });
 
   // 좌측 입력 socket을 socket registry에 등록 — 엣지 드롭이 이 위치로 맞춰 들어온다.
   useEffect(() => {
@@ -83,7 +87,7 @@ function GeneratorNodeViewImpl({ id, incomingCount }: Props): JSX.Element | null
   if (!node.position) return null;
   if (!layout) return null;
 
-  const { width, height, labelY, textX, valueY, generatorBody } = layout;
+  const { width, height, labelY, textX, valueY, generatorBody, panelCx, panelCy } = layout;
   const stateClass = enabled ? 'is-focal' : 'is-calm';
 
   const valueText =
@@ -112,13 +116,20 @@ function GeneratorNodeViewImpl({ id, incomingCount }: Props): JSX.Element | null
       onBodyDoubleClick={onBodyDoubleClick}
     >
       <NodeBody
-        width={width}
-        height={height}
+        width={layout.panelWidth}
+        height={layout.panelHeight}
+        cx={panelCx}
+        cy={panelCy}
         stateClass={stateClass}
         isSelected={isSelected}
       />
 
-      <text className="trama-node-label" x={textX} y={labelY} textAnchor="start">
+      <text
+        className="trama-node-label"
+        x={layout.labelAnchor === 'middle' ? 0 : textX}
+        y={labelY}
+        textAnchor={layout.labelAnchor}
+      >
         {node.label}
       </text>
 
@@ -127,6 +138,7 @@ function GeneratorNodeViewImpl({ id, incomingCount }: Props): JSX.Element | null
         x={0}
         y={valueY}
         textAnchor="middle"
+        dominantBaseline="central"
       >
         {valueText}
       </text>

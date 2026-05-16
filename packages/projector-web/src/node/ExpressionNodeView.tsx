@@ -28,6 +28,7 @@ import {
 } from './use-socket-connections.js';
 import { useEdgeDraftSource } from '../canvas/use-edge-draft-source.js';
 import { useNodeLayout } from './use-node-layout.js';
+import { getDefaultDisplayMode } from './display-mode.js';
 import { slotColor } from './slot-palette.js';
 
 interface Props {
@@ -157,6 +158,7 @@ function ExpressionNodeViewImpl({ id }: Props): JSX.Element | null {
   const layout = useNodeLayout(node, {
     incomingCount: variables.length,
     expressionSize: measured,
+    displayMode: node ? getDefaultDisplayMode(node) : undefined,
   });
 
   // 입력 슬롯 등록 — 변수 갯수만큼. 좌표는 공통 box.ts 레이아웃을 그대로 사용해
@@ -292,8 +294,10 @@ function ExpressionNodeViewImpl({ id }: Props): JSX.Element | null {
         <title>{formatInvalidReason(invalidReason)}</title>
       ) : null}
       <NodeBody
-        width={width}
-        height={height}
+        width={layout.panelWidth}
+        height={layout.panelHeight}
+        cx={layout.panelCx}
+        cy={layout.panelCy}
         stateClass={stateClass}
         isSelected={isSelected}
       />

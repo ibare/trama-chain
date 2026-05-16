@@ -7,6 +7,7 @@ import {
 } from '@trama/core';
 import { useTrama } from '../store/index.js';
 import { getNodeLayout } from './box.js';
+import { getDefaultDisplayMode } from './display-mode.js';
 import { UnitInspector } from './UnitInspector.js';
 import { ObserveInspector } from './ObserveInspector.js';
 import { GeneratorInspector } from './GeneratorInspector.js';
@@ -39,7 +40,10 @@ export function UnitInspectorLayer(): JSX.Element | null {
 
   const anchor = useMemo(() => {
     if (!node || !node.position) return null;
-    const layout = getNodeLayout(node, { incomingCount });
+    const layout = getNodeLayout(node, {
+      incomingCount,
+      displayMode: getDefaultDisplayMode(node),
+    });
     const canvasAnchorX = node.position.x + layout.halfW;
     const canvasAnchorY = node.position.y - layout.halfH;
     return {

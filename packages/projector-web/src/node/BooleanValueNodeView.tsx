@@ -4,6 +4,7 @@ import { isValueNode, type NodeId } from '@trama/core';
 import { useTrama } from '../store/index.js';
 import { combinerRegistry } from '../store/registries.js';
 import { useNodeLayout } from './use-node-layout.js';
+import { getDefaultDisplayMode } from './display-mode.js';
 import { NodeBody } from './NodeBody.js';
 import { NodeFrame } from './NodeFrame.js';
 import { NodeLabel } from './NodeLabel.js';
@@ -73,7 +74,10 @@ function BooleanValueNodeViewImpl({ id, incomingCount }: Props): JSX.Element | n
   // 좌표 폴백 — hook 순서를 위해 노드/위치 가드 전에 호출.
   const posX = node?.position?.x ?? 0;
   const posY = node?.position?.y ?? 0;
-  const layout = useNodeLayout(node, { incomingCount });
+  const layout = useNodeLayout(node, {
+    incomingCount,
+    displayMode: node ? getDefaultDisplayMode(node) : undefined,
+  });
 
   const onBodyDoubleClick = useCallback(() => {
     setEditingNode(id);
@@ -128,14 +132,17 @@ function BooleanValueNodeViewImpl({ id, incomingCount }: Props): JSX.Element | n
   if (!node || !isValueNode(node) || !node.position || !layout) return null;
   if (node.initialValue.kind !== 'boolean') return null;
 
-  const { halfW, width, height, valueY } = layout;
+  const { halfW, width, height, valueY, panelCx, panelCy, outerControlSlot } = layout;
   const stateClass = currentBoolean ? 'is-focal' : 'is-calm';
   const combiner = combinerRegistry.getOfKind(node.combiner, 'boolean');
   const combinerLabel = combiner?.labels.ko ?? node.combiner;
   const isInputNode = !hasLag0Incoming;
 
-  const iconCx = -halfW + 32;
-  const toggleCx = halfW - 40;
+  // compact일 때 토글은 패널 *밖* 외곽 컨트롤 슬롯으로. standard일 때는 패널 안쪽
+  // 오른편(기존 동작 유지).
+  const iconCx = outerControlSlot ? panelCx : -halfW + 32;
+  const toggleCx = outerControlSlot ? panelCx : halfW - 40;
+  const toggleCy = outerControlSlot ? outerControlSlot.cy : valueY;
 
   return (
     <NodeFrame
@@ -146,8 +153,10 @@ function BooleanValueNodeViewImpl({ id, incomingCount }: Props): JSX.Element | n
       onBodyDoubleClick={onBodyDoubleClick}
     >
       <NodeBody
-        width={width}
-        height={height}
+        width={layout.panelWidth}
+        height={layout.panelHeight}
+        cx={panelCx}
+        cy={panelCy}
         stateClass={stateClass}
         isSelected={isSelected}
       />
@@ -156,17 +165,18 @@ function BooleanValueNodeViewImpl({ id, incomingCount }: Props): JSX.Element | n
         x={layout.textX}
         y={layout.labelY}
         width={width - (layout.textX - -halfW) * 2}
+        textAnchor={layout.labelAnchor}
         isEditing={isEditing}
         onCommit={commitLabel}
         onCancel={cancelLabel}
       />
 
-      <BooleanStateIcon cx={iconCx} cy={valueY} on={currentBoolean} />
+      <BooleanStateIcon cx={iconCx} cy={outerControlSlot ? panelCy : valueY} on={currentBoolean} />
 
       {isInputNode && (
         <BooleanToggleSwitch
           cx={toggleCx}
-          cy={valueY}
+          cy={toggleCy}
           on={currentBoolean}
           onClick={onToggleClick}
         />

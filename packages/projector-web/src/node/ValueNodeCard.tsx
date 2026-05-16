@@ -51,8 +51,10 @@ function ValueNodeCardImpl({
   return (
     <>
       <NodeBody
-        width={width}
-        height={layout.height}
+        width={layout.panelWidth}
+        height={layout.panelHeight}
+        cx={layout.panelCx}
+        cy={layout.panelCy}
         stateClass={stateClass}
         isSelected={isSelected}
       />
@@ -61,6 +63,7 @@ function ValueNodeCardImpl({
         x={layout.textX}
         y={layout.labelY}
         width={width - (layout.textX - -halfW) * 2}
+        textAnchor={layout.labelAnchor}
         isEditing={isEditing}
         onCommit={onCommitLabel}
         onCancel={onCancelLabel}

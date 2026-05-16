@@ -112,14 +112,40 @@ export interface PinLayout {
   sockets: SocketPoint[];
 }
 
+/**
+ * 노드의 디스플레이 모드. standard는 패널 안에 모든 요소(라벨/값/슬라이더 등)를
+ * 담고, compact는 패널을 데이터 디스플레이로 순수화해 외곽 부속(라벨 위, 슬롯
+ * 좌우 바깥, 컨트롤 아래)으로 분리한다.
+ */
+export type NodeDisplayMode = 'standard' | 'compact';
+
 export interface NodeLayout {
+  /**
+   * 노드 전체 사이즈 — 드래그·충돌·hit 영역의 기준. compact에서는 패널 밖
+   * 외곽 부속(라벨/슬롯/컨트롤)까지 모두 포함한다.
+   */
   width: number;
   height: number;
+  /**
+   * 패널(데이터 디스플레이) 본체 사이즈. standard에서는 width/height와 동치.
+   * compact에서는 외곽 부속을 제외한 작은 카드 영역.
+   */
+  panelWidth: number;
+  panelHeight: number;
+  /**
+   * 패널 중심 좌표(노드 중심 기준). standard에서는 (0, 0).
+   * compact에서는 라벨 슬롯(위) 만큼 아래로 시프트된다. NodeBody가 패널을 그릴 때
+   * 사용하는 단일 기준점 — `(cx-halfW, cy-halfH)` 로 좌상단을 계산한다.
+   */
+  panelCx: number;
+  panelCy: number;
   halfW: number;
   halfH: number;
   /** 좌측 정렬 텍스트의 x 시작점 (라벨·값 공통). */
   textX: number;
   labelY: number;
+  /** 라벨 정렬 — standard는 'start'(좌측 정렬), compact는 'middle'(중앙 정렬). */
+  labelAnchor: 'start' | 'middle';
   valueY: number;
   /** 입력성 ValueNode의 슬라이더 트랙 y 좌표 (노드 안쪽 하단). */
   trackY: number;
@@ -135,8 +161,15 @@ export interface NodeLayout {
   expressionBody: { x: number; y: number; w: number; h: number } | null;
   /** Observe 노드의 시각화 본문 영역(노드 중심 기준). ObserveNode가 아니면 null. */
   observeBody: { x: number; y: number; w: number; h: number } | null;
-  /** Generator 노드의 컨트롤러(▶/■/↺) 슬롯 영역. GeneratorNode가 아니면 null. */
+  /** Generator 노드의 컨트롤러(▶/■/↺) 슬롯 영역. GeneratorNode가 아니면 null.
+   *  compact에서는 패널 *밖 아래쪽* 외곽 컨트롤 슬롯으로 재배치된다. */
   generatorBody: { x: number; y: number; w: number; h: number } | null;
+  /**
+   * compact 모드에서 패널 아래쪽에 마련되는 외곽 컨트롤 슬롯 — 토글·버튼이
+   * 들어가는 자리. NodeView가 자기 컨트롤을 이 슬롯의 cy에 정렬해 그린다.
+   * standard에서는 null. compact라도 컨트롤이 없는 종류(예: logic-gate)면 null.
+   */
+  outerControlSlot: { cy: number; h: number } | null;
 }
 
 function buildPin(cx: number, cy: number, nSockets: number): PinLayout {
@@ -191,6 +224,146 @@ const EXPR_LABEL_SLOT_H = 36;
 const EXPR_BOTTOM_PADDING = 16;
 
 /**
+ * compact 모드 외곽 사양 — 라벨 슬롯(위) + 패널 + 컨트롤 슬롯(아래) 스택.
+ * 각 종류별로 panel 사이즈와 컨트롤 슬롯 유무만 다르고, 외곽 패딩은 공통.
+ */
+const COMPACT_LABEL_OUTER_H = 24;
+const COMPACT_LABEL_BASELINE_FROM_TOP = 18;
+const COMPACT_PANEL_LABEL_GAP = 4;
+const COMPACT_CONTROLS_OUTER_H = 36;
+const COMPACT_PANEL_CONTROLS_GAP = 4;
+const COMPACT_SOCKET_SIDE_INSET = 18;
+
+interface CompactSpec {
+  panelW: number;
+  panelH: number;
+  hasOuterControls: boolean;
+}
+
+const COMPACT_SPEC_BOOLEAN: CompactSpec = {
+  panelW: 96,
+  panelH: 64,
+  hasOuterControls: true,
+};
+const COMPACT_SPEC_GENERATOR: CompactSpec = {
+  panelW: 128,
+  panelH: 56,
+  hasOuterControls: true,
+};
+const COMPACT_SPEC_LOGIC_GATE: CompactSpec = {
+  panelW: 64,
+  panelH: 56,
+  hasOuterControls: false,
+};
+// ConstantNode 는 입력 없음. 본문에 짧은 라벨 + 값/✓·✗ 한 줄. 인라인 편집은
+// 본체 더블클릭 진입이라 외곽 컨트롤 슬롯 불필요.
+const COMPACT_SPEC_CONSTANT: CompactSpec = {
+  panelW: 112,
+  panelH: 56,
+  hasOuterControls: false,
+};
+
+/**
+ * compact 모드의 공통 layout 계산. 라벨 슬롯(위) + 패널 + (옵션) 컨트롤 슬롯(아래)을
+ * 세로로 쌓고, 좌·우 socket은 총 박스 외곽에 패널 cy로 정렬한다.
+ */
+function buildCompactLayout(
+  node: Node,
+  spec: CompactSpec,
+  opts: { incomingCount: number },
+): NodeLayout {
+  const incomingCount = Math.max(0, opts.incomingCount);
+  // 입력 슬롯 수 — constant는 입력 없음, boolean ValueNode는 combiner 없는
+  // 단일 입력, generator는 단일 boolean gate, logic-gate는 N항(NOT만 1).
+  const isConstant = node.kind === 'constant';
+  const isLogicGate = node.kind === 'logic-gate';
+  const isUnaryLogicGate = isLogicGate && node.operator === 'not';
+  const inSockets = isConstant
+    ? 0
+    : isLogicGate
+      ? isUnaryLogicGate
+        ? 1
+        : Math.max(1, incomingCount)
+      : 1;
+
+  const labelBlockH = COMPACT_LABEL_OUTER_H + COMPACT_PANEL_LABEL_GAP;
+  const controlsBlockH = spec.hasOuterControls
+    ? COMPACT_PANEL_CONTROLS_GAP + COMPACT_CONTROLS_OUTER_H
+    : 0;
+
+  // compact 의 핵심 약속: panel 사이즈는 spec 으로 *고정* — socket 수에 의존하지
+  // 않는다. socket pin stack 은 panel 과 무관하게 자체 크기로 자라서 panel cy
+  // 기준으로 위·아래로 흘러나간다. 흘러나간 만큼만 노드 총 박스가 늘어난다.
+  const panelH = spec.panelH;
+  const inMinH =
+    PIN_PAD * 2 + inSockets * SOCKET_SIZE + Math.max(0, inSockets - 1) * PIN_SOCKET_GAP;
+  const pinDemandH = Math.max(PIN_W, inMinH);
+  const socketOverflow = Math.max(0, (pinDemandH - panelH) / 2);
+
+  const totalH = labelBlockH + panelH + controlsBlockH + socketOverflow * 2;
+  // socket center 는 panel 좌·우 edge 바깥쪽 INSET 만큼 떨어져 위치 —
+  // compact 의 "슬롯은 패널 바깥" 약속. 노드 박스(드래그 hit) 는 socket 까지 포함.
+  const totalW = spec.panelW + COMPACT_SOCKET_SIDE_INSET * 2;
+
+  const halfW = totalW / 2;
+  const halfH = totalH / 2;
+  const topY = -halfH;
+
+  const panelCy = topY + socketOverflow + labelBlockH + panelH / 2;
+  const labelY = topY + socketOverflow + COMPACT_LABEL_BASELINE_FROM_TOP;
+  const outerControlSlot = spec.hasOuterControls
+    ? {
+        cy:
+          panelCy +
+          panelH / 2 +
+          COMPACT_PANEL_CONTROLS_GAP +
+          COMPACT_CONTROLS_OUTER_H / 2,
+        h: COMPACT_CONTROLS_OUTER_H,
+      }
+    : null;
+
+  const leftPin = buildPin(-halfW, panelCy, inSockets);
+  const rightPin = buildPin(halfW, panelCy, 1);
+
+  // generator의 ▶/↺ 버튼은 기존 generatorBody 슬롯을 그대로 쓰는 형태로 작성되어
+  // 있으므로, compact에서도 generatorBody에 outer 컨트롤 슬롯 좌표를 채워 호환.
+  const generatorBody =
+    node.kind === 'generator' && outerControlSlot
+      ? {
+          x: -spec.panelW / 2,
+          y: outerControlSlot.cy - COMPACT_CONTROLS_OUTER_H / 2,
+          w: spec.panelW,
+          h: COMPACT_CONTROLS_OUTER_H,
+        }
+      : null;
+
+  return {
+    width: totalW,
+    height: totalH,
+    panelWidth: spec.panelW,
+    panelHeight: panelH,
+    panelCx: 0,
+    panelCy,
+    halfW,
+    halfH,
+    textX: 0,
+    labelY,
+    labelAnchor: 'middle',
+    valueY: panelCy,
+    trackY: halfH,
+    combinerCenterY: null,
+    hasCombiner: false,
+    leftPin,
+    rightPin,
+    skinBorder: null,
+    expressionBody: null,
+    observeBody: null,
+    generatorBody,
+    outerControlSlot,
+  };
+}
+
+/**
  * 노드 카드의 모든 절대 좌표(노드 중심 기준)를 반환한다.
  * 카드 폭은 고정, 높이는 (1) combiner 칩 유무 (2) 좌측 핀 소켓 수에 따라 자동 확장.
  *
@@ -202,8 +375,26 @@ export function getNodeLayout(
   opts: {
     incomingCount: number;
     expressionSize?: { width: number; height: number };
+    displayMode?: NodeDisplayMode;
   },
 ): NodeLayout {
+  // compact 모드 — 외곽 부속(라벨 위 / 슬롯 좌우 / 컨트롤 아래)으로 분리.
+  // 스킨이 적용된 ValueNode는 별도 분기에서 처리되므로 여기 도달하지 않는다.
+  if (opts.displayMode === 'compact') {
+    if (isValueNode(node) && !node.skin && node.initialValue.kind === 'boolean') {
+      return buildCompactLayout(node, COMPACT_SPEC_BOOLEAN, opts);
+    }
+    if (isGeneratorNode(node)) {
+      return buildCompactLayout(node, COMPACT_SPEC_GENERATOR, opts);
+    }
+    if (node.kind === 'logic-gate') {
+      return buildCompactLayout(node, COMPACT_SPEC_LOGIC_GATE, opts);
+    }
+    if (node.kind === 'constant') {
+      return buildCompactLayout(node, COMPACT_SPEC_CONSTANT, opts);
+    }
+    // 위 외의 kind는 compact 사양이 정의되지 않았으므로 standard fallback.
+  }
   // 스킨이 켜진 ValueNode는 본문이 스킨으로 통째 대체되므로 카드/콤바이너/슬라이더
   // 트랙용 좌표가 필요 없다. 캡슐 크기만큼만 노드 영역을 잡고 좌·우 핀은
   // 캡슐 좌우 중점에 둔다.
@@ -219,10 +410,15 @@ export function getNodeLayout(
       return {
         width: spec.width,
         height: spec.height,
+        panelWidth: spec.width,
+        panelHeight: spec.height,
+        panelCx: 0,
+        panelCy: 0,
         halfW,
         halfH,
         textX: 0,
         labelY: 0,
+        labelAnchor: 'start',
         valueY: 0,
         trackY: halfH,
         combinerCenterY: null,
@@ -233,6 +429,7 @@ export function getNodeLayout(
         expressionBody: null,
         observeBody: null,
         generatorBody: null,
+        outerControlSlot: null,
       };
     }
   }
@@ -277,10 +474,15 @@ export function getNodeLayout(
     return {
       width,
       height,
+      panelWidth: width,
+      panelHeight: height,
+      panelCx: 0,
+      panelCy: 0,
       halfW,
       halfH,
       textX: -halfW + EXPR_LEFT_INSET,
       labelY,
+      labelAnchor: 'start',
       valueY: bodyY,
       trackY: halfH,
       combinerCenterY: null,
@@ -291,6 +493,7 @@ export function getNodeLayout(
       expressionBody: { x: bodyX, y: bodyY, w: bodyW, h: bodyH },
       observeBody: null,
       generatorBody: null,
+      outerControlSlot: null,
     };
   }
 
@@ -308,10 +511,15 @@ export function getNodeLayout(
     return {
       width: OBSERVE_W,
       height: OBSERVE_H,
+      panelWidth: OBSERVE_W,
+      panelHeight: OBSERVE_H,
+      panelCx: 0,
+      panelCy: 0,
       halfW,
       halfH,
       textX: -halfW + SIDE_INSET,
       labelY: cardTop + OBSERVE_LABEL_FROM_TOP,
+      labelAnchor: 'start',
       valueY: 0,
       trackY: halfH,
       combinerCenterY: null,
@@ -322,6 +530,7 @@ export function getNodeLayout(
       expressionBody: null,
       observeBody: { x: bodyX, y: bodyY, w: bodyW, h: bodyH },
       generatorBody: null,
+      outerControlSlot: null,
     };
   }
 
@@ -338,10 +547,15 @@ export function getNodeLayout(
     return {
       width: GENERATOR_W,
       height: GENERATOR_H,
+      panelWidth: GENERATOR_W,
+      panelHeight: GENERATOR_H,
+      panelCx: 0,
+      panelCy: 0,
       halfW,
       halfH,
       textX: -halfW + GENERATOR_BODY_INSET,
       labelY: cardTop + NAME_FROM_TOP,
+      labelAnchor: 'start',
       valueY: cardTop + VALUE_FROM_TOP,
       trackY: halfH,
       combinerCenterY: null,
@@ -357,6 +571,7 @@ export function getNodeLayout(
         w: GENERATOR_W - GENERATOR_BODY_INSET * 2,
         h: GENERATOR_CONTROLS_H,
       },
+      outerControlSlot: null,
     };
   }
 
@@ -395,10 +610,15 @@ export function getNodeLayout(
   return {
     width: CARD_W,
     height,
+    panelWidth: CARD_W,
+    panelHeight: height,
+    panelCx: 0,
+    panelCy: 0,
     halfW,
     halfH,
     textX: -halfW + SIDE_INSET,
     labelY,
+    labelAnchor: 'start',
     valueY,
     trackY,
     combinerCenterY,
@@ -409,5 +629,6 @@ export function getNodeLayout(
     expressionBody: null,
     observeBody: null,
     generatorBody: null,
+    outerControlSlot: null,
   };
 }

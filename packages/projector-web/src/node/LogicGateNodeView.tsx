@@ -8,9 +8,9 @@ import {
 } from '@trama/core';
 import { useTrama } from '../store/index.js';
 import { useNodeLayout } from './use-node-layout.js';
+import { getDefaultDisplayMode } from './display-mode.js';
 import { NodeBody } from './NodeBody.js';
 import { NodeFrame } from './NodeFrame.js';
-import { NodeLabel } from './NodeLabel.js';
 import { InteractiveArea } from './InteractiveArea.js';
 import { BooleanStateIcon } from './BooleanStateIcon.js';
 import { Socket } from './Socket.js';
@@ -39,14 +39,11 @@ const OPERATOR_LABEL: Record<LogicGateOperator, string> = {
 /**
  * LogicGateNode 뷰 — boolean 입력 N개를 operator로 결합해 boolean을 출력한다.
  *
- * 본문 구성(시안 기준):
- *   - 상단: 사용자 라벨 (의미 표현; 예: "영어 OK?")
- *   - 중앙: operator 큰 텍스트(AND/OR/XOR) — 게이트 종류 명시. 클릭 시 순환.
- *   - 하단: 결과 아이콘 (BooleanStateIcon — boolean ValueNode와 같은 ✓/✗)
- *
- * "라벨로 게이트 종류를 외우게 하지 않는다" — 라벨과 operator를 시각적으로
- * 분리해 사용자 라벨은 의미를 담고 게이트 종류는 본문 큰 텍스트가 명시한다.
- * 라벨/operator가 어긋날 여지 자체를 없애는 디자인.
+ * compact 구성:
+ *   - 타이틀(라벨 슬롯): operator 텍스트(AND/OR/XOR/NOT) — 클릭 시 순환.
+ *   - 패널 안: 결과 아이콘(✓/✗)만.  사용자 라벨은 별도로 두지 않는다.
+ *     "게이트 종류 = 노드의 이름" 디자인 — 라벨과 operator가 어긋날 여지를
+ *     없앤다.
  *
  * 결과 아이콘은 boolean ValueNode와 동일한 [[BooleanStateIcon]] — boolean을
  * 보여주는 모든 노드가 단일 시각 컴포넌트를 공유한다.
@@ -62,15 +59,14 @@ function LogicGateNodeViewImpl({ id, incomingCount }: Props): JSX.Element | null
   });
   const updateNode = modelStore((s) => s.updateNode);
   const selection = uiStore((s) => s.selection);
-  const editingNode = uiStore((s) => s.editingNode);
-  const setEditingNode = uiStore((s) => s.setEditingNode);
-  const isEditing = editingNode?.id === id;
-  const editTarget = isEditing ? editingNode.target : null;
   const outputConnected = useOutputConnected(id);
 
   const posX = node?.position?.x ?? 0;
   const posY = node?.position?.y ?? 0;
-  const layout = useNodeLayout(node, { incomingCount });
+  const layout = useNodeLayout(node, {
+    incomingCount,
+    displayMode: node ? getDefaultDisplayMode(node) : undefined,
+  });
 
   useEffect(() => {
     if (!layout) return;
@@ -100,23 +96,6 @@ function LogicGateNodeViewImpl({ id, incomingCount }: Props): JSX.Element | null
     updateNode(id, { operator: next });
   }, [id, node, uiStore, updateNode]);
 
-  const onLabelDoubleClick = useCallback(
-    (e: React.MouseEvent) => {
-      e.stopPropagation();
-      setEditingNode(id, 'label');
-    },
-    [id, setEditingNode],
-  );
-
-  const commitLabel = useCallback(
-    (next: string) => {
-      if (node && next !== node.label) updateNode(id, { label: next });
-      setEditingNode(null);
-    },
-    [id, node, setEditingNode, updateNode],
-  );
-  const cancelEdit = useCallback(() => setEditingNode(null), [setEditingNode]);
-
   if (!node || !isLogicGateNode(node) || !node.position || !layout) return null;
 
   const isSelected = selection.kind === 'node' && selection.id === id;
@@ -126,9 +105,12 @@ function LogicGateNodeViewImpl({ id, incomingCount }: Props): JSX.Element | null
   const opLabel = OPERATOR_LABEL[node.operator];
   const resultBoolean = isActive ? !!outputValue : false;
 
-  const { halfW, width, height, valueY } = layout;
-  const operatorY = valueY;
-  const resultY = valueY + 36;
+  const { width, height, panelCx, panelCy, panelWidth, panelHeight, labelY } = layout;
+  const panelHalfW = panelWidth / 2;
+  // 타이틀(라벨 슬롯) = operator 표시 + 클릭 순환.  패널 안 = ✓/✗ 결과만.
+  // 라벨 슬롯 hit 영역은 baseline 위·아래로 균등하게 잡아 클릭 표적을 명확히 한다.
+  const titleHitH = 24;
+  const titleHitY = labelY - titleHitH + 6;
 
   return (
     <NodeFrame
@@ -139,39 +121,29 @@ function LogicGateNodeViewImpl({ id, incomingCount }: Props): JSX.Element | null
       className={`trama-logic-gate-node${isActive ? '' : ' is-invalid'}`}
     >
       <NodeBody
-        width={width}
-        height={height}
+        width={panelWidth}
+        height={panelHeight}
+        cx={panelCx}
+        cy={panelCy}
         stateClass={stateClass}
         isSelected={isSelected}
         extraClassName="trama-function-body"
       />
 
-      <NodeLabel
-        text={node.label}
-        x={0}
-        y={layout.labelY}
-        width={width - 24}
-        textAnchor="middle"
-        isEditing={editTarget === 'label'}
-        onCommit={commitLabel}
-        onCancel={cancelEdit}
-        onIsolatedDoubleClick={onLabelDoubleClick}
-      />
-
       <InteractiveArea
-        x={-halfW + 12}
-        y={operatorY - 28}
-        width={width - 24}
-        height={48}
+        x={panelCx - panelHalfW + 12}
+        y={titleHitY}
+        width={panelWidth - 24}
+        height={titleHitH}
         rx={8}
         ry={8}
         hitClassName="trama-logic-gate-operator-hit"
         onClick={onOperatorClick}
       >
         <text
-          className="trama-logic-gate-operator"
+          className="trama-logic-gate-operator-title"
           x={0}
-          y={operatorY + 8}
+          y={labelY}
           textAnchor="middle"
         >
           {opLabel}
@@ -179,7 +151,7 @@ function LogicGateNodeViewImpl({ id, incomingCount }: Props): JSX.Element | null
       </InteractiveArea>
 
       {isActive && (
-        <BooleanStateIcon cx={0} cy={resultY} on={resultBoolean} />
+        <BooleanStateIcon cx={panelCx} cy={panelCy} on={resultBoolean} />
       )}
 
       {layout.leftPin.sockets.map((s, i) => (

@@ -1,10 +1,12 @@
 import { useMemo } from 'react';
 import type { Node } from '@trama/core';
-import { getNodeLayout, type NodeLayout } from './box.js';
+import { getNodeLayout, type NodeDisplayMode, type NodeLayout } from './box.js';
 
 interface Options {
   incomingCount: number;
   expressionSize?: { width: number; height: number } | null;
+  /** 노드 디스플레이 모드. 호출자가 지정하지 않으면 box.ts 기본값(standard) 사용. */
+  displayMode?: NodeDisplayMode;
 }
 
 /**
@@ -26,12 +28,13 @@ export function useNodeLayout(
   node: Node | undefined,
   opts: Options,
 ): NodeLayout | null {
-  const { incomingCount, expressionSize } = opts;
+  const { incomingCount, expressionSize, displayMode } = opts;
   return useMemo(() => {
     if (!node) return null;
     return getNodeLayout(node, {
       incomingCount,
       expressionSize: expressionSize ?? undefined,
+      displayMode,
     });
-  }, [node, incomingCount, expressionSize]);
+  }, [node, incomingCount, expressionSize, displayMode]);
 }

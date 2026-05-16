@@ -3,6 +3,7 @@ import { tokens } from '@trama/tokens';
 import { isObserveNode, type NodeId, type Value } from '@trama/core';
 import { useTrama } from '../store/index.js';
 import { useNodeLayout } from './use-node-layout.js';
+import { getDefaultDisplayMode } from './display-mode.js';
 import { NodeBody } from './NodeBody.js';
 import { NodeFrame } from './NodeFrame.js';
 import { Socket } from './Socket.js';
@@ -34,7 +35,10 @@ function ObserveNodeViewImpl({ id, incomingCount }: Props): JSX.Element | null {
 
   const posX = node?.position?.x ?? 0;
   const posY = node?.position?.y ?? 0;
-  const layout = useNodeLayout(node, { incomingCount });
+  const layout = useNodeLayout(node, {
+    incomingCount,
+    displayMode: node ? getDefaultDisplayMode(node) : undefined,
+  });
 
   useEffect(() => {
     if (!layout) return;
@@ -81,8 +85,10 @@ function ObserveNodeViewImpl({ id, incomingCount }: Props): JSX.Element | null {
       onBodyDoubleClick={onBodyDoubleClick}
     >
       <NodeBody
-        width={width}
-        height={height}
+        width={layout.panelWidth}
+        height={layout.panelHeight}
+        cx={layout.panelCx}
+        cy={layout.panelCy}
         stateClass="is-calm"
         isSelected={isSelected}
       />

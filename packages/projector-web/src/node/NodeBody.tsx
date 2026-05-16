@@ -11,6 +11,12 @@ interface Props {
   isSelected: boolean;
   /** 노드별 추가 modifier 클래스(예: 'trama-function-body'). */
   extraClassName?: string;
+  /**
+   * 본문 사각의 중심 좌표. standard에서는 (0, 0). compact에서는 패널이 노드 중심
+   * 보다 아래로 시프트되므로 layout.panelCx/panelCy를 넘긴다.
+   */
+  cx?: number;
+  cy?: number;
 }
 
 /**
@@ -27,6 +33,8 @@ function NodeBodyImpl({
   stateClass,
   isSelected,
   extraClassName,
+  cx = 0,
+  cy = 0,
 }: Props): JSX.Element {
   const halfW = width / 2;
   const halfH = height / 2;
@@ -41,8 +49,8 @@ function NodeBodyImpl({
   return (
     <rect
       className={cls}
-      x={-halfW}
-      y={-halfH}
+      x={cx - halfW}
+      y={cy - halfH}
       width={width}
       height={height}
       rx={CARD_CORNER}

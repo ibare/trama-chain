@@ -239,12 +239,12 @@
   cursor: pointer;
 }
 
-/* LogicGateNode — operator 큰 텍스트(AND/OR/XOR).
-   본문 중앙에 게이트 종류를 명시. 클릭으로 순환되며 hit-area는 InteractiveArea. */
-[data-trama-root] .trama-logic-gate-operator {
-  font-size: 1.75rem;
+/* LogicGateNode — operator를 패널 위 타이틀 슬롯에 표시. 클릭으로 순환되며
+   hit-area는 InteractiveArea. 패널 안에는 ✓/✗ 결과 아이콘만 들어간다. */
+[data-trama-root] .trama-logic-gate-operator-title {
+  font-size: var(--typography-text-node-name);
   font-weight: 700;
-  fill: var(--color-node-stroke-focal);
+  fill: var(--color-node-text-primary);
   letter-spacing: 0.04em;
   pointer-events: none;
 }
