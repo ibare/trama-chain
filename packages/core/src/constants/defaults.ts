@@ -33,33 +33,6 @@ const E: NumericConstantDefinition = {
   fizzexName: 'e',
 };
 
-const ONE_HALF: NumericConstantDefinition = {
-  key: 'one-half',
-  valueKind: 'numeric',
-  labels: { ko: '이분의 일', en: 'One half' },
-  symbol: '½',
-  value: 0.5,
-  category: 'math',
-};
-
-const ONE_THIRD: NumericConstantDefinition = {
-  key: 'one-third',
-  valueKind: 'numeric',
-  labels: { ko: '삼분의 일', en: 'One third' },
-  symbol: '⅓',
-  value: 1 / 3,
-  category: 'math',
-};
-
-const ONE_FOURTH: NumericConstantDefinition = {
-  key: 'one-fourth',
-  valueKind: 'numeric',
-  labels: { ko: '사분의 일', en: 'One fourth' },
-  symbol: '¼',
-  value: 0.25,
-  category: 'math',
-};
-
 const GRAVITY: NumericConstantDefinition = {
   key: 'g',
   valueKind: 'numeric',
@@ -86,11 +59,11 @@ const SPEED_OF_LIGHT: NumericConstantDefinition = {
   category: 'physics',
 };
 
-/** 카탈로그에 없는 임의 수 — UI에서 "직접 입력" 진입점이 사용. */
+/** 카탈로그에 없는 단일 값 — UI에서 "직접 입력" 진입점이 사용. */
 const CUSTOM_PLACEHOLDER: NumericConstantDefinition = {
   key: 'custom',
   valueKind: 'numeric',
-  labels: { ko: '임의 수', en: 'Custom number' },
+  labels: { ko: '단일 값', en: 'Single value' },
   symbol: '?',
   value: 0,
   description: {
@@ -129,9 +102,6 @@ const FALSE_CONSTANT: BooleanConstantDefinition = {
 export const DEFAULT_CONSTANTS: readonly ConstantDefinition[] = [
   PI,
   E,
-  ONE_HALF,
-  ONE_THIRD,
-  ONE_FOURTH,
   GRAVITY,
   SPEED_OF_LIGHT,
   CUSTOM_PLACEHOLDER,

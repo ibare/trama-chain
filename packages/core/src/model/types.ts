@@ -43,8 +43,8 @@ export interface ValueNode {
 
 /**
  * 상수 노드 — 사용자/카탈로그가 부여한 고정 값.
- * - `value`: 실행 시 항상 사용되는 값 (π·g 등 카탈로그 값 또는 사용자 임의 수).
- * - `constantKey`: 카탈로그 항목 식별자. 사용자 정의 임의 수면 비어있다.
+ * - `value`: 실행 시 항상 사용되는 값 (π·g 등 카탈로그 값 또는 사용자 단일 값).
+ * - `constantKey`: 카탈로그 항목 식별자. 사용자 정의 단일 값이면 비어있다.
  * - 단위는 numeric Value 안에 종속 (raw 흐름이면 'free').
  */
 export interface ConstantNode {

@@ -10,9 +10,6 @@ describe('ConstantRegistry', () => {
   it('기본 상수 세트 등록', () => {
     expect(reg.has('pi')).toBe(true);
     expect(reg.has('e')).toBe(true);
-    expect(reg.has('one-half')).toBe(true);
-    expect(reg.has('one-third')).toBe(true);
-    expect(reg.has('one-fourth')).toBe(true);
     expect(reg.has('g')).toBe(true);
     expect(reg.has('c')).toBe(true);
     expect(reg.has('custom')).toBe(true);
@@ -29,14 +26,13 @@ describe('ConstantRegistry', () => {
   it('수치 값이 정확하다', () => {
     expect(reg.getOfKind('pi', 'numeric')?.value).toBe(Math.PI);
     expect(reg.getOfKind('e', 'numeric')?.value).toBe(Math.E);
-    expect(reg.getOfKind('one-half', 'numeric')?.value).toBe(0.5);
     expect(reg.getOfKind('g', 'numeric')?.value).toBeCloseTo(9.80665);
     expect(reg.getOfKind('c', 'numeric')?.value).toBe(299_792_458);
   });
 
   it('카테고리별 묶음', () => {
     expect(reg.listByCategory('math').map((d) => d.key)).toEqual(
-      expect.arrayContaining(['pi', 'e', 'one-half', 'one-third', 'one-fourth']),
+      expect.arrayContaining(['pi', 'e']),
     );
     expect(reg.listByCategory('physics').map((d) => d.key)).toEqual(
       expect.arrayContaining(['g', 'c']),
@@ -61,7 +57,7 @@ describe('ConstantRegistry', () => {
 
   it('listForKind는 ValueKind별 항목만 반환', () => {
     expect(reg.listForKind('boolean').map((d) => d.key)).toEqual(['true', 'false']);
-    expect(reg.listForKind('numeric').length).toBeGreaterThanOrEqual(8);
+    expect(reg.listForKind('numeric').length).toBeGreaterThanOrEqual(5);
   });
 
   it('중복 등록은 거부한다', () => {

@@ -14,7 +14,7 @@ interface ConstantDefinitionBase {
   key: string;
   /** UI 라벨. ko/en 두 가지. */
   labels: { ko: string; en: string };
-  /** 노드 카드 중앙에 표시되는 심볼/짧은 표기. 예: "π", "½", "g". */
+  /** 노드 카드 중앙에 표시되는 심볼/짧은 표기. 예: "π", "g", "c". */
   symbol: string;
   /** 짧은 도메인 설명. 사용자에게 의미를 환기시키는 한 줄. */
   description?: { ko: string; en: string };
@@ -29,7 +29,7 @@ export interface NumericConstantDefinition extends ConstantDefinitionBase {
   /**
    * fizzex 평가기의 정규화 변수명. 식 노드가 분석한 `constants` 슬롯과
    * 매칭되어 자동 연결 후보로 사용된다. 예: PI → 'π', E → 'e'.
-   * 매칭 대상이 없는 사용자 상수(예: 임의 수, 도메인 상수)는 생략.
+   * 매칭 대상이 없는 사용자 상수(예: 단일 값, 도메인 상수)는 생략.
    */
   fizzexName?: string;
 }

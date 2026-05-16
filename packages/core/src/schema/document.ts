@@ -55,7 +55,7 @@ export const ConstantNodeSchema = z.object({
   id: z.string(),
   label: z.string(),
   value: ValueSchema,
-  /** 카탈로그 항목 식별자. 사용자 정의 임의 수면 비어 있다. */
+  /** 카탈로그 항목 식별자. 사용자 정의 단일 값이면 비어 있다. */
   constantKey: z.string().optional(),
   position: z.object({ x: z.number(), y: z.number() }).nullable(),
   isFocal: z.boolean(),

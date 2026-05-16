@@ -57,7 +57,7 @@ function ConstantNodeViewImpl({ id }: Props): JSX.Element | null {
   const valueDraftSeed = constantNumeric;
   const isCustom = node && isConstantNode(node) && (node.constantKey ?? '') === 'custom';
 
-  // 사용자 정의 임의 수에 한해, 본체 더블클릭으로 수치 인라인 편집 진입.
+  // 사용자 정의 단일 값에 한해, 본체 더블클릭으로 수치 인라인 편집 진입.
   // 카탈로그 상수(π·g 등)는 값이 고정 의미라 편집 불가 — 라벨만 편집.
   const onBodyDoubleClick = useCallback(() => {
     setEditingNode(id);
@@ -70,7 +70,7 @@ function ConstantNodeViewImpl({ id }: Props): JSX.Element | null {
   const { onPointerDown: onSocketPointerDown, onPointerUp: onSocketPointerUp } =
     useEdgeDraftSource(id, { getStartPoint: getOutputStartPoint });
 
-  // 인라인 편집 — 임의 수면 value/label 모두, 카탈로그 상수면 label만.
+  // 인라인 편집 — 단일 값이면 value/label 모두, 카탈로그 상수면 label만.
   const [nameDraft, setNameDraft] = useState(labelDraftSeed);
   const [valueDraft, setValueDraft] = useState(String(valueDraftSeed));
   useEffect(() => {
@@ -152,7 +152,7 @@ function ConstantNodeViewImpl({ id }: Props): JSX.Element | null {
               onChange={setNameDraft}
               onCommit={commitEdit}
               onCancel={() => setEditingNode(null)}
-              // 카탈로그 상수(π·g 등)는 라벨만 편집 — Enter로 즉시 커밋. 임의 수치는
+              // 카탈로그 상수(π·g 등)는 라벨만 편집 — Enter로 즉시 커밋. 단일 값은
               // 다음 input(value)으로 포커스를 옮길 여지가 있어 Enter 커밋을 막는다.
               commitOnEnter={!isCustom}
             />
