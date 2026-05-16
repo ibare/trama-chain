@@ -1634,6 +1634,26 @@
   user-select: none;
 }
 
+/* Mode toggle — panel 우상단 안쪽에 얹는 compact/standard 전환 버튼.
+   hit-area는 InteractiveArea가 fill:transparent로 제공하므로 cursor만 부여.
+   glyph는 항상 흐릿하게 떠 있다가 hit-area hover 시 불투명으로 살아난다. */
+[data-trama-root] .trama-mode-toggle {
+  cursor: pointer;
+}
+[data-trama-root] .trama-mode-toggle-glyph {
+  fill: none;
+  stroke: var(--color-node-text-primary);
+  stroke-width: 1.3;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+  opacity: 0.45;
+  transition: opacity 0.12s ease-out;
+  pointer-events: none;
+}
+[data-trama-root] .trama-mode-toggle:hover + g .trama-mode-toggle-glyph {
+  opacity: 1;
+}
+
 /* Node picker (radix Dialog) -------------------------------------------- */
 /* 노드 추가 통합 패널. 좌측 칩 그리드 + 우측 설명 프리뷰 + 하단 추가/취소 액션.
    Dialog 자체는 Portal 없이 [data-trama-root] 안에서 렌더되어 토큰을 상속한다. */

@@ -8,9 +8,10 @@ import {
 } from '@trama/core';
 import { useTrama } from '../store/index.js';
 import { useNodeLayout } from './use-node-layout.js';
-import { getDefaultDisplayMode } from './display-mode.js';
+import { resolveDisplayMode } from './display-mode.js';
 import { NodeBody } from './NodeBody.js';
 import { NodeFrame } from './NodeFrame.js';
+import { ModeToggle } from './ModeToggle.js';
 import { InteractiveArea } from './InteractiveArea.js';
 import { BooleanStateIcon } from './BooleanStateIcon.js';
 import { Socket } from './Socket.js';
@@ -65,7 +66,7 @@ function LogicGateNodeViewImpl({ id, incomingCount }: Props): JSX.Element | null
   const posY = node?.position?.y ?? 0;
   const layout = useNodeLayout(node, {
     incomingCount,
-    displayMode: node ? getDefaultDisplayMode(node) : undefined,
+    displayMode: node ? resolveDisplayMode(node) : undefined,
   });
 
   useEffect(() => {
@@ -85,6 +86,14 @@ function LogicGateNodeViewImpl({ id, incomingCount }: Props): JSX.Element | null
       enabled: !!layout && outputValid,
       getStartPoint: getOutputStartPoint,
     });
+
+  const currentMode = node ? resolveDisplayMode(node) : 'compact';
+  const onToggleMode = useCallback(() => {
+    if (uiStore.getState().readOnly) return;
+    updateNode(id, {
+      displayMode: currentMode === 'compact' ? 'standard' : 'compact',
+    });
+  }, [currentMode, id, uiStore, updateNode]);
 
   const onOperatorClick = useCallback(() => {
     if (uiStore.getState().readOnly) return;
@@ -153,6 +162,13 @@ function LogicGateNodeViewImpl({ id, incomingCount }: Props): JSX.Element | null
       {isActive && (
         <BooleanStateIcon cx={panelCx} cy={panelCy} on={resultBoolean} />
       )}
+
+      <ModeToggle
+        panelRight={panelCx + panelHalfW}
+        panelTop={panelCy - panelHeight / 2}
+        mode={currentMode}
+        onToggle={onToggleMode}
+      />
 
       {layout.leftPin.sockets.map((s, i) => (
         <Socket

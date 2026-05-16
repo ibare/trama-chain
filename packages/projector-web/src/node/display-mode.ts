@@ -1,4 +1,10 @@
-import type { Node } from '@trama/core';
+import {
+  isConstantNode,
+  isGeneratorNode,
+  isLogicGateNode,
+  isValueNode,
+  type Node,
+} from '@trama/core';
 import type { NodeDisplayMode } from './box.js';
 
 /**
@@ -34,4 +40,34 @@ export function getDefaultDisplayMode(node: Node): NodeDisplayMode {
       return _exhaustive;
     }
   }
+}
+
+/**
+ * 인스턴스 오버라이드를 적용한 최종 디스플레이 모드.
+ *
+ * displayMode 필드를 가진 kind(value/constant/generator/logic-gate)는
+ * 노드별로 mode를 영속화할 수 있다. 값이 비어 있으면 kind 기본을 따른다.
+ * 그 외 kind는 오버라이드 의미가 없으므로 항상 기본을 반환한다.
+ */
+export function resolveDisplayMode(node: Node): NodeDisplayMode {
+  if (
+    isValueNode(node) ||
+    isConstantNode(node) ||
+    isGeneratorNode(node) ||
+    isLogicGateNode(node)
+  ) {
+    if (node.displayMode) return node.displayMode;
+  }
+  return getDefaultDisplayMode(node);
+}
+
+/**
+ * 노드 kind가 compact/standard 토글 UI 노출 대상인지.
+ * compact spec이 정의된 kind에 한해 토글이 의미를 갖는다.
+ */
+export function supportsDisplayModeToggle(node: Node): boolean {
+  if (isValueNode(node)) {
+    return node.initialValue.kind === 'boolean';
+  }
+  return isConstantNode(node) || isGeneratorNode(node) || isLogicGateNode(node);
 }

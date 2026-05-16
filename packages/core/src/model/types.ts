@@ -8,6 +8,17 @@ export type EdgeId = string;
 export type EdgeLag = 0 | 1;
 
 /**
+ * 노드 디스플레이 모드 — standard는 패널 안에 모든 요소를 담는 풀 카드,
+ * compact는 패널을 데이터 디스플레이로 순수화해 외곽 부속(라벨/슬롯/컨트롤)을
+ * 분리한다. 각 kind에는 기본 모드가 있고, 노드 인스턴스에서 이 필드로
+ * 오버라이드한다. 비어 있으면 기본 모드를 따른다.
+ *
+ * compact spec이 정의된 kind(value-boolean / constant / generator / logic-gate)
+ * 에서만 의미가 있고, 다른 kind는 무시된다.
+ */
+export type NodeDisplayMode = 'standard' | 'compact';
+
+/**
  * 노드 시각 스킨 — 추상 기본 형태를 도메인 친화 형상으로 대체한다.
  * core는 kind/params의 의미를 해석하지 않으며, projector가 자체 레지스트리에서
  * kind를 해석해 컴포넌트를 (lazy) 로드한다. 모델 값은 항상 스칼라로 유지되고
@@ -39,6 +50,8 @@ export interface ValueNode {
   description?: string | null;
   /** 시각 스킨. 비어 있으면 추상 기본 형태로 그려진다. */
   skin?: NodeSkin;
+  /** 디스플레이 모드 인스턴스 오버라이드. 비어 있으면 kind 기본을 따른다. */
+  displayMode?: NodeDisplayMode;
 }
 
 /**
@@ -56,6 +69,8 @@ export interface ConstantNode {
   position: { x: number; y: number } | null;
   isFocal: boolean;
   description?: string | null;
+  /** 디스플레이 모드 인스턴스 오버라이드. 비어 있으면 kind 기본을 따른다. */
+  displayMode?: NodeDisplayMode;
 }
 
 /**
@@ -155,6 +170,8 @@ export interface LogicGateNode {
   position: { x: number; y: number } | null;
   isFocal: boolean;
   description?: string | null;
+  /** 디스플레이 모드 인스턴스 오버라이드. 비어 있으면 kind 기본을 따른다. */
+  displayMode?: NodeDisplayMode;
 }
 
 /**
@@ -232,6 +249,8 @@ export interface GeneratorNode {
   position: { x: number; y: number } | null;
   isFocal: boolean;
   description?: string | null;
+  /** 디스플레이 모드 인스턴스 오버라이드. 비어 있으면 kind 기본을 따른다. */
+  displayMode?: NodeDisplayMode;
 }
 
 export type Node =

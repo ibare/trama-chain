@@ -18,6 +18,8 @@ export const NodeSkinSchema = z
   })
   .strict();
 
+export const NodeDisplayModeSchema = z.enum(['standard', 'compact']);
+
 /** numeric ValueKind — 수치 + 카탈로그 단위 키. */
 export const NumericValueSchema = z.object({
   kind: z.literal('numeric'),
@@ -48,6 +50,7 @@ export const ValueNodeSchema = z.object({
   isFocal: z.boolean(),
   description: z.string().nullable().optional(),
   skin: NodeSkinSchema.optional(),
+  displayMode: NodeDisplayModeSchema.optional(),
 });
 
 export const ConstantNodeSchema = z.object({
@@ -60,6 +63,7 @@ export const ConstantNodeSchema = z.object({
   position: z.object({ x: z.number(), y: z.number() }).nullable(),
   isFocal: z.boolean(),
   description: z.string().nullable().optional(),
+  displayMode: NodeDisplayModeSchema.optional(),
 });
 
 export const ConditionOperatorSchema = z.enum(['>', '<', '>=', '<=', '==', '!=']);
@@ -96,6 +100,7 @@ export const LogicGateNodeSchema = z.object({
   position: z.object({ x: z.number(), y: z.number() }).nullable(),
   isFocal: z.boolean(),
   description: z.string().nullable().optional(),
+  displayMode: NodeDisplayModeSchema.optional(),
 });
 
 export const ObserveCapacitySchema = z.discriminatedUnion('kind', [
@@ -162,6 +167,7 @@ export const GeneratorNodeSchema = z.object({
   position: z.object({ x: z.number(), y: z.number() }).nullable(),
   isFocal: z.boolean(),
   description: z.string().nullable().optional(),
+  displayMode: NodeDisplayModeSchema.optional(),
 });
 
 export const NodeSchema = z.discriminatedUnion('kind', [

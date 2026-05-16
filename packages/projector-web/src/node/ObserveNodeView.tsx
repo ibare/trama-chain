@@ -3,7 +3,7 @@ import { tokens } from '@trama/tokens';
 import { isObserveNode, type NodeId, type Value } from '@trama/core';
 import { useTrama } from '../store/index.js';
 import { useNodeLayout } from './use-node-layout.js';
-import { getDefaultDisplayMode } from './display-mode.js';
+import { resolveDisplayMode } from './display-mode.js';
 import { NodeBody } from './NodeBody.js';
 import { NodeFrame } from './NodeFrame.js';
 import { Socket } from './Socket.js';
@@ -37,7 +37,7 @@ function ObserveNodeViewImpl({ id, incomingCount }: Props): JSX.Element | null {
   const posY = node?.position?.y ?? 0;
   const layout = useNodeLayout(node, {
     incomingCount,
-    displayMode: node ? getDefaultDisplayMode(node) : undefined,
+    displayMode: node ? resolveDisplayMode(node) : undefined,
   });
 
   useEffect(() => {

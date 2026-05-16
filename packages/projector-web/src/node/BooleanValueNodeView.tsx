@@ -4,10 +4,11 @@ import { isValueNode, type NodeId } from '@trama/core';
 import { useTrama } from '../store/index.js';
 import { combinerRegistry } from '../store/registries.js';
 import { useNodeLayout } from './use-node-layout.js';
-import { getDefaultDisplayMode } from './display-mode.js';
+import { resolveDisplayMode } from './display-mode.js';
 import { NodeBody } from './NodeBody.js';
 import { NodeFrame } from './NodeFrame.js';
 import { NodeLabel } from './NodeLabel.js';
+import { ModeToggle } from './ModeToggle.js';
 import { InteractiveArea } from './InteractiveArea.js';
 import { BooleanStateIcon } from './BooleanStateIcon.js';
 import { Socket } from './Socket.js';
@@ -76,7 +77,7 @@ function BooleanValueNodeViewImpl({ id, incomingCount }: Props): JSX.Element | n
   const posY = node?.position?.y ?? 0;
   const layout = useNodeLayout(node, {
     incomingCount,
-    displayMode: node ? getDefaultDisplayMode(node) : undefined,
+    displayMode: node ? resolveDisplayMode(node) : undefined,
   });
 
   const onBodyDoubleClick = useCallback(() => {
@@ -129,6 +130,14 @@ function BooleanValueNodeViewImpl({ id, incomingCount }: Props): JSX.Element | n
     scrubInitialValue(id, !currentBoolean);
   }, [id, currentBoolean, readOnly, scrubInitialValue]);
 
+  const currentMode = node ? resolveDisplayMode(node) : 'compact';
+  const onToggleMode = useCallback(() => {
+    if (readOnly) return;
+    updateNode(id, {
+      displayMode: currentMode === 'compact' ? 'standard' : 'compact',
+    });
+  }, [currentMode, id, readOnly, updateNode]);
+
   if (!node || !isValueNode(node) || !node.position || !layout) return null;
   if (node.initialValue.kind !== 'boolean') return null;
 
@@ -172,6 +181,15 @@ function BooleanValueNodeViewImpl({ id, incomingCount }: Props): JSX.Element | n
       />
 
       <BooleanStateIcon cx={iconCx} cy={outerControlSlot ? panelCy : valueY} on={currentBoolean} />
+
+      {!readOnly && !isEditing && (
+        <ModeToggle
+          panelRight={panelCx + layout.panelWidth / 2}
+          panelTop={panelCy - layout.panelHeight / 2}
+          mode={currentMode}
+          onToggle={onToggleMode}
+        />
+      )}
 
       {isInputNode && (
         <BooleanToggleSwitch

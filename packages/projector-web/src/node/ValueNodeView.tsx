@@ -4,7 +4,7 @@ import { isNumericValue, isValueNode, type NodeId } from '@trama/core';
 import { useTrama } from '../store/index.js';
 import { resolveNodeUnit } from '../util/unit-resolver.js';
 import { useNodeLayout } from './use-node-layout.js';
-import { getDefaultDisplayMode } from './display-mode.js';
+import { resolveDisplayMode } from './display-mode.js';
 import { NodeBorderTrack } from './NodeBorderTrack.js';
 import { NodeFrame } from './NodeFrame.js';
 import { Socket } from './Socket.js';
@@ -64,7 +64,7 @@ function ValueNodeViewImpl({ id, incomingCount }: Props): JSX.Element | null {
   const posY = node?.position?.y ?? 0;
   const layout = useNodeLayout(node, {
     incomingCount,
-    displayMode: node ? getDefaultDisplayMode(node) : undefined,
+    displayMode: node ? resolveDisplayMode(node) : undefined,
   });
 
   const onBodyDoubleClick = useCallback(() => {

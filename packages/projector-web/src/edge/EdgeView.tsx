@@ -13,7 +13,7 @@ import {
 import { useTrama } from '../store/index.js';
 import { shapeRegistry } from '../store/registries.js';
 import { getNodeLayout } from '../node/box.js';
-import { getDefaultDisplayMode } from '../node/display-mode.js';
+import { resolveDisplayMode } from '../node/display-mode.js';
 import { getConditionNodeLayout } from '../node/condition-box.js';
 import { slotColor } from '../node/slot-palette.js';
 import { useExpressionMeasureStore } from '../expression/expression-measure-store.js';
@@ -435,7 +435,7 @@ function rightOutputSocket(
   const layout = getNodeLayout(node, {
     incomingCount: fromIncomingCount,
     expressionSize: measure,
-    displayMode: getDefaultDisplayMode(node),
+    displayMode: resolveDisplayMode(node),
   });
   return layout.rightPin.sockets[0] ?? { x: 0, y: 0 };
 }
@@ -454,7 +454,7 @@ function leftInputSocket(
   const layout = getNodeLayout(node, {
     incomingCount: toIncomingCount,
     expressionSize: measure,
-    displayMode: getDefaultDisplayMode(node),
+    displayMode: resolveDisplayMode(node),
   });
   return (
     layout.leftPin.sockets[Math.max(0, socketIndex)] ??

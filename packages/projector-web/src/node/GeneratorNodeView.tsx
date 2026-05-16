@@ -3,9 +3,10 @@ import { tokens } from '@trama/tokens';
 import { isGeneratorNode, isNumericValue, type NodeId } from '@trama/core';
 import { useTrama } from '../store/index.js';
 import { useNodeLayout } from './use-node-layout.js';
-import { getDefaultDisplayMode } from './display-mode.js';
+import { resolveDisplayMode } from './display-mode.js';
 import { NodeFrame } from './NodeFrame.js';
 import { NodeBody } from './NodeBody.js';
+import { ModeToggle } from './ModeToggle.js';
 import { InteractiveArea } from './InteractiveArea.js';
 import { Socket } from './Socket.js';
 import { useOutputConnected } from './use-socket-connections.js';
@@ -37,6 +38,7 @@ function GeneratorNodeViewImpl({ id, incomingCount }: Props): JSX.Element | null
   const currentValue = modelStore((s) => s.executionState.values[id] ?? null);
   const setGeneratorEnabled = modelStore((s) => s.setGeneratorEnabled);
   const resetGenerator = modelStore((s) => s.resetGenerator);
+  const updateNode = modelStore((s) => s.updateNode);
   const isSelected = uiStore(
     (s) => s.selection.kind === 'node' && s.selection.id === id,
   );
@@ -48,7 +50,7 @@ function GeneratorNodeViewImpl({ id, incomingCount }: Props): JSX.Element | null
   const posY = node?.position?.y ?? 0;
   const layout = useNodeLayout(node, {
     incomingCount,
-    displayMode: node ? getDefaultDisplayMode(node) : undefined,
+    displayMode: node ? resolveDisplayMode(node) : undefined,
   });
 
   // 좌측 입력 socket을 socket registry에 등록 — 엣지 드롭이 이 위치로 맞춰 들어온다.
@@ -76,6 +78,13 @@ function GeneratorNodeViewImpl({ id, incomingCount }: Props): JSX.Element | null
   const onReset = useCallback(() => {
     resetGenerator(id);
   }, [id, resetGenerator]);
+
+  const currentMode = node ? resolveDisplayMode(node) : 'compact';
+  const onToggleMode = useCallback(() => {
+    updateNode(id, {
+      displayMode: currentMode === 'compact' ? 'standard' : 'compact',
+    });
+  }, [currentMode, id, updateNode]);
 
   const onBodyDoubleClick = useCallback(() => {
     selectNode(id);
@@ -198,6 +207,13 @@ function GeneratorNodeViewImpl({ id, incomingCount }: Props): JSX.Element | null
           </InteractiveArea>
         </>
       )}
+
+      <ModeToggle
+        panelRight={panelCx + layout.panelWidth / 2}
+        panelTop={panelCy - layout.panelHeight / 2}
+        mode={currentMode}
+        onToggle={onToggleMode}
+      />
 
       {/* 우측 단일 출력 소켓 */}
       {layout.rightPin.sockets[0] && (

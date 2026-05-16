@@ -4,9 +4,10 @@ import { tokens } from '@trama/tokens';
 import { isConstantNode, isNumericValue, numericValue, type NodeId } from '@trama/core';
 import { useTrama } from '../store/index.js';
 import { useNodeLayout } from './use-node-layout.js';
-import { getDefaultDisplayMode } from './display-mode.js';
+import { resolveDisplayMode } from './display-mode.js';
 import { NodeFrame } from './NodeFrame.js';
 import { NodeBody } from './NodeBody.js';
+import { ModeToggle } from './ModeToggle.js';
 import { BooleanStateIcon } from './BooleanStateIcon.js';
 import { InlineSvgInput } from './InlineSvgInput.js';
 import { Socket } from './Socket.js';
@@ -53,7 +54,7 @@ function ConstantNodeViewImpl({ id }: Props): JSX.Element | null {
 
   const layout = useNodeLayout(node, {
     incomingCount: 0,
-    displayMode: node ? getDefaultDisplayMode(node) : undefined,
+    displayMode: node ? resolveDisplayMode(node) : undefined,
   });
 
   const onBodyDoubleClick = useCallback(() => {
@@ -77,6 +78,13 @@ function ConstantNodeViewImpl({ id }: Props): JSX.Element | null {
       }
     }
   }, [isEditing, node]);
+
+  const currentMode = node ? resolveDisplayMode(node) : 'compact';
+  const onToggleMode = useCallback(() => {
+    updateNode(id, {
+      displayMode: currentMode === 'compact' ? 'standard' : 'compact',
+    });
+  }, [currentMode, id, updateNode]);
 
   const commitEdit = useCallback(() => {
     if (!node || !isConstantNode(node)) {
@@ -199,6 +207,15 @@ function ConstantNodeViewImpl({ id }: Props): JSX.Element | null {
             onPointerUp={onSocketPointerUp}
           />
         </>
+      )}
+
+      {!isEditing && (
+        <ModeToggle
+          panelRight={panelCx + panelWidth / 2}
+          panelTop={panelCy - panelHeight / 2}
+          mode={currentMode}
+          onToggle={onToggleMode}
+        />
       )}
     </NodeFrame>
   );
