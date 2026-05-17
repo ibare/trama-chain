@@ -215,6 +215,10 @@ function ConditionNodeViewImpl({ id }: Props): JSX.Element | null {
       pos={node.position}
       width={width}
       height={height}
+      panelCx={panelCx}
+      panelCy={panelCy}
+      panelWidth={panelWidth}
+      panelHeight={panelHeight}
       className={`trama-condition-node${isActive ? '' : ' is-invalid'}`}
     >
       <NodeBody

@@ -159,6 +159,10 @@ function BooleanValueNodeViewImpl({ id, incomingCount }: Props): JSX.Element | n
       pos={node.position}
       width={width}
       height={height}
+      panelCx={panelCx}
+      panelCy={panelCy}
+      panelWidth={layout.panelWidth}
+      panelHeight={layout.panelHeight}
       onBodyDoubleClick={onBodyDoubleClick}
     >
       <NodeBody

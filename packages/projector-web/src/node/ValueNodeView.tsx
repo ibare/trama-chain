@@ -157,6 +157,10 @@ function ValueNodeViewImpl({ id, incomingCount }: Props): JSX.Element | null {
       pos={node.position}
       width={width}
       height={height}
+      panelCx={layout.panelCx}
+      panelCy={layout.panelCy}
+      panelWidth={layout.panelWidth}
+      panelHeight={layout.panelHeight}
       onBodyDoubleClick={onBodyDoubleClick}
     >
       {hasSkin && SkinLazy ? (

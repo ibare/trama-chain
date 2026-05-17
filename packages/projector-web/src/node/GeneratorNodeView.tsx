@@ -129,6 +129,10 @@ function GeneratorNodeViewImpl({ id, incomingCount }: Props): JSX.Element | null
       pos={node.position}
       width={width}
       height={height}
+      panelCx={panelCx}
+      panelCy={panelCy}
+      panelWidth={layout.panelWidth}
+      panelHeight={layout.panelHeight}
       className={`trama-generator-node${enabled ? ' is-running' : ''}`}
       onBodyDoubleClick={onBodyDoubleClick}
     >

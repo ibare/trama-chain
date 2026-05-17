@@ -287,6 +287,10 @@ function ExpressionNodeViewImpl({ id }: Props): JSX.Element | null {
       pos={node.position}
       width={width}
       height={height}
+      panelCx={layout.panelCx}
+      panelCy={layout.panelCy}
+      panelWidth={layout.panelWidth}
+      panelHeight={layout.panelHeight}
       className={`trama-expression-node${isValid ? '' : ' is-invalid'}`}
       onBodyDoubleClick={onBodyDoubleClick}
     >

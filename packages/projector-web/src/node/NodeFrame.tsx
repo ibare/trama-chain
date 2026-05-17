@@ -14,6 +14,16 @@ interface Props {
   /** drag hit 영역의 크기 — 보통 노드 박스 width/height. 노드 중심 기준 사각형. */
   width: number;
   height: number;
+  /**
+   * 시각 본체(panel)의 중심과 크기. flash overlay 는 이 사각형에 정렬된다.
+   * compact 모드에서는 panel 이 노드 bbox 중심에서 시프트되어 있으므로
+   * drag-hit(width/height)와 별도로 전달해야 시각이 본체에 맞는다.
+   * standard 모드 호출자는 panel 이 bbox 와 동치이므로 cx=0/cy=0/width/height 그대로 전달한다.
+   */
+  panelCx: number;
+  panelCy: number;
+  panelWidth: number;
+  panelHeight: number;
   /** 추가 root className. 노드별 hook 클래스(예: 'trama-condition-node') 부착용. */
   className?: string;
   /** body 빈 영역 더블클릭. (예: 인라인 편집 진입) */
@@ -42,6 +52,10 @@ function NodeFrameImpl({
   pos,
   width,
   height,
+  panelCx,
+  panelCy,
+  panelWidth,
+  panelHeight,
   className,
   onBodyDoubleClick,
   children,
@@ -182,10 +196,10 @@ function NodeFrameImpl({
         <rect
           key={flashId}
           className="trama-node-flash-overlay"
-          x={-halfW}
-          y={-halfH}
-          width={width}
-          height={height}
+          x={panelCx - panelWidth / 2}
+          y={panelCy - panelHeight / 2}
+          width={panelWidth}
+          height={panelHeight}
           rx={CARD_CORNER}
           ry={CARD_CORNER}
           pointerEvents="none"

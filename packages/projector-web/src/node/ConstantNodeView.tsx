@@ -124,6 +124,10 @@ function ConstantNodeViewImpl({ id }: Props): JSX.Element | null {
       pos={node.position}
       width={width}
       height={height}
+      panelCx={panelCx}
+      panelCy={panelCy}
+      panelWidth={panelWidth}
+      panelHeight={panelHeight}
       className="trama-constant-node"
       onBodyDoubleClick={onBodyDoubleClick}
     >

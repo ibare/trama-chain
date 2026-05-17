@@ -96,6 +96,10 @@ function ObserveNodeViewImpl({ id, incomingCount }: Props): JSX.Element | null {
       pos={node.position}
       width={width}
       height={height}
+      panelCx={panelCx}
+      panelCy={panelCy}
+      panelWidth={panelWidth}
+      panelHeight={panelHeight}
       className="trama-observe-node"
       onBodyDoubleClick={onBodyDoubleClick}
     >
