@@ -1,4 +1,5 @@
 import type {
+  AverageNode,
   ConditionNode,
   ConstantNode,
   Edge,
@@ -11,6 +12,7 @@ import type {
   ValueNode,
 } from '../model/index.js';
 import {
+  isAverageNode,
   isConditionNode,
   isConstantNode,
   isExpressionNode,
@@ -20,6 +22,7 @@ import {
   isValueNode,
 } from '../model/index.js';
 import type {
+  TramaAverageNode,
   TramaConditionNode,
   TramaConstantNode,
   TramaDocument,
@@ -115,6 +118,7 @@ function nodeToDoc(n: Node): TramaNode {
       id: n.id,
       label: n.label,
       capacity: n.capacity,
+      extraction: n.extraction,
       visualization: n.visualization,
       position: n.position,
       isFocal: n.isFocal,
@@ -132,6 +136,18 @@ function nodeToDoc(n: Node): TramaNode {
       position: n.position,
       isFocal: n.isFocal,
       description: n.description ?? null,
+    };
+    return doc;
+  }
+  if (isAverageNode(n)) {
+    const doc: TramaAverageNode = {
+      kind: 'average',
+      id: n.id,
+      label: n.label,
+      position: n.position,
+      isFocal: n.isFocal,
+      description: n.description ?? null,
+      displayMode: n.displayMode,
     };
     return doc;
   }
@@ -224,6 +240,7 @@ export function documentToModel(doc: TramaDocument): Model {
         id: n.id,
         label: n.label,
         capacity: n.capacity,
+        extraction: n.extraction,
         visualization: n.visualization,
         position: n.position,
         isFocal: n.isFocal,
@@ -240,6 +257,17 @@ export function documentToModel(doc: TramaDocument): Model {
         position: n.position,
         isFocal: n.isFocal,
         description: n.description ?? null,
+      };
+      nodes[n.id] = node;
+    } else if (n.kind === 'average') {
+      const node: AverageNode = {
+        kind: 'average',
+        id: n.id,
+        label: n.label,
+        position: n.position,
+        isFocal: n.isFocal,
+        description: n.description ?? null,
+        displayMode: n.displayMode,
       };
       nodes[n.id] = node;
     } else {

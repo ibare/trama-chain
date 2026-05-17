@@ -1,19 +1,21 @@
 import { memo, useCallback, useEffect } from 'react';
 import { tokens } from '@trama/tokens';
-import { isObserveNode, isSequence, unwrap, type NodeId } from '@trama/core';
-import type { SequenceSample } from '@trama/core';
+import {
+  isAverageNode,
+  isNumericValue,
+  isSequence,
+  unwrap,
+  type NodeId,
+} from '@trama/core';
 import { useTrama } from '../store/index.js';
 import { useNodeLayout } from './use-node-layout.js';
-import { resolveDisplayMode } from './display-mode.js';
-import { NodeBody } from './NodeBody.js';
+import { resolveDisplayMode, supportsDisplayModeToggle } from './display-mode.js';
 import { NodeFrame } from './NodeFrame.js';
+import { NodeBody } from './NodeBody.js';
 import { ModeToggle } from './ModeToggle.js';
 import { Socket } from './Socket.js';
 import { useOutputConnected } from './use-socket-connections.js';
-import { slotColor } from './slot-palette.js';
 import { useEdgeDraftSource } from '../canvas/use-edge-draft-source.js';
-import { getObserveVisualization } from '../observe/registry.js';
-import '../observe/register-default-visualizations.js';
 
 interface Props {
   id: NodeId;
@@ -21,19 +23,28 @@ interface Props {
 }
 
 const SOCKET_SIZE = parseFloat(tokens.spacing.socketSize);
-const EMPTY_BUFFER: SequenceSample[] = [];
 
-function ObserveNodeViewImpl({ id, incomingCount }: Props): JSX.Element | null {
+function formatAverage(v: number): string {
+  if (!Number.isFinite(v)) return '·';
+  if (Number.isInteger(v)) return String(v);
+  const abs = Math.abs(v);
+  if (abs >= 1_000_000 || (abs > 0 && abs < 0.001)) return v.toExponential(2);
+  return v.toFixed(3);
+}
+
+function AverageNodeViewImpl({ id, incomingCount }: Props): JSX.Element | null {
   const { modelStore, uiStore, socketRegistry } = useTrama();
   const node = modelStore((s) => s.model.nodes[id]);
-  const samples = modelStore((s) => s.executionState.observeBuffers[id] ?? EMPTY_BUFFER);
-  // 누적 버퍼는 Value[] 그대로지만 current 는 ExecValue 가 들어올 수 있다 —
-  // 시각화는 alue 만 보면 충분하므로 unwrap 후 노출.
-  const current = modelStore((s) => {
+  const currentValue = modelStore((s) => {
     const ev = s.executionState.values[id];
     if (ev === undefined || isSequence(ev)) return null;
     return unwrap(ev);
   });
+  const isValid = modelStore((s) => {
+    const key = `${id}#0`;
+    return s.executionState.validOutputs.has(key);
+  });
+
   const updateNode = modelStore((s) => s.updateNode);
   const outputConnected = useOutputConnected(id);
   const isSelected = uiStore(
@@ -51,18 +62,15 @@ function ObserveNodeViewImpl({ id, incomingCount }: Props): JSX.Element | null {
 
   useEffect(() => {
     if (!layout) return;
-    const unreg = socketRegistry.register({
+    return socketRegistry.register({
       nodeId: id,
       offset: { x: layout.leftPin.cx, y: layout.leftPin.cy },
     });
-    return unreg;
   }, [id, layout, socketRegistry]);
 
   const getOutputStartPoint = useCallback(() => {
     const out = layout?.rightPin.sockets[0];
-    return out
-      ? { x: posX + out.x, y: posY + out.y }
-      : { x: posX, y: posY };
+    return out ? { x: posX + out.x, y: posY + out.y } : { x: posX, y: posY };
   }, [layout, posX, posY]);
   const { onPointerDown: onSocketPointerDown, onPointerUp: onSocketPointerUp } =
     useEdgeDraftSource(id, {
@@ -70,27 +78,32 @@ function ObserveNodeViewImpl({ id, incomingCount }: Props): JSX.Element | null {
       getStartPoint: getOutputStartPoint,
     });
 
+  const currentMode = node ? resolveDisplayMode(node) : 'standard';
+  const onToggleMode = useCallback(() => {
+    updateNode(id, {
+      displayMode: currentMode === 'compact' ? 'standard' : 'compact',
+    });
+  }, [currentMode, id, updateNode]);
+
   const onBodyDoubleClick = useCallback(() => {
     selectNode(id);
     openInspector(id);
   }, [id, openInspector, selectNode]);
 
-  const currentMode = node && isObserveNode(node) ? resolveDisplayMode(node) : 'standard';
-  const onToggleMode = useCallback(() => {
-    if (uiStore.getState().readOnly) return;
-    updateNode(id, {
-      displayMode: currentMode === 'compact' ? 'standard' : 'compact',
-    });
-  }, [currentMode, id, uiStore, updateNode]);
-
   if (!node) return null;
-  if (!isObserveNode(node)) return null;
+  if (!isAverageNode(node)) return null;
   if (!node.position) return null;
   if (!layout) return null;
 
-  const { width, height, labelY, textX, observeBody, labelAnchor, panelCx, panelWidth, panelHeight, panelCy } = layout;
-  const vis = getObserveVisualization(node.visualization);
-  const Render = vis?.Render;
+  const { width, height, labelY, textX, valueY, panelCx, panelCy } = layout;
+  const stateClass = isValid ? 'is-focal' : 'is-calm';
+
+  const valueText =
+    isValid && currentValue && isNumericValue(currentValue)
+      ? formatAverage(currentValue.n)
+      : '—';
+
+  const showModeToggle = supportsDisplayModeToggle(node);
 
   return (
     <NodeFrame
@@ -100,61 +113,55 @@ function ObserveNodeViewImpl({ id, incomingCount }: Props): JSX.Element | null {
       height={height}
       panelCx={panelCx}
       panelCy={panelCy}
-      panelWidth={panelWidth}
-      panelHeight={panelHeight}
-      className="trama-observe-node"
+      panelWidth={layout.panelWidth}
+      panelHeight={layout.panelHeight}
+      className="trama-average-node"
       onBodyDoubleClick={onBodyDoubleClick}
     >
       <NodeBody
         width={layout.panelWidth}
         height={layout.panelHeight}
-        cx={layout.panelCx}
-        cy={layout.panelCy}
-        stateClass="is-calm"
+        cx={panelCx}
+        cy={panelCy}
+        stateClass={stateClass}
         isSelected={isSelected}
       />
 
       <text
         className="trama-node-label"
-        x={labelAnchor === 'middle' ? panelCx : textX}
+        x={layout.labelAnchor === 'middle' ? 0 : textX}
         y={labelY}
-        textAnchor={labelAnchor}
+        textAnchor={layout.labelAnchor}
       >
         {node.label}
       </text>
 
-      {observeBody && Render ? (
-        <g transform={`translate(0 ${observeBody.y + observeBody.h / 2})`}>
-          <Render
-            node={node}
-            samples={samples}
-            current={current}
-            halfW={observeBody.w / 2}
-            halfH={observeBody.h / 2}
-            compact={currentMode === 'compact'}
-          />
-        </g>
-      ) : observeBody ? (
-        <text
-          className="trama-observe-empty-label"
-          x={0}
-          y={observeBody.y + observeBody.h / 2}
-          textAnchor="middle"
-          dominantBaseline="middle"
-        >
-          시각화 없음
-        </text>
-      ) : null}
+      <text
+        className={`trama-node-value${currentMode === 'compact' ? ' is-compact' : ''}`}
+        x={layout.labelAnchor === 'middle' ? 0 : textX}
+        y={valueY}
+        textAnchor={layout.labelAnchor}
+        dominantBaseline={currentMode === 'compact' ? 'central' : undefined}
+      >
+        {valueText}
+      </text>
 
-      {layout.leftPin.sockets.map((s, i) => (
+      {layout.leftPin.sockets[0] && (
         <Socket
-          key={`l${i}`}
-          cx={s.x}
-          cy={s.y}
-          connected={i < incomingCount}
-          color={slotColor(i, incomingCount)}
+          cx={layout.leftPin.sockets[0].x}
+          cy={layout.leftPin.sockets[0].y}
+          connected={incomingCount > 0}
         />
-      ))}
+      )}
+
+      {showModeToggle && (
+        <ModeToggle
+          panelRight={panelCx + layout.panelWidth / 2}
+          panelTop={panelCy - layout.panelHeight / 2}
+          mode={currentMode}
+          onToggle={onToggleMode}
+        />
+      )}
 
       {layout.rightPin.sockets[0] && (
         <>
@@ -173,15 +180,8 @@ function ObserveNodeViewImpl({ id, incomingCount }: Props): JSX.Element | null {
           />
         </>
       )}
-
-      <ModeToggle
-        panelRight={panelCx + panelWidth / 2}
-        panelTop={panelCy - panelHeight / 2}
-        mode={currentMode}
-        onToggle={onToggleMode}
-      />
     </NodeFrame>
   );
 }
 
-export const ObserveNodeView = memo(ObserveNodeViewImpl);
+export const AverageNodeView = memo(AverageNodeViewImpl);

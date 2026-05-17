@@ -19,8 +19,8 @@ const PAD_Y = 12;
 const PAD_X_COMPACT = 4;
 const PAD_Y_COMPACT = 3;
 
-function pickValueKind(samples: Value[], current: Value | null): 'numeric' | 'boolean' | null {
-  for (const v of samples) {
+function pickValueKind(values: Value[], current: Value | null): 'numeric' | 'boolean' | null {
+  for (const v of values) {
     return v.kind;
   }
   if (current) return current.kind;
@@ -63,7 +63,8 @@ function SparklineImpl({
   halfH,
   compact,
 }: ObserveVisualizationRenderProps): JSX.Element {
-  const kind = pickValueKind(samples, current);
+  const sampleValues = useMemo(() => samples.map((s) => s.value), [samples]);
+  const kind = pickValueKind(sampleValues, current);
 
   const padX = compact ? PAD_X_COMPACT : PAD_X;
   const padY = compact ? PAD_Y_COMPACT : PAD_Y;
@@ -76,18 +77,18 @@ function SparklineImpl({
   // 현재 값을 같이 보여주기 위해 marker 점만 별도 처리 — 버퍼에는 아직 안 들어간
   // 가장 최근 출력값을 표시 (descriptor가 push하기 전 hot-path에서도 보이도록).
   const combined: Value[] = useMemo(() => {
-    if (!current) return samples;
-    const tail = samples[samples.length - 1];
+    if (!current) return sampleValues;
+    const tail = sampleValues[sampleValues.length - 1];
     if (tail && tail.kind === current.kind) {
       if (tail.kind === 'numeric' && current.kind === 'numeric' && tail.n === current.n) {
-        return samples;
+        return sampleValues;
       }
       if (tail.kind === 'boolean' && current.kind === 'boolean' && tail.b === current.b) {
-        return samples;
+        return sampleValues;
       }
     }
-    return [...samples, current];
-  }, [samples, current]);
+    return [...sampleValues, current];
+  }, [sampleValues, current]);
 
   if (!kind || combined.length === 0) {
     return (

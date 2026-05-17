@@ -1,4 +1,5 @@
 import {
+  isAverageNode,
   isConditionNode,
   isConstantNode,
   isGeneratorNode,
@@ -30,6 +31,9 @@ export function getDefaultDisplayMode(node: Node): NodeDisplayMode {
       return 'compact';
     case 'condition':
       return 'standard';
+    case 'average':
+      // 평균값 + 라벨이 본질 → standard. 시퀀스 입력에서 추출한 결과 카드.
+      return 'standard';
     default: {
       const _exhaustive: never = node;
       return _exhaustive;
@@ -51,7 +55,8 @@ export function resolveDisplayMode(node: Node): NodeDisplayMode {
     isConditionNode(node) ||
     isGeneratorNode(node) ||
     isLogicGateNode(node) ||
-    isObserveNode(node)
+    isObserveNode(node) ||
+    isAverageNode(node)
   ) {
     if (node.displayMode) return node.displayMode;
   }
@@ -76,6 +81,7 @@ export function supportsDisplayModeToggle(node: Node): boolean {
     isConditionNode(node) ||
     isGeneratorNode(node) ||
     isLogicGateNode(node) ||
-    isObserveNode(node)
+    isObserveNode(node) ||
+    isAverageNode(node)
   );
 }

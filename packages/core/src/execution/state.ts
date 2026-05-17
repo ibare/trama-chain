@@ -6,9 +6,13 @@ import {
   type GeneratorRuntime,
 } from '../generators/index.js';
 import type { EvalDiagnosis } from './expression-evaluator.js';
-import type { ExecValue } from './exec-value.js';
-import { unwrap } from './exec-value.js';
-import { defaultNodeKindRegistry, type NodeKindRegistry } from './kinds.js';
+import type { ExecValue, SequenceSample, SequenceValue } from './exec-value.js';
+import { isSequence, unwrap } from './exec-value.js';
+import {
+  defaultNodeKindRegistry,
+  type NodeKindRegistry,
+  type ObserveExtractionRuntime,
+} from './kinds.js';
 
 /**
  * 실행 시점의 노드 값들. *모델과 분리* — 모델은 초기값/구조의 source of truth고,
@@ -29,19 +33,41 @@ import { defaultNodeKindRegistry, type NodeKindRegistry } from './kinds.js';
  */
 export interface ExecutionState {
   values: Record<NodeId, ExecValue>;
+  /**
+   * Sequence 채널 출력 — 누적 추출 슬롯 등 sequence PortSpec 을 advertise 하는
+   * 슬롯의 SequenceValue 스냅샷. 키는 `${nodeId}:${slot}` (outputKey 와 동일 포맷).
+   * 스칼라 [[values]] 와 별도 채널로 분리해 두 출력이 서로 덮어쓰지 않게 한다.
+   * runtime-only.
+   */
+  sequenceOutputs: Record<string, SequenceValue>;
   validOutputs: Set<string>;
   invalidReasons: Record<NodeId, EvalDiagnosis & { ok: false }>;
   /**
-   * ObserveNode가 통과한 값을 시간순으로 누적한 버퍼. runtime-only — 직렬화되지
-   * 않고 세션이 끝나면 사라진다. capacity 정책(bounded/unbounded)은 propagate
-   * 시점에 적용되어 이 버퍼에 들어오는 시점부터 잘려있다.
+   * ObserveNode가 통과한 값을 시간순으로 누적한 sample 버퍼. 각 sample 은
+   * (value, t) 페어 — t 는 누적 당시의 simulation time(ms). runtime-only —
+   * 직렬화되지 않고 세션이 끝나면 사라진다. capacity 정책(bounded/unbounded)은
+   * propagate 시점에 적용되어 이 버퍼에 들어오는 시점부터 잘려있다.
    */
-  observeBuffers: Record<NodeId, Value[]>;
+  observeBuffers: Record<NodeId, SequenceSample[]>;
+  /**
+   * ObserveNode 추출 슬롯의 throttle 런타임 — 마지막 emit 시각을 기억해 throttle
+   * 정책의 다음 emit 여부를 결정. runtime-only.
+   */
+  observeExtractionRuntime: Record<NodeId, ObserveExtractionRuntime>;
   /**
    * GeneratorNode의 enabled 플래그와 cursor. runtime-only — 매개변수는 모델에
    * 영속되지만 시작/정지 상태와 cursor 진행도는 세션 한정이다.
    */
   generatorRuntime: Record<NodeId, GeneratorRuntime>;
+  /**
+   * 현재 simulation time(ms). 매 propagate step 마다 step 간격만큼 증가한다.
+   * wall clock 과 분리된 모델 시간축 — ObserveNode 의 (value, t) sample 누적,
+   * throttle 비교 기준이 된다. 0 부터 시작 (reset 시 0 으로 복귀).
+   *
+   * step 인덱스가 아닌 ms 단위인 이유는 sub-step 지연(스크럽 spawn, 비주기 펄스)
+   * 까지 표현할 수 있기 위함.
+   */
+  simulationTimeMs: number;
 }
 
 /** 출력 유효성 집합용 키 생성. */
@@ -79,10 +105,13 @@ export function initializeFromInitialValues(
   }
   return {
     values,
+    sequenceOutputs: {},
     validOutputs,
     invalidReasons: {},
     observeBuffers: {},
+    observeExtractionRuntime: {},
     generatorRuntime,
+    simulationTimeMs: 0,
   };
 }
 
@@ -93,13 +122,14 @@ export function initializeFromInitialValues(
  */
 export function getNodeValue(state: ExecutionState, id: NodeId): Value | undefined {
   const ev = state.values[id];
-  return ev === undefined ? undefined : unwrap(ev);
+  if (ev === undefined || isSequence(ev)) return undefined;
+  return unwrap(ev);
 }
 
-/** 노드의 numeric 값. boolean Value거나 미기록이면 undefined. wrapped 자동 unwrap. */
+/** 노드의 numeric 값. boolean Value·sequence·미기록이면 undefined. wrapped 자동 unwrap. */
 export function getNumericValue(state: ExecutionState, id: NodeId): number | undefined {
   const ev = state.values[id];
-  if (!ev) return undefined;
+  if (!ev || isSequence(ev)) return undefined;
   const v = unwrap(ev);
   if (v.kind !== 'numeric') return undefined;
   return v.n;

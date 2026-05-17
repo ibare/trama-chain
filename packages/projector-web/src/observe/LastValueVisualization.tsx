@@ -27,13 +27,14 @@ function LastValueImpl({
   // 누적 버퍼가 propagate 단계에서 이미 최신값을 push해뒀다면 samples 마지막이 곧 latest.
   // 펄스 hot-path 등으로 current가 버퍼와 어긋날 수 있어 안전하게 합쳐서 단일 timeline 구성.
   const timeline: Value[] = useMemo(() => {
-    const tail = samples[samples.length - 1];
-    if (!current) return samples;
+    const values = samples.map((s) => s.value);
+    const tail = values[values.length - 1];
+    if (!current) return values;
     if (!tail) return [current];
     const same =
       (tail.kind === 'numeric' && current.kind === 'numeric' && tail.n === current.n) ||
       (tail.kind === 'boolean' && current.kind === 'boolean' && tail.b === current.b);
-    return same ? samples : [...samples, current];
+    return same ? values : [...values, current];
   }, [samples, current]);
 
   const latest = timeline[timeline.length - 1] ?? null;

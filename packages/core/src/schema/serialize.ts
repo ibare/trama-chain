@@ -1,4 +1,5 @@
 import type {
+  TramaAverageNode,
   TramaConditionNode,
   TramaConstantNode,
   TramaDocument,
@@ -72,7 +73,18 @@ const OBSERVE_NODE_KEY_ORDER: (keyof TramaObserveNode)[] = [
   'id',
   'label',
   'capacity',
+  'extraction',
   'visualization',
+  'position',
+  'isFocal',
+  'displayMode',
+  'description',
+];
+
+const AVERAGE_NODE_KEY_ORDER: (keyof TramaAverageNode)[] = [
+  'kind',
+  'id',
+  'label',
   'position',
   'isFocal',
   'displayMode',
@@ -139,6 +151,7 @@ function orderNode(n: TramaNode): TramaNode {
   if (n.kind === 'logic-gate') return orderObject(n, LOGIC_GATE_NODE_KEY_ORDER);
   if (n.kind === 'observe') return orderObject(n, OBSERVE_NODE_KEY_ORDER);
   if (n.kind === 'generator') return orderObject(n, GENERATOR_NODE_KEY_ORDER);
+  if (n.kind === 'average') return orderObject(n, AVERAGE_NODE_KEY_ORDER);
   return orderObject(n, EXPRESSION_NODE_KEY_ORDER);
 }
 

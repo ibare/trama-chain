@@ -1,7 +1,7 @@
 import type { CombinerRegistry } from '../combiners/index.js';
 import type { Model, NodeId, Value } from '../model/index.js';
 import { booleanValue, isNumericValue, isValueNode, numericValue } from '../model/index.js';
-import { unwrap, type ExecValue } from './exec-value.js';
+import { isSequence, unwrap, type ExecValue, type SequenceSample, type SequenceValue } from './exec-value.js';
 import type { ShapeRegistry } from '../functions/index.js';
 import type { Rng } from '../functions/types.js';
 import {
@@ -21,6 +21,7 @@ import {
   getNodeOutputUnit,
   isRawOutputNode,
   type NodeKindRegistry,
+  type ObserveExtractionRuntime,
   type PropagateContext,
 } from './kinds.js';
 import {
@@ -45,6 +46,12 @@ export interface PropagateOptions {
   generatorRegistry?: GeneratorRegistry;
   /** 이미 계산된 위상을 재사용하려면 전달 */
   topology?: InstantaneousTopology;
+  /**
+   * 이번 step 에서 누적·throttle 비교의 기준이 될 simulation time(ms) 증가량.
+   * 미지정 시 0 — 시간이 흐르지 않는 step (수동 recompute 등) 으로 간주.
+   * 정상 ticker 경로는 step 간격(예: STEP_TICK_MS) 을 넘긴다.
+   */
+  stepIntervalMs?: number;
 }
 
 /**
@@ -69,10 +76,13 @@ export function propagateOneStep(
   };
   // ObserveNode 누적 버퍼는 step 간에 이어진다 — 직전 step의 버퍼를 그대로
   // 카피해 디스크립터가 새 값을 push하면 잘림 정책까지 디스크립터가 적용한다.
-  const observeBuffers: Record<string, Value[]> = {};
+  const observeBuffers: Record<string, SequenceSample[]> = {};
   for (const [nid, buf] of Object.entries(state.observeBuffers ?? {})) {
     observeBuffers[nid] = [...buf];
   }
+  const observeExtractionRuntime: Record<NodeId, ObserveExtractionRuntime> = {
+    ...(state.observeExtractionRuntime ?? {}),
+  };
   // GeneratorRuntime도 step 간에 이어진다 — clone-in/out으로 caller state는 안전.
   const generatorRuntime: Record<NodeId, GeneratorRuntime> = {};
   for (const [nid, rt] of Object.entries(state.generatorRuntime ?? {})) {
@@ -83,6 +93,12 @@ export function propagateOneStep(
     };
   }
   const generatorRegistry = options.generatorRegistry ?? defaultGeneratorRegistry;
+  // Sequence 채널 출력 — 이전 step 의 슬롯별 SequenceValue 를 카피해 두고,
+  // 디스크립터가 이번 step 의 emit 결정에 따라 덮어쓰거나 그대로 둔다.
+  const sequenceNext: Record<string, SequenceValue> = { ...(state.sequenceOutputs ?? {}) };
+  // 이번 step 에서 사용할 simulation time — 이전 시각 + 옵션 증분.
+  const stepDelta = options.stepIntervalMs ?? 0;
+  const simulationTimeMs = (state.simulationTimeMs ?? 0) + stepDelta;
 
   for (const nid of topology.order) {
     const node = model.nodes[nid];
@@ -104,18 +120,24 @@ export function propagateOneStep(
         options.expressionEvaluator ?? noopExpressionEvaluator,
       rng,
       observeBuffers,
+      observeExtractionRuntime,
       generatorRuntime,
       generatorRegistry,
+      sequenceNext,
+      simulationTimeMs,
     };
     desc.propagate(node, ctx);
   }
 
   return {
     values: next,
+    sequenceOutputs: sequenceNext,
     validOutputs,
     invalidReasons,
     observeBuffers,
+    observeExtractionRuntime,
     generatorRuntime,
+    simulationTimeMs,
   };
 }
 
@@ -159,6 +181,9 @@ export function applyFeedbackEdges(
     const sourceExec =
       state.values[edge.from] ?? (isValueNode(source) ? source.initialValue : undefined);
     if (!sourceExec) continue;
+    // feedback combiner는 스칼라만 — sequence source는 단위/극성 결합에 의미가 없어
+    // 기여하지 않는다 (port-compat이 차단해야 정상이지만 안전망).
+    if (isSequence(sourceExec)) continue;
     const sourceVal: Value = unwrap(sourceExec);
     // PortType 호환: source ValueKind ≠ target ValueKind면 기여하지 않음.
     if (sourceVal.kind !== target.initialValue.kind) continue;
@@ -181,7 +206,7 @@ export function applyFeedbackEdges(
     const combiner = options.combinerRegistry.getOfKind(target.combiner, 'numeric');
     if (!combiner) throw new MissingCombinerError(target.combiner);
     const baseExec = next[tid];
-    const baseVal = baseExec ? unwrap(baseExec) : undefined;
+    const baseVal = baseExec && !isSequence(baseExec) ? unwrap(baseExec) : undefined;
     const baseNumber =
       baseVal && baseVal.kind === 'numeric' ? baseVal.n : target.initialValue.n;
     const combined = combiner.combine([baseNumber, ...contribs]);
@@ -199,7 +224,7 @@ export function applyFeedbackEdges(
     const combiner = options.combinerRegistry.getOfKind(target.combiner, 'boolean');
     if (!combiner) throw new MissingCombinerError(target.combiner);
     const baseExec = next[tid];
-    const baseVal = baseExec ? unwrap(baseExec) : undefined;
+    const baseVal = baseExec && !isSequence(baseExec) ? unwrap(baseExec) : undefined;
     const baseBool =
       baseVal && baseVal.kind === 'boolean' ? baseVal.b : target.initialValue.b;
     next[tid] = booleanValue(combiner.combine([baseBool, ...contribs]));
@@ -208,9 +233,12 @@ export function applyFeedbackEdges(
 
   return {
     values: next,
+    sequenceOutputs: { ...state.sequenceOutputs },
     validOutputs,
     invalidReasons: { ...state.invalidReasons },
     observeBuffers: { ...state.observeBuffers },
+    observeExtractionRuntime: { ...state.observeExtractionRuntime },
     generatorRuntime: { ...state.generatorRuntime },
+    simulationTimeMs: state.simulationTimeMs ?? 0,
   };
 }

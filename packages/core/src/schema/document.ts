@@ -98,11 +98,17 @@ export const ObserveCapacitySchema = z.discriminatedUnion('kind', [
   z.object({ kind: z.literal('unbounded') }),
 ]);
 
+export const ObserveExtractionSchema = z.discriminatedUnion('kind', [
+  z.object({ kind: z.literal('realtime') }),
+  z.object({ kind: z.literal('throttle'), intervalMs: z.number().positive() }),
+]);
+
 export const ObserveNodeSchema = z.object({
   kind: z.literal('observe'),
   id: z.string(),
   label: z.string(),
   capacity: ObserveCapacitySchema,
+  extraction: ObserveExtractionSchema,
   visualization: z.string(),
   position: z.object({ x: z.number(), y: z.number() }).nullable(),
   isFocal: z.boolean(),
@@ -161,6 +167,16 @@ export const GeneratorNodeSchema = z.object({
   displayMode: NodeDisplayModeSchema.optional(),
 });
 
+export const AverageNodeSchema = z.object({
+  kind: z.literal('average'),
+  id: z.string(),
+  label: z.string(),
+  position: z.object({ x: z.number(), y: z.number() }).nullable(),
+  isFocal: z.boolean(),
+  description: z.string().nullable().optional(),
+  displayMode: NodeDisplayModeSchema.optional(),
+});
+
 export const NodeSchema = z.discriminatedUnion('kind', [
   ValueNodeSchema,
   ConstantNodeSchema,
@@ -169,6 +185,7 @@ export const NodeSchema = z.discriminatedUnion('kind', [
   ObserveNodeSchema,
   ExpressionNodeSchema,
   GeneratorNodeSchema,
+  AverageNodeSchema,
 ]);
 
 export const EdgeSchema = z.object({
@@ -212,4 +229,5 @@ export type TramaLogicGateNode = z.infer<typeof LogicGateNodeSchema>;
 export type TramaObserveNode = z.infer<typeof ObserveNodeSchema>;
 export type TramaExpressionNode = z.infer<typeof ExpressionNodeSchema>;
 export type TramaGeneratorNode = z.infer<typeof GeneratorNodeSchema>;
+export type TramaAverageNode = z.infer<typeof AverageNodeSchema>;
 export type TramaEdge = z.infer<typeof EdgeSchema>;

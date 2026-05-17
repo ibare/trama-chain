@@ -5,12 +5,13 @@ import {
   defaultGeneratorRegistry,
   type GeneratorRegistry,
 } from '../generators/index.js';
-import type { Model, NodeId, Value } from '../model/index.js';
+import type { Model, NodeId } from '../model/index.js';
 import { defaultUnitCatalog, type UnitCatalog } from '../units/index.js';
-import type { ExecValue } from './exec-value.js';
+import type { ExecValue, SequenceSample, SequenceValue } from './exec-value.js';
 import {
   defaultNodeKindRegistry,
   type NodeKindRegistry,
+  type ObserveExtractionRuntime,
   type PropagateContext,
 } from './kinds.js';
 import {
@@ -44,7 +45,18 @@ export interface RecomputeNodeOptions {
    * 호출자가 현재 `state.observeBuffers`를 전달하고 결과의 `newObserveBuffers`
    * 를 다시 state에 반영한다.
    */
-  observeBuffers?: Readonly<Record<NodeId, Value[]>>;
+  observeBuffers?: Readonly<Record<NodeId, SequenceSample[]>>;
+  /**
+   * ObserveNode 추출 throttle 런타임 시작 상태. 미지정이면 빈 객체 — 단발 호출은
+   * 보통 본체 passthrough 가 목적이라 추출 발사 여부와 무관하지만, propagate 가
+   * runtime 을 읽으므로 일관성을 위해 전달 가능.
+   */
+  observeExtractionRuntime?: Readonly<Record<NodeId, ObserveExtractionRuntime>>;
+  /**
+   * 현재 simulation time(ms). ObserveNode 누적 sample 의 t 값과 throttle 비교
+   * 기준으로 쓰인다. 미지정이면 0 — wall-clock 과 무관한 모델 시간.
+   */
+  simulationTimeMs?: number;
 }
 
 export interface RecomputeNodeResult {
@@ -65,7 +77,18 @@ export interface RecomputeNodeResult {
    * 그 버퍼에 push된 결과가 새 reference로 반환된다 (caller의 입력은 mutate
    * 되지 않음 — 내부에서 clone 후 사용). 미입력이었으면 빈 객체.
    */
-  newObserveBuffers: Record<NodeId, Value[]>;
+  newObserveBuffers: Record<NodeId, SequenceSample[]>;
+  /**
+   * 재계산 후의 ObserveNode 누적 추출 throttle 런타임. emit 결정으로 갱신될 수
+   * 있다. 미입력이었으면 빈 객체.
+   */
+  newObserveExtractionRuntime: Record<NodeId, ObserveExtractionRuntime>;
+  /**
+   * 재계산 후의 sequence 채널 출력 작업 버퍼. 누적 추출 슬롯이 발사하면
+   * 여기에 SequenceValue 가 기록되어 있다. 호출자가 결과를 state 에 반영할 때
+   * sequenceOutputs 와 머지.
+   */
+  newSequenceOutputs: Record<string, SequenceValue>;
 }
 
 /**
@@ -84,12 +107,19 @@ export function recomputeNode(
 ): RecomputeNodeResult {
   const node = model.nodes[nodeId];
   // 입력 버퍼는 clone — descriptor가 mutate해도 caller의 source는 건드리지 않는다.
-  const seedBuffers: Record<NodeId, Value[]> = {};
+  const seedBuffers: Record<NodeId, SequenceSample[]> = {};
   if (options.observeBuffers) {
     for (const [nid, buf] of Object.entries(options.observeBuffers)) {
       seedBuffers[nid] = [...buf];
     }
   }
+  const seedExtractionRuntime: Record<NodeId, ObserveExtractionRuntime> = {};
+  if (options.observeExtractionRuntime) {
+    for (const [nid, rt] of Object.entries(options.observeExtractionRuntime)) {
+      seedExtractionRuntime[nid] = { ...rt };
+    }
+  }
+  const seedSequenceOutputs: Record<string, SequenceValue> = {};
 
   if (!node) {
     return {
@@ -98,6 +128,8 @@ export function recomputeNode(
       validOutputs: new Set(state.validOutputs),
       outputSlotKeys: [],
       newObserveBuffers: seedBuffers,
+      newObserveExtractionRuntime: seedExtractionRuntime,
+      newSequenceOutputs: seedSequenceOutputs,
     };
   }
 
@@ -110,6 +142,8 @@ export function recomputeNode(
       validOutputs: new Set(state.validOutputs),
       outputSlotKeys: [outputKey(nodeId, 0)],
       newObserveBuffers: seedBuffers,
+      newObserveExtractionRuntime: seedExtractionRuntime,
+      newSequenceOutputs: seedSequenceOutputs,
     };
   }
 
@@ -146,10 +180,13 @@ export function recomputeNode(
     expressionEvaluator: options.expressionEvaluator ?? noopExpressionEvaluator,
     rng: options.rng ?? defaultRng,
     observeBuffers: seedBuffers,
+    observeExtractionRuntime: seedExtractionRuntime,
     // recomputeNode는 단일 target만 propagate — generator는 target이 될 수 없으니
     // 빈 runtime + 기본 registry로 충분. ctx 인터페이스 만족을 위해 채워둔다.
     generatorRuntime: {},
     generatorRegistry: options.generatorRegistry ?? defaultGeneratorRegistry,
+    sequenceNext: seedSequenceOutputs,
+    simulationTimeMs: options.simulationTimeMs ?? 0,
   };
 
   desc.propagate(node, ctx);
@@ -163,5 +200,7 @@ export function recomputeNode(
     validOutputs: workingValid,
     outputSlotKeys,
     newObserveBuffers: seedBuffers,
+    newObserveExtractionRuntime: seedExtractionRuntime,
+    newSequenceOutputs: seedSequenceOutputs,
   };
 }

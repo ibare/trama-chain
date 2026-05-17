@@ -1,5 +1,6 @@
 import { create, type StoreApi, type UseBoundStore } from 'zustand';
 import {
+  addAverageNode as addAverageNodeOp,
   addConditionNode as addConditionNodeOp,
   addLogicGateNode as addLogicGateNodeOp,
   addObserveNode as addObserveNodeOp,
@@ -31,6 +32,7 @@ import {
   updateNode as updateNodeOp,
 } from '@trama/core';
 import type {
+  AddAverageNodeInput,
   AddConditionNodeInput,
   AddConstantNodeInput,
   AddLogicGateNodeInput,
@@ -82,6 +84,7 @@ export interface ModelStore {
   addObserveNode: (input: AddObserveNodeInput) => Node;
   addExpressionNode: (input: AddExpressionNodeInput) => Node;
   addGeneratorNode: (input: AddGeneratorNodeInput) => Node;
+  addAverageNode: (input: AddAverageNodeInput) => Node;
   updateNode: (id: NodeId, patch: NodePatch) => void;
   removeNode: (id: NodeId) => void;
 
@@ -287,12 +290,17 @@ export function createModelStore({
       stopGeneratorTicker();
       return;
     }
+    // 시뮬레이션 시간을 한 step 만큼 진행시킨다 — ObserveNode 누적 sample t
+    // 와 throttle 비교의 기준. wall clock 과 별개의 모델 시간축이며, ticker tick
+    // 한 번이 곧 한 step 의 model 시간 진행을 의미.
+    const stepDelta = currentStepIntervalMs();
     store.setState((s) => ({
       executionState: {
         ...s.executionState,
         values: newValues,
         validOutputs: newValid,
         generatorRuntime: newRuntime,
+        simulationTimeMs: s.executionState.simulationTimeMs + stepDelta,
       },
     }));
     const latest = store.getState();
@@ -488,6 +496,8 @@ export function createModelStore({
       expressionEvaluator: fizzexExpressionEvaluator,
       sourceValueOverrides: { [pulse.sourceNodeId]: pulse.sourceValue },
       observeBuffers: executionState.observeBuffers,
+      observeExtractionRuntime: executionState.observeExtractionRuntime,
+      simulationTimeMs: executionState.simulationTimeMs,
     });
 
     const prevValue = executionState.values[pulse.targetNodeId];
@@ -517,10 +527,16 @@ export function createModelStore({
       return {
         executionState: {
           values: newValues,
+          sequenceOutputs: {
+            ...s.executionState.sequenceOutputs,
+            ...result.newSequenceOutputs,
+          },
           validOutputs: result.validOutputs,
           invalidReasons: s.executionState.invalidReasons,
           observeBuffers: result.newObserveBuffers,
+          observeExtractionRuntime: result.newObserveExtractionRuntime,
           generatorRuntime: s.executionState.generatorRuntime,
+          simulationTimeMs: s.executionState.simulationTimeMs,
         },
       };
     });
@@ -633,6 +649,16 @@ export function createModelStore({
       return node;
     },
 
+    addAverageNode: (input) => {
+      const s = get();
+      const after = addAverageNodeOp(s.model, input);
+      const newId = after.nodeOrder[after.nodeOrder.length - 1]!;
+      const node = after.nodes[newId]!;
+      const exec = computeExecutionState(after, s.executionState);
+      set({ model: after, ...exec });
+      return node;
+    },
+
     setGeneratorEnabled: (id, enabled) => {
       const s = get();
       const node = s.model.nodes[id];
@@ -723,10 +749,13 @@ export function createModelStore({
             model: after,
             executionState: {
               values: newValues,
+              sequenceOutputs: s.executionState.sequenceOutputs,
               validOutputs: newValid,
               invalidReasons: s.executionState.invalidReasons,
               observeBuffers: s.executionState.observeBuffers,
+              observeExtractionRuntime: s.executionState.observeExtractionRuntime,
               generatorRuntime: s.executionState.generatorRuntime,
+              simulationTimeMs: s.executionState.simulationTimeMs,
             },
             trajectory: recomputed.trajectory,
           };
@@ -881,10 +910,13 @@ export function createModelStore({
             ? s.executionState
             : {
                 values: nextValues,
+                sequenceOutputs: s.executionState.sequenceOutputs,
                 validOutputs: nextValid,
                 invalidReasons: s.executionState.invalidReasons,
                 observeBuffers: s.executionState.observeBuffers,
+                observeExtractionRuntime: s.executionState.observeExtractionRuntime,
                 generatorRuntime: s.executionState.generatorRuntime,
+                simulationTimeMs: s.executionState.simulationTimeMs,
               },
           trajectory: recomputed.trajectory,
         };

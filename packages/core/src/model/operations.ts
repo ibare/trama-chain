@@ -1,4 +1,5 @@
 import type {
+  AverageNode,
   ConditionNode,
   ConditionOperator,
   ConstantNode,
@@ -13,6 +14,7 @@ import type {
   Node,
   NodeId,
   ObserveCapacity,
+  ObserveExtraction,
   ObserveNode,
   ValueNode,
 } from './types.js';
@@ -230,6 +232,7 @@ export function addLogicGateNode(
 export interface AddObserveNodeInput {
   label: string;
   capacity?: ObserveCapacity;
+  extraction?: ObserveExtraction;
   visualization?: string;
   position?: { x: number; y: number } | null;
   isFocal?: boolean;
@@ -248,6 +251,7 @@ export function addObserveNode(
     id,
     label: input.label,
     capacity: input.capacity ?? { kind: 'bounded', size: 30 },
+    extraction: input.extraction ?? { kind: 'realtime' },
     visualization: input.visualization ?? 'last-value',
     position: input.position ?? null,
     isFocal: input.isFocal ?? false,
@@ -284,6 +288,38 @@ export function addGeneratorNode(
     id,
     label: input.label,
     params: input.params ?? { kind: 'counter', start: 1, step: 1 },
+    position: input.position ?? null,
+    isFocal: input.isFocal ?? false,
+    description: input.description ?? null,
+  };
+  return touch(
+    {
+      ...model,
+      nodes: { ...model.nodes, [id]: node },
+      nodeOrder: [...model.nodeOrder, id],
+    },
+    now,
+  );
+}
+
+export interface AddAverageNodeInput {
+  label: string;
+  position?: { x: number; y: number } | null;
+  isFocal?: boolean;
+  description?: string | null;
+  id?: NodeId;
+}
+
+export function addAverageNode(
+  model: Model,
+  input: AddAverageNodeInput,
+  now?: number,
+): Model {
+  const id = input.id ?? makeNodeId();
+  const node: AverageNode = {
+    kind: 'average',
+    id,
+    label: input.label,
     position: input.position ?? null,
     isFocal: input.isFocal ?? false,
     description: input.description ?? null,

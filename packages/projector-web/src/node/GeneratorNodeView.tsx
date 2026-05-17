@@ -1,6 +1,6 @@
 import { memo, useCallback, useEffect } from 'react';
 import { tokens } from '@trama/tokens';
-import { isGeneratorNode, isNumericValue, unwrap, type NodeId } from '@trama/core';
+import { isGeneratorNode, isNumericValue, isSequence, unwrap, type NodeId } from '@trama/core';
 import { useTrama } from '../store/index.js';
 import { useNodeLayout } from './use-node-layout.js';
 import { resolveDisplayMode } from './display-mode.js';
@@ -42,7 +42,8 @@ function GeneratorNodeViewImpl({ id, incomingCount }: Props): JSX.Element | null
   // executionState.values 는 ExecValue — UI 표시는 alue 만 필요하므로 selector 에서 unwrap.
   const currentValue = modelStore((s) => {
     const ev = s.executionState.values[id];
-    return ev === undefined ? null : unwrap(ev);
+    if (ev === undefined || isSequence(ev)) return null;
+    return unwrap(ev);
   });
   const setGeneratorEnabled = modelStore((s) => s.setGeneratorEnabled);
   const resetGenerator = modelStore((s) => s.resetGenerator);

@@ -1,5 +1,5 @@
 import type { ComponentType } from 'react';
-import type { ObserveNode, Value, ValueKind } from '@trama/core';
+import type { ObserveNode, SequenceSample, Value, ValueKind } from '@trama/core';
 
 /**
  * Observe 시각화 패러다임.
@@ -13,8 +13,13 @@ import type { ObserveNode, Value, ValueKind } from '@trama/core';
  */
 export interface ObserveVisualizationRenderProps {
   node: ObserveNode;
-  /** 누적 버퍼. 시간 오름차순 — 가장 최근이 마지막. */
-  samples: Value[];
+  /**
+   * 누적 sample 버퍼. 시간 오름차순 — 가장 최근이 마지막.
+   * 각 sample 은 `{ value, t }` — t 는 누적 시점 simulation time(ms).
+   * 시간축이 필요 없는 시각은 `s.value` 만 보고, sparkline 같이 시간 분포가
+   * 필요한 시각은 t 까지 사용.
+   */
+  samples: SequenceSample[];
   /** 현재 step 출력 값. 누적 버퍼가 비어 있어도 invalid가 아니면 들어온다. */
   current: Value | null;
   halfW: number;

@@ -8,6 +8,7 @@ import { LogicGateNodeView } from './LogicGateNodeView.js';
 import { ExpressionNodeView } from './ExpressionNodeView.js';
 import { GeneratorNodeView } from './GeneratorNodeView.js';
 import { ObserveNodeView } from './ObserveNodeView.js';
+import { AverageNodeView } from './AverageNodeView.js';
 import { fizzexExpressionEvaluator } from '../expression/fizzex-evaluator.js';
 import { registerNodeKindUI } from './kind-catalog.js';
 
@@ -231,6 +232,28 @@ registerNodeKindUI({
         const addObserveNode = instance.modelStore.getState().addObserveNode;
         const node = addObserveNode({
           label: '관찰',
+          position: canvasPos,
+        });
+        return node.id;
+      },
+    },
+  ],
+});
+
+registerNodeKindUI({
+  kind: 'average',
+  menuSectionLabel: '집계',
+  menuSectionOrder: 12,
+  View: AverageNodeView,
+  buildMenuItems: (instance) => [
+    {
+      key: 'average',
+      label: '평균 노드',
+      symbol: 'x̄',
+      createNode: (canvasPos) => {
+        const addAverageNode = instance.modelStore.getState().addAverageNode;
+        const node = addAverageNode({
+          label: '평균',
           position: canvasPos,
         });
         return node.id;

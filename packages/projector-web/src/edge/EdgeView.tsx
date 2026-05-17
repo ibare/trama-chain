@@ -5,6 +5,7 @@ import {
   isExpressionNode,
   isNumericValue,
   isOutputValid,
+  isSequence,
   isValueNode,
   normalize,
   unwrap,
@@ -89,7 +90,7 @@ function EdgeViewImpl({
     const fallback =
       n && isValueNode(n) && isNumericValue(n.initialValue) ? n.initialValue.n : 0;
     const ev = s.executionState.values[fromId];
-    if (ev) {
+    if (ev && !isSequence(ev)) {
       const v = unwrap(ev);
       if (isNumericValue(v)) return v.n;
     }

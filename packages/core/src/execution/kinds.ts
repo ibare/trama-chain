@@ -15,7 +15,27 @@ import {
 } from '../units/index.js';
 import { MissingCombinerError, MissingShapeError } from './errors.js';
 import type { EvalDiagnosis, ExpressionEvaluator } from './expression-evaluator.js';
-import { asBooleanGate, unwrap, wrap, type ExecValue } from './exec-value.js';
+import {
+  asBooleanGate,
+  isSequence,
+  unwrap,
+  wrap,
+  type ExecValue,
+  type SequenceSample,
+  type SequenceValue,
+} from './exec-value.js';
+
+/**
+ * ObserveNode 의 누적 추출 슬롯 런타임 상태. throttle 정책의 마지막 emit 시각을
+ * 박제해 다음 propagate 가 발사 여부를 결정한다. realtime 모드에서는 사실상
+ * 사용되지 않지만 일관된 형태로 유지.
+ *
+ * `state.ts` 의 ExecutionState 가 이 타입을 참조하지만, kinds.ts → state.ts 의
+ * 단방향 import 를 유지하기 위해 이 자리에 정의.
+ */
+export interface ObserveExtractionRuntime {
+  lastEmitTimeMs: number;
+}
 import { outputKey } from './state.js';
 
 /**
@@ -28,6 +48,7 @@ import { outputKey } from './state.js';
 function getNumericNext(ctx: PropagateContext, id: NodeId): number | undefined {
   const ev = ctx.next[id];
   if (ev) {
+    if (isSequence(ev)) return undefined;
     const v = unwrap(ev);
     if (v.kind === 'numeric') return v.n;
     return undefined;
@@ -47,6 +68,7 @@ function getNumericNext(ctx: PropagateContext, id: NodeId): number | undefined {
 function getBooleanNext(ctx: PropagateContext, id: NodeId): boolean | undefined {
   const ev = ctx.next[id];
   if (ev) {
+    if (isSequence(ev)) return undefined;
     const v = unwrap(ev);
     if (v.kind === 'boolean') return v.b;
     return undefined;
@@ -115,11 +137,17 @@ export interface PropagateContext {
   expressionEvaluator: ExpressionEvaluator;
   rng: Rng;
   /**
-   * ObserveNode가 통과한 값을 시간순으로 누적해 두는 버퍼.
-   * 디스크립터가 mutate하며, propagateOneStep이 결과를 ExecutionState로 회수한다.
+   * ObserveNode 가 통과한 값을 시간순으로 누적해 두는 sample 버퍼.
+   * 각 sample 은 (value, t) — t 는 누적 당시 simulation time(ms).
+   * 디스크립터가 mutate하며, propagateOneStep 이 결과를 ExecutionState 로 회수한다.
    * runtime-only — 직렬화되지 않는다.
    */
-  observeBuffers: Record<NodeId, Value[]>;
+  observeBuffers: Record<NodeId, SequenceSample[]>;
+  /**
+   * ObserveNode 추출 슬롯 throttle 런타임. 마지막 emit 시각(simulation time)을
+   * 박제해 다음 propagate 가 발사 여부를 결정. runtime-only.
+   */
+  observeExtractionRuntime: Record<NodeId, ObserveExtractionRuntime>;
   /**
    * GeneratorNode의 enabled 플래그와 cursor. propagate가 emit할 때 mutate한다.
    * runtime-only — 직렬화되지 않는다.
@@ -127,6 +155,14 @@ export interface PropagateContext {
   generatorRuntime: Record<NodeId, GeneratorRuntime>;
   /** 등록된 패러다임 모음. emit 라우팅에 사용. */
   generatorRegistry: GeneratorRegistry;
+  /**
+   * Sequence 채널 출력 작업 버퍼. 키: outputKey(nodeId, slot). 누적 추출 등
+   * sequence PortSpec slot 의 SequenceValue 스냅샷을 디스크립터가 여기 기록한다.
+   * 스칼라 [[next]] 와 분리된 채널.
+   */
+  sequenceNext: Record<string, SequenceValue>;
+  /** 현재 simulation time(ms). 이 step 내 누적·emit 시각의 기준. */
+  simulationTimeMs: number;
 }
 
 /**
@@ -142,23 +178,45 @@ export interface PortTypeContext {
 }
 
 /**
- * 한 포트(입력/출력 슬롯)의 타입 명세. `value` 는 알맹이 Value 의 kind,
- * `meta` 는 WrappedValue 의 메타 kind — 미정의면 메타 없음(평탄한 Value).
- *
- * 입력 포트는 acceptsList 로 여러 PortSpec 을 OR 매칭한다.
- * 출력 포트(`OutputSlotSpec`)는 슬롯당 항상 단일 spec.
+ * scalar 채널 포트 spec — 한 스텝당 단일 값(+optional 메타) 이 흐른다.
+ * `value` 는 알맹이 Value 의 kind, `meta` 는 WrappedValue 의 메타 kind
+ * (미정의면 메타 없음). 기본 종류이므로 `kind` 는 생략 가능.
  */
-export interface PortSpec {
+export interface ScalarPortSpec {
+  kind?: 'scalar';
   value: ValueKind;
   meta?: ValueKind;
   /** UI/디버깅용 라벨. 없으면 인덱스·value 로 자동 표기. */
   label?: string;
 }
 
-/** 한 출력 슬롯의 명세. 디스크립터는 0..n-1 순서로 반환. */
-export interface OutputSlotSpec extends PortSpec {
-  index: number;
+/**
+ * sequence 채널 포트 spec — 누적된 (value, t) sample 시퀀스가 흐른다.
+ * 누적 추출 슬롯(ObserveNode 상단 우측 등) 의 출력 / 통계 노드(AverageNode 등)
+ * 의 입력에 쓰인다. scalar 와는 호환되지 않는다(자동 변환 없음 — 명시적 변환 노드 필요).
+ */
+export interface SequencePortSpec {
+  kind: 'sequence';
+  /** sample element 의 value kind. 누적원 본체 PortSpec.value 를 따른다. */
+  element: ValueKind;
+  label?: string;
 }
+
+/**
+ * 한 포트(입력/출력 슬롯)의 타입 명세. scalar 채널과 sequence 채널의 합집합.
+ *
+ * 입력 포트는 acceptsList 로 여러 PortSpec 을 OR 매칭.
+ * 출력 포트(`OutputSlotSpec`) 는 슬롯당 항상 단일 spec.
+ */
+export type PortSpec = ScalarPortSpec | SequencePortSpec;
+
+/** scalar/sequence 분기 가드. C4 Sum Type Routing 의 단일 진입점. */
+export function isSequencePortSpec(spec: PortSpec): spec is SequencePortSpec {
+  return spec.kind === 'sequence';
+}
+
+/** 한 출력 슬롯의 명세. 디스크립터는 0..n-1 순서로 반환. */
+export type OutputSlotSpec = PortSpec & { index: number };
 
 /**
  * 노드 종류별 동작을 한 곳에 모은 디스크립터.
@@ -442,8 +500,10 @@ const conditionNodeDescriptor: NodeKindDescriptor<
       if (n === undefined) continue;
       value = n;
       // valueObj 는 raw 알맹이 Value — wrapped 면 unwrap 후 단위만 보존.
+      // sequence source 는 Condition 게이트가 다루지 않는다 (port-compat 차단).
       const sourceEv = ctx.next[edge.from];
-      const sourceVal = sourceEv ? unwrap(sourceEv) : undefined;
+      const sourceVal =
+        sourceEv && !isSequence(sourceEv) ? unwrap(sourceEv) : undefined;
       valueObj = sourceVal ?? (isValueNode(source) ? source.initialValue : undefined);
       break;
     }
@@ -547,12 +607,14 @@ const expressionNodeDescriptor: NodeKindDescriptor<
       if (!source) continue;
       if (!isEdgeSourceValid(ctx, edge)) continue;
       // 식 평가는 메타 인식이 아니다 — wrapped 면 알맹이 Value 로 unwrap.
+      // sequence 는 식 변수로 흘려보낼 수 없다 (port-compat 차단; 안전망).
       const sourceEv = ctx.next[edge.from];
-      const sourceV: Value | undefined = sourceEv
-        ? unwrap(sourceEv)
-        : isValueNode(source)
-          ? source.initialValue
-          : undefined;
+      const sourceV: Value | undefined =
+        sourceEv && !isSequence(sourceEv)
+          ? unwrap(sourceEv)
+          : isValueNode(source)
+            ? source.initialValue
+            : undefined;
       if (!sourceV) continue;
       const varName = node.variables[slot];
       if (typeof varName !== 'string') continue;
@@ -705,6 +767,9 @@ function passthroughSourceSpec(
   const sourceSlots = getOutputSlots(source, ctx.registry, ctx.model);
   const slot = sourceSlots[srcSlot] ?? sourceSlots[0];
   if (!slot) return { value: 'numeric' };
+  // ObserveNode 본체는 스칼라 passthrough — sequence source 는 port-compat 가
+  // 차단해야 정상이지만, 그 결과까지 미러링하지 않는다. 보수적 폴백.
+  if (isSequencePortSpec(slot)) return { value: 'numeric' };
   return slot.meta !== undefined
     ? { value: slot.value, meta: slot.meta }
     : { value: slot.value };
@@ -717,9 +782,18 @@ const observeNodeDescriptor: NodeKindDescriptor<Extract<Node, { kind: 'observe' 
   initialValue: () => undefined,
   initialValidSlots: () => [],
   inputAccepts: (node, ctx) => [passthroughSourceSpec(node, ctx)],
+  // 슬롯 0: 스칼라 passthrough(본체). 슬롯 1: 누적 추출 sequence.
+  //   element kind 는 본체 passthrough spec.value 와 같다 — 본체가 numeric 이면
+  //   추출 sample 도 numeric.
   outputSlots: (node, ctx) => {
-    const spec = passthroughSourceSpec(node, ctx);
-    return [{ index: 0, ...spec }];
+    const bodySpec = passthroughSourceSpec(node, ctx);
+    const elementKind: ValueKind = isSequencePortSpec(bodySpec)
+      ? 'numeric'
+      : bodySpec.value;
+    return [
+      { index: 0, ...bodySpec },
+      { index: 1, kind: 'sequence', element: elementKind, label: '누적 추출' },
+    ];
   },
   acceptsAnyInput: (node, ctx) => {
     if (!ctx) return false;
@@ -727,9 +801,12 @@ const observeNodeDescriptor: NodeKindDescriptor<Extract<Node, { kind: 'observe' 
   },
   outputUnit: () => FREE_FALLBACK,
   propagate: (node, ctx) => {
+    const extractionSlotKey = outputKey(node.id, 1);
     const edge = ctx.incoming[0];
     if (!edge) {
       ctx.validOutputs.delete(outputKey(node.id, 0));
+      // 누적 추출은 본체가 stall 해도 이전 누적 스냅샷을 유지한다 — 다운스트림
+      // 통계 노드가 마지막으로 보았던 분포를 잃지 않게. valid 도 그대로.
       return;
     }
     if (!isEdgeSourceValid(ctx, edge)) {
@@ -746,6 +823,12 @@ const observeNodeDescriptor: NodeKindDescriptor<Extract<Node, { kind: 'observe' 
       ctx.validOutputs.delete(outputKey(node.id, 0));
       return;
     }
+    // ObserveNode 는 스칼라만 passthrough — sequence source 는 port-compat 단계의
+    // 별도 처리(차후 Phase) 대상. 안전망으로 무효 처리.
+    if (isSequence(sourceEv)) {
+      ctx.validOutputs.delete(outputKey(node.id, 0));
+      return;
+    }
     const inner: Value = unwrap(sourceEv);
     const innerOut: Value =
       edge.inverted && inner.kind === 'boolean'
@@ -758,14 +841,31 @@ const observeNodeDescriptor: NodeKindDescriptor<Extract<Node, { kind: 'observe' 
     ctx.next[node.id] = passed;
     ctx.validOutputs.add(outputKey(node.id, 0));
 
-    // observeBuffer 는 시각화용 알맹이만 기록 — 메타는 라우팅 표면에만 의미가 있고
-    // 그래프/플롯이 보는 데이터는 알맹이 Value.
+    // observeBuffer 에는 (value, t) sample 로 누적 — t 는 현 step 의 simulation time.
+    // 메타는 시각화/통계 모두 알맹이만 보면 충분하므로 메타 분리 후 알맹이만 박제.
     const buf = ctx.observeBuffers[node.id] ? [...ctx.observeBuffers[node.id]!] : [];
-    buf.push(innerOut);
+    const sample: SequenceSample = { value: innerOut, t: ctx.simulationTimeMs };
+    buf.push(sample);
     if (node.capacity.kind === 'bounded') {
       while (buf.length > node.capacity.size) buf.shift();
     }
     ctx.observeBuffers[node.id] = buf;
+
+    // 누적 추출 슬롯의 발사 정책 평가. realtime 은 매번, throttle 은 지난 emit
+    // 이후 intervalMs 가 simulation time 으로 지났을 때만 새 스냅샷을 흘려보낸다.
+    const extraction = node.extraction;
+    const lastEmit = ctx.observeExtractionRuntime[node.id]?.lastEmitTimeMs ?? -Infinity;
+    const shouldEmit =
+      extraction.kind === 'realtime' ||
+      ctx.simulationTimeMs - lastEmit >= extraction.intervalMs;
+    if (shouldEmit) {
+      const snapshot: SequenceValue = { kind: 'sequence', samples: buf.slice() };
+      ctx.sequenceNext[extractionSlotKey] = snapshot;
+      ctx.validOutputs.add(extractionSlotKey);
+      ctx.observeExtractionRuntime[node.id] = { lastEmitTimeMs: ctx.simulationTimeMs };
+    }
+    // emit 하지 않으면 직전 스냅샷을 그대로 둔다 — 다운스트림이 stale 값을 계속
+    // 본다는 의미가 아니라 "아직 다음 발사 시각이 안 됐다" 의 결정론적 표현.
   },
 };
 
@@ -854,6 +954,63 @@ const generatorNodeDescriptor: NodeKindDescriptor<
   },
 };
 
+/**
+ * AverageNode 디스크립터 — sequence<numeric> 입력의 표본 평균을 numeric 으로 출력.
+ *
+ * - 입력은 sequence<numeric> 단일 슬롯. ObserveNode 의 누적 추출 슬롯 등 sequence
+ *   PortSpec 을 advertise 하는 source 만 호환.
+ * - propagate: ctx.sequenceNext[sourceKey] 에서 SequenceValue 를 꺼내 numeric
+ *   sample 만 골라 표본 평균 계산. 빈 sequence / numeric sample 0 개면 invalid.
+ * - 출력 단위는 raw('free') — 다운스트림 ValueNode/시각화가 도메인 단위 해석.
+ * - canBeFeedbackTarget=false: 통계 결과를 다시 통계 입력으로 되먹이는 의미는
+ *   현재 정의되지 않음. 추후 도입 시 명시적 분리.
+ */
+const averageNodeDescriptor: NodeKindDescriptor<Extract<Node, { kind: 'average' }>> = {
+  kind: 'average',
+  outputsRaw: true,
+  canBeFeedbackTarget: false,
+  initialValue: () => undefined,
+  initialValidSlots: () => [],
+  inputAccepts: () => [{ kind: 'sequence', element: 'numeric' }],
+  outputSlots: () => [{ index: 0, value: 'numeric' }],
+  outputUnit: () => FREE_FALLBACK,
+  propagate: (node, ctx) => {
+    const slotKey = outputKey(node.id, 0);
+    const edge = ctx.incoming[0];
+    if (!edge) {
+      ctx.validOutputs.delete(slotKey);
+      return;
+    }
+    if (!isEdgeSourceValid(ctx, edge)) {
+      ctx.validOutputs.delete(slotKey);
+      return;
+    }
+    const srcSlot = edge.sourceSlotIndex ?? 0;
+    const seqKey = outputKey(edge.from, srcSlot);
+    const seq = ctx.sequenceNext[seqKey];
+    if (!seq) {
+      ctx.validOutputs.delete(slotKey);
+      return;
+    }
+    let sum = 0;
+    let count = 0;
+    for (const sample of seq.samples) {
+      if (sample.value.kind !== 'numeric') continue;
+      const n = sample.value.n;
+      if (!Number.isFinite(n)) continue;
+      sum += n;
+      count += 1;
+    }
+    if (count === 0) {
+      ctx.validOutputs.delete(slotKey);
+      return;
+    }
+    const mean = sum / count;
+    ctx.next[node.id] = numericValue(mean, 'free');
+    ctx.validOutputs.add(slotKey);
+  },
+};
+
 export function createDefaultNodeKindRegistry(): NodeKindRegistry {
   return createNodeKindRegistry()
     .register(valueNodeDescriptor)
@@ -862,7 +1019,8 @@ export function createDefaultNodeKindRegistry(): NodeKindRegistry {
     .register(logicGateNodeDescriptor)
     .register(observeNodeDescriptor)
     .register(expressionNodeDescriptor)
-    .register(generatorNodeDescriptor);
+    .register(generatorNodeDescriptor)
+    .register(averageNodeDescriptor);
 }
 
 /**
@@ -942,10 +1100,10 @@ export function getInputAccepts(
 }
 
 /**
- * 노드의 입력 PortType (slot 0, value 만). null 이면 입력 없음.
+ * 노드의 scalar 입력 PortType (slot 0, value 만). null 이면 입력 없음 또는 sequence-only.
  * 미등록 종류는 null 로 안전 폴백.
  *
- * 슬롯·메타 인지 호출자는 [[getInputAccepts]] 를 직접 사용.
+ * 슬롯·메타·sequence 인지 호출자는 [[getInputAccepts]] 를 직접 사용.
  */
 export function getInputPortType(
   node: Node,
@@ -954,20 +1112,26 @@ export function getInputPortType(
 ): ValueKind | null {
   const accepts = getInputAccepts(node, registry, model);
   if (accepts === null) return null;
-  return accepts[0]?.value ?? null;
+  const first = accepts[0];
+  if (!first) return null;
+  if (isSequencePortSpec(first)) return null;
+  return first.value;
 }
 
 /**
- * 노드의 출력 PortType (slot 0, value 만). 미등록 종류는 'numeric' 폴백.
+ * 노드의 scalar 출력 PortType (slot 0, value 만). 미등록·sequence 슬롯은 'numeric' 폴백.
  *
- * 슬롯별 PortType 이 필요하면 [[getOutputSlotAt]] 사용.
+ * 슬롯별 / sequence 인지 PortType 이 필요하면 [[getOutputSlotAt]] 사용.
  */
 export function getOutputPortType(
   node: Node,
   registry: NodeKindRegistry = defaultNodeKindRegistry,
   model?: Model,
 ): ValueKind {
-  return getOutputSlots(node, registry, model)[0]?.value ?? 'numeric';
+  const first = getOutputSlots(node, registry, model)[0];
+  if (!first) return 'numeric';
+  if (isSequencePortSpec(first)) return 'numeric';
+  return first.value;
 }
 
 export type EdgeCompatibility =
@@ -986,8 +1150,16 @@ export type EdgeCompatibility =
  * boolean 게이트가 plain numeric 을 받아 freeze 만 되는 사례를 메뉴에서 제외시킨다.
  */
 function specMatches(source: PortSpec, target: PortSpec): boolean {
-  if (source.value !== target.value) return false;
-  if (target.meta !== undefined && source.meta !== target.meta) return false;
+  // scalar ↔ sequence 는 호환 안 됨 — 자동 변환 없음 (명시적 변환 노드 필요).
+  if (isSequencePortSpec(source) !== isSequencePortSpec(target)) return false;
+  if (isSequencePortSpec(source) && isSequencePortSpec(target)) {
+    return source.element === target.element;
+  }
+  // 둘 다 scalar — 기존 의미 동일.
+  const ss = source as ScalarPortSpec;
+  const ts = target as ScalarPortSpec;
+  if (ss.value !== ts.value) return false;
+  if (ts.meta !== undefined && ss.meta !== ts.meta) return false;
   return true;
 }
 
@@ -1039,9 +1211,15 @@ export function checkEdgeCompatibility(
   for (const accept of targetAccepts) {
     if (specMatches(sourceSlot, accept)) return { compatible: true };
   }
-  const wanted = targetAccepts.map((a) => a.value).join('|');
+  const wanted = targetAccepts.map(describePortSpec).join('|');
   return {
     compatible: false,
-    reason: `port type mismatch: source outputs "${sourceSlot.value}", target expects "${wanted}"`,
+    reason: `port type mismatch: source outputs "${describePortSpec(sourceSlot)}", target expects "${wanted}"`,
   };
+}
+
+/** PortSpec → 사람이 읽을 수 있는 라우팅 라벨. scalar/sequence 양쪽을 한 형식으로. */
+function describePortSpec(spec: PortSpec): string {
+  if (isSequencePortSpec(spec)) return `sequence<${spec.element}>`;
+  return spec.value;
 }

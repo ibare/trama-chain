@@ -5,6 +5,7 @@ import {
   documentToModel,
   initializeFromInitialValues,
   isNumericValue,
+  isSequence,
   isValueNode,
   normalize,
   parseTrama,
@@ -43,7 +44,7 @@ function resolveNodeUnit(node: Node): ResolvedUnit {
 }
 
 function valueAsNumber(ev: ExecValue | undefined): number {
-  if (!ev) return 0;
+  if (!ev || isSequence(ev)) return 0;
   const v: Value = unwrap(ev);
   if (!isNumericValue(v)) return 0;
   return v.n;

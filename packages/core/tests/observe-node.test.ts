@@ -154,7 +154,9 @@ describe('ObserveNode', () => {
 
     const buf = state.observeBuffers['mon'];
     expect(buf).toBeDefined();
-    expect(buf!.map((v) => (v.kind === 'numeric' ? v.n : null))).toEqual([3, 4, 5]);
+    expect(
+      buf!.map((s) => (s.value.kind === 'numeric' ? s.value.n : null)),
+    ).toEqual([3, 4, 5]);
   });
 
   it('unbounded capacity keeps all values', () => {

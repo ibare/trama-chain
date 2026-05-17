@@ -1,5 +1,6 @@
 import { tokens } from '@trama/tokens';
 import {
+  isAverageNode,
   isConditionNode,
   isExpressionNode,
   isGeneratorNode,
@@ -426,6 +427,9 @@ export function getNodeLayout(
     if (isObserveNode(node)) {
       return buildCompactLayout(node, opts, { hasOuterControls: false });
     }
+    if (isAverageNode(node)) {
+      return buildCompactLayout(node, opts, { hasOuterControls: false });
+    }
     // 위 외의 kind는 compact 사양이 정의되지 않았으므로 standard fallback.
   }
   // 스킨이 켜진 ValueNode는 본문이 스킨으로 통째 대체되므로 카드/콤바이너/슬라이더
@@ -597,6 +601,40 @@ export function getNodeLayout(
       skinBorder: null,
       expressionBody: null,
       observeBody: { x: bodyX, y: bodyY, w: bodyW, h: bodyH },
+      generatorBody: null,
+      outerControlSlot: null,
+    };
+  }
+
+  // AverageNode — 단일 sequence 입력, 단일 numeric 출력. 본문에 라벨 + 평균값(읽기 전용).
+  // ValueNode와 같은 모양의 카드를 갖되 슬라이더·콤바이너 없음.
+  if (isAverageNode(node)) {
+    const halfW = STANDARD_PANEL.w / 2;
+    const halfH = STANDARD_PANEL.h / 2;
+    const cardTop = -halfH;
+    const leftPin = buildPin(-halfW, 0, 1);
+    const rightPin = buildPin(halfW, 0, 1);
+    return {
+      width: STANDARD_PANEL.w,
+      height: STANDARD_PANEL.h,
+      panelWidth: STANDARD_PANEL.w,
+      panelHeight: STANDARD_PANEL.h,
+      panelCx: 0,
+      panelCy: 0,
+      halfW,
+      halfH,
+      textX: -halfW + SIDE_INSET,
+      labelY: cardTop + NAME_FROM_TOP,
+      labelAnchor: 'start',
+      valueY: cardTop + VALUE_FROM_TOP,
+      sliderY: halfH,
+      combinerCenterY: null,
+      hasCombiner: false,
+      leftPin,
+      rightPin,
+      skinBorder: null,
+      expressionBody: null,
+      observeBody: null,
       generatorBody: null,
       outerControlSlot: null,
     };

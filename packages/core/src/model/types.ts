@@ -172,11 +172,29 @@ export type ObserveCapacity =
   | { kind: 'bounded'; size: number }
   | { kind: 'unbounded' };
 
+/**
+ * 누적 추출 슬롯의 발사 정책.
+ *
+ * - `realtime`: 본체에 sample 이 누적될 때마다 추출 슬롯도 한 번 emit. 다운스트림이
+ *   매 도착마다 통계를 다시 계산한다.
+ * - `throttle`: 마지막 emit 으로부터 `intervalMs` (simulation time 기준) 가
+ *   지나야 다음 emit. 그 사이 sample 은 본체 버퍼에 계속 쌓이고, emit 시 누적된
+ *   전체 스냅샷이 한 번에 흘러간다.
+ *
+ * 정책은 "통계 노드에 데이터가 얼마나 자주 도착하는가" 의 결정. 본체 누적
+ * 자체는 입력 펄스 빈도를 그대로 따른다.
+ */
+export type ObserveExtraction =
+  | { kind: 'realtime' }
+  | { kind: 'throttle'; intervalMs: number };
+
 export interface ObserveNode {
   kind: 'observe';
   id: NodeId;
   label: string;
   capacity: ObserveCapacity;
+  /** 누적 추출 슬롯의 발사 정책. 기본 `{ kind: 'realtime' }`. */
+  extraction: ObserveExtraction;
   /** Visualization paradigm key, registered in projector-web visualization registry */
   visualization: string;
   position: { x: number; y: number } | null;
@@ -234,6 +252,30 @@ export interface GeneratorNode {
   displayMode?: NodeDisplayMode;
 }
 
+/**
+ * 평균 노드 — sequence<numeric> 입력을 받아 표본 평균을 단일 numeric 으로 출력.
+ *
+ * - 입력 1개: ObserveNode 의 누적 추출 슬롯 같은 sequence 채널 source.
+ * - 출력 단위는 raw('free') — 다운스트림 ValueNode/시각화가 source 단위를 흡수.
+ *   (UI 표시는 source 의 ObserveNode 본체 단위를 거울처럼 따라간다.)
+ * - 본체에 매개변수 없음 — 평균은 결정론적이고 매개변수가 의미가 없다. 표본
+ *   가중/시간 가중 등은 별도 노드 종류(추후) 로 분리.
+ * - 빈 sequence 가 들어오면 출력 invalid (평균이 정의되지 않음).
+ *
+ * "통계 도메인 전문가" — sequence 채널을 소비하는 첫 번째 노드. 분산/표준편차/
+ * 히스토그램 등 후속 통계 노드가 같은 구조로 추가된다.
+ */
+export interface AverageNode {
+  kind: 'average';
+  id: NodeId;
+  label: string;
+  position: { x: number; y: number } | null;
+  isFocal: boolean;
+  description?: string | null;
+  /** 디스플레이 모드 인스턴스 오버라이드. 비어 있으면 kind 기본을 따른다. */
+  displayMode?: NodeDisplayMode;
+}
+
 export type Node =
   | ValueNode
   | ConstantNode
@@ -241,7 +283,8 @@ export type Node =
   | LogicGateNode
   | ExpressionNode
   | ObserveNode
-  | GeneratorNode;
+  | GeneratorNode
+  | AverageNode;
 
 export function isValueNode(n: Node): n is ValueNode {
   return n.kind === 'value';
@@ -263,6 +306,9 @@ export function isObserveNode(n: Node): n is ObserveNode {
 }
 export function isGeneratorNode(n: Node): n is GeneratorNode {
   return n.kind === 'generator';
+}
+export function isAverageNode(n: Node): n is AverageNode {
+  return n.kind === 'average';
 }
 
 export interface Edge {
