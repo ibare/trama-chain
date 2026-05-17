@@ -173,6 +173,27 @@ function computeExecutionState(
   const mergedRuntime: Record<NodeId, GeneratorRuntime> = {};
   const mergedValues: Record<NodeId, ExecValue> = { ...fresh.executionState.values };
   const mergedValid = new Set(fresh.executionState.validOutputs);
+  // ObserveNode 누적·throttle 런타임·sequence 슬롯 출력은 모델 편집(엣지 추가
+  // 등) 으로 리셋되면 안 된다. executeModel 은 initializeFromInitialValues 에서
+  // 빈 버퍼로 시작하므로 fresh 만 쓰면 한 step 분량만 남는다. prior 에 있던
+  // 살아있는 노드/슬롯의 버퍼를 그대로 채택.
+  const mergedObserveBuffers = { ...fresh.executionState.observeBuffers };
+  for (const [nid, buf] of Object.entries(prior.observeBuffers ?? {})) {
+    if (!model.nodes[nid]) continue;
+    mergedObserveBuffers[nid] = buf;
+  }
+  const mergedExtractionRuntime = { ...fresh.executionState.observeExtractionRuntime };
+  for (const [nid, rt] of Object.entries(prior.observeExtractionRuntime ?? {})) {
+    if (!model.nodes[nid]) continue;
+    mergedExtractionRuntime[nid] = rt;
+  }
+  const mergedSequenceOutputs = { ...fresh.executionState.sequenceOutputs };
+  for (const [key, seq] of Object.entries(prior.sequenceOutputs ?? {})) {
+    const colon = key.lastIndexOf(':');
+    const nid = colon >= 0 ? key.slice(0, colon) : key;
+    if (!model.nodes[nid]) continue;
+    mergedSequenceOutputs[key] = seq;
+  }
   for (const nid in fresh.executionState.generatorRuntime) {
     const node = model.nodes[nid];
     if (!node || !isGeneratorNode(node)) continue;
@@ -203,6 +224,9 @@ function computeExecutionState(
       values: mergedValues,
       validOutputs: mergedValid,
       generatorRuntime: mergedRuntime,
+      observeBuffers: mergedObserveBuffers,
+      observeExtractionRuntime: mergedExtractionRuntime,
+      sequenceOutputs: mergedSequenceOutputs,
     },
     trajectory: fresh.trajectory,
   };
@@ -402,11 +426,18 @@ export function createModelStore({
    * 주어진 source 노드의 lag=0 outgoing edges에 대해 펄스를 spawn.
    * lag=1 feedback 엣지는 제외 (방식 가). 출력 슬롯이 invalid면 skip.
    * playback 중이면 spawn 자체를 막는다.
+   *
+   * allowedSlots 가 주어지면 해당 슬롯 인덱스에 속한 outgoing edge 만 spawn —
+   * 호출자가 "이번 step 에 실제로 갱신/emit 된 슬롯" 만 추려 넘기는 경로용.
+   * ObserveNode 누적 추출처럼 throttle 미충족 step 에서 valid 가 *유지* 되는
+   * 슬롯이 있어 valid 만 기준으로 하면 시각(펄스)이 실제 인과(emit)와 어긋난다.
+   * 미지정이면 기존 동작 — 모든 valid outgoing 슬롯에 spawn.
    */
   function spawnOutgoingPulses(
     model: Model,
     executionState: ExecutionState,
     sourceNodeId: NodeId,
+    allowedSlots?: ReadonlySet<number>,
   ): void {
     if (store.getState().playbackStep !== null) return;
     for (const eid of model.edgeOrder) {
@@ -414,6 +445,7 @@ export function createModelStore({
       if (!e || e.from !== sourceNodeId) continue;
       if ((e.lag ?? 0) !== 0) continue;
       const slot = e.sourceSlotIndex ?? 0;
+      if (allowedSlots && !allowedSlots.has(slot)) continue;
       if (!executionState.validOutputs.has(outputKey(sourceNodeId, slot))) continue;
       const sourceValue = executionState.values[sourceNodeId];
       if (!sourceValue) continue;
@@ -497,6 +529,7 @@ export function createModelStore({
       sourceValueOverrides: { [pulse.sourceNodeId]: pulse.sourceValue },
       observeBuffers: executionState.observeBuffers,
       observeExtractionRuntime: executionState.observeExtractionRuntime,
+      sequenceOutputs: executionState.sequenceOutputs,
       simulationTimeMs: executionState.simulationTimeMs,
     });
 
@@ -541,9 +574,28 @@ export function createModelStore({
       };
     });
 
-    if (valueChanged && result.newValue !== undefined) {
+    // 이번 step 에 실제로 갱신/emit 된 슬롯만 펄스 spawn — slot 0 은 스칼라
+    // 본체 값이 바뀐 경우, slot 1+ 는 sequenceOutputs reference 가 바뀐(=새 emit)
+    // 경우. throttle 미충족 step 에서도 valid 는 유지되는 sequence 슬롯이 있어
+    // valid 만 기준으로 하면 시각과 인과가 어긋난다.
+    const allowedSlots = new Set<number>();
+    if (valueChanged) allowedSlots.add(0);
+    const prevSeq = executionState.sequenceOutputs;
+    const prefix = `${pulse.targetNodeId}:`;
+    for (const [key, seq] of Object.entries(result.newSequenceOutputs)) {
+      if (!key.startsWith(prefix)) continue;
+      if (prevSeq[key] === seq) continue;
+      const slot = Number.parseInt(key.slice(prefix.length), 10);
+      if (!Number.isNaN(slot)) allowedSlots.add(slot);
+    }
+    if (allowedSlots.size > 0) {
       const latest = store.getState();
-      spawnOutgoingPulses(latest.model, latest.executionState, pulse.targetNodeId);
+      spawnOutgoingPulses(
+        latest.model,
+        latest.executionState,
+        pulse.targetNodeId,
+        allowedSlots,
+      );
     }
   }
 

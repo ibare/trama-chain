@@ -4,6 +4,7 @@ import {
   isAverageNode,
   isNumericValue,
   isSequence,
+  outputKey,
   unwrap,
   type NodeId,
 } from '@trama/core';
@@ -40,10 +41,9 @@ function AverageNodeViewImpl({ id, incomingCount }: Props): JSX.Element | null {
     if (ev === undefined || isSequence(ev)) return null;
     return unwrap(ev);
   });
-  const isValid = modelStore((s) => {
-    const key = `${id}#0`;
-    return s.executionState.validOutputs.has(key);
-  });
+  const isValid = modelStore((s) =>
+    s.executionState.validOutputs.has(outputKey(id, 0)),
+  );
 
   const updateNode = modelStore((s) => s.updateNode);
   const outputConnected = useOutputConnected(id);

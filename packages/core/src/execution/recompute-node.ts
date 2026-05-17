@@ -53,6 +53,13 @@ export interface RecomputeNodeOptions {
    */
   observeExtractionRuntime?: Readonly<Record<NodeId, ObserveExtractionRuntime>>;
   /**
+   * 직전 step 의 sequence 채널 출력. 미지정이면 빈 객체로 시작 — 단발 호출이라도
+   * AverageNode 등 시퀀스 소비 디스크립터는 ctx.sequenceNext 에서만 읽으므로,
+   * 펄스 도착 시 ObserveNode 추출 슬롯의 마지막 스냅샷을 이어보려면 호출자가
+   * 현재 `state.sequenceOutputs` 를 전달해야 한다.
+   */
+  sequenceOutputs?: Readonly<Record<string, SequenceValue>>;
+  /**
    * 현재 simulation time(ms). ObserveNode 누적 sample 의 t 값과 throttle 비교
    * 기준으로 쓰인다. 미지정이면 0 — wall-clock 과 무관한 모델 시간.
    */
@@ -119,7 +126,9 @@ export function recomputeNode(
       seedExtractionRuntime[nid] = { ...rt };
     }
   }
-  const seedSequenceOutputs: Record<string, SequenceValue> = {};
+  const seedSequenceOutputs: Record<string, SequenceValue> = {
+    ...(options.sequenceOutputs ?? {}),
+  };
 
   if (!node) {
     return {

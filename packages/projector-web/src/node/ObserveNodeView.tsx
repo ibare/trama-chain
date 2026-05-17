@@ -1,6 +1,6 @@
 import { memo, useCallback, useEffect } from 'react';
 import { tokens } from '@trama/tokens';
-import { isObserveNode, isSequence, unwrap, type NodeId } from '@trama/core';
+import { isObserveNode, isSequence, outputKey, unwrap, type NodeId } from '@trama/core';
 import type { SequenceSample } from '@trama/core';
 import { useTrama } from '../store/index.js';
 import { useNodeLayout } from './use-node-layout.js';
@@ -39,7 +39,7 @@ function ObserveNodeViewImpl({ id, incomingCount }: Props): JSX.Element | null {
   const extractionConnected = useOutputConnected(id, 1);
   // 누적 추출 슬롯의 valid 여부 — invalid면 socket을 흐리게 표시해 "아직 발사 없음" 시그널.
   const extractionValid = modelStore((s) =>
-    s.executionState.validOutputs.has(`${id}#1`),
+    s.executionState.validOutputs.has(outputKey(id, 1)),
   );
   const isSelected = uiStore(
     (s) => s.selection.kind === 'node' && s.selection.id === id,
