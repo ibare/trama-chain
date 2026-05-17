@@ -1589,6 +1589,9 @@
   text-anchor: middle;
   pointer-events: none;
 }
+[data-trama-root] .trama-function-symbol.is-compact {
+  font-size: 20px;
+}
 
 [data-trama-root] .trama-function-label {
   font-size: var(--typography-text-node-unit);

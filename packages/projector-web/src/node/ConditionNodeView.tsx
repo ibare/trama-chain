@@ -221,8 +221,9 @@ function ConditionNodeViewImpl({ id }: Props): JSX.Element | null {
         <text
           className={`trama-function-symbol${isCompact ? ' is-compact' : ''}`}
           x={opX}
-          y={panelCy + 4}
+          y={panelCy}
           textAnchor="middle"
+          dominantBaseline="central"
         >
           {opGlyph}
         </text>
@@ -255,8 +256,9 @@ function ConditionNodeViewImpl({ id }: Props): JSX.Element | null {
           <text
             className={`trama-function-symbol${isCompact ? ' is-compact' : ''}`}
             x={thresholdX}
-            y={panelCy + 4}
+            y={panelCy}
             textAnchor="start"
+            dominantBaseline="central"
             onDoubleClick={onThresholdDoubleClick}
           >
             {`${thresholdText}${suffix}`}
