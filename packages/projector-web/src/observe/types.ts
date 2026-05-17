@@ -19,6 +19,8 @@ export interface ObserveVisualizationRenderProps {
   current: Value | null;
   halfW: number;
   halfH: number;
+  /** compact 모드 여부. 시각화는 자체 폰트/패딩을 이 값에 맞게 줄여야 한다. */
+  compact: boolean;
 }
 
 export type ObserveVisualizationComponent = ComponentType<ObserveVisualizationRenderProps>;

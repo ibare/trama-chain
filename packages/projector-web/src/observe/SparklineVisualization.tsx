@@ -16,6 +16,8 @@ import type { ObserveVisualizationRenderProps } from './types.js';
 
 const PAD_X = 12;
 const PAD_Y = 12;
+const PAD_X_COMPACT = 4;
+const PAD_Y_COMPACT = 3;
 
 function pickValueKind(samples: Value[], current: Value | null): 'numeric' | 'boolean' | null {
   for (const v of samples) {
@@ -59,13 +61,17 @@ function SparklineImpl({
   current,
   halfW,
   halfH,
+  compact,
 }: ObserveVisualizationRenderProps): JSX.Element {
   const kind = pickValueKind(samples, current);
 
-  const innerW = halfW * 2 - PAD_X * 2;
-  const innerH = halfH * 2 - PAD_Y * 2;
-  const x0 = -halfW + PAD_X;
-  const y0 = -halfH + PAD_Y;
+  const padX = compact ? PAD_X_COMPACT : PAD_X;
+  const padY = compact ? PAD_Y_COMPACT : PAD_Y;
+  const markerR = compact ? 2 : 3;
+  const innerW = halfW * 2 - padX * 2;
+  const innerH = halfH * 2 - padY * 2;
+  const x0 = -halfW + padX;
+  const y0 = -halfH + padY;
 
   // 현재 값을 같이 보여주기 위해 marker 점만 별도 처리 — 버퍼에는 아직 안 들어간
   // 가장 최근 출력값을 표시 (descriptor가 push하기 전 hot-path에서도 보이도록).
@@ -124,7 +130,7 @@ function SparklineImpl({
         <circle
           cx={last.x}
           cy={last.y}
-          r={3}
+          r={markerR}
           className="trama-observe-sparkline-marker"
         />
       </g>

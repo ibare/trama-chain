@@ -2169,6 +2169,9 @@
   letter-spacing: -0.01em;
   pointer-events: none;
 }
+[data-trama-root] .trama-observe-last-value.is-compact {
+  font-size: 1rem;
+}
 [data-trama-root] .trama-observe-last-value.is-empty {
   fill: var(--color-node-text-low);
 }

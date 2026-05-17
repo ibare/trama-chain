@@ -208,6 +208,9 @@ function buildPin(cx: number, cy: number, nSockets: number): PinLayout {
 /** ObserveNode 본문 — 라벨 슬롯 + 시각화 슬롯 내부 패딩. 폭·높이는 STANDARD_PANEL이 정한다. */
 const OBSERVE_LABEL_FROM_TOP = 28;
 const OBSERVE_BODY_INSET = 16;
+/** compact 패널은 56px라 standard 인셋을 그대로 쓰면 시각화 높이가 0이 된다.
+ *  compact 전용으로 인셋을 줄여 실제 그릴 수 있는 슬롯을 확보. */
+const OBSERVE_BODY_INSET_COMPACT = 6;
 
 /** GeneratorNode 본문 — 라벨 + 현재값 + 컨트롤러(▶/■/↺) 슬롯 내부 패딩. 폭·높이는 STANDARD_PANEL이 정한다. */
 const GENERATOR_BODY_INSET = 16;
@@ -341,14 +344,14 @@ function buildCompactLayout(
 
   // observe compact — 패널 안쪽 패딩만 두고 panel 전체를 시각화 슬롯으로 쓴다.
   // standard에서 라벨이 차지했던 상단 공간이 외곽으로 빠졌으므로 시각화가 패널을
-  // 통째로 점유 가능.
+  // 통째로 점유 가능. 인셋은 compact 전용 작은 값을 써서 56px 패널 안에 실효 높이를 확보.
   const observeBody =
     node.kind === 'observe'
       ? {
-          x: -panelW / 2 + OBSERVE_BODY_INSET,
-          y: panelCy - panelH / 2 + OBSERVE_BODY_INSET,
-          w: panelW - OBSERVE_BODY_INSET * 2,
-          h: panelH - OBSERVE_BODY_INSET * 2,
+          x: -panelW / 2 + OBSERVE_BODY_INSET_COMPACT,
+          y: panelCy - panelH / 2 + OBSERVE_BODY_INSET_COMPACT,
+          w: panelW - OBSERVE_BODY_INSET_COMPACT * 2,
+          h: panelH - OBSERVE_BODY_INSET_COMPACT * 2,
         }
       : null;
 

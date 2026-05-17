@@ -120,6 +120,7 @@ function ObserveNodeViewImpl({ id, incomingCount }: Props): JSX.Element | null {
             current={current}
             halfW={observeBody.w / 2}
             halfH={observeBody.h / 2}
+            compact={currentMode === 'compact'}
           />
         </g>
       ) : observeBody ? (

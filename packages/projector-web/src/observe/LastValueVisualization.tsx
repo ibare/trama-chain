@@ -22,6 +22,7 @@ function formatValue(v: Value): string {
 function LastValueImpl({
   samples,
   current,
+  compact,
 }: ObserveVisualizationRenderProps): JSX.Element {
   // 누적 버퍼가 propagate 단계에서 이미 최신값을 push해뒀다면 samples 마지막이 곧 latest.
   // 펄스 hot-path 등으로 current가 버퍼와 어긋날 수 있어 안전하게 합쳐서 단일 timeline 구성.
@@ -42,12 +43,17 @@ function LastValueImpl({
     halo.push(timeline[i]!);
   }
 
+  const modClass = compact ? ' is-compact' : '';
+  // compact에서는 latest 좌측 시작점과 halo 간격을 모두 축소해 패널 내부에 맞춤.
+  const latestX = compact ? 6 : 12;
+  const haloBaseDx = compact ? -2 : -4;
+  const haloStep = compact ? 14 : 28;
   return (
     <g className="trama-observe-vis-last-value">
       {latest ? (
         <text
-          className="trama-observe-last-value"
-          x={12}
+          className={`trama-observe-last-value${modClass}`}
+          x={latestX}
           y={0}
           textAnchor="start"
           dominantBaseline="middle"
@@ -56,7 +62,7 @@ function LastValueImpl({
         </text>
       ) : (
         <text
-          className="trama-observe-last-value is-empty"
+          className={`trama-observe-last-value is-empty${modClass}`}
           x={0}
           y={0}
           textAnchor="middle"
@@ -69,8 +75,11 @@ function LastValueImpl({
         // 흐름은 왼쪽→오른쪽: 오래된 값이 왼쪽, 최근일수록 latest에 가까운 오른쪽.
         // halo[0]가 latest 직전이므로 latest 바로 왼쪽. tier가 클수록 더 왼쪽·작음·흐림.
         const tier = idx;
-        const dx = -4 - tier * 28;
-        const scale = 0.58 - tier * 0.1;
+        const dx = haloBaseDx - tier * haloStep;
+        // compact에서는 latest 자체가 1rem로 줄어들기에 halo가 상대적으로 커 보임.
+        // 0.45 baseline으로 한 단계 더 축소.
+        const scaleBase = compact ? 0.45 : 0.58;
+        const scale = scaleBase - tier * 0.1;
         const opacity = 0.55 - tier * 0.15;
         return (
           <text
