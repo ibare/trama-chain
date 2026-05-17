@@ -13,26 +13,20 @@ import type { NodeDisplayMode } from './box.js';
 /**
  * 노드 종류별 기본 디스플레이 모드 매핑.
  *
- * 기준: 패널 안에 "읽어야 할" 정보가 본질이면 standard, 도식 자체가 식별
- * 단서면 compact. 사용자가 노드별로 ModeToggle로 오버라이드 가능.
+ * 토글 지원 kind는 모두 compact로 시작 — 사용자가 ModeToggle로 standard 확대.
+ * 토글 미지원(expression)만 standard 고정.
  */
 export function getDefaultDisplayMode(node: Node): NodeDisplayMode {
   switch (node.kind) {
     case 'value':
-      // numeric: 현재값 + 슬라이더 본질 → standard
-      // boolean: ✓/✗ 결과 아이콘만 → compact (토글 컨트롤은 패널 아래로 분리)
-      return node.initialValue.kind === 'boolean' ? 'compact' : 'standard';
-    case 'expression':
     case 'observe':
-      return 'standard';
     case 'constant':
     case 'generator':
     case 'logic-gate':
-      return 'compact';
     case 'condition':
-      return 'standard';
     case 'average':
-      // 평균값 + 라벨이 본질 → standard. 시퀀스 입력에서 추출한 결과 카드.
+      return 'compact';
+    case 'expression':
       return 'standard';
     default: {
       const _exhaustive: never = node;
