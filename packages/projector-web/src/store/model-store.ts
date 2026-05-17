@@ -50,7 +50,7 @@ import type {
   NodePatch,
   Value,
 } from '@trama/core';
-import { booleanValue, isNumericValue, isValueNode, numericValue, unwrap } from '@trama/core';
+import { asBooleanGate, booleanValue, isNumericValue, isValueNode, numericValue } from '@trama/core';
 import { tokens } from '@trama/tokens';
 import { combinerRegistry, shapeRegistry } from './registries.js';
 import { fizzexExpressionEvaluator } from '../expression/fizzex-evaluator.js';
@@ -448,13 +448,13 @@ export function createModelStore({
             e.lag === 0,
         );
       let gateOpen: boolean | undefined;
-      // 펄스의 sourceValue 는 ExecValue — Condition을 통과한 wrapped boolean 도
-      // 받을 수 있도록 alue 만 우선 추출. P6 에서 메타 인식 게이트를 추가하면 raw
-      // ExecValue 를 직접 분기.
+      // 펄스의 sourceValue 는 ExecValue — asBooleanGate 가 알맹이 boolean / wrapped
+      // value:boolean / wrapped meta:boolean 우선순위로 게이트를 추출해 준다. Condition
+      // 슬롯에서 흘러온 wrapped numeric 의 meta:boolean 도 동일하게 게이트로 인식.
       if (edge) {
-        const inner = unwrap(pulse.sourceValue);
-        if (inner.kind === 'boolean') {
-          gateOpen = edge.inverted ? !inner.b : inner.b;
+        const raw = asBooleanGate(pulse.sourceValue);
+        if (raw !== undefined) {
+          gateOpen = edge.inverted ? !raw : raw;
         }
       }
       store.setState((s) => {

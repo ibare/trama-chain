@@ -15,7 +15,7 @@ import {
 } from '../units/index.js';
 import { MissingCombinerError, MissingShapeError } from './errors.js';
 import type { EvalDiagnosis, ExpressionEvaluator } from './expression-evaluator.js';
-import { unwrap, type ExecValue } from './exec-value.js';
+import { asBooleanGate, unwrap, wrap, type ExecValue } from './exec-value.js';
 import { outputKey } from './state.js';
 
 /**
@@ -142,6 +142,25 @@ export interface PortTypeContext {
 }
 
 /**
+ * 한 포트(입력/출력 슬롯)의 타입 명세. `value` 는 알맹이 Value 의 kind,
+ * `meta` 는 WrappedValue 의 메타 kind — 미정의면 메타 없음(평탄한 Value).
+ *
+ * 입력 포트는 acceptsList 로 여러 PortSpec 을 OR 매칭한다.
+ * 출력 포트(`OutputSlotSpec`)는 슬롯당 항상 단일 spec.
+ */
+export interface PortSpec {
+  value: ValueKind;
+  meta?: ValueKind;
+  /** UI/디버깅용 라벨. 없으면 인덱스·value 로 자동 표기. */
+  label?: string;
+}
+
+/** 한 출력 슬롯의 명세. 디스크립터는 0..n-1 순서로 반환. */
+export interface OutputSlotSpec extends PortSpec {
+  index: number;
+}
+
+/**
  * 노드 종류별 동작을 한 곳에 모은 디스크립터.
  * 새 노드 종류 추가 시 디스크립터를 작성·등록하면 전파·초기화·피드백·단위
  * 해석이 모두 라우팅된다.
@@ -150,26 +169,38 @@ export interface NodeKindDescriptor<N extends Node = Node> {
   kind: N['kind'];
   /** 초기 state.values에 기록할 Value. undefined면 미기록(propagate 단계에서 채움). */
   initialValue(node: N): Value | undefined;
-  /** 초기 validOutputs(슬롯 0)에 포함시킬지. 단출력 노드 전제. */
-  initialValid(node: N): boolean;
+  /**
+   * 초기 validOutputs 에 포함시킬 슬롯 인덱스들. 단출력 노드의 즉시 valid 케이스는
+   * `[0]`, 모든 슬롯 invalid 출발이면 `[]`. ConditionNode 처럼 슬롯별로 결정되는
+   * 케이스를 일급화하기 위한 자리.
+   */
+  initialValidSlots(node: N): readonly number[];
   /** 이 노드의 출력 단위. raw 통과(outputsRaw=true)여도 시각화·클램프 폴백용으로 의미가 있다. */
   outputUnit(node: N, catalog: UnitCatalog): ResolvedUnit;
   /**
-   * 이 노드의 입력 PortType. null이면 이 노드는 입력을 받지 않는다
-   * (예: Constant). 현재는 노드 전체가 단일 PortType — 슬롯별 분기 필요해지면
-   * 별도 슬롯 인자 시그니처로 확장한다.
+   * 이 노드가 받을 수 있는 입력 포트 명세 리스트. null 이면 입력을 받지 않는다
+   * (예: Constant). 빈 배열은 의도된 "입력 슬롯은 있으나 어떤 spec 도 매칭 못함" —
+   * 정상적으론 발생하지 않게 한다.
    *
-   * ObserveNode처럼 passthrough성 노드는 입력 엣지의 source PortType을 따라가야
-   * 하므로 optional ctx로 모델과 레지스트리를 전달받는다. 정적 시점에 ctx 없이
-   * 호출되면 보수적인 폴백(예: 'numeric')을 반환.
+   * 리스트의 모든 spec 은 OR 매칭 — source 의 출력 PortSpec 이 그 중 하나와
+   * value(+meta) 가 일치하면 호환. Generator 같은 메타 인식 입력이 "boolean OR
+   * numeric(meta:boolean)" 두 spec 을 동시에 advertise 하는 자리.
+   *
+   * passthrough 노드(ObserveNode)는 입력 엣지의 source spec 을 따라가야 하므로
+   * optional ctx 로 모델·레지스트리를 받는다.
    */
-  inputPortType(node: N, ctx?: PortTypeContext): ValueKind | null;
-  /** 이 노드 출력의 PortType. 단출력 전제. ctx 시맨틱은 [[inputPortType]]과 동일. */
-  outputPortType(node: N, ctx?: PortTypeContext): ValueKind;
+  inputAccepts(node: N, ctx?: PortTypeContext): readonly PortSpec[] | null;
+  /**
+   * 이 노드의 출력 슬롯 명세. 인덱스 0..n-1 순서. 단출력 노드는 길이 1.
+   * Condition 처럼 다출력은 [true 슬롯, false 슬롯] 형태로 P4 에서 정의된다.
+   *
+   * passthrough 노드는 입력 엣지의 source spec 을 따라가므로 ctx 가 필요하다.
+   */
+  outputSlots(node: N, ctx?: PortTypeContext): readonly OutputSlotSpec[];
   /**
    * 입력 PortType이 비결정적(passthrough 노드 + 입력 미연결 등)일 때 어떤 source든
    * 받아주겠다는 신호. ObserveNode가 입력 엣지가 없을 때 true를 반환해
-   * 첫 연결을 자유롭게 허용한다. 일단 연결되면 false로 떨어져 inputPortType이
+   * 첫 연결을 자유롭게 허용한다. 일단 연결되면 false로 떨어져 inputAccepts 가
    * 잠긴 PortType을 반환한다. 미정의면 false 취급.
    */
   acceptsAnyInput?(node: N, ctx?: PortTypeContext): boolean;
@@ -230,11 +261,11 @@ const valueNodeDescriptor: NodeKindDescriptor<Extract<Node, { kind: 'value' }>> 
   outputsRaw: false,
   canBeFeedbackTarget: true,
   initialValue: (node) => node.initialValue,
-  initialValid: () => true,
+  initialValidSlots: () => [0],
   // ValueNode의 PortType은 initialValue의 kind 그대로 — boolean ValueNode가
-  // 추가되어도 동일 디스크립터에서 분기된다. propagate 로직은 5단계에서 분기 강화.
-  inputPortType: (node) => node.initialValue.kind,
-  outputPortType: (node) => node.initialValue.kind,
+  // 추가되어도 동일 디스크립터에서 분기된다.
+  inputAccepts: (node) => [{ value: node.initialValue.kind }],
+  outputSlots: (node) => [{ index: 0, value: node.initialValue.kind }],
   outputUnit: (node, catalog) => {
     // 단위는 numeric Value 안에 종속 — boolean ValueNode는 단위 없음.
     if (!isNumericValue(node.initialValue)) return FREE_FALLBACK;
@@ -350,10 +381,10 @@ const constantNodeDescriptor: NodeKindDescriptor<Extract<Node, { kind: 'constant
   outputsRaw: true,
   canBeFeedbackTarget: false,
   initialValue: (node) => node.value,
-  initialValid: () => true,
+  initialValidSlots: () => [0],
   // 상수는 입력을 받지 않는다 — addEdge가 target=Constant 엣지를 거부.
-  inputPortType: () => null,
-  outputPortType: (node) => node.value.kind,
+  inputAccepts: () => null,
+  outputSlots: (node) => [{ index: 0, value: node.value.kind }],
   outputUnit: () => FREE_FALLBACK,
   // 상수는 incoming을 받지 않는다 — 초기값으로 결정되고 매 step 동일.
   // 슬롯/엣지를 통한 입력이 있더라도 무시하고 자기 value를 유지한다.
@@ -364,17 +395,20 @@ const constantNodeDescriptor: NodeKindDescriptor<Extract<Node, { kind: 'constant
 };
 
 /**
- * 조건 노드 디스크립터 — 단일 입력 / 단일 출력 게이트.
+ * 조건 노드 디스크립터 — 단일 입력 / 두 출력 게이트 (true·false 슬롯).
  *
  * 동작:
- *   1. slot 0 입력 하나만 사용. source가 valid해야 함.
- *   2. `value op node.threshold`로 비교 (단위 무시, raw 수치).
- *   3. 참이면 입력값을 그대로 next에 흘려보내고 slot 0 valid.
- *      거짓이면 slot 0 invalid — 출력이 끊긴다.
- *   4. raw passthrough: 입력의 단위가 그대로 다음 노드에 전달된다.
+ *   1. slot 0 입력 하나만 사용. source 가 valid 해야 함.
+ *   2. `value op node.threshold` 로 비교 (단위 무시, raw 수치).
+ *   3. 입력값을 알맹이로, 조건 평가 결과(boolean) 를 메타로 부착한 WrappedValue 를
+ *      ctx.next 에 저장.
+ *   4. 조건 참 → slot 0(true) valid, slot 1(false) invalid; 거짓 → 반대.
+ *      다운스트림은 edge.sourceSlotIndex 로 어느 분기를 받을지 선택한다.
+ *   5. raw passthrough — 입력 단위가 그대로 다운스트림으로 전달된다.
  *
- * boolean을 생산하지 않는 데이터 통과 게이트 의미. 참/거짓 신호가 필요한
- * 논리 회로는 별도의 Comparator 노드(추후 도입)가 담당.
+ * 메타 부착의 의미: 어느 슬롯을 통해 흘러왔든 알맹이만 보면 입력값 그대로지만,
+ * 메타를 들여다보는 다운스트림(예: Generator gate) 은 조건 평가 결과까지 일관되게
+ * 활용할 수 있다.
  */
 const conditionNodeDescriptor: NodeKindDescriptor<
   Extract<Node, { kind: 'condition' }>
@@ -383,12 +417,17 @@ const conditionNodeDescriptor: NodeKindDescriptor<
   outputsRaw: true,
   canBeFeedbackTarget: false,
   initialValue: () => undefined,
-  initialValid: () => false,
-  // 조건 게이트는 numeric을 비교 — 출력은 입력 numeric의 raw passthrough.
-  inputPortType: () => 'numeric',
-  outputPortType: () => 'numeric',
+  initialValidSlots: () => [],
+  inputAccepts: () => [{ value: 'numeric' }],
+  outputSlots: () => [
+    { index: 0, value: 'numeric', meta: 'boolean', label: 'true' },
+    { index: 1, value: 'numeric', meta: 'boolean', label: 'false' },
+  ],
   outputUnit: () => FREE_FALLBACK,
   propagate: (node, ctx) => {
+    const trueSlot = outputKey(node.id, 0);
+    const falseSlot = outputKey(node.id, 1);
+
     let value: number | undefined;
     let valueObj: Value | undefined;
     for (const edge of ctx.incoming) {
@@ -399,13 +438,10 @@ const conditionNodeDescriptor: NodeKindDescriptor<
       const source = ctx.model.nodes[edge.from];
       if (!source) continue;
       if (!isEdgeSourceValid(ctx, edge)) continue;
-      // 조건 노드는 numeric 비교 — boolean source는 입력으로 받지 않음(PortType 검사가
-      // 3단계에서 막는다). 1단계에선 boolean이 들어오면 skip.
       const n = getNumericNext(ctx, edge.from);
       if (n === undefined) continue;
       value = n;
-      // valueObj 는 raw Value — wrapped 가 들어왔으면 알맹이만 사용 (raw passthrough 시
-      // 단위 보존만 목적이라 메타는 여기서 의미가 없다).
+      // valueObj 는 raw 알맹이 Value — wrapped 면 unwrap 후 단위만 보존.
       const sourceEv = ctx.next[edge.from];
       const sourceVal = sourceEv ? unwrap(sourceEv) : undefined;
       valueObj = sourceVal ?? (isValueNode(source) ? source.initialValue : undefined);
@@ -413,7 +449,8 @@ const conditionNodeDescriptor: NodeKindDescriptor<
     }
 
     if (value === undefined) {
-      ctx.validOutputs.delete(outputKey(node.id, 0));
+      ctx.validOutputs.delete(trueSlot);
+      ctx.validOutputs.delete(falseSlot);
       return;
     }
 
@@ -441,15 +478,18 @@ const conditionNodeDescriptor: NodeKindDescriptor<
         cond = false;
     }
 
+    const rawValue: Value =
+      valueObj && valueObj.kind === 'numeric' ? valueObj : numericValue(value, 'free');
+    // 알맹이 + meta(boolean cond) 를 한 WrappedValue 로 묶어 저장 — 두 슬롯이
+    // 같은 노드 값 컨테이너를 공유하지만, valid 슬롯 키로 라우팅이 갈린다.
+    ctx.next[node.id] = wrap(rawValue, booleanValue(cond));
+
     if (cond) {
-      // raw passthrough — 입력 numeric Value를 그대로 흘려보낸다.
-      // valueObj가 있으면 그대로, 없으면 'free' 단위로 wrap.
-      ctx.next[node.id] = valueObj && valueObj.kind === 'numeric'
-        ? valueObj
-        : numericValue(value, 'free');
-      ctx.validOutputs.add(outputKey(node.id, 0));
+      ctx.validOutputs.add(trueSlot);
+      ctx.validOutputs.delete(falseSlot);
     } else {
-      ctx.validOutputs.delete(outputKey(node.id, 0));
+      ctx.validOutputs.delete(trueSlot);
+      ctx.validOutputs.add(falseSlot);
     }
   },
 };
@@ -470,10 +510,10 @@ const expressionNodeDescriptor: NodeKindDescriptor<
   outputsRaw: true,
   canBeFeedbackTarget: false,
   initialValue: () => undefined,
-  initialValid: () => false,
+  initialValidSlots: () => [],
   // fizzex는 numeric 전용 — boolean 변수는 propagate에서도 거부된다.
-  inputPortType: () => 'numeric',
-  outputPortType: () => 'numeric',
+  inputAccepts: () => [{ value: 'numeric' }],
+  outputSlots: () => [{ index: 0, value: 'numeric' }],
   outputUnit: () => FREE_FALLBACK,
   propagate: (node, ctx) => {
     const arity = node.variables.length;
@@ -586,9 +626,9 @@ const logicGateNodeDescriptor: NodeKindDescriptor<
   outputsRaw: false,
   canBeFeedbackTarget: false,
   initialValue: () => undefined,
-  initialValid: () => false,
-  inputPortType: () => 'boolean',
-  outputPortType: () => 'boolean',
+  initialValidSlots: () => [],
+  inputAccepts: () => [{ value: 'boolean' }],
+  outputSlots: () => [{ index: 0, value: 'boolean' }],
   outputUnit: () => FREE_FALLBACK,
   propagate: (node, ctx) => {
     const contributions: boolean[] = [];
@@ -624,30 +664,14 @@ const logicGateNodeDescriptor: NodeKindDescriptor<
 };
 
 /**
- * 단일 source 노드의 현재 Value를 ctx에서 꺼낸다 (numeric·boolean 공통).
- * WrappedValue 면 자동 unwrap. 노드의 kind에 따라 ValueNode의 initialValue로 폴백 —
- * ObserveNode 같은 정체불명 source의 폴백은 ValueNode 한정으로만 안전.
- *
- * 메타까지 보존해야 하는 caller(예: passthrough 노드)는 ctx.next 를 직접 읽고
- * unwrap 하지 않는다.
- */
-function getAnyNext(ctx: PropagateContext, id: NodeId): Value | undefined {
-  const ev = ctx.next[id];
-  if (ev) return unwrap(ev);
-  const source = ctx.model.nodes[id];
-  if (source && isValueNode(source)) return source.initialValue;
-  return undefined;
-}
-
-/**
  * ObserveNode 디스크립터 — 입력값을 그대로 출력으로 통과시키는 모니터.
  *
  * 본체는 passthrough이고 부가 효과는 `ctx.observeBuffers[node.id]`에 통과한 값을
  * 누적하는 것. capacity 정책에 따라 큐 길이를 자른다. 버퍼는 runtime-only —
  * propagateOneStep이 ExecutionState로 회수하지만 직렬화 단계에서는 빠진다.
  *
- * PortType은 입력 엣지 source의 outputPortType을 그대로 거울처럼 따라가며,
- * 입력이 없으면 acceptsAnyInput=true로 어떤 source든 첫 연결을 허용한다.
+ * PortType 은 입력 엣지 source 의 출력 슬롯 PortSpec(value + meta) 을 그대로
+ * 거울처럼 미러링하며, 입력이 없으면 acceptsAnyInput=true 로 어떤 source 든 첫 연결을 허용한다.
  * 초기 구현은 단일 입력만 — 첫 번째 incoming edge를 본다.
  *
  * "데이터 흐름 도메인 전문가" — ValueNode + Skin이 단위 도메인 전문가인 것과
@@ -661,27 +685,41 @@ function firstIncomingEdgeForNode(model: Model, id: NodeId): Edge | undefined {
   return undefined;
 }
 
+/**
+ * ObserveNode passthrough 의 source spec 미러링 헬퍼.
+ * 입력 엣지가 없거나 source 가 사라졌으면 보수적인 numeric 폴백.
+ *
+ * source 의 출력 슬롯 spec(value + meta) 을 그대로 가져와 ObserveNode 의
+ * 입출력 모두에 동일하게 반영 — passthrough 의 핵심 의미.
+ */
+function passthroughSourceSpec(
+  node: Extract<Node, { kind: 'observe' }>,
+  ctx: PortTypeContext | undefined,
+): PortSpec {
+  if (!ctx) return { value: 'numeric' };
+  const edge = firstIncomingEdgeForNode(ctx.model, node.id);
+  if (!edge) return { value: 'numeric' };
+  const source = ctx.model.nodes[edge.from];
+  if (!source) return { value: 'numeric' };
+  const srcSlot = edge.sourceSlotIndex ?? 0;
+  const sourceSlots = getOutputSlots(source, ctx.registry, ctx.model);
+  const slot = sourceSlots[srcSlot] ?? sourceSlots[0];
+  if (!slot) return { value: 'numeric' };
+  return slot.meta !== undefined
+    ? { value: slot.value, meta: slot.meta }
+    : { value: slot.value };
+}
+
 const observeNodeDescriptor: NodeKindDescriptor<Extract<Node, { kind: 'observe' }>> = {
   kind: 'observe',
   outputsRaw: true, // passthrough — source의 raw성을 그대로 유지
   canBeFeedbackTarget: false,
   initialValue: () => undefined,
-  initialValid: () => false,
-  inputPortType: (node, ctx) => {
-    if (!ctx) return 'numeric'; // 정적 폴백
-    const edge = firstIncomingEdgeForNode(ctx.model, node.id);
-    if (!edge) return 'numeric';
-    const source = ctx.model.nodes[edge.from];
-    if (!source) return 'numeric';
-    return getOutputPortType(source, ctx.registry, ctx.model);
-  },
-  outputPortType: (node, ctx) => {
-    if (!ctx) return 'numeric';
-    const edge = firstIncomingEdgeForNode(ctx.model, node.id);
-    if (!edge) return 'numeric';
-    const source = ctx.model.nodes[edge.from];
-    if (!source) return 'numeric';
-    return getOutputPortType(source, ctx.registry, ctx.model);
+  initialValidSlots: () => [],
+  inputAccepts: (node, ctx) => [passthroughSourceSpec(node, ctx)],
+  outputSlots: (node, ctx) => {
+    const spec = passthroughSourceSpec(node, ctx);
+    return [{ index: 0, ...spec }];
   },
   acceptsAnyInput: (node, ctx) => {
     if (!ctx) return false;
@@ -698,22 +736,32 @@ const observeNodeDescriptor: NodeKindDescriptor<Extract<Node, { kind: 'observe' 
       ctx.validOutputs.delete(outputKey(node.id, 0));
       return;
     }
-    const v = getAnyNext(ctx, edge.from);
-    if (!v) {
+    // 메타 보존 passthrough — source 가 WrappedValue 면 알맹이만 inverted 변환 후
+    // 메타를 재부착해 흘려보낸다. 평탄한 Value 면 기존 동작 그대로.
+    const sourceNode = ctx.model.nodes[edge.from];
+    const fallback: Value | undefined =
+      sourceNode && isValueNode(sourceNode) ? sourceNode.initialValue : undefined;
+    const sourceEv: ExecValue | undefined = ctx.next[edge.from] ?? fallback;
+    if (!sourceEv) {
       ctx.validOutputs.delete(outputKey(node.id, 0));
       return;
     }
-    const passed: Value =
-      edge.inverted && v.kind === 'boolean'
-        ? booleanValue(!v.b)
-        : edge.inverted && v.kind === 'numeric'
-          ? numericValue(-v.n, v.unitId)
-          : v;
+    const inner: Value = unwrap(sourceEv);
+    const innerOut: Value =
+      edge.inverted && inner.kind === 'boolean'
+        ? booleanValue(!inner.b)
+        : edge.inverted && inner.kind === 'numeric'
+          ? numericValue(-inner.n, inner.unitId)
+          : inner;
+    const passed: ExecValue =
+      sourceEv.kind === 'wrapped' ? wrap(innerOut, sourceEv.meta) : innerOut;
     ctx.next[node.id] = passed;
     ctx.validOutputs.add(outputKey(node.id, 0));
 
+    // observeBuffer 는 시각화용 알맹이만 기록 — 메타는 라우팅 표면에만 의미가 있고
+    // 그래프/플롯이 보는 데이터는 알맹이 Value.
     const buf = ctx.observeBuffers[node.id] ? [...ctx.observeBuffers[node.id]!] : [];
-    buf.push(passed);
+    buf.push(innerOut);
     if (node.capacity.kind === 'bounded') {
       while (buf.length > node.capacity.size) buf.shift();
     }
@@ -724,10 +772,12 @@ const observeNodeDescriptor: NodeKindDescriptor<Extract<Node, { kind: 'observe' 
 /**
  * GeneratorNode 디스크립터 — cursor를 진행하며 자신의 numeric을 emit.
  *
- * 단일 boolean 입력 슬롯이 있다:
+ * 단일 메타 인식 입력 슬롯이 있다 — boolean 또는 numeric(meta:boolean) 을 OR 매칭:
  *  - 미연결: 사용자 ▶/⏸로 토글되는 `generatorRuntime.enabled`가 emit을 결정 (기본 모드).
- *  - 연결: 입력 boolean이 emit gate를 결정 — true=emit, false=freeze. source가
- *    invalid거나 boolean이 아니면 freeze로 수렴(안전한 정지).
+ *  - 연결 (plain boolean): 알맹이 boolean 이 emit gate.
+ *  - 연결 (Condition 슬롯 출력): wrapped value 의 meta(boolean) 가 emit gate —
+ *    "조건 슬롯을 통과한 펄스만 emit 진행" 의미가 자동으로 성립한다.
+ *  - source 가 invalid 거나 게이트로 해석 못 하면 freeze (안전한 정지).
  *  - 입력이 있는 한 사용자 토글은 의미를 잃는다 (NodeView는 컨트롤을 숨김).
  *
  * - propagate: 위 시맨틱으로 effectivelyEnabled를 산출 후 paradigm.emit. freeze면
@@ -744,9 +794,14 @@ const generatorNodeDescriptor: NodeKindDescriptor<
   outputsRaw: true,
   canBeFeedbackTarget: false,
   initialValue: () => undefined,
-  initialValid: () => false,
-  inputPortType: () => 'boolean',
-  outputPortType: () => 'numeric',
+  initialValidSlots: () => [],
+  // 메타 인지: plain boolean 또는 numeric+meta:boolean (Condition 슬롯) 둘 다 받는다.
+  // port-compat 검사가 둘 중 하나와 매칭되면 호환으로 판정.
+  inputAccepts: () => [
+    { value: 'boolean' },
+    { value: 'numeric', meta: 'boolean' },
+  ],
+  outputSlots: () => [{ index: 0, value: 'numeric' }],
   outputUnit: () => FREE_FALLBACK,
   propagate: (node, ctx) => {
     const existing = ctx.generatorRuntime[node.id];
@@ -759,13 +814,18 @@ const generatorNodeDescriptor: NodeKindDescriptor<
     // 입력 boolean gate 캐시 동기화 — propagate는 모델 변경/전체 재계산 시점이라
     // 이 자리에서 source state로부터 gateOpen을 새로 채운다. ticker는 이후 이
     // 캐시만 본다(state.values 직접 조회 금지).
+    //
+    // asBooleanGate 가 알맹이/메타 우선순위를 통일 — Condition 슬롯에서 흘러온
+    // wrapped numeric 의 meta:boolean 도 게이트로 인식.
     let gateOpen: boolean | undefined;
     if (ctx.incoming.length > 0) {
       for (const edge of ctx.incoming) {
         if (!isEdgeSourceValid(ctx, edge)) continue;
-        const b = getBooleanNext(ctx, edge.from);
-        if (b === undefined) continue;
-        gateOpen = edge.inverted ? !b : b;
+        const ev = ctx.next[edge.from];
+        if (!ev) continue;
+        const raw = asBooleanGate(ev);
+        if (raw === undefined) continue;
+        gateOpen = edge.inverted ? !raw : raw;
         break;
       }
     }
@@ -842,36 +902,72 @@ export function canBeFeedbackTarget(
 }
 
 /**
- * 노드의 입력 PortType. null이면 입력을 받지 않는다.
- * 미등록 종류는 null로 안전 폴백.
+ * 노드의 출력 슬롯 명세 전체. 미등록 종류는 보수적인 단일 numeric 슬롯으로 폴백.
  *
- * `model`을 주면 passthrough 노드(ObserveNode 등)가 입력 엣지의 source PortType을
- * 따라가 동적으로 PortType을 해석한다. 없으면 디스크립터의 정적 폴백.
+ * `model` 을 주면 passthrough 노드가 source spec 을 미러링한다.
+ */
+export function getOutputSlots(
+  node: Node,
+  registry: NodeKindRegistry = defaultNodeKindRegistry,
+  model?: Model,
+): readonly OutputSlotSpec[] {
+  const desc = registry.forNode(node);
+  if (!desc) return [{ index: 0, value: 'numeric' }];
+  return desc.outputSlots(node, model ? { model, registry } : undefined);
+}
+
+/**
+ * 특정 슬롯 인덱스의 출력 PortSpec. 슬롯이 없으면 undefined.
+ */
+export function getOutputSlotAt(
+  node: Node,
+  slot: number,
+  registry: NodeKindRegistry = defaultNodeKindRegistry,
+  model?: Model,
+): OutputSlotSpec | undefined {
+  return getOutputSlots(node, registry, model)[slot];
+}
+
+/**
+ * 노드의 입력 acceptsList. null 이면 입력을 받지 않는다.
+ */
+export function getInputAccepts(
+  node: Node,
+  registry: NodeKindRegistry = defaultNodeKindRegistry,
+  model?: Model,
+): readonly PortSpec[] | null {
+  const desc = registry.forNode(node);
+  if (!desc) return null;
+  return desc.inputAccepts(node, model ? { model, registry } : undefined);
+}
+
+/**
+ * 노드의 입력 PortType (slot 0, value 만). null 이면 입력 없음.
+ * 미등록 종류는 null 로 안전 폴백.
+ *
+ * 슬롯·메타 인지 호출자는 [[getInputAccepts]] 를 직접 사용.
  */
 export function getInputPortType(
   node: Node,
   registry: NodeKindRegistry = defaultNodeKindRegistry,
   model?: Model,
 ): ValueKind | null {
-  const desc = registry.forNode(node);
-  if (!desc) return null;
-  return desc.inputPortType(node, model ? { model, registry } : undefined) ?? null;
+  const accepts = getInputAccepts(node, registry, model);
+  if (accepts === null) return null;
+  return accepts[0]?.value ?? null;
 }
 
 /**
- * 노드의 출력 PortType. 미등록 종류는 'numeric'으로 안전 폴백 —
- * 1단계 호환성 검사가 통과하도록.
+ * 노드의 출력 PortType (slot 0, value 만). 미등록 종류는 'numeric' 폴백.
  *
- * `model`을 주면 passthrough 노드가 입력 엣지를 보고 동적으로 PortType을 해석.
+ * 슬롯별 PortType 이 필요하면 [[getOutputSlotAt]] 사용.
  */
 export function getOutputPortType(
   node: Node,
   registry: NodeKindRegistry = defaultNodeKindRegistry,
   model?: Model,
 ): ValueKind {
-  const desc = registry.forNode(node);
-  if (!desc) return 'numeric';
-  return desc.outputPortType(node, model ? { model, registry } : undefined);
+  return getOutputSlots(node, registry, model)[0]?.value ?? 'numeric';
 }
 
 export type EdgeCompatibility =
@@ -879,24 +975,46 @@ export type EdgeCompatibility =
   | { compatible: false; reason: string };
 
 /**
+ * 두 PortSpec 이 호환되는지.
+ *
+ * - `value` 는 항상 일치해야 한다 (자동 변환 없음).
+ * - target 이 `meta` 를 명시했으면 source 도 동일한 `meta` 를 가져야 한다.
+ *   target 이 meta 를 명시 안 했으면 source meta 유무 무관 — caller 가 unwrap 으로
+ *   알맹이만 본다.
+ *
+ * 이 모델은 "connected but doesn't work" 를 정적으로 차단한다 — Generator 의
+ * boolean 게이트가 plain numeric 을 받아 freeze 만 되는 사례를 메뉴에서 제외시킨다.
+ */
+function specMatches(source: PortSpec, target: PortSpec): boolean {
+  if (source.value !== target.value) return false;
+  if (target.meta !== undefined && source.meta !== target.meta) return false;
+  return true;
+}
+
+/**
  * source → target 엣지의 PortType 호환성을 본다.
  *
  * 검사 항목:
- *  1. target이 입력을 받지 않는 종류면 거부 (Constant 등)
- *  2. source의 outputPortType과 target의 inputPortType이 다르면 거부
+ *  1. target 이 입력을 받지 않는 종류면 거부 (Constant 등)
+ *  2. source 출력 슬롯의 PortSpec 이 target inputAccepts 의 어떤 spec 과도
+ *     매칭되지 않으면 거부
  *
  * 자동 변환은 없다 — numeric을 boolean으로(또는 그 반대) 흘리려면
  * 명시적 변환 노드를 끼워야 한다.
+ *
+ * `sourceSlotIndex` 미지정 시 슬롯 0 으로 간주. ConditionNode 의 true/false
+ * 슬롯이 동일 spec 이면 어느 쪽으로 연결하든 통과.
  */
 export function checkEdgeCompatibility(
   source: Node,
   target: Node,
   registry: NodeKindRegistry = defaultNodeKindRegistry,
   model?: Model,
+  sourceSlotIndex: number = 0,
 ): EdgeCompatibility {
-  // target이 입력 PortType이 비결정적인 passthrough(ObserveNode 미연결 상태 등)면
-  // 어떤 source든 받아준다 — acceptsAnyInput=true 케이스. 첫 연결을 자유롭게 허용해
-  // 이후 PortType이 그 source로 잠긴다.
+  // target 입력 PortType 이 비결정적인 passthrough(ObserveNode 미연결 상태 등)면
+  // 어떤 source 든 받아준다 — acceptsAnyInput=true 케이스. 첫 연결을 자유롭게 허용해
+  // 이후 PortType 이 그 source 로 잠긴다.
   const targetDesc = registry.forNode(target);
   if (
     targetDesc?.acceptsAnyInput &&
@@ -904,19 +1022,26 @@ export function checkEdgeCompatibility(
   ) {
     return { compatible: true };
   }
-  const targetIn = getInputPortType(target, registry, model);
-  if (targetIn === null) {
+  const targetAccepts = getInputAccepts(target, registry, model);
+  if (targetAccepts === null) {
     return {
       compatible: false,
       reason: `target node "${target.kind}" does not accept inputs`,
     };
   }
-  const sourceOut = getOutputPortType(source, registry, model);
-  if (sourceOut !== targetIn) {
+  const sourceSlot = getOutputSlotAt(source, sourceSlotIndex, registry, model);
+  if (!sourceSlot) {
     return {
       compatible: false,
-      reason: `port type mismatch: source outputs "${sourceOut}", target expects "${targetIn}"`,
+      reason: `source node "${source.kind}" has no output slot ${sourceSlotIndex}`,
     };
   }
-  return { compatible: true };
+  for (const accept of targetAccepts) {
+    if (specMatches(sourceSlot, accept)) return { compatible: true };
+  }
+  const wanted = targetAccepts.map((a) => a.value).join('|');
+  return {
+    compatible: false,
+    reason: `port type mismatch: source outputs "${sourceSlot.value}", target expects "${wanted}"`,
+  };
 }

@@ -47,3 +47,23 @@ export function unwrap(ev: ExecValue): Value {
 export function metaOf(ev: ExecValue): Value | null {
   return ev.kind === 'wrapped' ? ev.meta : null;
 }
+
+/**
+ * 메타 인식 boolean 게이트 추출.
+ *
+ * 우선순위: 알맹이 boolean → meta boolean → 없음(undefined).
+ * - plain boolean Value: 알맹이 그대로 사용
+ * - WrappedValue + value:boolean : 알맹이 사용 (메타가 다른 의미를 가져도 알맹이 우선)
+ * - WrappedValue + value:numeric + meta:boolean : meta 사용 (Condition 슬롯 출력)
+ * - 그 외: 게이트로 쓸 수 없음 → undefined (caller 가 freeze 처리)
+ *
+ * Generator gate 와 model-store pulse 핸들러가 동일 시맨틱을 공유하도록 단일 헬퍼로 일원화.
+ */
+export function asBooleanGate(ev: ExecValue): boolean | undefined {
+  if (ev.kind === 'boolean') return ev.b;
+  if (ev.kind === 'wrapped') {
+    if (ev.value.kind === 'boolean') return ev.value.b;
+    if (ev.meta.kind === 'boolean') return ev.meta.b;
+  }
+  return undefined;
+}

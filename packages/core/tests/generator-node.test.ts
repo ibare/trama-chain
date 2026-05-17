@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import {
+  addConditionNode,
   addConstantNode,
   addEdge,
   addGeneratorNode,
@@ -471,6 +472,100 @@ describe('GeneratorNode — boolean gate input', () => {
     let state = initializeFromInitialValues(m);
     state = step(state, m);
     expect(state.generatorRuntime['g']!.gateOpen).toBeUndefined();
+  });
+});
+
+describe('GeneratorNode — Condition 슬롯 게이트 (메타 인식)', () => {
+  // Condition→Generator: condition 평가 결과가 WrappedValue meta(boolean)로 부착돼
+  // generator의 boolean gate로 자연스레 흘러간다. plain boolean 게이트와 동일 시맨틱.
+  it('condition true → wrapped meta:true 가 게이트를 연다 (slot 0 경유)', () => {
+    let m = createEmptyModel(0);
+    m = addValueNode(m, { id: 'v', label: 'v', unitId: 'free', initialNumber: 7 }, 0);
+    m = addConditionNode(
+      m,
+      { id: 'c', label: 'c', operator: '>', threshold: 3 },
+      0,
+    );
+    m = addGeneratorNode(
+      m,
+      { id: 'g', label: 'gen', params: { kind: 'counter', start: 100, step: 1 } },
+      0,
+    );
+    m = addEdge(m, { from: 'v', to: 'c', shape: { kind: 'none', params: {} }, slotIndex: 0 }, 0);
+    m = addEdge(
+      m,
+      { from: 'c', to: 'g', shape: { kind: 'none', params: {} }, sourceSlotIndex: 0 },
+      0,
+    );
+    let state = initializeFromInitialValues(m);
+    state = step(state, m);
+    expect(state.generatorRuntime['g']!.gateOpen).toBe(true);
+    expect(state.values['g']).toEqual(numericValue(100, 'free'));
+    state = step(state, m);
+    expect(state.values['g']).toEqual(numericValue(101, 'free'));
+  });
+
+  it('condition false → wrapped meta:false 가 게이트를 닫는다 (freeze)', () => {
+    let m = createEmptyModel(0);
+    m = addValueNode(m, { id: 'v', label: 'v', unitId: 'free', initialNumber: 1 }, 0);
+    m = addConditionNode(
+      m,
+      { id: 'c', label: 'c', operator: '>', threshold: 3 },
+      0,
+    );
+    m = addGeneratorNode(
+      m,
+      { id: 'g', label: 'gen', params: { kind: 'counter', start: 50, step: 5 } },
+      0,
+    );
+    m = addEdge(m, { from: 'v', to: 'c', shape: { kind: 'none', params: {} }, slotIndex: 0 }, 0);
+    // false 슬롯(1) 경유 — Condition meta 는 false 라 게이트도 닫혀야 한다.
+    m = addEdge(
+      m,
+      { from: 'c', to: 'g', shape: { kind: 'none', params: {} }, sourceSlotIndex: 1 },
+      0,
+    );
+    let state = initializeFromInitialValues(m);
+    // 명시적으로 enabled=true 로 두어도 게이트가 닫혀야 한다.
+    state = {
+      ...state,
+      generatorRuntime: {
+        ...state.generatorRuntime,
+        g: { ...state.generatorRuntime['g']!, enabled: true },
+      },
+    };
+    const before = state.values['g'];
+    state = step(state, m);
+    expect(state.generatorRuntime['g']!.gateOpen).toBe(false);
+    expect(state.values['g']).toEqual(before);
+  });
+
+  it('condition false + true 슬롯 경유 → 슬롯 invalid 라 freeze (게이트 미캐싱)', () => {
+    // 조건이 거짓이면 slot 0(true)는 invalid — Generator가 source invalid를 보고 freeze.
+    // gateOpen 캐시는 undefined로 남는다 (캐시 진입 자체가 source valid 조건).
+    let m = createEmptyModel(0);
+    m = addValueNode(m, { id: 'v', label: 'v', unitId: 'free', initialNumber: 1 }, 0);
+    m = addConditionNode(
+      m,
+      { id: 'c', label: 'c', operator: '>', threshold: 3 },
+      0,
+    );
+    m = addGeneratorNode(
+      m,
+      { id: 'g', label: 'gen', params: { kind: 'counter', start: 7, step: 1 } },
+      0,
+    );
+    m = addEdge(m, { from: 'v', to: 'c', shape: { kind: 'none', params: {} }, slotIndex: 0 }, 0);
+    m = addEdge(
+      m,
+      { from: 'c', to: 'g', shape: { kind: 'none', params: {} }, sourceSlotIndex: 0 },
+      0,
+    );
+    let state = initializeFromInitialValues(m);
+    const before = state.values['g'];
+    state = step(state, m);
+    expect(state.generatorRuntime['g']!.gateOpen).toBeUndefined();
+    expect(state.values['g']).toEqual(before);
   });
 });
 

@@ -13,9 +13,11 @@ import { createDefaultCombinerRegistry } from '../src/combiners/index.js';
 import { createDefaultShapeRegistry } from '../src/functions/index.js';
 import type { ConditionOperator } from '../src/model/types.js';
 import {
+  getExecValue,
   getNumericValue,
   initializeFromInitialValues,
   isOutputValid,
+  isWrapped,
   outputKey,
   propagateOneStep,
 } from '../src/execution/index.js';
@@ -252,6 +254,56 @@ describe('ConditionNode 게이트 시맨틱', () => {
   it('outputKey 키 포맷', () => {
     expect(outputKey('c', 0)).toBe('c:0');
     expect(outputKey('c')).toBe('c:0');
+  });
+
+  it('두 슬롯 시맨틱 — 조건 참: slot 0(true) valid / slot 1(false) invalid', () => {
+    const m = setup(7, 3, '>');
+    const s = propagateOneStep(initializeFromInitialValues(m), m, {
+      shapeRegistry: shapes,
+      combinerRegistry: combiners,
+    });
+    expect(isOutputValid(s, 'c', 0)).toBe(true);
+    expect(isOutputValid(s, 'c', 1)).toBe(false);
+  });
+
+  it('두 슬롯 시맨틱 — 조건 거짓: slot 0(true) invalid / slot 1(false) valid', () => {
+    const m = setup(2, 5, '>');
+    const s = propagateOneStep(initializeFromInitialValues(m), m, {
+      shapeRegistry: shapes,
+      combinerRegistry: combiners,
+    });
+    expect(isOutputValid(s, 'c', 0)).toBe(false);
+    expect(isOutputValid(s, 'c', 1)).toBe(true);
+  });
+
+  it('WrappedValue meta=true 부착 — 조건 참', () => {
+    const m = setup(7, 3, '>');
+    const s = propagateOneStep(initializeFromInitialValues(m), m, {
+      shapeRegistry: shapes,
+      combinerRegistry: combiners,
+    });
+    const ev = getExecValue(s, 'c');
+    expect(ev).toBeDefined();
+    expect(ev && isWrapped(ev)).toBe(true);
+    if (ev && isWrapped(ev)) {
+      expect(ev.value.kind).toBe('numeric');
+      if (ev.value.kind === 'numeric') expect(ev.value.n).toBe(7);
+      expect(ev.meta).toEqual({ kind: 'boolean', b: true });
+    }
+  });
+
+  it('WrappedValue meta=false 부착 — 조건 거짓 (false 슬롯으로 흘리는 경우에도 메타 일관)', () => {
+    const m = setup(2, 5, '>');
+    const s = propagateOneStep(initializeFromInitialValues(m), m, {
+      shapeRegistry: shapes,
+      combinerRegistry: combiners,
+    });
+    const ev = getExecValue(s, 'c');
+    expect(ev).toBeDefined();
+    expect(ev && isWrapped(ev)).toBe(true);
+    if (ev && isWrapped(ev)) {
+      expect(ev.meta).toEqual({ kind: 'boolean', b: false });
+    }
   });
 
   it('직렬화 라운드트립 — operator·threshold 보존', () => {
