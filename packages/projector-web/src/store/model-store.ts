@@ -447,25 +447,27 @@ export function createModelStore({
             e.from === pulse.sourceNodeId &&
             e.lag === 0,
         );
-      let gateOpen: boolean | undefined;
       // 펄스의 sourceValue 는 ExecValue — asBooleanGate 가 알맹이 boolean / wrapped
       // value:boolean / wrapped meta:boolean 우선순위로 게이트를 추출해 준다. Condition
       // 슬롯에서 흘러온 wrapped numeric 의 meta:boolean 도 동일하게 게이트로 인식.
-      if (edge) {
-        const raw = asBooleanGate(pulse.sourceValue);
-        if (raw !== undefined) {
-          gateOpen = edge.inverted ? !raw : raw;
-        }
-      }
+      // 추출 실패 시 prev.gateOpen 을 유지 — 잘못된 펄스 하나로 ticker 가 영구
+      // freeze 되는 일이 없게.
       store.setState((s) => {
         const prev = s.executionState.generatorRuntime[pulse.targetNodeId];
         if (!prev) return s;
+        let nextGateOpen = prev.gateOpen;
+        if (edge) {
+          const raw = asBooleanGate(pulse.sourceValue);
+          if (raw !== undefined) {
+            nextGateOpen = edge.inverted ? !raw : raw;
+          }
+        }
         const newRuntime = {
           ...s.executionState.generatorRuntime,
           [pulse.targetNodeId]: {
             enabled: prev.enabled,
             cursor: prev.cursor,
-            gateOpen,
+            gateOpen: nextGateOpen,
           },
         };
         return {
@@ -538,6 +540,7 @@ export function createModelStore({
     setModel: (next) => {
       const exec = computeExecutionState(next, get().executionState);
       set({ model: next, ...exec });
+      reconcileGeneratorTicker();
     },
 
     recompute: () => {

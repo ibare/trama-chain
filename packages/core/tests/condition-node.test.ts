@@ -20,6 +20,7 @@ import {
   isWrapped,
   outputKey,
   propagateOneStep,
+  recomputeNode,
 } from '../src/execution/index.js';
 
 const shapes = createDefaultShapeRegistry();
@@ -303,6 +304,29 @@ describe('ConditionNode 게이트 시맨틱', () => {
     expect(ev && isWrapped(ev)).toBe(true);
     if (ev && isWrapped(ev)) {
       expect(ev.meta).toEqual({ kind: 'boolean', b: false });
+    }
+  });
+
+  it('recomputeNode — ConditionNode 출력의 WrappedValue 메타가 보존된다', () => {
+    // 펄스 도착 경로(model-store handlePulseArrival 일반 경로)는 recomputeNode 의
+    // result.newValue 를 그대로 store.values 에 저장하고, 그것이 다시
+    // 다운스트림 펄스의 sourceValue 로 운반된다. 만약 여기서 wrapped 가 unwrap
+    // 되면 GeneratorNode 의 asBooleanGate 가 게이트 boolean 을 읽지 못해
+    // gateOpen 이 사라지고 ticker 가 영구 freeze 되는 회귀가 생긴다.
+    const m = setup(7, 3, '>');
+    const state = propagateOneStep(initializeFromInitialValues(m), m, {
+      shapeRegistry: shapes,
+      combinerRegistry: combiners,
+    });
+    const result = recomputeNode('c', state, m, {
+      shapeRegistry: shapes,
+      combinerRegistry: combiners,
+    });
+    expect(result.isValid).toBe(true);
+    expect(result.newValue).toBeDefined();
+    expect(result.newValue && isWrapped(result.newValue)).toBe(true);
+    if (result.newValue && isWrapped(result.newValue)) {
+      expect(result.newValue.meta).toEqual({ kind: 'boolean', b: true });
     }
   });
 

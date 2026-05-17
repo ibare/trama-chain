@@ -7,7 +7,7 @@ import {
 } from '../generators/index.js';
 import type { Model, NodeId, Value } from '../model/index.js';
 import { defaultUnitCatalog, type UnitCatalog } from '../units/index.js';
-import { unwrap, type ExecValue } from './exec-value.js';
+import type { ExecValue } from './exec-value.js';
 import {
   defaultNodeKindRegistry,
   type NodeKindRegistry,
@@ -48,8 +48,12 @@ export interface RecomputeNodeOptions {
 }
 
 export interface RecomputeNodeResult {
-  /** 재계산 후의 새 target 값. validOutputs에서 빠진 경우 undefined. */
-  newValue: Value | undefined;
+  /**
+   * 재계산 후의 새 target 값. validOutputs에서 빠진 경우 undefined.
+   * WrappedValue 메타까지 보존된 ExecValue — caller 가 다운스트림 펄스로
+   * 그대로 운반해 메타 인식 노드(GeneratorNode 등)가 게이트를 읽을 수 있게 한다.
+   */
+  newValue: ExecValue | undefined;
   /** 단출력 노드 기준 슬롯 0의 valid 여부. */
   isValid: boolean;
   /** 갱신된 validOutputs 집합 (조건 노드 등 다출력 케이스 포함). */
@@ -100,9 +104,8 @@ export function recomputeNode(
   const nodeKindRegistry = options.nodeKindRegistry ?? defaultNodeKindRegistry;
   const desc = nodeKindRegistry.forNode(node);
   if (!desc) {
-    const ev = state.values[nodeId];
     return {
-      newValue: ev === undefined ? undefined : unwrap(ev),
+      newValue: state.values[nodeId],
       isValid: state.validOutputs.has(outputKey(nodeId, 0)),
       validOutputs: new Set(state.validOutputs),
       outputSlotKeys: [outputKey(nodeId, 0)],
@@ -154,11 +157,8 @@ export function recomputeNode(
   // 모든 노드가 출력 슬롯 0 하나만 사용 — 조건 노드도 게이트 시맨틱이라 단일 출력.
   const outputSlotKeys = [outputKey(nodeId, 0)];
 
-  const ev = workingValues[nodeId];
   return {
-    // newValue 의 외부 시그니처는 Value — 메타 인식 caller 가 아직 없으므로
-    // wrapped 가 저장돼 있으면 알맹이만 노출한다.
-    newValue: ev === undefined ? undefined : unwrap(ev),
+    newValue: workingValues[nodeId],
     isValid: workingValid.has(outputKey(nodeId, 0)),
     validOutputs: workingValid,
     outputSlotKeys,
