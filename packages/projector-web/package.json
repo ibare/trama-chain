@@ -17,6 +17,7 @@
     "build": "tsc -p tsconfig.json"
   },
   "dependencies": {
+    "@phosphor-icons/core": "^2.1.1",
     "@radix-ui/react-dialog": "^1.1.15",
     "@radix-ui/react-form": "^0.1.8",
     "@radix-ui/react-hover-card": "^1.1.15",

@@ -2,6 +2,7 @@ import { useCallback } from 'react';
 import * as Form from '@radix-ui/react-form';
 import { hasFeedbackEdges } from '@trama/core';
 import { useTrama } from '../store/index.js';
+import { PhosphorIcon } from '../icon/phosphor.js';
 
 export function ExecutionControl(): JSX.Element | null {
   const { modelStore } = useTrama();
@@ -46,8 +47,9 @@ export function ExecutionControl(): JSX.Element | null {
           onChange={(e) => setExecution({ stepUnit: e.currentTarget.value || null })}
         />
       </Form.Field>
-      <button type="button" onClick={play} title="step별 재생">
-        ▶ 재생
+      <button type="button" onClick={play} title="step별 재생" className="trama-exec-play">
+        <PhosphorIcon name="play" size={14} />
+        <span>재생</span>
       </button>
       <button type="button" onClick={recompute} title="다시 실행 (stochastic 모델 재실행용)">
         다시 실행

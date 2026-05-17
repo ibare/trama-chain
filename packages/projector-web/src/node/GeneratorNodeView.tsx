@@ -11,6 +11,7 @@ import { InteractiveArea } from './InteractiveArea.js';
 import { Socket } from './Socket.js';
 import { useOutputConnected } from './use-socket-connections.js';
 import { useEdgeDraftSource } from '../canvas/use-edge-draft-source.js';
+import { PhosphorGlyph } from '../icon/phosphor.js';
 
 interface Props {
   id: NodeId;
@@ -20,6 +21,7 @@ interface Props {
 const SOCKET_SIZE = parseFloat(tokens.spacing.socketSize);
 const BUTTON_SIZE = 32;
 const BUTTON_GAP = 10;
+const GLYPH_SIZE = 18;
 
 function formatGeneratorValue(v: number): string {
   if (!Number.isFinite(v)) return '·';
@@ -164,7 +166,7 @@ function GeneratorNodeViewImpl({ id, incomingCount }: Props): JSX.Element | null
       {/* 입력 연결되면 사용자 토글 컨트롤은 의미를 잃으므로 숨김 — gate가 emit을 결정. */}
       {generatorBody && incomingCount === 0 && (
         <>
-          {/* ▶/⏸ 토글 — enabled에 따라 글리프만 바뀜. 원형 hit-area. */}
+          {/* play/pause 토글 — enabled에 따라 글리프만 바뀜. 원형 hit-area. */}
           <InteractiveArea
             x={buttonsStartX}
             y={buttonY}
@@ -175,17 +177,16 @@ function GeneratorNodeViewImpl({ id, incomingCount }: Props): JSX.Element | null
             hitClassName="trama-generator-btn"
             onClick={onToggle}
           >
-            <text
+            <PhosphorGlyph
+              name={enabled ? 'pause' : 'play'}
+              cx={buttonsStartX + BUTTON_SIZE / 2}
+              cy={buttonY + BUTTON_SIZE / 2}
+              size={GLYPH_SIZE}
               className="trama-generator-btn-glyph"
-              x={buttonsStartX + BUTTON_SIZE / 2}
-              y={buttonY + BUTTON_SIZE / 2 + 5}
-              textAnchor="middle"
-            >
-              {enabled ? '⏸' : '▶'}
-            </text>
+            />
           </InteractiveArea>
 
-          {/* ↺ 리셋 — 원형 hit-area. */}
+          {/* reset — 원형 hit-area. */}
           <InteractiveArea
             x={buttonsStartX + BUTTON_SIZE + BUTTON_GAP}
             y={buttonY}
@@ -196,14 +197,13 @@ function GeneratorNodeViewImpl({ id, incomingCount }: Props): JSX.Element | null
             hitClassName="trama-generator-btn"
             onClick={onReset}
           >
-            <text
+            <PhosphorGlyph
+              name="reset"
+              cx={buttonsStartX + BUTTON_SIZE + BUTTON_GAP + BUTTON_SIZE / 2}
+              cy={buttonY + BUTTON_SIZE / 2}
+              size={GLYPH_SIZE}
               className="trama-generator-btn-glyph"
-              x={buttonsStartX + BUTTON_SIZE + BUTTON_GAP + BUTTON_SIZE / 2}
-              y={buttonY + BUTTON_SIZE / 2 + 5}
-              textAnchor="middle"
-            >
-              {'↺'}
-            </text>
+            />
           </InteractiveArea>
         </>
       )}

@@ -1,5 +1,6 @@
 import * as ToggleGroup from '@radix-ui/react-toggle-group';
 import { useTrama } from '../store/trama-instance.js';
+import { PhosphorIcon } from '../icon/phosphor.js';
 
 /**
  * 전역 미니 플레이어 — 우상단 부동 패널.
@@ -35,7 +36,7 @@ export function MiniPlayer(): JSX.Element {
         title={paused ? '재생' : '일시정지'}
         aria-label={paused ? '재생' : '일시정지'}
       >
-        {paused ? '▶' : '⏸'}
+        <PhosphorIcon name={paused ? 'play' : 'pause'} size={18} />
       </button>
       <span className="trama-mini-player-divider" />
       <ToggleGroup.Root
