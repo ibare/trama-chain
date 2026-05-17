@@ -10,7 +10,9 @@ import {
   parseTrama,
   propagateOneStep,
   resolveUnit,
+  unwrap,
   type EdgeId,
+  type ExecValue,
   type Node,
   type NodeId,
   type ResolvedUnit,
@@ -40,8 +42,10 @@ function resolveNodeUnit(node: Node): ResolvedUnit {
   return resolveUnit(def, node.unitOverride);
 }
 
-function valueAsNumber(v: Value | undefined): number {
-  if (!v || !isNumericValue(v)) return 0;
+function valueAsNumber(ev: ExecValue | undefined): number {
+  if (!ev) return 0;
+  const v: Value = unwrap(ev);
+  if (!isNumericValue(v)) return 0;
   return v.n;
 }
 

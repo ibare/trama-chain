@@ -42,6 +42,7 @@ import type {
   Edge,
   EdgeId,
   ExecutionState,
+  ExecValue,
   GeneratorRuntime,
   Model,
   Node,
@@ -49,7 +50,7 @@ import type {
   NodePatch,
   Value,
 } from '@trama/core';
-import { booleanValue, isNumericValue, isValueNode, numericValue } from '@trama/core';
+import { booleanValue, isNumericValue, isValueNode, numericValue, unwrap } from '@trama/core';
 import { tokens } from '@trama/tokens';
 import { combinerRegistry, shapeRegistry } from './registries.js';
 import { fizzexExpressionEvaluator } from '../expression/fizzex-evaluator.js';
@@ -167,7 +168,7 @@ function computeExecutionState(
   // 생성기 런타임(enabled·cursor)과 마지막 emit 값은 모델 편집으로 리셋되면 안 된다.
   // paradigm kind가 바뀌었다면 fresh가 params에 맞게 초기화한 cursor를 쓴다.
   const mergedRuntime: Record<NodeId, GeneratorRuntime> = {};
-  const mergedValues: Record<NodeId, Value> = { ...fresh.executionState.values };
+  const mergedValues: Record<NodeId, ExecValue> = { ...fresh.executionState.values };
   const mergedValid = new Set(fresh.executionState.validOutputs);
   for (const nid in fresh.executionState.generatorRuntime) {
     const node = model.nodes[nid];
@@ -261,7 +262,7 @@ export function createModelStore({
   function tickGenerators(): void {
     const { model, executionState, playbackStep } = store.getState();
     if (playbackStep !== null) return;
-    const newValues: Record<NodeId, Value> = { ...executionState.values };
+    const newValues: Record<NodeId, ExecValue> = { ...executionState.values };
     const newValid = new Set(executionState.validOutputs);
     const newRuntime: Record<NodeId, GeneratorRuntime> = {
       ...executionState.generatorRuntime,
@@ -447,8 +448,14 @@ export function createModelStore({
             e.lag === 0,
         );
       let gateOpen: boolean | undefined;
-      if (edge && pulse.sourceValue.kind === 'boolean') {
-        gateOpen = edge.inverted ? !pulse.sourceValue.b : pulse.sourceValue.b;
+      // 펄스의 sourceValue 는 ExecValue — Condition을 통과한 wrapped boolean 도
+      // 받을 수 있도록 alue 만 우선 추출. P6 에서 메타 인식 게이트를 추가하면 raw
+      // ExecValue 를 직접 분기.
+      if (edge) {
+        const inner = unwrap(pulse.sourceValue);
+        if (inner.kind === 'boolean') {
+          gateOpen = edge.inverted ? !inner.b : inner.b;
+        }
       }
       store.setState((s) => {
         const prev = s.executionState.generatorRuntime[pulse.targetNodeId];
@@ -503,7 +510,7 @@ export function createModelStore({
     }
 
     store.setState((s) => {
-      const newValues: Record<NodeId, Value> = { ...s.executionState.values };
+      const newValues: Record<NodeId, ExecValue> = { ...s.executionState.values };
       if (result.newValue !== undefined) newValues[pulse.targetNodeId] = result.newValue;
       return {
         executionState: {
@@ -651,7 +658,7 @@ export function createModelStore({
       const cursor = defaultGeneratorRegistry.initCursor(node.params);
       // 값은 비우지 않는다 — idle peek로 다시 "다음 emit 값"을 노출.
       // (cursor를 origin으로 되돌렸으니 peek 결과는 counter.start / random(seed) 첫 샘플).
-      const newValues: Record<NodeId, Value> = { ...s.executionState.values };
+      const newValues: Record<NodeId, ExecValue> = { ...s.executionState.values };
       newValues[id] = defaultGeneratorRegistry.peek(node.params, cursor);
       const newValid = new Set(s.executionState.validOutputs);
       newValid.add(outputKey(id, 0));
@@ -705,7 +712,7 @@ export function createModelStore({
               ? (patch.initialValue as Value)
               : undefined;
         set((s) => {
-          const newValues: Record<NodeId, Value> = { ...s.executionState.values };
+          const newValues: Record<NodeId, ExecValue> = { ...s.executionState.values };
           if (nextNodeValue) newValues[id] = nextNodeValue;
           const newValid = new Set(s.executionState.validOutputs);
           newValid.add(outputKey(id, 0));
@@ -858,7 +865,7 @@ export function createModelStore({
       const recomputed = computeExecutionState(after, get().executionState);
       const playbackActive = get().playbackStep !== null;
       set((s) => {
-        const nextValues: Record<NodeId, Value> = playbackActive
+        const nextValues: Record<NodeId, ExecValue> = playbackActive
           ? s.executionState.values
           : { ...s.executionState.values, [id]: nextValueRecord };
         const nextValid = playbackActive

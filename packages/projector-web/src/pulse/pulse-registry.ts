@@ -1,4 +1,4 @@
-import type { EdgeId, NodeId, Value } from '@trama/core';
+import type { EdgeId, ExecValue, NodeId } from '@trama/core';
 import { tokens } from '@trama/tokens';
 import type { AnimationLoop } from '../canvas/animation-loop.js';
 import type { PulseSettingsStore } from '../store/pulse-settings.js';
@@ -18,8 +18,12 @@ export interface Pulse {
   sourceNodeId: NodeId;
   sourceSlotIndex: number;
   targetNodeId: NodeId;
-  /** spawn 시점에 박제. 도착 후 target 재계산 시 이 source의 출력으로 사용. */
-  sourceValue: Value;
+  /**
+   * spawn 시점에 박제. 도착 후 target 재계산 시 이 source의 출력으로 사용.
+   * 타입은 [[ExecValue]] — Condition 통과 시 부착된 WrappedValue 메타가
+   * 다운스트림(Generator gate 등)까지 끊김 없이 흘러가도록 envelope 단위로 운반.
+   */
+  sourceValue: ExecValue;
   /** performance.now() 기준 spawn 시각. */
   startTime: number;
   /** spawn 시점에 (BASE_TRAVEL_MS * multiplier)로 박제. */
@@ -31,7 +35,7 @@ export interface PulseSpawnArgs {
   sourceNodeId: NodeId;
   sourceSlotIndex: number;
   targetNodeId: NodeId;
-  sourceValue: Value;
+  sourceValue: ExecValue;
 }
 
 export type ArrivalHandler = (pulse: Pulse) => void;

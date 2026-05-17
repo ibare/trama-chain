@@ -1,6 +1,6 @@
 import { memo, useCallback, useEffect } from 'react';
 import { tokens } from '@trama/tokens';
-import { isObserveNode, type NodeId, type Value } from '@trama/core';
+import { isObserveNode, unwrap, type NodeId, type Value } from '@trama/core';
 import { useTrama } from '../store/index.js';
 import { useNodeLayout } from './use-node-layout.js';
 import { resolveDisplayMode } from './display-mode.js';
@@ -26,7 +26,12 @@ function ObserveNodeViewImpl({ id, incomingCount }: Props): JSX.Element | null {
   const { modelStore, uiStore, socketRegistry } = useTrama();
   const node = modelStore((s) => s.model.nodes[id]);
   const samples = modelStore((s) => s.executionState.observeBuffers[id] ?? EMPTY_BUFFER);
-  const current = modelStore((s) => s.executionState.values[id] ?? null);
+  // 누적 버퍼는 Value[] 그대로지만 current 는 ExecValue 가 들어올 수 있다 —
+  // 시각화는 alue 만 보면 충분하므로 unwrap 후 노출.
+  const current = modelStore((s) => {
+    const ev = s.executionState.values[id];
+    return ev === undefined ? null : unwrap(ev);
+  });
   const updateNode = modelStore((s) => s.updateNode);
   const outputConnected = useOutputConnected(id);
   const isSelected = uiStore(

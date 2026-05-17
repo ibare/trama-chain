@@ -1,6 +1,6 @@
 import { memo, useCallback, useEffect } from 'react';
 import { tokens } from '@trama/tokens';
-import { isNumericValue, isValueNode, type NodeId } from '@trama/core';
+import { isNumericValue, isValueNode, unwrap, type NodeId } from '@trama/core';
 import { useTrama } from '../store/index.js';
 import { combinerRegistry } from '../store/registries.js';
 import { formatNodeValue } from '../util/format.js';
@@ -37,8 +37,11 @@ function ValueNodeViewImpl({ id, incomingCount }: Props): JSX.Element | null {
     const n = s.model.nodes[id];
     const fallbackVal =
       n && isValueNode(n) && isNumericValue(n.initialValue) ? n.initialValue.n : 0;
-    const v = s.executionState.values[id];
-    if (v && isNumericValue(v)) return v.n;
+    const ev = s.executionState.values[id];
+    if (ev) {
+      const v = unwrap(ev);
+      if (isNumericValue(v)) return v.n;
+    }
     return fallbackVal;
   });
 

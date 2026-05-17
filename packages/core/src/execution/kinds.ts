@@ -15,17 +15,20 @@ import {
 } from '../units/index.js';
 import { MissingCombinerError, MissingShapeError } from './errors.js';
 import type { EvalDiagnosis, ExpressionEvaluator } from './expression-evaluator.js';
+import { unwrap, type ExecValue } from './exec-value.js';
 import { outputKey } from './state.js';
 
 /**
  * propagate 컨텍스트에서 source 노드의 현재 numeric value를 꺼낸다.
  * - ctx.next에 기록돼 있으면 그것 (Value sum type 중 numeric만 인정).
+ * - WrappedValue 면 알맹이 Value 로 unwrap 후 검사.
  * - 없으면 ValueNode의 initialValue에서 폴백.
  * - boolean Value거나 미기록이면 undefined — caller가 skip해야 한다.
  */
 function getNumericNext(ctx: PropagateContext, id: NodeId): number | undefined {
-  const v = ctx.next[id];
-  if (v) {
+  const ev = ctx.next[id];
+  if (ev) {
+    const v = unwrap(ev);
     if (v.kind === 'numeric') return v.n;
     return undefined;
   }
@@ -38,11 +41,13 @@ function getNumericNext(ctx: PropagateContext, id: NodeId): number | undefined {
 
 /**
  * boolean Value 버전. boolean ValueNode propagate가 사용.
+ * WrappedValue 면 알맹이 Value 로 unwrap 후 분기.
  * source가 numeric이면 undefined — PortType 검사가 막아야 하지만 안전망.
  */
 function getBooleanNext(ctx: PropagateContext, id: NodeId): boolean | undefined {
-  const v = ctx.next[id];
-  if (v) {
+  const ev = ctx.next[id];
+  if (ev) {
+    const v = unwrap(ev);
     if (v.kind === 'boolean') return v.b;
     return undefined;
   }
@@ -90,7 +95,13 @@ export function isIdentityShape(edge: Edge): boolean {
 export interface PropagateContext {
   model: Model;
   incoming: ReadonlyArray<Edge>;
-  next: Record<NodeId, Value>;
+  /**
+   * 노드별 출력값(작업 버퍼). 타입은 [[ExecValue]] — Value 또는 WrappedValue.
+   * 디스크립터가 알맹이만 보고 싶다면 `unwrap(ctx.next[id])` 또는 헬퍼
+   * `getNumericNext`/`getBooleanNext`/`getAnyNext` 를 통해 자동 unwrap 된 값을 사용.
+   * 메타까지 보고 분기하는 디스크립터(예: Generator gate)는 raw 그대로 읽는다.
+   */
+  next: Record<NodeId, ExecValue>;
   validOutputs: Set<string>;
   /**
    * 노드별 마지막 실패 사유 (UI invalid 배지/툴팁 노출용).
@@ -393,7 +404,11 @@ const conditionNodeDescriptor: NodeKindDescriptor<
       const n = getNumericNext(ctx, edge.from);
       if (n === undefined) continue;
       value = n;
-      valueObj = ctx.next[edge.from] ?? (isValueNode(source) ? source.initialValue : undefined);
+      // valueObj 는 raw Value — wrapped 가 들어왔으면 알맹이만 사용 (raw passthrough 시
+      // 단위 보존만 목적이라 메타는 여기서 의미가 없다).
+      const sourceEv = ctx.next[edge.from];
+      const sourceVal = sourceEv ? unwrap(sourceEv) : undefined;
+      valueObj = sourceVal ?? (isValueNode(source) ? source.initialValue : undefined);
       break;
     }
 
@@ -491,7 +506,13 @@ const expressionNodeDescriptor: NodeKindDescriptor<
       const source = ctx.model.nodes[edge.from];
       if (!source) continue;
       if (!isEdgeSourceValid(ctx, edge)) continue;
-      const sourceV = ctx.next[edge.from] ?? (isValueNode(source) ? source.initialValue : undefined);
+      // 식 평가는 메타 인식이 아니다 — wrapped 면 알맹이 Value 로 unwrap.
+      const sourceEv = ctx.next[edge.from];
+      const sourceV: Value | undefined = sourceEv
+        ? unwrap(sourceEv)
+        : isValueNode(source)
+          ? source.initialValue
+          : undefined;
       if (!sourceV) continue;
       const varName = node.variables[slot];
       if (typeof varName !== 'string') continue;
@@ -604,12 +625,15 @@ const logicGateNodeDescriptor: NodeKindDescriptor<
 
 /**
  * 단일 source 노드의 현재 Value를 ctx에서 꺼낸다 (numeric·boolean 공통).
- * 노드의 kind에 따라 ValueNode의 initialValue로 폴백 — ObserveNode 같은
- * 정체불명 source의 폴백은 ValueNode 한정으로만 안전.
+ * WrappedValue 면 자동 unwrap. 노드의 kind에 따라 ValueNode의 initialValue로 폴백 —
+ * ObserveNode 같은 정체불명 source의 폴백은 ValueNode 한정으로만 안전.
+ *
+ * 메타까지 보존해야 하는 caller(예: passthrough 노드)는 ctx.next 를 직접 읽고
+ * unwrap 하지 않는다.
  */
 function getAnyNext(ctx: PropagateContext, id: NodeId): Value | undefined {
-  const v = ctx.next[id];
-  if (v) return v;
+  const ev = ctx.next[id];
+  if (ev) return unwrap(ev);
   const source = ctx.model.nodes[id];
   if (source && isValueNode(source)) return source.initialValue;
   return undefined;

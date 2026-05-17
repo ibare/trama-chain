@@ -7,6 +7,7 @@ import {
 } from '../generators/index.js';
 import type { Model, NodeId, Value } from '../model/index.js';
 import { defaultUnitCatalog, type UnitCatalog } from '../units/index.js';
+import { unwrap, type ExecValue } from './exec-value.js';
 import {
   defaultNodeKindRegistry,
   type NodeKindRegistry,
@@ -34,9 +35,9 @@ export interface RecomputeNodeOptions {
   /**
    * 특정 source 노드의 값을 임시 대체. 펄스 도착 시 그 펄스가 운반한
    * snapshot 값을 해당 source의 출력으로 간주하기 위함. 다른 입력은
-   * 현재 state 그대로 사용.
+   * 현재 state 그대로 사용. ExecValue — WrappedValue 메타까지 그대로 전달된다.
    */
-  sourceValueOverrides?: Readonly<Record<NodeId, Value>>;
+  sourceValueOverrides?: Readonly<Record<NodeId, ExecValue>>;
   /**
    * ObserveNode 누적 버퍼의 시작 상태. 미지정이면 빈 버퍼로 시작해 hot-path
    * 단발 호출에서 누적을 버릴 수 있다. 펄스 도착 시 누적이 *유지*되어야 하면
@@ -99,8 +100,9 @@ export function recomputeNode(
   const nodeKindRegistry = options.nodeKindRegistry ?? defaultNodeKindRegistry;
   const desc = nodeKindRegistry.forNode(node);
   if (!desc) {
+    const ev = state.values[nodeId];
     return {
-      newValue: state.values[nodeId],
+      newValue: ev === undefined ? undefined : unwrap(ev),
       isValid: state.validOutputs.has(outputKey(nodeId, 0)),
       validOutputs: new Set(state.validOutputs),
       outputSlotKeys: [outputKey(nodeId, 0)],
@@ -112,7 +114,7 @@ export function recomputeNode(
   const incoming = topology.incomingByTarget.get(nodeId) ?? [];
 
   // 작업용 카피. 디스크립터가 mutate해도 caller의 state는 건드리지 않음.
-  const workingValues: Record<NodeId, Value> = { ...state.values };
+  const workingValues: Record<NodeId, ExecValue> = { ...state.values };
   const workingValid = new Set(state.validOutputs);
   const workingInvalidReasons: ExecutionState['invalidReasons'] = {
     ...state.invalidReasons,
@@ -152,8 +154,11 @@ export function recomputeNode(
   // 모든 노드가 출력 슬롯 0 하나만 사용 — 조건 노드도 게이트 시맨틱이라 단일 출력.
   const outputSlotKeys = [outputKey(nodeId, 0)];
 
+  const ev = workingValues[nodeId];
   return {
-    newValue: workingValues[nodeId],
+    // newValue 의 외부 시그니처는 Value — 메타 인식 caller 가 아직 없으므로
+    // wrapped 가 저장돼 있으면 알맹이만 노출한다.
+    newValue: ev === undefined ? undefined : unwrap(ev),
     isValid: workingValid.has(outputKey(nodeId, 0)),
     validOutputs: workingValid,
     outputSlotKeys,

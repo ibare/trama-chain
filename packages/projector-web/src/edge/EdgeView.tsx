@@ -7,6 +7,7 @@ import {
   isOutputValid,
   isValueNode,
   normalize,
+  unwrap,
   type EdgeId,
   type Node,
 } from '@trama/core';
@@ -87,8 +88,11 @@ function EdgeViewImpl({
     const n = s.model.nodes[fromId];
     const fallback =
       n && isValueNode(n) && isNumericValue(n.initialValue) ? n.initialValue.n : 0;
-    const v = s.executionState.values[fromId];
-    if (v && isNumericValue(v)) return v.n;
+    const ev = s.executionState.values[fromId];
+    if (ev) {
+      const v = unwrap(ev);
+      if (isNumericValue(v)) return v.n;
+    }
     return fallback;
   });
   // source 출력 슬롯이 현재 valid한가. condition 게이트가 닫히는 등으로 invalid가

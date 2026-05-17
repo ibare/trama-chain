@@ -1,6 +1,7 @@
 import type { CombinerRegistry } from '../combiners/index.js';
 import type { Model, NodeId, Value } from '../model/index.js';
 import { booleanValue, isNumericValue, isValueNode, numericValue } from '../model/index.js';
+import { unwrap, type ExecValue } from './exec-value.js';
 import type { ShapeRegistry } from '../functions/index.js';
 import type { Rng } from '../functions/types.js';
 import {
@@ -61,7 +62,7 @@ export function propagateOneStep(
   const rng = options.rng ?? defaultRng;
   const catalog = options.unitCatalog ?? defaultUnitCatalog;
   const nodeKindRegistry = options.nodeKindRegistry ?? defaultNodeKindRegistry;
-  const next: Record<string, Value> = { ...state.values };
+  const next: Record<string, ExecValue> = { ...state.values };
   const validOutputs = new Set(state.validOutputs);
   const invalidReasons: ExecutionState['invalidReasons'] = {
     ...state.invalidReasons,
@@ -137,7 +138,7 @@ export function applyFeedbackEdges(
   if (topology.feedbackEdges.length === 0) return state;
   const catalog = options.unitCatalog ?? defaultUnitCatalog;
   const nodeKindRegistry = options.nodeKindRegistry ?? defaultNodeKindRegistry;
-  const next: Record<string, Value> = { ...state.values };
+  const next: Record<string, ExecValue> = { ...state.values };
   const validOutputs = new Set(state.validOutputs);
 
   // ValueKind별 buckets — numeric은 단위 클램프와 raw passthrough를 따지고
@@ -153,9 +154,12 @@ export function applyFeedbackEdges(
     if (!isValueNode(target)) continue;
     const srcSlot = edge.sourceSlotIndex ?? 0;
     if (!validOutputs.has(outputKey(edge.from, srcSlot))) continue;
-    const sourceVal =
+    // ExecValue 가 저장된 경우 unwrap 으로 알맹이 Value 만 본다 — feedback 결합은
+    // 메타 인식 동작이 아니므로 wrapped 여부와 무관하게 alue 만 필요.
+    const sourceExec =
       state.values[edge.from] ?? (isValueNode(source) ? source.initialValue : undefined);
-    if (!sourceVal) continue;
+    if (!sourceExec) continue;
+    const sourceVal: Value = unwrap(sourceExec);
     // PortType 호환: source ValueKind ≠ target ValueKind면 기여하지 않음.
     if (sourceVal.kind !== target.initialValue.kind) continue;
     if (sourceVal.kind === 'numeric') {
@@ -176,7 +180,8 @@ export function applyFeedbackEdges(
     if (!isNumericValue(target.initialValue)) continue;
     const combiner = options.combinerRegistry.getOfKind(target.combiner, 'numeric');
     if (!combiner) throw new MissingCombinerError(target.combiner);
-    const baseVal = next[tid];
+    const baseExec = next[tid];
+    const baseVal = baseExec ? unwrap(baseExec) : undefined;
     const baseNumber =
       baseVal && baseVal.kind === 'numeric' ? baseVal.n : target.initialValue.n;
     const combined = combiner.combine([baseNumber, ...contribs]);
@@ -193,7 +198,8 @@ export function applyFeedbackEdges(
     if (target.initialValue.kind !== 'boolean') continue;
     const combiner = options.combinerRegistry.getOfKind(target.combiner, 'boolean');
     if (!combiner) throw new MissingCombinerError(target.combiner);
-    const baseVal = next[tid];
+    const baseExec = next[tid];
+    const baseVal = baseExec ? unwrap(baseExec) : undefined;
     const baseBool =
       baseVal && baseVal.kind === 'boolean' ? baseVal.b : target.initialValue.b;
     next[tid] = booleanValue(combiner.combine([baseBool, ...contribs]));
