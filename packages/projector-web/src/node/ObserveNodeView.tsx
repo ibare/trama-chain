@@ -35,7 +35,12 @@ function ObserveNodeViewImpl({ id, incomingCount }: Props): JSX.Element | null {
     return unwrap(ev);
   });
   const updateNode = modelStore((s) => s.updateNode);
-  const outputConnected = useOutputConnected(id);
+  const outputConnected = useOutputConnected(id, 0);
+  const extractionConnected = useOutputConnected(id, 1);
+  // 누적 추출 슬롯의 valid 여부 — invalid면 socket을 흐리게 표시해 "아직 발사 없음" 시그널.
+  const extractionValid = modelStore((s) =>
+    s.executionState.validOutputs.has(`${id}#1`),
+  );
   const isSelected = uiStore(
     (s) => s.selection.kind === 'node' && s.selection.id === id,
   );
@@ -69,6 +74,20 @@ function ObserveNodeViewImpl({ id, incomingCount }: Props): JSX.Element | null {
       enabled: !!layout,
       getStartPoint: getOutputStartPoint,
     });
+  const getExtractionStartPoint = useCallback(() => {
+    const out = layout?.rightPin.sockets[1];
+    return out
+      ? { x: posX + out.x, y: posY + out.y }
+      : { x: posX, y: posY };
+  }, [layout, posX, posY]);
+  const {
+    onPointerDown: onExtractionPointerDown,
+    onPointerUp: onExtractionPointerUp,
+  } = useEdgeDraftSource(id, {
+    enabled: !!layout,
+    getStartPoint: getExtractionStartPoint,
+    sourceSlotIndex: 1,
+  });
 
   const onBodyDoubleClick = useCallback(() => {
     selectNode(id);
@@ -172,6 +191,28 @@ function ObserveNodeViewImpl({ id, incomingCount }: Props): JSX.Element | null {
             onPointerUp={onSocketPointerUp}
           />
         </>
+      )}
+
+      {/* 누적 추출 슬롯(슬롯 1) — 노드 우상단에 분리 배치. 클래스로 시퀀스 채널임을
+          표시해 별도 시각을 부여한다. invalid(아직 발사 없음) 면 흐림. */}
+      {layout.rightPin.sockets[1] && (
+        <g
+          className={`trama-observe-extraction${extractionValid ? '' : ' is-pending'}`}
+        >
+          <Socket
+            cx={layout.rightPin.sockets[1].x}
+            cy={layout.rightPin.sockets[1].y}
+            connected={extractionConnected}
+          />
+          <circle
+            className="trama-node-socket-hit"
+            cx={layout.rightPin.sockets[1].x}
+            cy={layout.rightPin.sockets[1].y}
+            r={Math.max(SOCKET_SIZE, 12)}
+            onPointerDown={onExtractionPointerDown}
+            onPointerUp={onExtractionPointerUp}
+          />
+        </g>
       )}
 
       <ModeToggle

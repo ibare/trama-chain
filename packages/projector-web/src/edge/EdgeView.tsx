@@ -432,11 +432,13 @@ function EdgeViewImpl({
 
 export const EdgeView = memo(EdgeViewImpl);
 
-/** 노드 종류에 맞는 우측(출력) 소켓 좌표 — 노드 중심 기준. */
+/** 노드 종류에 맞는 우측(출력) 소켓 좌표 — 노드 중심 기준.
+ *  sourceSlotIndex 가 지정되면 해당 슬롯의 소켓 좌표를, 없으면 0번 소켓을 반환한다.
+ *  슬롯이 정의되지 않은 인덱스에 대해서는 0번으로 폴백. */
 function rightOutputSocket(
   node: Node,
   fromIncomingCount: number,
-  _sourceSlotIndex?: number,
+  sourceSlotIndex: number | undefined,
   measure?: FizzexMeasure,
 ): Point {
   const layout = getNodeLayout(node, {
@@ -444,7 +446,11 @@ function rightOutputSocket(
     expressionSize: measure,
     displayMode: resolveDisplayMode(node),
   });
-  return layout.rightPin.sockets[0] ?? { x: 0, y: 0 };
+  const idx = Math.max(0, sourceSlotIndex ?? 0);
+  return (
+    layout.rightPin.sockets[idx] ??
+    layout.rightPin.sockets[0] ?? { x: 0, y: 0 }
+  );
 }
 
 /** 노드 종류에 맞는 좌측(입력) 소켓 좌표 — 노드 중심 기준. */

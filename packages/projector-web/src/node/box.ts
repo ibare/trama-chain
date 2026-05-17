@@ -209,6 +209,9 @@ function buildPin(cx: number, cy: number, nSockets: number): PinLayout {
 /** ObserveNode 본문 — 라벨 슬롯 + 시각화 슬롯 내부 패딩. 폭·높이는 STANDARD_PANEL이 정한다. */
 const OBSERVE_LABEL_FROM_TOP = 28;
 const OBSERVE_BODY_INSET = 16;
+/** ObserveNode 누적 추출(슬롯 1) 소켓이 노드 상단에서 떨어진 거리.
+ *  본체 슬롯(중앙)과 시각적으로 분리되어 "추출 채널"이라는 별도 시맨틱을 드러낸다. */
+const OBSERVE_EXTRACTION_FROM_TOP = 18;
 /** compact 패널은 56px라 standard 인셋을 그대로 쓰면 시각화 높이가 0이 된다.
  *  compact 전용으로 인셋을 줄여 실제 그릴 수 있는 슬롯을 확보. */
 const OBSERVE_BODY_INSET_COMPACT = 6;
@@ -425,7 +428,19 @@ export function getNodeLayout(
       return buildCompactLayout(node, opts, { hasOuterControls: false, outSockets: 2 });
     }
     if (isObserveNode(node)) {
-      return buildCompactLayout(node, opts, { hasOuterControls: false });
+      // ObserveNode compact — 출력 슬롯 2개 (passthrough + 누적 추출).
+      // 슬롯 1(누적 추출)은 패널 우상단 코너로 분리 — standard와 동일한 시맨틱.
+      const base = buildCompactLayout(node, opts, {
+        hasOuterControls: false,
+        outSockets: 2,
+      });
+      const slot0 = base.rightPin.sockets[0]!;
+      const panelTop = base.panelCy - base.panelHeight / 2;
+      const rightPin: PinLayout = {
+        ...base.rightPin,
+        sockets: [slot0, { x: base.rightPin.cx, y: panelTop + 6 }],
+      };
+      return { ...base, rightPin };
     }
     if (isAverageNode(node)) {
       return buildCompactLayout(node, opts, { hasOuterControls: false });
@@ -569,7 +584,9 @@ export function getNodeLayout(
     };
   }
 
-  // ObserveNode — 본문은 시각화 슬롯. 단일 입력/단일 출력 핀.
+  // ObserveNode — 본문은 시각화 슬롯. 단일 입력 / 두 출력(슬롯 0: passthrough,
+  // 슬롯 1: 누적 추출 sequence). 추출 슬롯은 우상단으로 분리해 본체 흐름과 시각적으로
+  // 구별한다.
   if (isObserveNode(node)) {
     const halfW = STANDARD_PANEL.w / 2;
     const halfH = STANDARD_PANEL.h / 2;
@@ -579,7 +596,16 @@ export function getNodeLayout(
     const bodyW = STANDARD_PANEL.w - OBSERVE_BODY_INSET * 2;
     const bodyH = STANDARD_PANEL.h - OBSERVE_LABEL_FROM_TOP - 8 - 12;
     const leftPin = buildPin(-halfW, 0, 1);
-    const rightPin = buildPin(halfW, 0, 1);
+    // 우측 핀 — 슬롯 0(중앙, passthrough)은 기본 위치 그대로. 슬롯 1(누적 추출)은
+    // 노드 우상단에 별도 배치 — 본체 흐름과 시각적으로 분리.
+    const basePin = buildPin(halfW, 0, 1);
+    const rightPin: PinLayout = {
+      ...basePin,
+      sockets: [
+        basePin.sockets[0]!,
+        { x: halfW, y: cardTop + OBSERVE_EXTRACTION_FROM_TOP },
+      ],
+    };
     return {
       width: STANDARD_PANEL.w,
       height: STANDARD_PANEL.h,

@@ -2205,3 +2205,14 @@
   fill: var(--color-node-text-low);
   pointer-events: none;
 }
+
+/* 누적 추출 슬롯 — Observe 노드 우상단. 사용 가능 시 본체 소켓과 동일 톤,
+ * 아직 발사 없음(invalid) 상태에서는 흐리게 표시해 "대기 중" 의미를 보존한다. */
+[data-trama-root] .trama-observe-extraction.is-pending {
+  opacity: 0.45;
+}
+
+/* AverageNode — ValueNode 결의 단순 카드. 슬라이더·콤바이너 없음. */
+[data-trama-root] .trama-average-node .trama-node-value {
+  fill: var(--color-node-text-primary);
+}
