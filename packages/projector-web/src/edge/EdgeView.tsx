@@ -15,7 +15,7 @@ import { useTrama } from '../store/index.js';
 import { shapeRegistry } from '../store/registries.js';
 import { getNodeLayout } from '../node/box.js';
 import { resolveDisplayMode } from '../node/display-mode.js';
-import { slotColor } from '../node/slot-palette.js';
+import { conditionSourceSlotColor, slotColor } from '../node/slot-palette.js';
 import { useExpressionMeasureStore } from '../expression/expression-measure-store.js';
 import type { FizzexMeasure } from '../expression/use-fizzex-renderer.js';
 import { resolveNodeUnit } from '../util/unit-resolver.js';
@@ -278,7 +278,14 @@ function EdgeViewImpl({
 
   // 멀티슬롯 노드에 연결된 엣지에 슬롯 식별색을 CSS 변수로 부여.
   // feedback·strained는 styles.css 우선순위로 이 색을 덮어 시맨틱 상태가 우선됨.
-  const edgeSlotColor = slotColor(effectiveSocket, toIncomingCount);
+  //
+  // 우선순위: source 가 ConditionNode 면 true/false 의미가 target slot 식별색보다
+  // 강하므로 conditionSourceSlotColor 가 먼저. 그 외엔 target 슬롯 식별색.
+  const conditionColor =
+    fromNode && isConditionNode(fromNode)
+      ? conditionSourceSlotColor(edgeSourceSlot)
+      : null;
+  const edgeSlotColor = conditionColor ?? slotColor(effectiveSocket, toIncomingCount);
   const groupStyle = edgeSlotColor
     ? ({ '--slot-color': edgeSlotColor } as React.CSSProperties)
     : undefined;

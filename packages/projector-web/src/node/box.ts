@@ -256,6 +256,8 @@ const COMPACT_SOCKET_SIDE_INSET = 18;
  */
 interface CompactOpts {
   hasOuterControls: boolean;
+  /** 우측 출력 슬롯 수. 미지정이면 1. ConditionNode 만 2 (true·false 게이트). */
+  outSockets?: number;
 }
 
 /**
@@ -292,9 +294,12 @@ function buildCompactLayout(
   // panel cy 기준으로 위·아래로 흘러나간다. 흘러나간 만큼만 노드 총 박스가 늘어난다.
   const panelW = COMPACT_PANEL.w;
   const panelH = COMPACT_PANEL.h;
+  const outSockets = Math.max(1, compactOpts.outSockets ?? 1);
   const inMinH =
     PIN_PAD * 2 + inSockets * SOCKET_SIZE + Math.max(0, inSockets - 1) * PIN_SOCKET_GAP;
-  const pinDemandH = Math.max(PIN_W, inMinH);
+  const outMinH =
+    PIN_PAD * 2 + outSockets * SOCKET_SIZE + Math.max(0, outSockets - 1) * PIN_SOCKET_GAP;
+  const pinDemandH = Math.max(PIN_W, inMinH, outMinH);
   const socketOverflow = Math.max(0, (pinDemandH - panelH) / 2);
 
   const totalH = labelBlockH + panelH + controlsBlockH + socketOverflow * 2;
@@ -320,7 +325,7 @@ function buildCompactLayout(
     : null;
 
   const leftPin = buildPin(-halfW, panelCy, inSockets);
-  const rightPin = buildPin(halfW, panelCy, 1);
+  const rightPin = buildPin(halfW, panelCy, outSockets);
 
   // generator의 ▶/↺ 버튼은 기존 generatorBody 슬롯을 그대로 쓰는 형태로 작성되어
   // 있으므로, compact에서도 generatorBody에 outer 컨트롤 슬롯 좌표를 채워 호환.
@@ -415,7 +420,8 @@ export function getNodeLayout(
       return buildCompactLayout(node, opts, { hasOuterControls: false });
     }
     if (isConditionNode(node)) {
-      return buildCompactLayout(node, opts, { hasOuterControls: false });
+      // Condition 은 true/false 두 출력 슬롯 — compact 에서도 두 소켓을 노출.
+      return buildCompactLayout(node, opts, { hasOuterControls: false, outSockets: 2 });
     }
     if (isObserveNode(node)) {
       return buildCompactLayout(node, opts, { hasOuterControls: false });
@@ -531,7 +537,8 @@ export function getNodeLayout(
     const halfH = STANDARD_PANEL.h / 2;
     const cardTop = -halfH;
     const leftPin = buildPin(-halfW, 0, 1);
-    const rightPin = buildPin(halfW, 0, 1);
+    // 우측 두 출력 슬롯 — slot 0: true 분기, slot 1: false 분기.
+    const rightPin = buildPin(halfW, 0, 2);
     return {
       width: STANDARD_PANEL.w,
       height: STANDARD_PANEL.h,

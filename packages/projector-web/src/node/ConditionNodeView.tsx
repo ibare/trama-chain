@@ -19,6 +19,7 @@ import { ModeToggle } from './ModeToggle.js';
 import { InlineSvgInput } from './InlineSvgInput.js';
 import { InteractiveArea } from './InteractiveArea.js';
 import { Socket } from './Socket.js';
+import { conditionSourceSlotColor } from './slot-palette.js';
 import {
   useInputConnected,
   useOutputConnected,
@@ -46,7 +47,10 @@ const OPERATOR_GLYPH: Record<ConditionOperator, string> = {
 function ConditionNodeViewImpl({ id }: Props): JSX.Element | null {
   const { modelStore, uiStore, socketRegistry } = useTrama();
   const node = modelStore((s) => s.model.nodes[id]);
-  const outputValid = modelStore((s) => isOutputValid(s.executionState, id, 0));
+  // 두 슬롯 각각의 valid — true(0)·false(1) 가 상호 배타지만 양쪽 모두 invalid 인
+  // 입력 미연결 상태도 있으므로 독립 selector.
+  const outputValid0 = modelStore((s) => isOutputValid(s.executionState, id, 0));
+  const outputValid1 = modelStore((s) => isOutputValid(s.executionState, id, 1));
   const updateNode = modelStore((s) => s.updateNode);
   const selection = uiStore((s) => s.selection);
   const editingNode = uiStore((s) => s.editingNode);
@@ -54,7 +58,8 @@ function ConditionNodeViewImpl({ id }: Props): JSX.Element | null {
   const isEditing = editingNode?.id === id;
   const editTarget = isEditing ? editingNode.target : null;
   const inputConnected = useInputConnected(id, 0);
-  const outputConnected = useOutputConnected(id);
+  const outputConnected0 = useOutputConnected(id, 0);
+  const outputConnected1 = useOutputConnected(id, 1);
 
   // 입력 source 노드의 단위를 따라가 임계값에 suffix를 붙인다 (예: '≥ 10 °C').
   // 미연결이면 raw 표시.
@@ -87,16 +92,29 @@ function ConditionNodeViewImpl({ id }: Props): JSX.Element | null {
     });
   }, [id, layout, socketRegistry]);
 
-  const getOutputStartPoint = useCallback(() => {
+  const getOutputStartPoint0 = useCallback(() => {
     const out = layout?.rightPin.sockets[0];
     return out
       ? { x: posX + out.x, y: posY + out.y }
       : { x: posX, y: posY };
   }, [layout, posX, posY]);
-  const { onPointerDown: onSocketPointerDown, onPointerUp: onSocketPointerUp } =
+  const getOutputStartPoint1 = useCallback(() => {
+    const out = layout?.rightPin.sockets[1];
+    return out
+      ? { x: posX + out.x, y: posY + out.y }
+      : { x: posX, y: posY };
+  }, [layout, posX, posY]);
+  const { onPointerDown: onSocketPointerDown0, onPointerUp: onSocketPointerUp0 } =
     useEdgeDraftSource(id, {
-      enabled: !!layout && outputValid,
-      getStartPoint: getOutputStartPoint,
+      enabled: !!layout && outputValid0,
+      getStartPoint: getOutputStartPoint0,
+      sourceSlotIndex: 0,
+    });
+  const { onPointerDown: onSocketPointerDown1, onPointerUp: onSocketPointerUp1 } =
+    useEdgeDraftSource(id, {
+      enabled: !!layout && outputValid1,
+      getStartPoint: getOutputStartPoint1,
+      sourceSlotIndex: 1,
     });
 
   const onOperatorClick = useCallback(() => {
@@ -165,7 +183,9 @@ function ConditionNodeViewImpl({ id }: Props): JSX.Element | null {
   if (!node || !isConditionNode(node) || !node.position || !layout) return null;
 
   const isSelected = selection.kind === 'node' && selection.id === id;
-  const isActive = outputValid;
+  // 본문 상태색은 어느 슬롯이든 valid 면 calm — 두 슬롯이 상호 배타라 어차피
+  // 둘 중 하나만 valid 다. 슬롯별 흐림 처리는 각 소켓 <g> 의 is-inactive-output.
+  const isActive = outputValid0 || outputValid1;
   const stateClass = isActive ? 'is-calm' : 'is-low';
 
   const opGlyph = OPERATOR_GLYPH[node.operator];
@@ -311,21 +331,43 @@ function ConditionNodeViewImpl({ id }: Props): JSX.Element | null {
         onPointerDown={(e) => e.stopPropagation()}
       />
 
-      {/* 우측 단일 출력 소켓 — 조건이 거짓이면 invalid 상태로 시각 표시. */}
+      {/* 우측 두 출력 소켓 — slot 0: true(파랑), slot 1: false(붉은빛).
+          현재 비활성 슬롯은 흐림(is-inactive-output) 처리해 다운스트림 흐름을 시각화. */}
       {layout.rightPin.sockets[0] && (
-        <g className={isActive ? '' : 'is-inactive-output'}>
+        <g className={outputValid0 ? '' : 'is-inactive-output'}>
           <Socket
             cx={layout.rightPin.sockets[0].x}
             cy={layout.rightPin.sockets[0].y}
-            connected={outputConnected}
+            connected={outputConnected0}
+            color={conditionSourceSlotColor(0)}
           />
           <circle
             className="trama-node-socket-hit"
+            data-trama-source-slot-index={0}
             cx={layout.rightPin.sockets[0].x}
             cy={layout.rightPin.sockets[0].y}
             r={Math.max(SOCKET_SIZE, 12)}
-            onPointerDown={onSocketPointerDown}
-            onPointerUp={onSocketPointerUp}
+            onPointerDown={onSocketPointerDown0}
+            onPointerUp={onSocketPointerUp0}
+          />
+        </g>
+      )}
+      {layout.rightPin.sockets[1] && (
+        <g className={outputValid1 ? '' : 'is-inactive-output'}>
+          <Socket
+            cx={layout.rightPin.sockets[1].x}
+            cy={layout.rightPin.sockets[1].y}
+            connected={outputConnected1}
+            color={conditionSourceSlotColor(1)}
+          />
+          <circle
+            className="trama-node-socket-hit"
+            data-trama-source-slot-index={1}
+            cx={layout.rightPin.sockets[1].x}
+            cy={layout.rightPin.sockets[1].y}
+            r={Math.max(SOCKET_SIZE, 12)}
+            onPointerDown={onSocketPointerDown1}
+            onPointerUp={onSocketPointerUp1}
           />
         </g>
       )}

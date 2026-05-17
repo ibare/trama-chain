@@ -27,3 +27,14 @@ export function slotColor(slotIndex: number, totalSlots: number): string | null 
   if (slotIndex <= 0) return null;
   return PALETTE[(slotIndex - 1) % PALETTE.length] ?? null;
 }
+
+/**
+ * ConditionNode 의 source 슬롯 색 — slot 0: true(파랑), slot 1: false(붉은빛).
+ * 그 외 슬롯은 null. 일반 target 식별색([[slotColor]]) 보다 source 의 의미가
+ * 더 강하므로 EdgeView 가 이 함수를 먼저 호출하고, null 이면 [[slotColor]] 로 폴백.
+ */
+export function conditionSourceSlotColor(slotIndex: number): string | null {
+  if (slotIndex === 0) return tokens.color.conditionTrue;
+  if (slotIndex === 1) return tokens.color.conditionFalse;
+  return null;
+}
