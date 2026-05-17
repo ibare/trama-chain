@@ -35,10 +35,10 @@ export default function Playground(): JSX.Element {
 
       <style>{`
         .trama-playground {
+          position: absolute;
+          inset: 0;
           display: flex;
           flex-direction: column;
-          height: calc(100vh - 56px);
-          position: relative;
         }
         .trama-playground-canvas {
           position: relative;

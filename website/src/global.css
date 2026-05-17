@@ -61,6 +61,7 @@ pre {
 .trama-site-main {
   flex: 1;
   width: 100%;
+  position: relative;
 }
 
 .trama-site-loading {
