@@ -19,9 +19,11 @@ interface Props {
 }
 
 const SOCKET_SIZE = parseFloat(tokens.spacing.socketSize);
-const BUTTON_SIZE = 32;
+// BUTTON_SIZE 는 box.ts 의 GENERATOR_CONTROLS_H(=26) 슬롯 안에 정확히 들어가는
+// 값. compact 모드의 외곽 컨트롤 슬롯(36)에서는 위·아래 여유가 자연스럽게 남는다.
+const BUTTON_SIZE = 26;
 const BUTTON_GAP = 10;
-const GLYPH_SIZE = 18;
+const GLYPH_SIZE = 16;
 
 function formatGeneratorValue(v: number): string {
   if (!Number.isFinite(v)) return '·';
