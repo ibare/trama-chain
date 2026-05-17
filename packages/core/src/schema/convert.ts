@@ -93,6 +93,7 @@ function nodeToDoc(n: Node): TramaNode {
       position: n.position,
       isFocal: n.isFocal,
       description: n.description ?? null,
+      displayMode: n.displayMode,
     };
     return doc;
   }
@@ -118,6 +119,7 @@ function nodeToDoc(n: Node): TramaNode {
       position: n.position,
       isFocal: n.isFocal,
       description: n.description ?? null,
+      displayMode: n.displayMode,
     };
     return doc;
   }
@@ -202,6 +204,7 @@ export function documentToModel(doc: TramaDocument): Model {
         position: n.position,
         isFocal: n.isFocal,
         description: n.description ?? null,
+        displayMode: n.displayMode,
       };
       nodes[n.id] = node;
     } else if (n.kind === 'logic-gate') {
@@ -225,6 +228,7 @@ export function documentToModel(doc: TramaDocument): Model {
         position: n.position,
         isFocal: n.isFocal,
         description: n.description ?? null,
+        displayMode: n.displayMode,
       };
       nodes[n.id] = node;
     } else if (n.kind === 'generator') {

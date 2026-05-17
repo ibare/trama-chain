@@ -53,6 +53,7 @@ const CONDITION_NODE_KEY_ORDER: (keyof TramaConditionNode)[] = [
   'threshold',
   'position',
   'isFocal',
+  'displayMode',
   'description',
 ];
 
@@ -74,6 +75,7 @@ const OBSERVE_NODE_KEY_ORDER: (keyof TramaObserveNode)[] = [
   'visualization',
   'position',
   'isFocal',
+  'displayMode',
   'description',
 ];
 

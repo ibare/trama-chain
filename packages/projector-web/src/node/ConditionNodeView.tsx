@@ -10,14 +10,12 @@ import {
 } from '@trama/core';
 import { useTrama } from '../store/index.js';
 import { resolveNodeUnit } from '../util/unit-resolver.js';
-import {
-  CONDITION_CARD_H,
-  CONDITION_CARD_W,
-  getConditionNodeLayout,
-} from './condition-box.js';
+import { useNodeLayout } from './use-node-layout.js';
+import { resolveDisplayMode } from './display-mode.js';
 import { NodeFrame } from './NodeFrame.js';
 import { NodeBody } from './NodeBody.js';
 import { NodeLabel } from './NodeLabel.js';
+import { ModeToggle } from './ModeToggle.js';
 import { InlineSvgInput } from './InlineSvgInput.js';
 import { InteractiveArea } from './InteractiveArea.js';
 import { Socket } from './Socket.js';
@@ -31,8 +29,6 @@ interface Props {
   id: NodeId;
 }
 
-const CARD_W = CONDITION_CARD_W;
-const CARD_H = CONDITION_CARD_H;
 const SOCKET_SIZE = parseFloat(tokens.spacing.socketSize);
 
 const OPERATORS: ConditionOperator[] = ['>', '<', '>=', '<=', '==', '!='];
@@ -75,29 +71,31 @@ function ConditionNodeViewImpl({ id }: Props): JSX.Element | null {
     return '';
   });
 
-  // 좌표는 아래 가드 `!node ... || !node.position` 통과 후에만 의미를 갖는다.
   const posX = node?.position?.x ?? 0;
   const posY = node?.position?.y ?? 0;
-  const layout = getConditionNodeLayout();
+  const layout = useNodeLayout(node, {
+    incomingCount: inputConnected ? 1 : 0,
+    displayMode: node ? resolveDisplayMode(node) : undefined,
+  });
 
   useEffect(() => {
+    if (!layout) return;
     return socketRegistry.register({
       nodeId: id,
       slotIndex: 0,
-      offset: { x: layout.inputSocket.x, y: layout.inputSocket.y },
+      offset: { x: layout.leftPin.cx, y: layout.leftPin.cy },
     });
-  }, [id, layout.inputSocket.x, layout.inputSocket.y, socketRegistry]);
+  }, [id, layout, socketRegistry]);
 
-  const getOutputStartPoint = useCallback(
-    () => ({
-      x: posX + layout.outputSocket.x,
-      y: posY + layout.outputSocket.y,
-    }),
-    [layout.outputSocket.x, layout.outputSocket.y, posX, posY],
-  );
+  const getOutputStartPoint = useCallback(() => {
+    const out = layout?.rightPin.sockets[0];
+    return out
+      ? { x: posX + out.x, y: posY + out.y }
+      : { x: posX, y: posY };
+  }, [layout, posX, posY]);
   const { onPointerDown: onSocketPointerDown, onPointerUp: onSocketPointerUp } =
     useEdgeDraftSource(id, {
-      enabled: !!node && outputValid,
+      enabled: !!layout && outputValid,
       getStartPoint: getOutputStartPoint,
     });
 
@@ -156,7 +154,15 @@ function ConditionNodeViewImpl({ id }: Props): JSX.Element | null {
   );
   const cancelEdit = useCallback(() => setEditingNode(null), [setEditingNode]);
 
-  if (!node || !isConditionNode(node) || !node.position) return null;
+  const currentMode = node ? resolveDisplayMode(node) : 'standard';
+  const onToggleMode = useCallback(() => {
+    if (uiStore.getState().readOnly) return;
+    updateNode(id, {
+      displayMode: currentMode === 'compact' ? 'standard' : 'compact',
+    });
+  }, [currentMode, id, uiStore, updateNode]);
+
+  if (!node || !isConditionNode(node) || !node.position || !layout) return null;
 
   const isSelected = selection.kind === 'node' && selection.id === id;
   const isActive = outputValid;
@@ -166,44 +172,70 @@ function ConditionNodeViewImpl({ id }: Props): JSX.Element | null {
   const thresholdText = formatThreshold(node.threshold);
   const suffix = inputUnitSuffix ? ` ${inputUnitSuffix}` : '';
 
+  const {
+    width,
+    height,
+    panelCx,
+    panelCy,
+    panelWidth,
+    panelHeight,
+    labelY,
+    labelAnchor,
+  } = layout;
+  const panelHalfW = panelWidth / 2;
+  const isCompact = currentMode === 'compact';
+  // compact: 패널 안쪽에 op+threshold만, 폰트 축소. standard: 기존 중앙 정렬 표시.
+  const opX = isCompact ? panelCx - 14 : -56 + 18 /* 글리프 중앙 보정 */;
+  const thresholdX = isCompact ? panelCx + 6 : 4;
+  const thresholdInputW = isCompact ? Math.min(60, panelWidth - 30) : 70;
+
   return (
     <NodeFrame
       id={id}
       pos={node.position}
-      width={CARD_W}
-      height={CARD_H}
+      width={width}
+      height={height}
       className={`trama-condition-node${isActive ? '' : ' is-invalid'}`}
     >
       <NodeBody
-        width={CARD_W}
-        height={CARD_H}
+        width={panelWidth}
+        height={panelHeight}
+        cx={panelCx}
+        cy={panelCy}
         stateClass={stateClass}
         isSelected={isSelected}
         extraClassName="trama-function-body"
       />
 
-      {/* 중앙: {op} {threshold}{unit suffix}.
-          - operator 영역(글리프 좌측)은 클릭으로 6종 순환.
-          - threshold 영역은 더블클릭으로 인라인 수치 편집 진입. */}
+      {/* operator 글리프 — 클릭 시 6종 순환. compact는 패널 중앙 좌측, standard는 본문 좌측. */}
       <InteractiveArea
-        x={-56}
-        y={-22}
-        width={36}
-        height={44}
+        x={isCompact ? panelCx - 28 : -56}
+        y={panelCy - 14}
+        width={isCompact ? 28 : 36}
+        height={isCompact ? 28 : 44}
         rx={6}
         ry={6}
         hitClassName="trama-condition-operator-hit"
         onClick={onOperatorClick}
       >
-        <text className="trama-function-symbol" x={-38} y={4} textAnchor="middle">
+        <text
+          className={`trama-function-symbol${isCompact ? ' is-compact' : ''}`}
+          x={opX}
+          y={panelCy + 4}
+          textAnchor="middle"
+        >
           {opGlyph}
         </text>
       </InteractiveArea>
 
+      {/* threshold 텍스트(또는 인라인 편집) — compact는 패널 중앙 우측, standard는 본문 우측. */}
       {editTarget === 'threshold' ? (
-        // 표시 텍스트("4 kg")가 x=4 textAnchor="start"에서 시작하므로 input 좌측 패딩을
-        // 보정해 같은 시각 위치에서 편집을 이어간다.
-        <foreignObject x={0} y={-13} width={70} height={26}>
+        <foreignObject
+          x={thresholdX - 4}
+          y={panelCy - 13}
+          width={thresholdInputW}
+          height={26}
+        >
           <Form.Root onSubmit={(e) => e.preventDefault()}>
             <InlineSvgInput
               name="threshold"
@@ -221,9 +253,9 @@ function ConditionNodeViewImpl({ id }: Props): JSX.Element | null {
       ) : (
         <>
           <text
-            className="trama-function-symbol"
-            x={4}
-            y={4}
+            className={`trama-function-symbol${isCompact ? ' is-compact' : ''}`}
+            x={thresholdX}
+            y={panelCy + 4}
             textAnchor="start"
             onDoubleClick={onThresholdDoubleClick}
           >
@@ -231,9 +263,9 @@ function ConditionNodeViewImpl({ id }: Props): JSX.Element | null {
           </text>
           <rect
             className="trama-condition-threshold-hit"
-            x={0}
-            y={-13}
-            width={70}
+            x={thresholdX - 4}
+            y={panelCy - 13}
+            width={thresholdInputW}
             height={26}
             fill="transparent"
             onDoubleClick={onThresholdDoubleClick}
@@ -243,47 +275,58 @@ function ConditionNodeViewImpl({ id }: Props): JSX.Element | null {
 
       <NodeLabel
         text={node.label || '조건'}
-        x={0}
-        y={layout.labelY}
-        width={CARD_W - 24}
-        textAnchor="middle"
+        x={labelAnchor === 'middle' ? panelCx : 0}
+        y={labelY}
+        width={panelWidth - 24}
+        textAnchor={labelAnchor === 'middle' ? 'middle' : 'middle'}
         isEditing={editTarget === 'label'}
         onCommit={commitLabel}
         onCancel={cancelEdit}
         onIsolatedDoubleClick={onLabelDoubleClick}
       />
 
+      {!isEditing && (
+        <ModeToggle
+          panelRight={panelCx + panelHalfW}
+          panelTop={panelCy - panelHeight / 2}
+          mode={currentMode}
+          onToggle={onToggleMode}
+        />
+      )}
+
       {/* 좌측 단일 입력 소켓 */}
       <Socket
-        cx={layout.inputSocket.x}
-        cy={layout.inputSocket.y}
+        cx={layout.leftPin.cx}
+        cy={layout.leftPin.cy}
         connected={inputConnected}
       />
       <circle
         className="trama-node-socket-hit"
         data-trama-slot-index={0}
-        cx={layout.inputSocket.x}
-        cy={layout.inputSocket.y}
+        cx={layout.leftPin.cx}
+        cy={layout.leftPin.cy}
         r={Math.max(SOCKET_SIZE, 12)}
         onPointerDown={(e) => e.stopPropagation()}
       />
 
       {/* 우측 단일 출력 소켓 — 조건이 거짓이면 invalid 상태로 시각 표시. */}
-      <g className={isActive ? '' : 'is-inactive-output'}>
-        <Socket
-          cx={layout.outputSocket.x}
-          cy={layout.outputSocket.y}
-          connected={outputConnected}
-        />
-        <circle
-          className="trama-node-socket-hit"
-          cx={layout.outputSocket.x}
-          cy={layout.outputSocket.y}
-          r={Math.max(SOCKET_SIZE, 12)}
-          onPointerDown={onSocketPointerDown}
-          onPointerUp={onSocketPointerUp}
-        />
-      </g>
+      {layout.rightPin.sockets[0] && (
+        <g className={isActive ? '' : 'is-inactive-output'}>
+          <Socket
+            cx={layout.rightPin.sockets[0].x}
+            cy={layout.rightPin.sockets[0].y}
+            connected={outputConnected}
+          />
+          <circle
+            className="trama-node-socket-hit"
+            cx={layout.rightPin.sockets[0].x}
+            cy={layout.rightPin.sockets[0].y}
+            r={Math.max(SOCKET_SIZE, 12)}
+            onPointerDown={onSocketPointerDown}
+            onPointerUp={onSocketPointerUp}
+          />
+        </g>
+      )}
     </NodeFrame>
   );
 }

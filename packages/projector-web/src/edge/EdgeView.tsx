@@ -14,7 +14,6 @@ import { useTrama } from '../store/index.js';
 import { shapeRegistry } from '../store/registries.js';
 import { getNodeLayout } from '../node/box.js';
 import { resolveDisplayMode } from '../node/display-mode.js';
-import { getConditionNodeLayout } from '../node/condition-box.js';
 import { slotColor } from '../node/slot-palette.js';
 import { useExpressionMeasureStore } from '../expression/expression-measure-store.js';
 import type { FizzexMeasure } from '../expression/use-fizzex-renderer.js';
@@ -428,10 +427,6 @@ function rightOutputSocket(
   _sourceSlotIndex?: number,
   measure?: FizzexMeasure,
 ): Point {
-  if (isConditionNode(node)) {
-    const s = getConditionNodeLayout().outputSocket;
-    return { x: s.x, y: s.y };
-  }
   const layout = getNodeLayout(node, {
     incomingCount: fromIncomingCount,
     expressionSize: measure,
@@ -447,10 +442,6 @@ function leftInputSocket(
   socketIndex: number,
   measure?: FizzexMeasure,
 ): Point {
-  if (isConditionNode(node)) {
-    const s = getConditionNodeLayout().inputSocket;
-    return { x: s.x, y: s.y };
-  }
   const layout = getNodeLayout(node, {
     incomingCount: toIncomingCount,
     expressionSize: measure,

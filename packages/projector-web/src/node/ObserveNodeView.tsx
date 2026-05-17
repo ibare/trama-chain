@@ -6,6 +6,7 @@ import { useNodeLayout } from './use-node-layout.js';
 import { resolveDisplayMode } from './display-mode.js';
 import { NodeBody } from './NodeBody.js';
 import { NodeFrame } from './NodeFrame.js';
+import { ModeToggle } from './ModeToggle.js';
 import { Socket } from './Socket.js';
 import { useOutputConnected } from './use-socket-connections.js';
 import { slotColor } from './slot-palette.js';
@@ -26,6 +27,7 @@ function ObserveNodeViewImpl({ id, incomingCount }: Props): JSX.Element | null {
   const node = modelStore((s) => s.model.nodes[id]);
   const samples = modelStore((s) => s.executionState.observeBuffers[id] ?? EMPTY_BUFFER);
   const current = modelStore((s) => s.executionState.values[id] ?? null);
+  const updateNode = modelStore((s) => s.updateNode);
   const outputConnected = useOutputConnected(id);
   const isSelected = uiStore(
     (s) => s.selection.kind === 'node' && s.selection.id === id,
@@ -66,12 +68,20 @@ function ObserveNodeViewImpl({ id, incomingCount }: Props): JSX.Element | null {
     openInspector(id);
   }, [id, openInspector, selectNode]);
 
+  const currentMode = node && isObserveNode(node) ? resolveDisplayMode(node) : 'standard';
+  const onToggleMode = useCallback(() => {
+    if (uiStore.getState().readOnly) return;
+    updateNode(id, {
+      displayMode: currentMode === 'compact' ? 'standard' : 'compact',
+    });
+  }, [currentMode, id, uiStore, updateNode]);
+
   if (!node) return null;
   if (!isObserveNode(node)) return null;
   if (!node.position) return null;
   if (!layout) return null;
 
-  const { width, height, labelY, textX, observeBody } = layout;
+  const { width, height, labelY, textX, observeBody, labelAnchor, panelCx, panelWidth, panelHeight, panelCy } = layout;
   const vis = getObserveVisualization(node.visualization);
   const Render = vis?.Render;
 
@@ -95,9 +105,9 @@ function ObserveNodeViewImpl({ id, incomingCount }: Props): JSX.Element | null {
 
       <text
         className="trama-node-label"
-        x={textX}
+        x={labelAnchor === 'middle' ? panelCx : textX}
         y={labelY}
-        textAnchor="start"
+        textAnchor={labelAnchor}
       >
         {node.label}
       </text>
@@ -151,6 +161,13 @@ function ObserveNodeViewImpl({ id, incomingCount }: Props): JSX.Element | null {
           />
         </>
       )}
+
+      <ModeToggle
+        panelRight={panelCx + panelWidth / 2}
+        panelTop={panelCy - panelHeight / 2}
+        mode={currentMode}
+        onToggle={onToggleMode}
+      />
     </NodeFrame>
   );
 }

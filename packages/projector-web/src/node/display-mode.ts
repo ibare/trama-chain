@@ -1,7 +1,9 @@
 import {
+  isConditionNode,
   isConstantNode,
   isGeneratorNode,
   isLogicGateNode,
+  isObserveNode,
   isValueNode,
   type Node,
 } from '@trama/core';
@@ -11,13 +13,7 @@ import type { NodeDisplayMode } from './box.js';
  * 노드 종류별 기본 디스플레이 모드 매핑.
  *
  * 기준: 패널 안에 "읽어야 할" 정보가 본질이면 standard, 도식 자체가 식별
- * 단서면 compact. 사용자 인스턴스 오버라이드(노드별 모드 변경 UI)는 후속
- * 작업에서 추가될 예정 — 현재는 이 함수가 단일 출처.
- *
- * `condition`은 별도 layout(`condition-box.ts`) 경유라 본 함수의 반환값이
- * 실제 box.ts 분기에 영향을 주지 않는다. 일관성을 위해 값은 반환하되
- * displayMode는 무시된다 — condition이 box.ts 분기를 타게 되면 이 매핑이
- * 비로소 의미를 갖는다.
+ * 단서면 compact. 사용자가 노드별로 ModeToggle로 오버라이드 가능.
  */
 export function getDefaultDisplayMode(node: Node): NodeDisplayMode {
   switch (node.kind) {
@@ -44,16 +40,18 @@ export function getDefaultDisplayMode(node: Node): NodeDisplayMode {
 /**
  * 인스턴스 오버라이드를 적용한 최종 디스플레이 모드.
  *
- * displayMode 필드를 가진 kind(value/constant/generator/logic-gate)는
- * 노드별로 mode를 영속화할 수 있다. 값이 비어 있으면 kind 기본을 따른다.
- * 그 외 kind는 오버라이드 의미가 없으므로 항상 기본을 반환한다.
+ * displayMode 필드를 가진 kind(value/constant/condition/generator/logic-gate/
+ * observe)는 노드별로 mode를 영속화할 수 있다. 값이 비어 있으면 kind 기본을
+ * 따른다. 그 외 kind는 오버라이드 의미가 없으므로 항상 기본을 반환한다.
  */
 export function resolveDisplayMode(node: Node): NodeDisplayMode {
   if (
     isValueNode(node) ||
     isConstantNode(node) ||
+    isConditionNode(node) ||
     isGeneratorNode(node) ||
-    isLogicGateNode(node)
+    isLogicGateNode(node) ||
+    isObserveNode(node)
   ) {
     if (node.displayMode) return node.displayMode;
   }
@@ -73,5 +71,11 @@ export function supportsDisplayModeToggle(node: Node): boolean {
       node.initialValue.kind === 'boolean' || node.initialValue.kind === 'numeric'
     );
   }
-  return isConstantNode(node) || isGeneratorNode(node) || isLogicGateNode(node);
+  return (
+    isConstantNode(node) ||
+    isConditionNode(node) ||
+    isGeneratorNode(node) ||
+    isLogicGateNode(node) ||
+    isObserveNode(node)
+  );
 }

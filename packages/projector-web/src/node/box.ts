@@ -1,5 +1,6 @@
 import { tokens } from '@trama/tokens';
 import {
+  isConditionNode,
   isExpressionNode,
   isGeneratorNode,
   isObserveNode,
@@ -265,8 +266,8 @@ function buildCompactLayout(
   compactOpts: CompactOpts,
 ): NodeLayout {
   const incomingCount = Math.max(0, opts.incomingCount);
-  // 입력 슬롯 수 — constant는 입력 없음, boolean ValueNode는 combiner 없는
-  // 단일 입력, generator는 단일 boolean gate, logic-gate는 N항(NOT만 1).
+  // 입력 슬롯 수 — constant는 입력 없음, boolean ValueNode·condition·observe·
+  // generator는 단일 입력, logic-gate는 N항(NOT만 1).
   const isConstant = node.kind === 'constant';
   const isLogicGate = node.kind === 'logic-gate';
   const isUnaryLogicGate = isLogicGate && node.operator === 'not';
@@ -338,6 +339,19 @@ function buildCompactLayout(
   const sliderY = outerControlSlot && isNumericValueNode ? outerControlSlot.cy : halfH;
   const combinerCenterY = hasCombiner && outerControlSlot ? outerControlSlot.cy : null;
 
+  // observe compact — 패널 안쪽 패딩만 두고 panel 전체를 시각화 슬롯으로 쓴다.
+  // standard에서 라벨이 차지했던 상단 공간이 외곽으로 빠졌으므로 시각화가 패널을
+  // 통째로 점유 가능.
+  const observeBody =
+    node.kind === 'observe'
+      ? {
+          x: -panelW / 2 + OBSERVE_BODY_INSET,
+          y: panelCy - panelH / 2 + OBSERVE_BODY_INSET,
+          w: panelW - OBSERVE_BODY_INSET * 2,
+          h: panelH - OBSERVE_BODY_INSET * 2,
+        }
+      : null;
+
   return {
     width: totalW,
     height: totalH,
@@ -358,7 +372,7 @@ function buildCompactLayout(
     rightPin,
     skinBorder: null,
     expressionBody: null,
-    observeBody: null,
+    observeBody,
     generatorBody,
     outerControlSlot,
   };
@@ -395,6 +409,12 @@ export function getNodeLayout(
       return buildCompactLayout(node, opts, { hasOuterControls: false });
     }
     if (node.kind === 'constant') {
+      return buildCompactLayout(node, opts, { hasOuterControls: false });
+    }
+    if (isConditionNode(node)) {
+      return buildCompactLayout(node, opts, { hasOuterControls: false });
+    }
+    if (isObserveNode(node)) {
       return buildCompactLayout(node, opts, { hasOuterControls: false });
     }
     // 위 외의 kind는 compact 사양이 정의되지 않았으므로 standard fallback.
@@ -501,6 +521,40 @@ export function getNodeLayout(
     };
   }
 
+  // ConditionNode standard — 1입력/1출력 게이트. 좌·우 중앙 단일 소켓.
+  // 패널 크기는 STANDARD_PANEL 그대로, 라벨은 상단 정렬(다른 standard 노드와 동일).
+  if (isConditionNode(node)) {
+    const halfW = STANDARD_PANEL.w / 2;
+    const halfH = STANDARD_PANEL.h / 2;
+    const cardTop = -halfH;
+    const leftPin = buildPin(-halfW, 0, 1);
+    const rightPin = buildPin(halfW, 0, 1);
+    return {
+      width: STANDARD_PANEL.w,
+      height: STANDARD_PANEL.h,
+      panelWidth: STANDARD_PANEL.w,
+      panelHeight: STANDARD_PANEL.h,
+      panelCx: 0,
+      panelCy: 0,
+      halfW,
+      halfH,
+      textX: -halfW + SIDE_INSET,
+      labelY: cardTop + NAME_FROM_TOP,
+      labelAnchor: 'start',
+      valueY: 0,
+      sliderY: halfH,
+      combinerCenterY: null,
+      hasCombiner: false,
+      leftPin,
+      rightPin,
+      skinBorder: null,
+      expressionBody: null,
+      observeBody: null,
+      generatorBody: null,
+      outerControlSlot: null,
+    };
+  }
+
   // ObserveNode — 본문은 시각화 슬롯. 단일 입력/단일 출력 핀.
   if (isObserveNode(node)) {
     const halfW = STANDARD_PANEL.w / 2;
@@ -580,9 +634,10 @@ export function getNodeLayout(
   }
 
   const incomingCount = Math.max(0, opts.incomingCount);
-  // 모든 standard 노드(Value/Constant/LogicGate/Condition)는 STANDARD_PANEL
-  // 사이즈를 공유한다. combiner 칩 유무·소켓 pin overflow 만 baseline 위에 *덧붙는*
-  // 형태로 높이를 늘린다 — 종류 자체가 폭·높이를 정하지 않는다.
+  // 모든 standard 노드(Value/Constant/LogicGate)는 STANDARD_PANEL 사이즈를
+  // 공유한다 (Condition/Observe/Generator는 각자 위 분기에서 처리). combiner 칩
+  // 유무·소켓 pin overflow 만 baseline 위에 *덧붙는* 형태로 높이를 늘린다 —
+  // 종류 자체가 폭·높이를 정하지 않는다.
   const isLogicGate = node.kind === 'logic-gate';
   // NOT 게이트는 단항 — 입력 슬롯이 항상 1로 고정.
   const isUnaryLogicGate = isLogicGate && node.operator === 'not';

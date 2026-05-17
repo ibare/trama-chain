@@ -77,6 +77,7 @@ export const ConditionNodeSchema = z.object({
   position: z.object({ x: z.number(), y: z.number() }).nullable(),
   isFocal: z.boolean(),
   description: z.string().nullable().optional(),
+  displayMode: NodeDisplayModeSchema.optional(),
 });
 
 export const LogicGateOperatorSchema = z.enum(['and', 'or', 'xor', 'not']);
@@ -106,6 +107,7 @@ export const ObserveNodeSchema = z.object({
   position: z.object({ x: z.number(), y: z.number() }).nullable(),
   isFocal: z.boolean(),
   description: z.string().nullable().optional(),
+  displayMode: NodeDisplayModeSchema.optional(),
 });
 
 export const ExpressionNodeSchema = z.object({

@@ -13,8 +13,8 @@ export type EdgeLag = 0 | 1;
  * 분리한다. 각 kind에는 기본 모드가 있고, 노드 인스턴스에서 이 필드로
  * 오버라이드한다. 비어 있으면 기본 모드를 따른다.
  *
- * compact spec이 정의된 kind(value-boolean / constant / generator / logic-gate)
- * 에서만 의미가 있고, 다른 kind는 무시된다.
+ * compact spec이 정의된 kind(value-boolean / constant / condition / generator /
+ * logic-gate / observe)에서만 의미가 있고, 다른 kind는 무시된다.
  */
 export type NodeDisplayMode = 'standard' | 'compact';
 
@@ -96,6 +96,8 @@ export interface ConditionNode {
   position: { x: number; y: number } | null;
   isFocal: boolean;
   description?: string | null;
+  /** 디스플레이 모드 인스턴스 오버라이드. 비어 있으면 kind 기본을 따른다. */
+  displayMode?: NodeDisplayMode;
 }
 
 /**
@@ -180,6 +182,8 @@ export interface ObserveNode {
   position: { x: number; y: number } | null;
   isFocal: boolean;
   description?: string | null;
+  /** 디스플레이 모드 인스턴스 오버라이드. 비어 있으면 kind 기본을 따른다. */
+  displayMode?: NodeDisplayMode;
 }
 
 /**
