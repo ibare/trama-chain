@@ -1,6 +1,5 @@
 import { create, type StoreApi, type UseBoundStore } from 'zustand';
 import {
-  addComparisonNode as addComparisonNodeOp,
   addConditionNode as addConditionNodeOp,
   addLogicGateNode as addLogicGateNodeOp,
   addObserveNode as addObserveNodeOp,
@@ -32,7 +31,6 @@ import {
   updateNode as updateNodeOp,
 } from '@trama/core';
 import type {
-  AddComparisonNodeInput,
   AddConditionNodeInput,
   AddConstantNodeInput,
   AddLogicGateNodeInput,
@@ -79,7 +77,6 @@ export interface ModelStore {
   addNode: (input: AddValueNodeInput) => Node;
   addConstantNode: (input: AddConstantNodeInput) => Node;
   addConditionNode: (input: AddConditionNodeInput) => Node;
-  addComparisonNode: (input: AddComparisonNodeInput) => Node;
   addLogicGateNode: (input: AddLogicGateNodeInput) => Node;
   addObserveNode: (input: AddObserveNodeInput) => Node;
   addExpressionNode: (input: AddExpressionNodeInput) => Node;
@@ -579,16 +576,6 @@ export function createModelStore({
     addConditionNode: (input) => {
       const s = get();
       const after = addConditionNodeOp(s.model, input);
-      const newId = after.nodeOrder[after.nodeOrder.length - 1]!;
-      const node = after.nodes[newId]!;
-      const exec = computeExecutionState(after, s.executionState);
-      set({ model: after, ...exec });
-      return node;
-    },
-
-    addComparisonNode: (input) => {
-      const s = get();
-      const after = addComparisonNodeOp(s.model, input);
       const newId = after.nodeOrder[after.nodeOrder.length - 1]!;
       const node = after.nodes[newId]!;
       const exec = computeExecutionState(after, s.executionState);

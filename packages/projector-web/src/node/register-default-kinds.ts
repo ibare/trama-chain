@@ -4,7 +4,6 @@ import { constantRegistry } from '../store/registries.js';
 import { ValueNodeView } from './ValueNodeView.js';
 import { ConstantNodeView } from './ConstantNodeView.js';
 import { ConditionNodeView } from './ConditionNodeView.js';
-import { ComparisonNodeView } from './ComparisonNodeView.js';
 import { LogicGateNodeView } from './LogicGateNodeView.js';
 import { ExpressionNodeView } from './ExpressionNodeView.js';
 import { GeneratorNodeView } from './GeneratorNodeView.js';
@@ -83,31 +82,6 @@ registerNodeKindUI({
         const addConditionNode = instance.modelStore.getState().addConditionNode;
         const node = addConditionNode({
           label: '조건',
-          operator: '>',
-          threshold: 0,
-          position: canvasPos,
-        });
-        return node.id;
-      },
-    },
-  ],
-});
-
-registerNodeKindUI({
-  kind: 'comparison',
-  menuSectionLabel: '노드',
-  menuSectionOrder: 12,
-  View: ComparisonNodeView,
-  buildMenuItems: (instance) => [
-    {
-      key: 'comparison',
-      label: '비교 노드',
-      symbol: '⊤?',
-      createNode: (canvasPos) => {
-        const addComparisonNode =
-          instance.modelStore.getState().addComparisonNode;
-        const node = addComparisonNode({
-          label: '비교',
           operator: '>',
           threshold: 0,
           position: canvasPos,

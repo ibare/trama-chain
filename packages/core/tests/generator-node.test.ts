@@ -1,6 +1,5 @@
 import { describe, expect, it } from 'vitest';
 import {
-  addComparisonNode,
   addConstantNode,
   addEdge,
   addGeneratorNode,
@@ -368,26 +367,6 @@ describe('GeneratorNode — boolean gate input', () => {
     const beforeValue = state.values['g'];
     state = step(state, m);
     expect(state.values['g']).toEqual(beforeValue);
-    state = step(state, m);
-    expect(state.values['g']).toEqual(beforeValue);
-  });
-
-  it('input source invalid → freeze', () => {
-    // ComparisonNode는 입력이 없으면 출력이 invalid — generator는 그 invalid source를 보고 freeze.
-    let m = createEmptyModel(0);
-    m = addComparisonNode(m, { id: 'cmp', label: 'cmp', operator: '>', threshold: 0 }, 0);
-    m = addGeneratorNode(m, { id: 'g', label: 'gen' }, 0);
-    m = addEdge(m, { from: 'cmp', to: 'g', shape: { kind: 'none', params: {} } }, 0);
-
-    let state = initializeFromInitialValues(m);
-    state = {
-      ...state,
-      generatorRuntime: {
-        ...state.generatorRuntime,
-        g: { ...state.generatorRuntime['g']!, enabled: true },
-      },
-    };
-    const beforeValue = state.values['g'];
     state = step(state, m);
     expect(state.values['g']).toEqual(beforeValue);
   });

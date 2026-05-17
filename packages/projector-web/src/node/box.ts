@@ -11,7 +11,7 @@ import {
  * 모드별 패널 기준 사이즈 — 노드 *종류*가 아니라 *모드*가 크기를 정한다.
  *
  * - STANDARD_PANEL: 숫자값 노드 기준. 모든 standard 노드(Value/Constant/LogicGate/
- *   Comparison/Condition/Generator/Observe)가 이 사이즈를 공유한다.
+ *   Condition/Generator/Observe)가 이 사이즈를 공유한다.
  * - COMPACT_PANEL: 생성기 노드 기준. 모든 compact 노드가 이 패널을 공유한다.
  *
  * 콘텐츠 demand(콤바이너 칩·socket pin overflow)는 이 baseline 위에 *덧붙는*
@@ -96,7 +96,7 @@ const SKIN_LAYOUTS: Record<string, SkinLayoutSpec> = {
   },
 };
 const COMBINER_ADD_H = 44;
-const NAME_FROM_TOP = 28;
+export const NAME_FROM_TOP = 28;
 const VALUE_FROM_TOP = 78;
 const COMBINER_CENTER_FROM_TOP = 156;
 const TRACK_FROM_BOTTOM = 24;
@@ -580,7 +580,7 @@ export function getNodeLayout(
   }
 
   const incomingCount = Math.max(0, opts.incomingCount);
-  // 모든 standard 노드(Value/Constant/LogicGate/Comparison/Condition)는 STANDARD_PANEL
+  // 모든 standard 노드(Value/Constant/LogicGate/Condition)는 STANDARD_PANEL
   // 사이즈를 공유한다. combiner 칩 유무·소켓 pin overflow 만 baseline 위에 *덧붙는*
   // 형태로 높이를 늘린다 — 종류 자체가 폭·높이를 정하지 않는다.
   const isLogicGate = node.kind === 'logic-gate';

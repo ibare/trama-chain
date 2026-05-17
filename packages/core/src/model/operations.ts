@@ -1,5 +1,4 @@
 import type {
-  ComparisonNode,
   ConditionNode,
   ConditionOperator,
   ConstantNode,
@@ -176,43 +175,6 @@ export function addConditionNode(
   const id = input.id ?? makeNodeId();
   const node: ConditionNode = {
     kind: 'condition',
-    id,
-    label: input.label,
-    operator: input.operator ?? '>',
-    threshold: input.threshold ?? 0,
-    position: input.position ?? null,
-    isFocal: input.isFocal ?? false,
-    description: input.description ?? null,
-  };
-  return touch(
-    {
-      ...model,
-      nodes: { ...model.nodes, [id]: node },
-      nodeOrder: [...model.nodeOrder, id],
-    },
-    now,
-  );
-}
-
-export interface AddComparisonNodeInput {
-  label: string;
-  operator?: ConditionOperator;
-  /** 비교 임계값. 입력 단위의 raw 수치로 해석된다. */
-  threshold?: number;
-  position?: { x: number; y: number } | null;
-  isFocal?: boolean;
-  description?: string | null;
-  id?: NodeId;
-}
-
-export function addComparisonNode(
-  model: Model,
-  input: AddComparisonNodeInput,
-  now?: number,
-): Model {
-  const id = input.id ?? makeNodeId();
-  const node: ComparisonNode = {
-    kind: 'comparison',
     id,
     label: input.label,
     operator: input.operator ?? '>',

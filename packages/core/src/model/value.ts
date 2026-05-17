@@ -5,7 +5,7 @@
  * 이 sum type을 통과한다. 단위(unit)는 numeric Value 안에 종속된다 —
  * "단위"는 연속/이산 수치의 의미론이지 boolean·enum과 무관하다.
  *
- * 자동 변환 없음: numeric↔boolean coercion은 명시적 노드(예: Comparison)로만.
+ * 자동 변환 없음: numeric↔boolean coercion은 명시적 노드로만.
  */
 
 export type ValueKind = Value['kind'];

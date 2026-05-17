@@ -1,5 +1,4 @@
 import type {
-  TramaComparisonNode,
   TramaConditionNode,
   TramaConstantNode,
   TramaDocument,
@@ -47,17 +46,6 @@ const CONSTANT_NODE_KEY_ORDER: (keyof TramaConstantNode)[] = [
 ];
 
 const CONDITION_NODE_KEY_ORDER: (keyof TramaConditionNode)[] = [
-  'kind',
-  'id',
-  'label',
-  'operator',
-  'threshold',
-  'position',
-  'isFocal',
-  'description',
-];
-
-const COMPARISON_NODE_KEY_ORDER: (keyof TramaComparisonNode)[] = [
   'kind',
   'id',
   'label',
@@ -146,7 +134,6 @@ function orderNode(n: TramaNode): TramaNode {
   if (n.kind === 'value') return orderObject(n, VALUE_NODE_KEY_ORDER);
   if (n.kind === 'constant') return orderObject(n, CONSTANT_NODE_KEY_ORDER);
   if (n.kind === 'condition') return orderObject(n, CONDITION_NODE_KEY_ORDER);
-  if (n.kind === 'comparison') return orderObject(n, COMPARISON_NODE_KEY_ORDER);
   if (n.kind === 'logic-gate') return orderObject(n, LOGIC_GATE_NODE_KEY_ORDER);
   if (n.kind === 'observe') return orderObject(n, OBSERVE_NODE_KEY_ORDER);
   if (n.kind === 'generator') return orderObject(n, GENERATOR_NODE_KEY_ORDER);

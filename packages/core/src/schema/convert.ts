@@ -1,5 +1,4 @@
 import type {
-  ComparisonNode,
   ConditionNode,
   ConstantNode,
   Edge,
@@ -12,7 +11,6 @@ import type {
   ValueNode,
 } from '../model/index.js';
 import {
-  isComparisonNode,
   isConditionNode,
   isConstantNode,
   isExpressionNode,
@@ -22,7 +20,6 @@ import {
   isValueNode,
 } from '../model/index.js';
 import type {
-  TramaComparisonNode,
   TramaConditionNode,
   TramaConstantNode,
   TramaDocument,
@@ -89,19 +86,6 @@ function nodeToDoc(n: Node): TramaNode {
   if (isConditionNode(n)) {
     const doc: TramaConditionNode = {
       kind: 'condition',
-      id: n.id,
-      label: n.label,
-      operator: n.operator,
-      threshold: n.threshold,
-      position: n.position,
-      isFocal: n.isFocal,
-      description: n.description ?? null,
-    };
-    return doc;
-  }
-  if (isComparisonNode(n)) {
-    const doc: TramaComparisonNode = {
-      kind: 'comparison',
       id: n.id,
       label: n.label,
       operator: n.operator,
@@ -211,18 +195,6 @@ export function documentToModel(doc: TramaDocument): Model {
     } else if (n.kind === 'condition') {
       const node: ConditionNode = {
         kind: 'condition',
-        id: n.id,
-        label: n.label,
-        operator: n.operator,
-        threshold: n.threshold,
-        position: n.position,
-        isFocal: n.isFocal,
-        description: n.description ?? null,
-      };
-      nodes[n.id] = node;
-    } else if (n.kind === 'comparison') {
-      const node: ComparisonNode = {
-        kind: 'comparison',
         id: n.id,
         label: n.label,
         operator: n.operator,

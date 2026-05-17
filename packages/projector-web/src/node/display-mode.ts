@@ -14,10 +14,10 @@ import type { NodeDisplayMode } from './box.js';
  * 단서면 compact. 사용자 인스턴스 오버라이드(노드별 모드 변경 UI)는 후속
  * 작업에서 추가될 예정 — 현재는 이 함수가 단일 출처.
  *
- * `condition` / `comparison`은 별도 layout(`condition-box.ts`) 경유라 본 함수의
- * 반환값이 실제 box.ts 분기에 영향을 주지 않는다. 일관성을 위해 값은 반환하되
- * displayMode는 무시된다 — condition/comparison이 box.ts 분기를 타게 되면
- * 이 매핑이 비로소 의미를 갖는다.
+ * `condition`은 별도 layout(`condition-box.ts`) 경유라 본 함수의 반환값이
+ * 실제 box.ts 분기에 영향을 주지 않는다. 일관성을 위해 값은 반환하되
+ * displayMode는 무시된다 — condition이 box.ts 분기를 타게 되면 이 매핑이
+ * 비로소 의미를 갖는다.
  */
 export function getDefaultDisplayMode(node: Node): NodeDisplayMode {
   switch (node.kind) {
@@ -33,7 +33,6 @@ export function getDefaultDisplayMode(node: Node): NodeDisplayMode {
     case 'logic-gate':
       return 'compact';
     case 'condition':
-    case 'comparison':
       return 'standard';
     default: {
       const _exhaustive: never = node;

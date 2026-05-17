@@ -79,7 +79,6 @@ function ConditionNodeViewImpl({ id }: Props): JSX.Element | null {
   const posX = node?.position?.x ?? 0;
   const posY = node?.position?.y ?? 0;
   const layout = getConditionNodeLayout();
-  const { halfH } = layout;
 
   useEffect(() => {
     return socketRegistry.register({
@@ -245,7 +244,7 @@ function ConditionNodeViewImpl({ id }: Props): JSX.Element | null {
       <NodeLabel
         text={node.label || '조건'}
         x={0}
-        y={halfH - 8}
+        y={layout.labelY}
         width={CARD_W - 24}
         textAnchor="middle"
         isEditing={editTarget === 'label'}
