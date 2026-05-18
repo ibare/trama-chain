@@ -2,7 +2,6 @@ import { memo, useCallback, useEffect } from 'react';
 import { tokens } from '@trama/tokens';
 import {
   isAverageNode,
-  isNumericValue,
   isSequence,
   outputKey,
   resolveScalar,
@@ -37,10 +36,14 @@ function formatAverage(v: number): string {
 function AverageNodeViewImpl({ id, incomingCount }: Props): JSX.Element | null {
   const { modelStore, uiStore, socketRegistry } = useTrama();
   const node = modelStore((s) => s.model.nodes[id]);
-  const currentValue = modelStore((s) => {
+  // FunctionHandle.peek 은 매 호출 새 Value 객체를 반환하므로 selector 가 객체를 그대로
+  // 흘리면 useSyncExternalStore 가 한 render 내 두 getSnapshot 비교에서 무한 루프를 감지한다.
+  // 표시용 수치만 필요하므로 primitive 로 환원해 안정화.
+  const currentNumber = modelStore((s) => {
     const ev = s.executionState.values[id];
     if (ev === undefined || isSequence(ev)) return null;
-    return unwrap(resolveScalar(ev, s.executionState.simulationTimeMs));
+    const v = unwrap(resolveScalar(ev, s.executionState.simulationTimeMs));
+    return v.kind === 'numeric' ? v.n : null;
   });
   const isValid = modelStore((s) =>
     s.executionState.validOutputs.has(outputKey(id, 0)),
@@ -100,9 +103,7 @@ function AverageNodeViewImpl({ id, incomingCount }: Props): JSX.Element | null {
   const stateClass = isValid ? 'is-focal' : 'is-calm';
 
   const valueText =
-    isValid && currentValue && isNumericValue(currentValue)
-      ? formatAverage(currentValue.n)
-      : '—';
+    isValid && currentNumber !== null ? formatAverage(currentNumber) : '—';
 
   const showModeToggle = supportsDisplayModeToggle(node);
 

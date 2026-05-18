@@ -1,14 +1,17 @@
 import { memo, useCallback, useEffect, useMemo } from 'react';
 import { tokens } from '@trama/tokens';
 import {
+  booleanValue,
   isObserveNode,
   isSequence,
+  numericValue,
   observeBufferToArray,
   outputKey,
   resolveScalar,
   unwrap,
   type NodeId,
   type ObserveBuffer,
+  type Value,
 } from '@trama/core';
 import type { SequenceSample } from '@trama/core';
 import { useTrama } from '../store/index.js';
@@ -45,12 +48,34 @@ function ObserveNodeViewImpl({ id, incomingCount }: Props): JSX.Element | null {
     [buffer],
   );
   // 누적 버퍼는 Value[] 그대로지만 current 는 ExecValue 가 들어올 수 있다 —
-  // 시각화는 alue 만 보면 충분하므로 unwrap 후 노출.
-  const current = modelStore((s) => {
+  // 시각화는 alue 만 보면 충분하므로 unwrap 후 노출. FunctionHandle.peek 은 매 호출
+  // 새 Value 객체를 만들기에 selector 가 객체를 그대로 흘리면 useSyncExternalStore 가
+  // 무한 update 루프를 감지한다. selector 는 primitive(kind + 원시값)만 반환하고
+  // Value 객체는 useMemo 로 재구성.
+  const currentKind = modelStore((s) => {
     const ev = s.executionState.values[id];
     if (ev === undefined || isSequence(ev)) return null;
-    return unwrap(resolveScalar(ev, s.executionState.simulationTimeMs));
+    return unwrap(resolveScalar(ev, s.executionState.simulationTimeMs)).kind;
   });
+  const currentNumber = modelStore((s) => {
+    const ev = s.executionState.values[id];
+    if (ev === undefined || isSequence(ev)) return null;
+    const v = unwrap(resolveScalar(ev, s.executionState.simulationTimeMs));
+    return v.kind === 'numeric' ? v.n : null;
+  });
+  const currentBoolean = modelStore((s) => {
+    const ev = s.executionState.values[id];
+    if (ev === undefined || isSequence(ev)) return null;
+    const v = unwrap(resolveScalar(ev, s.executionState.simulationTimeMs));
+    return v.kind === 'boolean' ? v.b : null;
+  });
+  const current = useMemo<Value | null>(() => {
+    if (currentKind === 'numeric' && currentNumber !== null)
+      return numericValue(currentNumber, 'free');
+    if (currentKind === 'boolean' && currentBoolean !== null)
+      return booleanValue(currentBoolean);
+    return null;
+  }, [currentKind, currentNumber, currentBoolean]);
   const updateNode = modelStore((s) => s.updateNode);
   const outputConnected = useOutputConnected(id, 0);
   const extractionConnected = useOutputConnected(id, 1);

@@ -2,7 +2,6 @@ import { memo, useCallback, useEffect } from 'react';
 import { tokens } from '@trama/tokens';
 import {
   isGeneratorNode,
-  isNumericValue,
   isSequence,
   resolveScalar,
   unwrap,
@@ -47,11 +46,14 @@ function GeneratorNodeViewImpl({ id, incomingCount }: Props): JSX.Element | null
   const enabled = modelStore(
     (s) => s.executionState.generatorRuntime[id]?.enabled ?? false,
   );
-  // executionState.values 는 ExecValue — UI 표시는 alue 만 필요하므로 selector 에서 unwrap.
-  const currentValue = modelStore((s) => {
+  // FunctionHandle.peek 은 매 호출 새 Value 객체를 만든다. selector 가 객체를 반환하면
+  // zustand useSyncExternalStore 가 한 render 에서 두 번의 getSnapshot 결과를 다르게 보고
+  // 무한 update 루프를 띄운다. UI 는 수치 표시만 필요하므로 primitive 로 환원한다.
+  const currentNumber = modelStore((s) => {
     const ev = s.executionState.values[id];
     if (ev === undefined || isSequence(ev)) return null;
-    return unwrap(resolveScalar(ev, s.executionState.simulationTimeMs));
+    const v = unwrap(resolveScalar(ev, s.executionState.simulationTimeMs));
+    return v.kind === 'numeric' ? v.n : null;
   });
   const setGeneratorEnabled = modelStore((s) => s.setGeneratorEnabled);
   const resetGenerator = modelStore((s) => s.resetGenerator);
@@ -119,9 +121,7 @@ function GeneratorNodeViewImpl({ id, incomingCount }: Props): JSX.Element | null
   const stateClass = enabled ? 'is-focal' : 'is-calm';
 
   const valueText =
-    currentValue && isNumericValue(currentValue)
-      ? formatGeneratorValue(currentValue.n)
-      : '—';
+    currentNumber !== null ? formatGeneratorValue(currentNumber) : '—';
 
   // 원형 토글 ▶/⏸ + ↺ 리셋 2버튼을 가로로 배치 — body 영역 중앙 정렬.
   // 미니플레이어와 동일 결: 재생/정지는 한 자리에서 글리프만 토글.
