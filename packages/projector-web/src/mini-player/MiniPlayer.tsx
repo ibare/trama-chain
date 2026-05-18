@@ -1,4 +1,3 @@
-import * as Popover from '@radix-ui/react-popover';
 import { useTrama } from '../store/trama-instance.js';
 import { PhosphorIcon } from '../icon/phosphor.js';
 
@@ -11,9 +10,11 @@ import { PhosphorIcon } from '../icon/phosphor.js';
  *   비움. 모델(노드/엣지/initialValue)은 보존.
  * - 시뮬레이션 시간(mm:ss.s) — `executionState.simulationTimeMs` 직접 표시.
  *   ticker가 step마다 갱신.
- * - 속도 프리셋(0.2×/0.5×/1×/1.5×): 현재 배속을 보여주는 단일 pill을 누르면 세로 메뉴.
- *   값은 [[time-settings]]의 `stepSpeedMultiplier`로 들어가고 model-store가 ticker·playback에
- *   반영한다. 펄스 travel은 별개의 시각 효과라 영향받지 않는다.
+ * - 속도 프리셋(0.2×/0.5×/1×/1.5×): 현재 배속 pill을 누르면 다음 프리셋으로 순환
+ *   (wraparound). 우상단 부동이라 위쪽 공간이 부족해서 메뉴/popover 형태가 잘리는
+ *   문제를 구조적으로 회피. 값은 [[time-settings]]의 `stepSpeedMultiplier`로 들어가고
+ *   model-store가 ticker·playback에 반영한다. 펄스 travel은 별개의 시각 효과라
+ *   영향받지 않는다.
  *
  * 음악 미니 플레이어 결로 디자인 — 앞으로 다른 전역 컨트롤(시드 재설정·loop 모드 등)이
  * 들어올 수 있도록 패널 자체가 한 가족.
@@ -25,6 +26,12 @@ function formatSimulationTime(ms: number): string {
   const minutes = Math.floor(total / 60_000);
   const seconds = (total % 60_000) / 1000;
   return `${minutes}:${seconds.toFixed(1).padStart(4, '0')}`;
+}
+
+function nextPreset(current: number): number {
+  const idx = SPEED_PRESETS.findIndex((p) => Math.abs(p - current) < 1e-9);
+  const nextIdx = idx >= 0 ? (idx + 1) % SPEED_PRESETS.length : 0;
+  return SPEED_PRESETS[nextIdx] as number;
 }
 
 export function MiniPlayer(): JSX.Element {
@@ -59,41 +66,15 @@ export function MiniPlayer(): JSX.Element {
       <span className="trama-mini-player-time" aria-label="시뮬레이션 시간">
         {formatSimulationTime(simulationTimeMs)}
       </span>
-      <Popover.Root>
-        <Popover.Trigger asChild>
-          <button
-            type="button"
-            className="trama-mini-player-speed-trigger"
-            aria-label="재생 속도"
-          >
-            {multiplier}×
-          </button>
-        </Popover.Trigger>
-        <Popover.Content
-          side="bottom"
-          align="center"
-          sideOffset={8}
-          collisionPadding={8}
-          className="trama-popover trama-mini-player-speed-popover"
-        >
-          {SPEED_PRESETS.map((p) => {
-            const active = Math.abs(p - multiplier) < 1e-9;
-            return (
-              <Popover.Close key={p} asChild>
-                <button
-                  type="button"
-                  className="trama-mini-player-speed-item"
-                  data-state={active ? 'on' : 'off'}
-                  onClick={() => setMultiplier(p)}
-                  aria-label={`${p}배속`}
-                >
-                  {p}×
-                </button>
-              </Popover.Close>
-            );
-          })}
-        </Popover.Content>
-      </Popover.Root>
+      <button
+        type="button"
+        className="trama-mini-player-speed-trigger"
+        onClick={() => setMultiplier(nextPreset(multiplier))}
+        title="재생 속도 (클릭으로 다음 프리셋)"
+        aria-label={`재생 속도 ${multiplier}배. 클릭하면 다음 프리셋으로 변경.`}
+      >
+        {multiplier}×
+      </button>
     </div>
   );
 }

@@ -1011,45 +1011,8 @@
   transition: background var(--motion-duration-fade-in) var(--motion-easing-fade-natural);
 }
 
-[data-trama-root] .trama-mini-player-speed-trigger:hover,
-[data-trama-root] .trama-mini-player-speed-trigger[data-state="open"] {
+[data-trama-root] .trama-mini-player-speed-trigger:hover {
   background: var(--color-node-fill-calm);
-}
-
-[data-trama-root] .trama-mini-player-speed-popover {
-  display: flex;
-  flex-direction: column;
-  gap: 2px;
-  padding: 4px;
-}
-
-[data-trama-root] .trama-mini-player-speed-item {
-  appearance: none;
-  background: transparent;
-  border: 1px solid transparent;
-  border-radius: var(--spacing-radius-pill);
-  padding: 4px 14px;
-  min-width: 56px;
-  text-align: center;
-  font-family: inherit;
-  font-size: var(--typography-text-picker-label);
-  font-variant-numeric: tabular-nums;
-  cursor: pointer;
-  color: var(--color-text-hint);
-  transition:
-    background var(--motion-duration-fade-in) var(--motion-easing-fade-natural),
-    color var(--motion-duration-fade-in) var(--motion-easing-fade-natural);
-}
-
-[data-trama-root] .trama-mini-player-speed-item:hover {
-  background: var(--color-node-fill-calm);
-  color: var(--color-node-text-primary);
-}
-
-[data-trama-root] .trama-mini-player-speed-item[data-state="on"] {
-  background: var(--color-node-fill-focal);
-  border-color: var(--color-node-stroke-calm);
-  color: var(--color-node-text-primary);
 }
 
 /* Question header */
