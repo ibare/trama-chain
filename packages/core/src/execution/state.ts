@@ -7,7 +7,7 @@ import {
 } from '../generators/index.js';
 import type { EvalDiagnosis } from './expression-evaluator.js';
 import type { ExecValue, SequenceSample, SequenceValue } from './exec-value.js';
-import { isSequence, unwrap } from './exec-value.js';
+import { isSequence, resolveScalar, unwrap } from './exec-value.js';
 import {
   defaultNodeKindRegistry,
   type NodeKindRegistry,
@@ -159,14 +159,14 @@ export function initializeFromInitialValues(
 export function getNodeValue(state: ExecutionState, id: NodeId): Value | undefined {
   const ev = state.values[id];
   if (ev === undefined || isSequence(ev)) return undefined;
-  return unwrap(ev);
+  return unwrap(resolveScalar(ev, state.simulationTimeMs));
 }
 
 /** 노드의 numeric 값. boolean Value·sequence·미기록이면 undefined. wrapped 자동 unwrap. */
 export function getNumericValue(state: ExecutionState, id: NodeId): number | undefined {
   const ev = state.values[id];
   if (!ev || isSequence(ev)) return undefined;
-  const v = unwrap(ev);
+  const v = unwrap(resolveScalar(ev, state.simulationTimeMs));
   if (v.kind !== 'numeric') return undefined;
   return v.n;
 }

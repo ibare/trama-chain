@@ -9,6 +9,7 @@ import {
   isSequence,
   isValueNode,
   normalize,
+  resolveScalar,
   unwrap,
   type EdgeId,
   type Node,
@@ -92,7 +93,7 @@ function EdgeViewImpl({
       n && isValueNode(n) && isNumericValue(n.initialValue) ? n.initialValue.n : 0;
     const ev = s.executionState.values[fromId];
     if (ev && !isSequence(ev)) {
-      const v = unwrap(ev);
+      const v = unwrap(resolveScalar(ev, s.executionState.simulationTimeMs));
       if (isNumericValue(v)) return v.n;
     }
     return fallback;

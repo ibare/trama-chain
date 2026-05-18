@@ -1,4 +1,5 @@
 import { numericValue } from '../model/index.js';
+import { functionHandle } from '../execution/exec-value.js';
 import type { GeneratorParadigm } from './types.js';
 
 /**
@@ -9,6 +10,13 @@ import type { GeneratorParadigm } from './types.js';
  * 외부 throttle도 없어 propagate가 호출되는 모든 시점에서 매끄러운 곡선을
  * 그린다. 시각화는 이 paradigm의 outputInterpolation: 'continuous'를 보고
  * stroke 색온도·opacity·width를 매 frame 변조할 수 있다.
+ *
+ * **FunctionHandle**: emit·peek는 즉시 값이 아니라 `peek(t)` closure를 담은
+ * FunctionHandle을 반환한다. 다운스트림은 두 가지 방식으로 환원한다:
+ *  - 로직 노드(ValueNode·Expression·Combiner 등): `resolveScalar(ev, t)`로
+ *    그 propagate 시점의 값을 한 번 추출해 ScalarExec로 환원해 사용.
+ *  - 시각 노드(EdgeView 등): 같은 핸들을 ticker 안에서 sub-frame t로 다시 peek해
+ *    부드러운 modulation을 그린다. peek는 결정적·부작용 없음.
  *
  * params:
  * - amplitude (A): 신호 진폭
@@ -32,12 +40,12 @@ export const sineParadigm: GeneratorParadigm<
   kind: 'sine',
   outputInterpolation: 'continuous',
   initCursor: () => ({ kind: 'sine' }),
-  emit: (params, _cursor, simulationTimeMs) => ({
-    value: numericValue(sampleAt(params, simulationTimeMs), 'free'),
+  emit: (params) => ({
+    value: functionHandle((t) => numericValue(sampleAt(params, t), 'free')),
     nextCursor: { kind: 'sine' },
   }),
-  peek: (params, _cursor, simulationTimeMs) =>
-    numericValue(sampleAt(params, simulationTimeMs), 'free'),
+  peek: (params) =>
+    functionHandle((t) => numericValue(sampleAt(params, t), 'free')),
 };
 
 /** y(t) — t는 simulationTimeMs(ms). omega는 rad/s이므로 t/1000으로 환산. */

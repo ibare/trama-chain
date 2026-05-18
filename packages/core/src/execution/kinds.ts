@@ -23,6 +23,7 @@ import type { EvalDiagnosis, ExpressionEvaluator } from './expression-evaluator.
 import {
   asBooleanGate,
   isSequence,
+  resolveScalar,
   unwrap,
   wrap,
   type ExecValue,
@@ -54,7 +55,7 @@ function getNumericNext(ctx: PropagateContext, id: NodeId): number | undefined {
   const ev = ctx.next[id];
   if (ev) {
     if (isSequence(ev)) return undefined;
-    const v = unwrap(ev);
+    const v = unwrap(resolveScalar(ev, ctx.simulationTimeMs));
     if (v.kind === 'numeric') return v.n;
     return undefined;
   }
@@ -67,14 +68,15 @@ function getNumericNext(ctx: PropagateContext, id: NodeId): number | undefined {
 
 /**
  * boolean Value 버전. boolean ValueNode propagate가 사용.
- * WrappedValue 면 알맹이 Value 로 unwrap 후 분기.
+ * WrappedValue 면 알맹이 Value 로 unwrap 후 분기. FunctionHandle은 ctx 시각의
+ * peek로 환원 후 동일 분기.
  * source가 numeric이면 undefined — PortType 검사가 막아야 하지만 안전망.
  */
 function getBooleanNext(ctx: PropagateContext, id: NodeId): boolean | undefined {
   const ev = ctx.next[id];
   if (ev) {
     if (isSequence(ev)) return undefined;
-    const v = unwrap(ev);
+    const v = unwrap(resolveScalar(ev, ctx.simulationTimeMs));
     if (v.kind === 'boolean') return v.b;
     return undefined;
   }
@@ -537,9 +539,12 @@ const conditionNodeDescriptor: NodeKindDescriptor<
       value = n;
       // valueObj 는 raw 알맹이 Value — wrapped 면 unwrap 후 단위만 보존.
       // sequence source 는 Condition 게이트가 다루지 않는다 (port-compat 차단).
+      // FunctionHandle 은 ctx 시각의 peek로 환원 후 일반 unwrap.
       const sourceEv = ctx.next[edge.from];
       const sourceVal =
-        sourceEv && !isSequence(sourceEv) ? unwrap(sourceEv) : undefined;
+        sourceEv && !isSequence(sourceEv)
+          ? unwrap(resolveScalar(sourceEv, ctx.simulationTimeMs))
+          : undefined;
       valueObj = sourceVal ?? (isValueNode(source) ? source.initialValue : undefined);
       break;
     }
@@ -644,10 +649,11 @@ const expressionNodeDescriptor: NodeKindDescriptor<
       if (!isEdgeSourceValid(ctx, edge)) continue;
       // 식 평가는 메타 인식이 아니다 — wrapped 면 알맹이 Value 로 unwrap.
       // sequence 는 식 변수로 흘려보낼 수 없다 (port-compat 차단; 안전망).
+      // FunctionHandle 은 ctx 시각의 peek로 환원.
       const sourceEv = ctx.next[edge.from];
       const sourceV: Value | undefined =
         sourceEv && !isSequence(sourceEv)
-          ? unwrap(sourceEv)
+          ? unwrap(resolveScalar(sourceEv, ctx.simulationTimeMs))
           : isValueNode(source)
             ? source.initialValue
             : undefined;
@@ -860,12 +866,13 @@ const observeNodeDescriptor: NodeKindDescriptor<Extract<Node, { kind: 'observe' 
       return;
     }
     // ObserveNode 는 스칼라만 passthrough — sequence source 는 port-compat 단계의
-    // 별도 처리(차후 Phase) 대상. 안전망으로 무효 처리.
+    // 별도 처리(차후 Phase) 대상. 안전망으로 무효 처리. FunctionHandle 은 ctx
+    // 시각의 peek로 환원해 메타 없는 스칼라처럼 처리한다.
     if (isSequence(sourceEv)) {
       ctx.validOutputs.delete(outputKey(node.id, 0));
       return;
     }
-    const inner: Value = unwrap(sourceEv);
+    const inner: Value = unwrap(resolveScalar(sourceEv, ctx.simulationTimeMs));
     const innerOut: Value =
       edge.inverted && inner.kind === 'boolean'
         ? booleanValue(!inner.b)

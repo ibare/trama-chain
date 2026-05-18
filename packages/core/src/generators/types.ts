@@ -1,4 +1,5 @@
 import type { GeneratorParams, Value } from '../model/index.js';
+import type { FunctionHandle } from '../execution/exec-value.js';
 
 /**
  * 생성기 cursor — paradigm 안의 내부 상태. ExecutionState에 노드별로 보관되며
@@ -110,6 +111,10 @@ export interface GeneratorParadigm<
     params: P,
     cursor: C,
     simulationTimeMs: number,
-  ): { value: Value | undefined; nextCursor: C };
-  peek(params: P, cursor: C, simulationTimeMs: number): Value | undefined;
+  ): { value: Value | FunctionHandle | undefined; nextCursor: C };
+  peek(
+    params: P,
+    cursor: C,
+    simulationTimeMs: number,
+  ): Value | FunctionHandle | undefined;
 }

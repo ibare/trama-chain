@@ -10,6 +10,7 @@ import {
   normalize,
   parseTrama,
   propagateOneStep,
+  resolveScalar,
   resolveUnit,
   unwrap,
   type EdgeId,
@@ -43,9 +44,9 @@ function resolveNodeUnit(node: Node): ResolvedUnit {
   return resolveUnit(def, node.unitOverride);
 }
 
-function valueAsNumber(ev: ExecValue | undefined): number {
+function valueAsNumber(ev: ExecValue | undefined, simulationTimeMs: number): number {
   if (!ev || isSequence(ev)) return 0;
-  const v: Value = unwrap(ev);
+  const v: Value = unwrap(resolveScalar(ev, simulationTimeMs));
   if (!isNumericValue(v)) return 0;
   return v.n;
 }
@@ -88,7 +89,12 @@ export function TramaEmbed({ json, height = 360, showQuestion = true }: Props): 
         shapeRegistry,
         combinerRegistry,
       });
-      return { ok: true as const, model, values: next.values };
+      return {
+        ok: true as const,
+        model,
+        values: next.values,
+        simulationTimeMs: next.simulationTimeMs,
+      };
     } catch (e) {
       return { ok: false as const, error: (e as Error).message };
     }
@@ -107,7 +113,7 @@ export function TramaEmbed({ json, height = 360, showQuestion = true }: Props): 
     );
   }
 
-  const { model, values } = result;
+  const { model, values, simulationTimeMs } = result;
 
   const incomingMap: Record<NodeId, EdgeId[]> = {};
   for (const eid of model.edgeOrder) {
@@ -162,7 +168,7 @@ export function TramaEmbed({ json, height = 360, showQuestion = true }: Props): 
           const srcRaw =
             values[edge.from] ??
             (isValueNode(fromNode) ? fromNode.initialValue : undefined);
-          const srcValue = valueAsNumber(srcRaw);
+          const srcValue = valueAsNumber(srcRaw, simulationTimeMs);
           const srcNorm = normalize(srcValue, resolveNodeUnit(fromNode));
           const isFeedback = edge.lag === 1;
           const isStrained = srcNorm < STRAINED_LOW || srcNorm > STRAINED_HIGH;
@@ -189,7 +195,7 @@ export function TramaEmbed({ json, height = 360, showQuestion = true }: Props): 
           const node = model.nodes[nid];
           if (!node || !isValueNode(node)) return null; // embed는 ValueNode만 렌더
           const layout = layouts[nid]!;
-          const v = valueAsNumber(values[nid] ?? node.initialValue);
+          const v = valueAsNumber(values[nid] ?? node.initialValue, simulationTimeMs);
           return <StaticNode key={nid} node={node} layout={layout} currentValue={v} />;
         })}
       </svg>

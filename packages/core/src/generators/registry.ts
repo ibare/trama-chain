@@ -1,4 +1,5 @@
 import type { GeneratorParams, Value } from '../model/index.js';
+import type { FunctionHandle } from '../execution/exec-value.js';
 import { counterParadigm } from './counter.js';
 import { uniformParadigm } from './uniform.js';
 import { normalParadigm } from './normal.js';
@@ -38,7 +39,7 @@ export class GeneratorRegistry {
     params: GeneratorParams,
     cursor: GeneratorCursor,
     simulationTimeMs: number,
-  ): { value: Value | undefined; nextCursor: GeneratorCursor } {
+  ): { value: Value | FunctionHandle | undefined; nextCursor: GeneratorCursor } {
     const p = this.map.get(params.kind);
     if (!p) throw new Error(`GeneratorRegistry: unknown paradigm "${params.kind}"`);
     // 패러다임이 바뀌어 cursor 모양이 다르면(사용자가 params.kind를 바꾼 직후) 재초기화.
@@ -54,7 +55,7 @@ export class GeneratorRegistry {
     params: GeneratorParams,
     cursor: GeneratorCursor,
     simulationTimeMs: number,
-  ): Value | undefined {
+  ): Value | FunctionHandle | undefined {
     const p = this.map.get(params.kind);
     if (!p) throw new Error(`GeneratorRegistry: unknown paradigm "${params.kind}"`);
     const c =

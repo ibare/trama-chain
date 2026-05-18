@@ -1,7 +1,7 @@
 import type { CombinerRegistry } from '../combiners/index.js';
 import type { Model, NodeId, Value } from '../model/index.js';
 import { booleanValue, isNumericValue, isValueNode, numericValue } from '../model/index.js';
-import { isSequence, unwrap, type ExecValue, type SequenceSample, type SequenceValue } from './exec-value.js';
+import { isSequence, resolveScalar, unwrap, type ExecValue, type SequenceSample, type SequenceValue } from './exec-value.js';
 import type { ShapeRegistry } from '../functions/index.js';
 import type { Rng } from '../functions/types.js';
 import {
@@ -194,9 +194,12 @@ export function applyFeedbackEdges(
       state.values[edge.from] ?? (isValueNode(source) ? source.initialValue : undefined);
     if (!sourceExec) continue;
     // feedback combiner는 스칼라만 — sequence source는 단위/극성 결합에 의미가 없어
-    // 기여하지 않는다 (port-compat이 차단해야 정상이지만 안전망).
+    // 기여하지 않는다 (port-compat이 차단해야 정상이지만 안전망). FunctionHandle은
+    // 직전 step의 simulationTimeMs에서 peek해 일반 Value로 환원.
     if (isSequence(sourceExec)) continue;
-    const sourceVal: Value = unwrap(sourceExec);
+    const sourceVal: Value = unwrap(
+      resolveScalar(sourceExec, state.simulationTimeMs ?? 0),
+    );
     // PortType 호환: source ValueKind ≠ target ValueKind면 기여하지 않음.
     if (sourceVal.kind !== target.initialValue.kind) continue;
     if (sourceVal.kind === 'numeric') {
@@ -218,7 +221,10 @@ export function applyFeedbackEdges(
     const combiner = options.combinerRegistry.getOfKind(target.combiner, 'numeric');
     if (!combiner) throw new MissingCombinerError(target.combiner);
     const baseExec = next[tid];
-    const baseVal = baseExec && !isSequence(baseExec) ? unwrap(baseExec) : undefined;
+    const baseVal =
+      baseExec && !isSequence(baseExec)
+        ? unwrap(resolveScalar(baseExec, state.simulationTimeMs ?? 0))
+        : undefined;
     const baseNumber =
       baseVal && baseVal.kind === 'numeric' ? baseVal.n : target.initialValue.n;
     const combined = combiner.combine([baseNumber, ...contribs]);
@@ -237,7 +243,10 @@ export function applyFeedbackEdges(
     const combiner = options.combinerRegistry.getOfKind(target.combiner, 'boolean');
     if (!combiner) throw new MissingCombinerError(target.combiner);
     const baseExec = next[tid];
-    const baseVal = baseExec && !isSequence(baseExec) ? unwrap(baseExec) : undefined;
+    const baseVal =
+      baseExec && !isSequence(baseExec)
+        ? unwrap(resolveScalar(baseExec, state.simulationTimeMs ?? 0))
+        : undefined;
     const baseBool =
       baseVal && baseVal.kind === 'boolean' ? baseVal.b : target.initialValue.b;
     next[tid] = booleanValue(combiner.combine([baseBool, ...contribs]));

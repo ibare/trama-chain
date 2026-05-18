@@ -18,6 +18,7 @@ import {
   numericValue,
   propagateOneStep,
   pulseParadigm,
+  resolveScalar,
   scheduleParadigm,
   sineParadigm,
   stepParadigm,
@@ -622,7 +623,10 @@ describe('GeneratorNode — sine paradigm', () => {
     };
     const cursor = sineParadigm.initCursor(params, 0);
     const r = sineParadigm.emit(params, cursor, 0);
-    expect(r.value).toEqual(numericValue(5 + 2 * Math.sin(Math.PI / 6), 'free'));
+    // sine emit은 FunctionHandle을 반환 — 그 시점 t로 환원해 Value 비교.
+    expect(resolveScalar(r.value!, 0)).toEqual(
+      numericValue(5 + 2 * Math.sin(Math.PI / 6), 'free'),
+    );
     // cursor는 상태 없음 — emit이 진행시키는 필드 없음.
     expect(r.nextCursor).toEqual({ kind: 'sine' });
   });
@@ -637,9 +641,14 @@ describe('GeneratorNode — sine paradigm', () => {
       offset: 0,
     };
     const cursor = sineParadigm.initCursor(params, 0);
-    const first = sineParadigm.peek(params, cursor, 0);
+    // peek는 FunctionHandle을 반환 — 각 시점으로 환원해 Value 비교.
+    const first = resolveScalar(sineParadigm.peek(params, cursor, 0)!, 0);
     // t = T(ms) = 20000ms 후 sin(2π) = sin(0). 부동소수 오차 ε 이내.
-    const afterCycle = sineParadigm.peek(params, cursor, periodSec * 1000);
+    const afterT = periodSec * 1000;
+    const afterCycle = resolveScalar(
+      sineParadigm.peek(params, cursor, afterT)!,
+      afterT,
+    );
     expect(afterCycle?.kind).toBe('numeric');
     if (afterCycle?.kind === 'numeric' && first?.kind === 'numeric') {
       expect(Math.abs(afterCycle.n - first.n)).toBeLessThan(1e-10);
@@ -656,11 +665,13 @@ describe('GeneratorNode — sine paradigm', () => {
     };
     const cursor = sineParadigm.initCursor(params, 0);
     for (let i = 0; i < 200; i++) {
-      const r = sineParadigm.emit(params, cursor, i * 100);
-      expect(r.value?.kind).toBe('numeric');
-      if (r.value?.kind === 'numeric') {
-        expect(r.value.n).toBeGreaterThanOrEqual(10 - 3 - 1e-12);
-        expect(r.value.n).toBeLessThanOrEqual(10 + 3 + 1e-12);
+      const t = i * 100;
+      const r = sineParadigm.emit(params, cursor, t);
+      const v = resolveScalar(r.value!, t);
+      expect(v.kind).toBe('numeric');
+      if (v.kind === 'numeric') {
+        expect(v.n).toBeGreaterThanOrEqual(10 - 3 - 1e-12);
+        expect(v.n).toBeLessThanOrEqual(10 + 3 + 1e-12);
       }
     }
   });
@@ -675,10 +686,15 @@ describe('GeneratorNode — sine paradigm', () => {
     };
     const cursor = sineParadigm.initCursor(params, 0);
     const t = 1234;
-    const peeked = sineParadigm.peek(params, cursor, t);
-    const peekedAgain = sineParadigm.peek(params, cursor, t);
+    // FunctionHandle은 매번 새 closure를 만들므로 핸들 자체는 deepEqual 불가.
+    // 같은 t로 환원한 Value가 동일한지 비교한다.
+    const peeked = resolveScalar(sineParadigm.peek(params, cursor, t)!, t);
+    const peekedAgain = resolveScalar(sineParadigm.peek(params, cursor, t)!, t);
     expect(peeked).toEqual(peekedAgain);
-    const emitted = sineParadigm.emit(params, cursor, t).value;
+    const emitted = resolveScalar(
+      sineParadigm.emit(params, cursor, t).value!,
+      t,
+    );
     expect(emitted).toEqual(peeked);
   });
 
@@ -696,7 +712,8 @@ describe('GeneratorNode — sine paradigm', () => {
       const t = i * 50;
       const ra = sineParadigm.emit(params, a, t);
       const rb = sineParadigm.emit(params, b, t);
-      expect(ra.value).toEqual(rb.value);
+      // 같은 시점으로 환원해 Value 동등성 비교.
+      expect(resolveScalar(ra.value!, t)).toEqual(resolveScalar(rb.value!, t));
     }
   });
 

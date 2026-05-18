@@ -1,6 +1,13 @@
 import { memo, useCallback, useEffect } from 'react';
 import { tokens } from '@trama/tokens';
-import { isGeneratorNode, isNumericValue, isSequence, unwrap, type NodeId } from '@trama/core';
+import {
+  isGeneratorNode,
+  isNumericValue,
+  isSequence,
+  resolveScalar,
+  unwrap,
+  type NodeId,
+} from '@trama/core';
 import { useTrama } from '../store/index.js';
 import { useNodeLayout } from './use-node-layout.js';
 import { resolveDisplayMode } from './display-mode.js';
@@ -44,7 +51,7 @@ function GeneratorNodeViewImpl({ id, incomingCount }: Props): JSX.Element | null
   const currentValue = modelStore((s) => {
     const ev = s.executionState.values[id];
     if (ev === undefined || isSequence(ev)) return null;
-    return unwrap(ev);
+    return unwrap(resolveScalar(ev, s.executionState.simulationTimeMs));
   });
   const setGeneratorEnabled = modelStore((s) => s.setGeneratorEnabled);
   const resetGenerator = modelStore((s) => s.resetGenerator);

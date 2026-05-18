@@ -5,6 +5,7 @@ import {
   isOutputPending,
   isSequence,
   isValueNode,
+  resolveScalar,
   unwrap,
   type NodeId,
 } from '@trama/core';
@@ -46,7 +47,7 @@ function ValueNodeViewImpl({ id, incomingCount }: Props): JSX.Element | null {
       n && isValueNode(n) && isNumericValue(n.initialValue) ? n.initialValue.n : 0;
     const ev = s.executionState.values[id];
     if (ev && !isSequence(ev)) {
-      const v = unwrap(ev);
+      const v = unwrap(resolveScalar(ev, s.executionState.simulationTimeMs));
       if (isNumericValue(v)) return v.n;
     }
     return fallbackVal;

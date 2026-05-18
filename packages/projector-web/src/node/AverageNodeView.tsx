@@ -5,6 +5,7 @@ import {
   isNumericValue,
   isSequence,
   outputKey,
+  resolveScalar,
   unwrap,
   type NodeId,
 } from '@trama/core';
@@ -39,7 +40,7 @@ function AverageNodeViewImpl({ id, incomingCount }: Props): JSX.Element | null {
   const currentValue = modelStore((s) => {
     const ev = s.executionState.values[id];
     if (ev === undefined || isSequence(ev)) return null;
-    return unwrap(ev);
+    return unwrap(resolveScalar(ev, s.executionState.simulationTimeMs));
   });
   const isValid = modelStore((s) =>
     s.executionState.validOutputs.has(outputKey(id, 0)),
