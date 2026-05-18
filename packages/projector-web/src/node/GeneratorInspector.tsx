@@ -33,7 +33,7 @@ const NORMAL_DEFAULTS = {
 const SINE_DEFAULTS = {
   kind: 'sine' as const,
   amplitude: 1,
-  omega: (2 * Math.PI) / 20,
+  omega: (2 * Math.PI) / 5,
   phase: 0,
   offset: 0,
 };

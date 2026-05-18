@@ -23,7 +23,7 @@ interface Props {
 }
 
 /** 보관 윈도우 프리셋 — 시뮬레이션 시간 기준 ms. tick rate와 무관하게 "최근 N초". */
-const PRESET_WINDOWS_MS = [30_000, 60_000, 180_000, 300_000];
+const PRESET_WINDOWS_MS = [30_000, 60_000, 180_000];
 /** 누적 추출 throttle 간격 프리셋 — 시뮬레이션 시간 기준 ms. */
 const PRESET_INTERVALS_MS = [1000, 5000, 10000];
 
