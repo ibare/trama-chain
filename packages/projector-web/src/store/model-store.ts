@@ -12,6 +12,7 @@ import {
   buildTopology,
   createEmptyModel,
   defaultGeneratorRegistry,
+  defaultNodeKindRegistry,
   executeModel,
   hasFeedbackEdges,
   initializeFromInitialValues,
@@ -596,6 +597,16 @@ export function createModelStore({
     // 박제와는 별개 — 시각·인과 전파만 차단한다.
     if (timeSettingsStore.getState().paused) return;
     if (store.getState().playbackStep !== null) return;
+    // continuous source(현재 sine paradigm) 는 매 tick 신호값이 변하는 흐름이라
+    // 시각적 "입자(펄스)" 시맨틱과 어울리지 않는다. EdgeView 가 stroke 변조로
+    // 흐름을 표현하므로 시각 펄스는 띄우지 않고, 그래도 다운스트림 상태(예:
+    // ObserveNode 누적 버퍼) 는 갱신되어야 하므로 즉시 도착한 합성 Pulse 로
+    // 동기 propagate 만 수행한다.
+    const sourceNode = model.nodes[sourceNodeId];
+    const sourceInterp =
+      sourceNode &&
+      defaultNodeKindRegistry.forNode(sourceNode)?.outputInterpolation?.(sourceNode);
+    const isContinuousSource = sourceInterp === 'continuous';
     for (const eid of model.edgeOrder) {
       const e = model.edges[eid];
       if (!e || e.from !== sourceNodeId) continue;
@@ -605,6 +616,19 @@ export function createModelStore({
       if (!executionState.validOutputs.has(outputKey(sourceNodeId, slot))) continue;
       const sourceValue = executionState.values[sourceNodeId];
       if (!sourceValue) continue;
+      if (isContinuousSource) {
+        handlePulseArrival({
+          id: `direct-${nextDirectPulseSerial++}`,
+          edgeId: eid,
+          sourceNodeId,
+          sourceSlotIndex: slot,
+          targetNodeId: e.to,
+          sourceValue,
+          startTime: performance.now(),
+          travelDurationMs: 0,
+        });
+        continue;
+      }
       pulseRegistry.spawn({
         edgeId: eid,
         sourceNodeId,
@@ -614,6 +638,7 @@ export function createModelStore({
       });
     }
   }
+  let nextDirectPulseSerial = 0;
 
   /**
    * 펄스 도착 처리.
