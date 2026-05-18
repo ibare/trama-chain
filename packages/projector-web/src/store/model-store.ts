@@ -77,14 +77,19 @@ export interface ModelStore {
   loadFromJson: (json: string) => boolean;
   exportToJson: () => string;
 
-  addNode: (input: AddValueNodeInput) => Node;
-  addConstantNode: (input: AddConstantNodeInput) => Node;
-  addConditionNode: (input: AddConditionNodeInput) => Node;
-  addLogicGateNode: (input: AddLogicGateNodeInput) => Node;
-  addObserveNode: (input: AddObserveNodeInput) => Node;
-  addExpressionNode: (input: AddExpressionNodeInput) => Node;
-  addGeneratorNode: (input: AddGeneratorNodeInput) => Node;
-  addAverageNode: (input: AddAverageNodeInput) => Node;
+  /**
+   * 노드 추가 류. 정지(paused) 상태에서만 동작 — 재생 중에는 모델 편집이 잠겨
+   * `null`을 반환한다. UI는 paused일 때 진입을 차단해 도달 자체를 막아야 하며,
+   * 본 가드는 우회 경로에 대한 안전망.
+   */
+  addNode: (input: AddValueNodeInput) => Node | null;
+  addConstantNode: (input: AddConstantNodeInput) => Node | null;
+  addConditionNode: (input: AddConditionNodeInput) => Node | null;
+  addLogicGateNode: (input: AddLogicGateNodeInput) => Node | null;
+  addObserveNode: (input: AddObserveNodeInput) => Node | null;
+  addExpressionNode: (input: AddExpressionNodeInput) => Node | null;
+  addGeneratorNode: (input: AddGeneratorNodeInput) => Node | null;
+  addAverageNode: (input: AddAverageNodeInput) => Node | null;
   updateNode: (id: NodeId, patch: NodePatch) => void;
   removeNode: (id: NodeId) => void;
 
@@ -105,6 +110,13 @@ export interface ModelStore {
 
   /** trajectory를 step-by-step 애니메이션 재생 (§ 11.7). feedback 모델에서만 의미. */
   play: () => void;
+
+  /**
+   * 시뮬레이션 전체 리셋. 모델(노드/엣지/initialValue)은 보존, 실행상태만 초기화.
+   * simulationTimeMs=0, generator cursor 재초기화, observe 누적·sequence 비움,
+   * in-flight 펄스 제거, ticker/playback 정지.
+   */
+  resetSimulation: () => void;
 }
 
 export type ModelStoreInstance = UseBoundStore<StoreApi<ModelStore>>;
@@ -130,22 +142,6 @@ function patchAffectsValues(patch: NodePatch): boolean {
     'operator' in p ||
     'params' in p
   );
-}
-
-/**
- * patch가 *오직* "노드 자체의 출력값"만 바꾸는 단순 변경인지.
- * true면 펄스 경로로 전파 가능 (구조적 변경이 아니므로 그래프 위상이 유지된다).
- * false면 unit/combiner/function 등 구조적 의미 변경 — 전체 재계산이 안전.
- */
-function patchIsSimpleValueChange(patch: NodePatch): boolean {
-  const keys = Object.keys(patch);
-  if (keys.length === 0) return false;
-  for (const k of keys) {
-    if (k !== 'initialValue' && k !== 'value' && k !== 'label' && k !== 'position') {
-      return false;
-    }
-  }
-  return 'initialValue' in patch || 'value' in patch;
 }
 
 function computeExecutionState(
@@ -241,6 +237,19 @@ export function createModelStore({
   const initialExec = computeExecutionState(initial);
   let activePlaybackToken = 0;
   let playbackTimeoutId: number | null = null;
+
+  /**
+   * 모델 편집 가능 여부 — paused일 때만 true. 재생 중에는 console.warn 후 false.
+   * 단일 진입점으로 모든 mutation 액션이 통과해 "정지 중에만 편집"을 강제한다.
+   * UI는 paused일 때 진입 차단으로 도달 자체를 막고, 본 가드는 우회 경로 안전망.
+   */
+  function assertEditable(): boolean {
+    if (timeSettingsStore.getState().paused) return true;
+    console.warn(
+      '[trama] 재생 중에는 모델 편집이 잠겨 있습니다. ⏸ 후 시도해주세요.',
+    );
+    return false;
+  }
 
   /**
    * GeneratorNode step ticker — enabled가 1개라도 있으면 STEP_TICK_MS 주기로
@@ -439,6 +448,10 @@ export function createModelStore({
     sourceNodeId: NodeId,
     allowedSlots?: ReadonlySet<number>,
   ): void {
+    // 정지(paused)면 어떤 경로로도 펄스가 흐르지 않는다 — 사용자의 명시적 ▶
+    // 행위 전까지는 시간·값 전파 모두 침묵. 정지 중 mutation으로 인한 즉시
+    // 박제와는 별개 — 시각·인과 전파만 차단한다.
+    if (timeSettingsStore.getState().paused) return;
     if (store.getState().playbackStep !== null) return;
     for (const eid of model.edgeOrder) {
       const e = model.edges[eid];
@@ -606,6 +619,7 @@ export function createModelStore({
     playbackStep: null,
 
     setModel: (next) => {
+      if (!assertEditable()) return;
       const exec = computeExecutionState(next, get().executionState);
       set({ model: next, ...exec });
       reconcileGeneratorTicker();
@@ -632,6 +646,7 @@ export function createModelStore({
     },
 
     addNode: (input) => {
+      if (!assertEditable()) return null;
       const s = get();
       const after = addValueNodeOp(s.model, input);
       const newId = after.nodeOrder[after.nodeOrder.length - 1]!;
@@ -642,6 +657,7 @@ export function createModelStore({
     },
 
     addConstantNode: (input) => {
+      if (!assertEditable()) return null;
       const s = get();
       const after = addConstantNodeOp(s.model, input);
       const newId = after.nodeOrder[after.nodeOrder.length - 1]!;
@@ -652,6 +668,7 @@ export function createModelStore({
     },
 
     addConditionNode: (input) => {
+      if (!assertEditable()) return null;
       const s = get();
       const after = addConditionNodeOp(s.model, input);
       const newId = after.nodeOrder[after.nodeOrder.length - 1]!;
@@ -662,6 +679,7 @@ export function createModelStore({
     },
 
     addLogicGateNode: (input) => {
+      if (!assertEditable()) return null;
       const s = get();
       const after = addLogicGateNodeOp(s.model, input);
       const newId = after.nodeOrder[after.nodeOrder.length - 1]!;
@@ -672,6 +690,7 @@ export function createModelStore({
     },
 
     addObserveNode: (input) => {
+      if (!assertEditable()) return null;
       const s = get();
       const after = addObserveNodeOp(s.model, input);
       const newId = after.nodeOrder[after.nodeOrder.length - 1]!;
@@ -682,6 +701,7 @@ export function createModelStore({
     },
 
     addExpressionNode: (input) => {
+      if (!assertEditable()) return null;
       const s = get();
       const after = addExpressionNodeOp(s.model, input);
       const newId = after.nodeOrder[after.nodeOrder.length - 1]!;
@@ -692,6 +712,7 @@ export function createModelStore({
     },
 
     addGeneratorNode: (input) => {
+      if (!assertEditable()) return null;
       const s = get();
       const after = addGeneratorNodeOp(s.model, input);
       const newId = after.nodeOrder[after.nodeOrder.length - 1]!;
@@ -702,6 +723,7 @@ export function createModelStore({
     },
 
     addAverageNode: (input) => {
+      if (!assertEditable()) return null;
       const s = get();
       const after = addAverageNodeOp(s.model, input);
       const newId = after.nodeOrder[after.nodeOrder.length - 1]!;
@@ -712,6 +734,7 @@ export function createModelStore({
     },
 
     setGeneratorEnabled: (id, enabled) => {
+      if (!assertEditable()) return;
       const s = get();
       const node = s.model.nodes[id];
       if (!node || !isGeneratorNode(node)) return;
@@ -733,6 +756,7 @@ export function createModelStore({
     },
 
     resetGenerator: (id) => {
+      if (!assertEditable()) return;
       const s = get();
       const node = s.model.nodes[id];
       if (!node || !isGeneratorNode(node)) return;
@@ -777,54 +801,26 @@ export function createModelStore({
               };
             })()
           : rawPatch;
+      const affectsValues = patchAffectsValues(patch);
+      // 비실행 patch(position/label/displayMode 등)는 재생 중에도 허용 — 관찰 편의.
+      // affectsValues=true 패치만 정지 상태로 제한.
+      if (affectsValues && !assertEditable()) return;
+
       const after = updateNodeOp(before, id, patch);
       if (after === before) return;
 
-      const affectsValues = patchAffectsValues(patch);
-      const simpleValue = patchIsSimpleValueChange(patch);
-      const playbackActive = get().playbackStep !== null;
-
-      if (simpleValue && !playbackActive) {
-        const recomputed = computeExecutionState(after, get().executionState);
-        const nextNodeValue: Value | undefined =
-          'value' in patch && patch.value && typeof patch.value === 'object' && 'kind' in patch.value
-            ? (patch.value as Value)
-            : 'initialValue' in patch && patch.initialValue
-              ? (patch.initialValue as Value)
-              : undefined;
-        set((s) => {
-          const newValues: Record<NodeId, ExecValue> = { ...s.executionState.values };
-          if (nextNodeValue) newValues[id] = nextNodeValue;
-          const newValid = new Set(s.executionState.validOutputs);
-          newValid.add(outputKey(id, 0));
-          return {
-            model: after,
-            executionState: {
-              values: newValues,
-              sequenceOutputs: s.executionState.sequenceOutputs,
-              validOutputs: newValid,
-              invalidReasons: s.executionState.invalidReasons,
-              observeBuffers: s.executionState.observeBuffers,
-              observeExtractionRuntime: s.executionState.observeExtractionRuntime,
-              generatorRuntime: s.executionState.generatorRuntime,
-              simulationTimeMs: s.executionState.simulationTimeMs,
-            },
-            trajectory: recomputed.trajectory,
-          };
-        });
+      const exec = affectsValues ? computeExecutionState(after, get().executionState) : null;
+      set({ model: after, ...(exec ?? {}) });
+      if (affectsValues) {
         nodeFlashRegistry.trigger(id);
         const latest = get();
         spawnOutgoingPulses(latest.model, latest.executionState, id);
-        reconcileGeneratorTicker();
-        return;
       }
-
-      const exec = affectsValues ? computeExecutionState(after, get().executionState) : null;
-      set({ model: after, ...(exec ?? {}) });
       reconcileGeneratorTicker();
     },
 
     removeNode: (id) => {
+      if (!assertEditable()) return;
       const s = get();
       const after = removeNodeOp(s.model, id);
       if (after === s.model) return;
@@ -835,6 +831,7 @@ export function createModelStore({
     },
 
     addEdge: (input) => {
+      if (!assertEditable()) return null;
       const before = get().model;
       const targetNode = before.nodes[input.to];
       if (targetNode && isExpressionNode(targetNode)) {
@@ -890,6 +887,7 @@ export function createModelStore({
     },
 
     updateEdge: (id, patch) => {
+      if (!assertEditable()) return;
       const s = get();
       const candidate = updateEdgeOp(s.model, id, patch);
       if (candidate === s.model) return;
@@ -907,6 +905,7 @@ export function createModelStore({
     },
 
     removeEdge: (id) => {
+      if (!assertEditable()) return;
       const s = get();
       const after = removeEdgeOp(s.model, id);
       if (after === s.model) return;
@@ -922,6 +921,7 @@ export function createModelStore({
     },
 
     setExecution: (e) => {
+      if (!assertEditable()) return;
       const s = get();
       const after = setExecutionOp(s.model, e);
       if (after === s.model) return;
@@ -930,6 +930,7 @@ export function createModelStore({
     },
 
     scrubInitialValue: (id, nextValue) => {
+      if (!assertEditable()) return;
       const before = get().model;
       const node = before.nodes[id];
       if (!node || !isValueNode(node)) return;
@@ -988,6 +989,21 @@ export function createModelStore({
       // step 0은 즉시 적용, 1+는 self-rescheduling으로 진행.
       applyStep(trajectory[0]!, 0, false);
       schedulePlaybackStep(token, 1);
+    },
+
+    resetSimulation: () => {
+      // 재생 중 리셋을 누르면 시간 0 + 정지 상태로 — "처음으로 되감기".
+      timeSettingsStore.getState().setPaused(true);
+      stopGeneratorTicker();
+      stopPlaybackTimer();
+      activePlaybackToken++;
+      pulseRegistry.clearAll();
+      const fresh = initializeFromInitialValues(get().model);
+      set({
+        executionState: fresh,
+        trajectory: [fresh],
+        playbackStep: null,
+      });
     },
   }));
 

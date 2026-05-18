@@ -318,7 +318,9 @@ function addAsEdgeChain(
     };
     const item = itemByKey.get(keys[i]!);
     if (!item) continue;
-    newIds.push(item.createNode(pos));
+    const id = item.createNode(pos);
+    if (!id) continue;
+    newIds.push(id);
   }
   if (newIds.length === 0) return;
 

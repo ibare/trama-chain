@@ -44,6 +44,7 @@ registerNodeKindUI({
           initialNumber: 5,
           position: canvasPos,
         });
+        if (!node) return null;
         setEditingNode(node.id);
         return node.id;
       },
@@ -62,6 +63,7 @@ registerNodeKindUI({
           combiner: 'or',
           position: canvasPos,
         });
+        if (!node) return null;
         setEditingNode(node.id);
         return node.id;
       },
@@ -87,6 +89,7 @@ registerNodeKindUI({
           threshold: 0,
           position: canvasPos,
         });
+        if (!node) return null;
         return node.id;
       },
     },
@@ -124,6 +127,7 @@ registerNodeKindUI({
           operator: preset.operator,
           position: canvasPos,
         });
+        if (!node) return null;
         return node.id;
       },
     })),
@@ -153,6 +157,7 @@ registerNodeKindUI({
           params: { kind: 'counter', start: 1, step: 1 },
           position: canvasPos,
         });
+        if (!node) return null;
         return node.id;
       },
     },
@@ -173,6 +178,7 @@ registerNodeKindUI({
           },
           position: canvasPos,
         });
+        if (!node) return null;
         return node.id;
       },
     },
@@ -192,6 +198,7 @@ registerNodeKindUI({
           },
           position: canvasPos,
         });
+        if (!node) return null;
         return node.id;
       },
     },
@@ -212,6 +219,7 @@ registerNodeKindUI({
           },
           position: canvasPos,
         });
+        if (!node) return null;
         return node.id;
       },
     },
@@ -234,6 +242,7 @@ registerNodeKindUI({
           label: '관찰',
           position: canvasPos,
         });
+        if (!node) return null;
         return node.id;
       },
     },
@@ -256,6 +265,7 @@ registerNodeKindUI({
           label: '평균',
           position: canvasPos,
         });
+        if (!node) return null;
         return node.id;
       },
     },
@@ -287,6 +297,7 @@ registerNodeKindUI({
             constantKey: def.key,
             position: canvasPos,
           });
+          if (!node) return null;
           if (isCustom) setEditingNode(node.id);
           return node.id;
         },
@@ -342,6 +353,7 @@ registerNodeKindUI({
             preset: isCustom ? undefined : { key: preset.key },
             position: canvasPos,
           });
+          if (!node) return null;
           if (isCustom) setEditingNode(node.id);
           return node.id;
         },

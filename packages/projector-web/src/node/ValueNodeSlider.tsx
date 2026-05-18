@@ -40,8 +40,9 @@ function snap(v: number, step: number): number {
 }
 
 export function ValueNodeSlider({ node, halfW, sliderY }: Props): JSX.Element | null {
-  const { modelStore, viewport } = useTrama();
+  const { modelStore, timeSettingsStore, viewport } = useTrama();
   const scrubInitialValue = modelStore((s) => s.scrubInitialValue);
+  const paused = timeSettingsStore((s) => s.paused);
   const unit = resolveNodeUnit(node);
   const { min, max, step } = boundsForSlider(unit);
   const range = max - min;
@@ -77,6 +78,9 @@ export function ValueNodeSlider({ node, halfW, sliderY }: Props): JSX.Element | 
   const onPointerDown = useCallback(
     (e: React.PointerEvent<SVGRectElement>) => {
       e.stopPropagation();
+      // hit rect는 그대로 두고(노드 본문 드래그와의 의도 충돌 방지) 핸들러
+      // 내부에서 paused일 때만 drag를 시작한다.
+      if (!paused) return;
       e.currentTarget.setPointerCapture(e.pointerId);
       dragRef.current = {
         startClientX: e.clientX,
@@ -84,7 +88,7 @@ export function ValueNodeSlider({ node, halfW, sliderY }: Props): JSX.Element | 
         zoom: viewport.getCurrentZoom(),
       };
     },
-    [value, viewport],
+    [paused, value, viewport],
   );
 
   const onPointerMove = useCallback(
@@ -104,7 +108,10 @@ export function ValueNodeSlider({ node, halfW, sliderY }: Props): JSX.Element | 
   if (numericInitial === null || range <= 0 || trackLen <= 0) return null;
 
   return (
-    <g className="trama-value-slider" pointerEvents="auto">
+    <g
+      className={`trama-value-slider${paused ? '' : ' is-paused-dim'}`}
+      pointerEvents="auto"
+    >
       <line
         className="trama-value-slider-rest"
         x1={trackLeft}

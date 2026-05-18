@@ -34,8 +34,9 @@ interface Props {
  *   (재클릭으로 해제되지 않음). 해제는 명시적 "해제" 버튼으로 통일.
  */
 export function UnitInspector({ node }: Props): JSX.Element {
-  const { modelStore } = useTrama();
+  const { modelStore, timeSettingsStore } = useTrama();
   const updateNode = modelStore((s) => s.updateNode);
+  const paused = timeSettingsStore((s) => s.paused);
 
   // numeric ValueNode 전용 인스펙터. boolean ValueNode는 단위 개념이 없어 별도 패널이 필요.
   const initialNumeric = isNumericValue(node.initialValue) ? node.initialValue : null;
@@ -167,6 +168,7 @@ export function UnitInspector({ node }: Props): JSX.Element {
         onValueChange={(v) => v && setSelectedCategory(v as UnitCategory)}
         aria-label="단위 카테고리"
         className="trama-unit-inspector-categories"
+        disabled={!paused}
       >
         <TramaCarousel ariaLabel="단위 카테고리 페이지">
           {categories.map((c) => (
@@ -185,6 +187,7 @@ export function UnitInspector({ node }: Props): JSX.Element {
         onValueChange={(v) => v && onPickUnit(v)}
         aria-label="단위 종류"
         className="trama-unit-inspector-units"
+        disabled={!paused}
       >
         <TramaCarousel ariaLabel="단위 종류 페이지">
           {unitsInCategory.map((d) => (
@@ -211,6 +214,7 @@ export function UnitInspector({ node }: Props): JSX.Element {
                   type="button"
                   className="trama-unit-inspector-clear"
                   onClick={onClearSkin}
+                  disabled={!paused}
                 >
                   해제
                 </button>
@@ -222,6 +226,7 @@ export function UnitInspector({ node }: Props): JSX.Element {
               onValueChange={(v) => v && onPickSkin(v)}
               aria-label="스킨"
               className="trama-unit-inspector-skin-list"
+              disabled={!paused}
             >
               <TramaCarousel ariaLabel="스킨 페이지">
                 {skinCandidates.map((s) => (
@@ -250,14 +255,15 @@ export function UnitInspector({ node }: Props): JSX.Element {
             className="trama-unit-inspector-range"
             onSubmit={(e) => e.preventDefault()}
           >
-            <RangeField name="min" label="최소" value={unit.min} step={unit.step} onCommit={(v) => setRange({ min: v })} />
-            <RangeField name="max" label="최대" value={unit.max} step={unit.step} onCommit={(v) => setRange({ max: v })} />
+            <RangeField name="min" label="최소" value={unit.min} step={unit.step} disabled={!paused} onCommit={(v) => setRange({ min: v })} />
+            <RangeField name="max" label="최대" value={unit.max} step={unit.step} disabled={!paused} onCommit={(v) => setRange({ max: v })} />
             <RangeField
               name="step"
               label="스텝"
               value={unit.step}
               step={unit.step / 10}
               min={0}
+              disabled={!paused}
               onCommit={(v) => {
                 if (v > 0) setRange({ step: v });
               }}
@@ -267,7 +273,12 @@ export function UnitInspector({ node }: Props): JSX.Element {
       )}
 
       <footer className="trama-unit-inspector-footer">
-        <button type="button" className="trama-unit-inspector-reset" onClick={onReset}>
+        <button
+          type="button"
+          className="trama-unit-inspector-reset"
+          onClick={onReset}
+          disabled={!paused}
+        >
           기본값으로 리셋
         </button>
       </footer>
@@ -281,10 +292,11 @@ interface RangeFieldProps {
   value: number;
   step: number;
   min?: number;
+  disabled?: boolean;
   onCommit: (v: number) => void;
 }
 
-function RangeField({ name, label, value, step, min, onCommit }: RangeFieldProps): JSX.Element {
+function RangeField({ name, label, value, step, min, disabled, onCommit }: RangeFieldProps): JSX.Element {
   return (
     <Form.Field name={name} className="trama-unit-inspector-range-row">
       <Form.Label className="trama-unit-inspector-range-label">{label}</Form.Label>
@@ -293,6 +305,7 @@ function RangeField({ name, label, value, step, min, onCommit }: RangeFieldProps
         value={value}
         step={step}
         min={min}
+        disabled={disabled}
         className="trama-unit-inspector-range-input"
         onChange={(e) => {
           const v = parseFloat(e.currentTarget.value);

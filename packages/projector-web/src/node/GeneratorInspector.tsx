@@ -68,8 +68,10 @@ function isParadigmKind(v: string): v is ParadigmKind {
  * 매개변수만 바꿔도 안전. start·seed 변경을 즉시 반영하려면 노드의 ↺ 버튼.
  */
 export function GeneratorInspector({ node }: Props): JSX.Element {
-  const { modelStore } = useTrama();
+  const { modelStore, timeSettingsStore } = useTrama();
   const updateNode = modelStore((s) => s.updateNode);
+  const paused = timeSettingsStore((s) => s.paused);
+  const disabled = !paused;
 
   const setParams = useCallback(
     (next: GeneratorParams) => {
@@ -106,6 +108,7 @@ export function GeneratorInspector({ node }: Props): JSX.Element {
             }
             className="trama-unit-inspector-categories"
             aria-label="생성 방식"
+            disabled={disabled}
           >
             <ToggleGroup.Item value="counter" className="trama-unit-inspector-chip">
               카운터
@@ -131,13 +134,13 @@ export function GeneratorInspector({ node }: Props): JSX.Element {
 
       <div className="trama-observe-inspector-section">
         {node.params.kind === 'counter' ? (
-          <CounterFields params={node.params} onChange={setParams} />
+          <CounterFields params={node.params} disabled={disabled} onChange={setParams} />
         ) : node.params.kind === 'uniform' ? (
-          <UniformFields params={node.params} onChange={setParams} />
+          <UniformFields params={node.params} disabled={disabled} onChange={setParams} />
         ) : node.params.kind === 'normal' ? (
-          <NormalFields params={node.params} onChange={setParams} />
+          <NormalFields params={node.params} disabled={disabled} onChange={setParams} />
         ) : (
-          <SineFields params={node.params} onChange={setParams} />
+          <SineFields params={node.params} disabled={disabled} onChange={setParams} />
         )}
       </div>
     </>
@@ -146,10 +149,11 @@ export function GeneratorInspector({ node }: Props): JSX.Element {
 
 interface CounterProps {
   params: Extract<GeneratorParams, { kind: 'counter' }>;
+  disabled?: boolean;
   onChange: (next: GeneratorParams) => void;
 }
 
-function CounterFields({ params, onChange }: CounterProps): JSX.Element {
+function CounterFields({ params, disabled, onChange }: CounterProps): JSX.Element {
   const [startDraft, setStartDraft] = useState(String(params.start));
   const [stepDraft, setStepDraft] = useState(String(params.step));
   useEffect(() => setStartDraft(String(params.start)), [params.start]);
@@ -166,6 +170,7 @@ function CounterFields({ params, onChange }: CounterProps): JSX.Element {
           type="number"
           value={startDraft}
           step="any"
+          disabled={disabled}
           className="trama-unit-inspector-range-input"
           onChange={(e) => {
             const next = e.currentTarget.value;
@@ -183,6 +188,7 @@ function CounterFields({ params, onChange }: CounterProps): JSX.Element {
           type="number"
           value={stepDraft}
           step="any"
+          disabled={disabled}
           className="trama-unit-inspector-range-input"
           onChange={(e) => {
             const next = e.currentTarget.value;
@@ -200,10 +206,11 @@ function CounterFields({ params, onChange }: CounterProps): JSX.Element {
 
 interface UniformProps {
   params: Extract<GeneratorParams, { kind: 'uniform' }>;
+  disabled?: boolean;
   onChange: (next: GeneratorParams) => void;
 }
 
-function UniformFields({ params, onChange }: UniformProps): JSX.Element {
+function UniformFields({ params, disabled, onChange }: UniformProps): JSX.Element {
   const [minDraft, setMinDraft] = useState(String(params.min));
   const [maxDraft, setMaxDraft] = useState(String(params.max));
   const [seedDraft, setSeedDraft] = useState(String(params.seed));
@@ -222,6 +229,7 @@ function UniformFields({ params, onChange }: UniformProps): JSX.Element {
           type="number"
           value={minDraft}
           step="any"
+          disabled={disabled}
           className="trama-unit-inspector-range-input"
           onChange={(e) => {
             const next = e.currentTarget.value;
@@ -239,6 +247,7 @@ function UniformFields({ params, onChange }: UniformProps): JSX.Element {
           type="number"
           value={maxDraft}
           step="any"
+          disabled={disabled}
           className="trama-unit-inspector-range-input"
           onChange={(e) => {
             const next = e.currentTarget.value;
@@ -263,6 +272,7 @@ function UniformFields({ params, onChange }: UniformProps): JSX.Element {
           }}
           className="trama-unit-inspector-categories"
           aria-label="정수 여부"
+          disabled={disabled}
         >
           <ToggleGroup.Item value="real" className="trama-unit-inspector-chip">
             실수
@@ -279,6 +289,7 @@ function UniformFields({ params, onChange }: UniformProps): JSX.Element {
           type="number"
           value={seedDraft}
           step={1}
+          disabled={disabled}
           className="trama-unit-inspector-range-input"
           onChange={(e) => {
             const next = e.currentTarget.value;
@@ -296,10 +307,11 @@ function UniformFields({ params, onChange }: UniformProps): JSX.Element {
 
 interface NormalProps {
   params: Extract<GeneratorParams, { kind: 'normal' }>;
+  disabled?: boolean;
   onChange: (next: GeneratorParams) => void;
 }
 
-function NormalFields({ params, onChange }: NormalProps): JSX.Element {
+function NormalFields({ params, disabled, onChange }: NormalProps): JSX.Element {
   const [meanDraft, setMeanDraft] = useState(String(params.mean));
   const [stdevDraft, setStdevDraft] = useState(String(params.stdev));
   const [seedDraft, setSeedDraft] = useState(String(params.seed));
@@ -318,6 +330,7 @@ function NormalFields({ params, onChange }: NormalProps): JSX.Element {
           type="number"
           value={meanDraft}
           step="any"
+          disabled={disabled}
           className="trama-unit-inspector-range-input"
           onChange={(e) => {
             const next = e.currentTarget.value;
@@ -335,6 +348,7 @@ function NormalFields({ params, onChange }: NormalProps): JSX.Element {
           type="number"
           value={stdevDraft}
           step="any"
+          disabled={disabled}
           className="trama-unit-inspector-range-input"
           onChange={(e) => {
             const next = e.currentTarget.value;
@@ -353,6 +367,7 @@ function NormalFields({ params, onChange }: NormalProps): JSX.Element {
           type="number"
           value={seedDraft}
           step={1}
+          disabled={disabled}
           className="trama-unit-inspector-range-input"
           onChange={(e) => {
             const next = e.currentTarget.value;
@@ -370,10 +385,11 @@ function NormalFields({ params, onChange }: NormalProps): JSX.Element {
 
 interface SineProps {
   params: Extract<GeneratorParams, { kind: 'sine' }>;
+  disabled?: boolean;
   onChange: (next: GeneratorParams) => void;
 }
 
-function SineFields({ params, onChange }: SineProps): JSX.Element {
+function SineFields({ params, disabled, onChange }: SineProps): JSX.Element {
   const [ampDraft, setAmpDraft] = useState(String(params.amplitude));
   const [omegaDraft, setOmegaDraft] = useState(String(params.omega));
   const [phaseDraft, setPhaseDraft] = useState(String(params.phase));
@@ -394,6 +410,7 @@ function SineFields({ params, onChange }: SineProps): JSX.Element {
           type="number"
           value={ampDraft}
           step="any"
+          disabled={disabled}
           className="trama-unit-inspector-range-input"
           onChange={(e) => {
             const next = e.currentTarget.value;
@@ -411,6 +428,7 @@ function SineFields({ params, onChange }: SineProps): JSX.Element {
           type="number"
           value={omegaDraft}
           step="any"
+          disabled={disabled}
           className="trama-unit-inspector-range-input"
           onChange={(e) => {
             const next = e.currentTarget.value;
@@ -428,6 +446,7 @@ function SineFields({ params, onChange }: SineProps): JSX.Element {
           type="number"
           value={phaseDraft}
           step="any"
+          disabled={disabled}
           className="trama-unit-inspector-range-input"
           onChange={(e) => {
             const next = e.currentTarget.value;
@@ -445,6 +464,7 @@ function SineFields({ params, onChange }: SineProps): JSX.Element {
           type="number"
           value={offsetDraft}
           step="any"
+          disabled={disabled}
           className="trama-unit-inspector-range-input"
           onChange={(e) => {
             const next = e.currentTarget.value;

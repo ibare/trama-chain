@@ -34,13 +34,13 @@ const DEFAULT_SPEED = 1;
 export function createTimeSettingsStore(): TimeSettingsStore {
   return create<TimeSettingsState>((set) => ({
     stepSpeedMultiplier: DEFAULT_SPEED,
-    paused: false,
+    paused: true,
     setStepSpeedMultiplier: (value) => {
       if (!Number.isFinite(value) || value <= 0) return;
       set({ stepSpeedMultiplier: value });
     },
     setPaused: (value) => set({ paused: value }),
     togglePaused: () => set((s) => ({ paused: !s.paused })),
-    resetTimeSettings: () => set({ stepSpeedMultiplier: DEFAULT_SPEED, paused: false }),
+    resetTimeSettings: () => set({ stepSpeedMultiplier: DEFAULT_SPEED, paused: true }),
   }));
 }

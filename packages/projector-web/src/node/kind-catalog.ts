@@ -9,13 +9,14 @@ import type { TramaInstance } from '../store/trama-instance.js';
  * - `description`: 우측 프리뷰에 표시할 설명 (선택). 향후 풍부한 설명으로 확장.
  * - `createNode(canvasPos)`: 사용자가 "추가"로 확정한 순간 호출. 생성된 노드의 id를 반환해야 한다 —
  *   엣지-분할 같은 후속 작업이 새 노드 id를 받아 단일 트랜잭션처럼 마무리할 수 있도록.
+ *   재생 중에는 모델 편집이 잠겨 `null`을 반환할 수 있다(UI가 진입 차단 못 한 우회 경로).
  */
 export interface NodeMenuItem {
   key: string;
   label: string;
   symbol?: string;
   description?: string;
-  createNode: (canvasPos: { x: number; y: number }) => NodeId;
+  createNode: (canvasPos: { x: number; y: number }) => NodeId | null;
 }
 
 export interface NodeViewProps {

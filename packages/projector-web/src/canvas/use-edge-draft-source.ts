@@ -38,13 +38,15 @@ interface Handlers {
  */
 export function useEdgeDraftSource(nodeId: NodeId, opts: Options): Handlers {
   const instance = useTrama();
-  const { uiStore } = instance;
+  const { uiStore, timeSettingsStore } = instance;
   const startEdgeDraft = uiStore((s) => s.startEdgeDraft);
   const { enabled = true, getStartPoint, sourceSlotIndex } = opts;
 
   const onPointerDown = useCallback(
     (e: React.PointerEvent<SVGCircleElement>) => {
       if (!enabled) return;
+      // 재생 중에는 엣지 편집이 잠겨 있으므로 draft 시작 자체를 차단.
+      if (!timeSettingsStore.getState().paused) return;
       e.stopPropagation();
       e.currentTarget.setPointerCapture(e.pointerId);
       const lag: 0 | 1 = e.altKey ? 1 : 0;
@@ -57,7 +59,7 @@ export function useEdgeDraftSource(nodeId: NodeId, opts: Options): Handlers {
         sourceSlotIndex,
       });
     },
-    [enabled, getStartPoint, nodeId, sourceSlotIndex, startEdgeDraft],
+    [enabled, getStartPoint, nodeId, sourceSlotIndex, startEdgeDraft, timeSettingsStore],
   );
 
   const onPointerUp = useCallback(

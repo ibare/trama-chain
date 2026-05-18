@@ -16,7 +16,13 @@ const PAN_THRESHOLD_PX = 3;
 const SNAP_RADIUS_PX = 12;
 
 export function Canvas(): JSX.Element {
-  const { modelStore, uiStore, viewport: viewportContainer, socketRegistry } = useTrama();
+  const {
+    modelStore,
+    uiStore,
+    timeSettingsStore,
+    viewport: viewportContainer,
+    socketRegistry,
+  } = useTrama();
   // 좁은 셀렉터 — Canvas 자체는 topology(노드·엣지 목록) 변경에만 리렌더된다.
   // 드래그 오프셋, 값 변화, 셀렉션 변화는 모두 자식이 자기 id로 직접 구독하므로
   // 여기서는 구독하지 않는다.
@@ -125,22 +131,25 @@ export function Canvas(): JSX.Element {
       // 또는 추후 각자의 메뉴로 위임.
       const target = e.target as Element;
       if (target !== e.currentTarget && !target.classList?.contains?.('trama-canvas-bg')) return;
+      // 재생 중에는 모델 편집이 잠겨 있으므로 NodePicker 진입 자체를 막는다.
+      if (!timeSettingsStore.getState().paused) return;
       e.preventDefault();
       const canvasPos = toCanvasCoords(e.clientX, e.clientY);
       openNodePickerAtCanvas({ x: e.clientX, y: e.clientY }, canvasPos);
     },
-    [openNodePickerAtCanvas, toCanvasCoords],
+    [openNodePickerAtCanvas, timeSettingsStore, toCanvasCoords],
   );
 
   const onCanvasDoubleClick = useCallback(
     (e: React.MouseEvent<SVGSVGElement>) => {
       if (uiStore.getState().readOnly) return;
+      if (!timeSettingsStore.getState().paused) return;
       const target = e.target as Element;
       if (target !== e.currentTarget && !target.classList?.contains?.('trama-canvas-bg')) return;
       const canvasPos = toCanvasCoords(e.clientX, e.clientY);
       openNodePickerAtCanvas({ x: e.clientX, y: e.clientY }, canvasPos);
     },
-    [openNodePickerAtCanvas, toCanvasCoords, uiStore],
+    [openNodePickerAtCanvas, timeSettingsStore, toCanvasCoords, uiStore],
   );
 
   const onPointerMove = useCallback(

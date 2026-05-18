@@ -302,6 +302,15 @@
   cursor: ew-resize;
 }
 
+/* 재생 중 — 슬라이더 시각만 흐려지고 hit rect는 유지(노드 드래그 의도 보전).
+   pointer-events는 건드리지 않는다(자식 hit rect가 onPointerDown에서 자체 가드). */
+[data-trama-root] .trama-value-slider.is-paused-dim {
+  opacity: 0.4;
+}
+[data-trama-root] .trama-value-slider.is-paused-dim .trama-value-slider-hit {
+  cursor: not-allowed;
+}
+
 /* Edge ------------------------------------------------------------------- */
 [data-trama-root] .trama-edge {
   fill: none;
@@ -930,7 +939,7 @@
   font-family: inherit;
 }
 
-[data-trama-root] .trama-mini-player-play {
+[data-trama-root] .trama-mini-player-button {
   appearance: none;
   background: var(--color-node-fill-calm);
   border: 1px solid var(--color-node-stroke-calm);
@@ -948,8 +957,17 @@
   transition: background var(--motion-duration-fade-in) var(--motion-easing-fade-natural);
 }
 
-[data-trama-root] .trama-mini-player-play:hover {
+[data-trama-root] .trama-mini-player-button:hover {
   background: var(--color-node-fill-focal);
+}
+
+[data-trama-root] .trama-mini-player-time {
+  font-family: inherit;
+  font-size: var(--typography-text-picker-label);
+  font-variant-numeric: tabular-nums;
+  color: var(--color-node-text-primary);
+  min-width: 4ch;
+  text-align: center;
 }
 
 [data-trama-root] .trama-mini-player-divider {
@@ -1633,6 +1651,13 @@
 [data-trama-root] .trama-generator-btn.is-active {
   fill: var(--color-node-fill-focal);
   stroke: var(--color-node-stroke-focal);
+}
+[data-trama-root] .trama-generator-btn.is-paused-dim {
+  opacity: 0.4;
+  cursor: not-allowed;
+}
+[data-trama-root] .trama-generator-btn.is-paused-dim:hover {
+  fill: transparent;
 }
 [data-trama-root] .trama-generator-btn-glyph {
   color: var(--color-node-text-primary);

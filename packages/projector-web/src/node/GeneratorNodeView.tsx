@@ -34,7 +34,8 @@ function formatGeneratorValue(v: number): string {
 }
 
 function GeneratorNodeViewImpl({ id, incomingCount }: Props): JSX.Element | null {
-  const { modelStore, uiStore, socketRegistry } = useTrama();
+  const { modelStore, uiStore, timeSettingsStore, socketRegistry } = useTrama();
+  const paused = timeSettingsStore((s) => s.paused);
   const node = modelStore((s) => s.model.nodes[id]);
   const enabled = modelStore(
     (s) => s.executionState.generatorRuntime[id]?.enabled ?? false,
@@ -82,11 +83,13 @@ function GeneratorNodeViewImpl({ id, incomingCount }: Props): JSX.Element | null
     });
 
   const onToggle = useCallback(() => {
+    if (!paused) return;
     setGeneratorEnabled(id, !enabled);
-  }, [enabled, id, setGeneratorEnabled]);
+  }, [enabled, id, paused, setGeneratorEnabled]);
   const onReset = useCallback(() => {
+    if (!paused) return;
     resetGenerator(id);
-  }, [id, resetGenerator]);
+  }, [id, paused, resetGenerator]);
 
   const currentMode = node ? resolveDisplayMode(node) : 'compact';
   const onToggleMode = useCallback(() => {
@@ -185,7 +188,7 @@ function GeneratorNodeViewImpl({ id, incomingCount }: Props): JSX.Element | null
             height={BUTTON_SIZE}
             rx={buttonRadius}
             ry={buttonRadius}
-            hitClassName="trama-generator-btn"
+            hitClassName={`trama-generator-btn${paused ? '' : ' is-paused-dim'}`}
             onClick={onToggle}
           >
             <PhosphorGlyph
@@ -205,7 +208,7 @@ function GeneratorNodeViewImpl({ id, incomingCount }: Props): JSX.Element | null
             height={BUTTON_SIZE}
             rx={buttonRadius}
             ry={buttonRadius}
-            hitClassName="trama-generator-btn"
+            hitClassName={`trama-generator-btn${paused ? '' : ' is-paused-dim'}`}
             onClick={onReset}
           >
             <PhosphorGlyph
