@@ -359,6 +359,7 @@ export function createModelStore({
     // RAF 루프가 시뮬레이션 시간축의 유일한 출처. generator emit은 그 시간 안에서
     // 일어나는 부수 효과로, enabled generator가 있을 때만 함께 갱신된다.
     const stepDelta = FIXED_DT_MS;
+    const nextSimulationTimeMs = executionState.simulationTimeMs + stepDelta;
     const newValues: Record<NodeId, ExecValue> = { ...executionState.values };
     const newValid = new Set(executionState.validOutputs);
     const newRuntime: Record<NodeId, GeneratorRuntime> = {
@@ -371,14 +372,22 @@ export function createModelStore({
       if (!isGeneratorEffectivelyEnabled(model, executionState, nid)) continue;
       const node = model.nodes[nid];
       if (!node || !isGeneratorNode(node)) continue;
-      const { value, nextCursor } = defaultGeneratorRegistry.emit(node.params, rt.cursor);
-      newValues[nid] = value;
-      newValid.add(outputKey(nid, 0));
+      const { value, nextCursor } = defaultGeneratorRegistry.emit(
+        node.params,
+        rt.cursor,
+        nextSimulationTimeMs,
+      );
+      // value=undefined는 paradigm이 freeze한 경우(스텝 t<startMs 등). values/validOutputs를
+      // 건드리지 않아 이전 상태를 유지하고 cursor만 진행. 다운스트림 펄스도 띄우지 않는다.
+      if (value !== undefined) {
+        newValues[nid] = value;
+        newValid.add(outputKey(nid, 0));
+        emittedIds.push(nid);
+      }
       // runtime.enabled는 사용자 토글 의도를 보존. gateOpen 캐시는 펄스로만 갱신되는
       // 단일 진입 — ticker tick에서 드롭하면 다음 tick에 게이트 false로 평가돼
       // emit이 멈춘다 (ticker 자체는 계속 시간만 진행).
       newRuntime[nid] = { enabled: rt.enabled, cursor: nextCursor, gateOpen: rt.gateOpen };
-      emittedIds.push(nid);
     }
     store.setState((s) => ({
       executionState: {
@@ -879,8 +888,10 @@ export function createModelStore({
       const node = s.model.nodes[id];
       if (!node || !isGeneratorNode(node)) return;
       const current = s.executionState.generatorRuntime[id];
-      // 노드는 있는데 runtime이 비어 있는 경우(레이스) — params로 새 cursor 생성.
-      const cursor = current?.cursor ?? defaultGeneratorRegistry.initCursor(node.params);
+      // 노드는 있는데 runtime이 비어 있는 경우(레이스) — params·현재 시뮬레이션 시간으로 새 cursor 생성.
+      const cursor =
+        current?.cursor ??
+        defaultGeneratorRegistry.initCursor(node.params, s.executionState.simulationTimeMs);
       if (current?.enabled === enabled) return;
       set({
         executionState: {
@@ -899,13 +910,20 @@ export function createModelStore({
       const s = get();
       const node = s.model.nodes[id];
       if (!node || !isGeneratorNode(node)) return;
-      const cursor = defaultGeneratorRegistry.initCursor(node.params);
+      const nowMs = s.executionState.simulationTimeMs;
+      const cursor = defaultGeneratorRegistry.initCursor(node.params, nowMs);
       // 값은 비우지 않는다 — idle peek로 다시 "다음 emit 값"을 노출.
       // (cursor를 origin으로 되돌렸으니 peek 결과는 counter.start / random(seed) 첫 샘플).
+      // 시간 기반 paradigm이 현재 시각에서 undefined를 반환하면 (예: 스텝 t<startMs)
+      // 값/valid를 끄지 않고 기존 상태를 유지한다 — reset은 cursor만의 의미이지
+      // 다운스트림 상태를 invalid로 강제하지 않는다.
       const newValues: Record<NodeId, ExecValue> = { ...s.executionState.values };
-      newValues[id] = defaultGeneratorRegistry.peek(node.params, cursor);
+      const peeked = defaultGeneratorRegistry.peek(node.params, cursor, nowMs);
       const newValid = new Set(s.executionState.validOutputs);
-      newValid.add(outputKey(id, 0));
+      if (peeked !== undefined) {
+        newValues[id] = peeked;
+        newValid.add(outputKey(id, 0));
+      }
       set({
         executionState: {
           ...s.executionState,

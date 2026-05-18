@@ -927,7 +927,7 @@ const generatorNodeDescriptor: NodeKindDescriptor<
     const existing = ctx.generatorRuntime[node.id];
     const runtime: GeneratorRuntime = existing ?? {
       enabled: false,
-      cursor: ctx.generatorRegistry.initCursor(node.params),
+      cursor: ctx.generatorRegistry.initCursor(node.params, ctx.simulationTimeMs),
       gateOpen: undefined,
     };
 
@@ -962,9 +962,18 @@ const generatorNodeDescriptor: NodeKindDescriptor<
       };
       return;
     }
-    const { value, nextCursor } = ctx.generatorRegistry.emit(node.params, runtime.cursor);
-    ctx.next[node.id] = value;
-    ctx.validOutputs.add(outputKey(node.id, 0));
+    const { value, nextCursor } = ctx.generatorRegistry.emit(
+      node.params,
+      runtime.cursor,
+      ctx.simulationTimeMs,
+    );
+    // value=undefined는 paradigm이 "지금은 출력이 정의되지 않음"으로 freeze한 경우
+    // (스텝 generator의 t<startMs 등). ctx.next·validOutputs를 건드리지 않아 마지막
+    // 값(또는 invalid)이 유지되고, cursor만 진행한다.
+    if (value !== undefined) {
+      ctx.next[node.id] = value;
+      ctx.validOutputs.add(outputKey(node.id, 0));
+    }
     // runtime.enabled는 사용자 토글 의도를 보존 — 입력 모드에서도 덮어쓰지 않는다.
     ctx.generatorRuntime[node.id] = {
       enabled: runtime.enabled,

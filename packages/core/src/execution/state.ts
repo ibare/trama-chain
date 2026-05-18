@@ -110,10 +110,16 @@ export function initializeFromInitialValues(
     // 사용자가 ▶을 눌러야 emit이 시작된다. 다만 idle 상태에서도 "다음 emit하면
     // 나올 값"을 peek로 미리 노출해 다운스트림 케이블이 떨어지지 않도록 한다.
     if (isGeneratorNode(node)) {
-      const cursor = generatorRegistry.initCursor(node.params);
+      const cursor = generatorRegistry.initCursor(node.params, 0);
       generatorRuntime[nid] = { enabled: false, cursor };
-      values[nid] = generatorRegistry.peek(node.params, cursor);
-      validOutputs.add(outputKey(nid, 0));
+      // 초기 시점(t=0) peek. 시간 기반 paradigm은 아직 정의되지 않은 시각이면
+      // undefined를 반환 — 그 경우 values/validOutputs를 건드리지 않아 invalid를
+      // 유지한다 (펄스 첫 발화 전·스텝 t<startMs 등).
+      const peeked = generatorRegistry.peek(node.params, cursor, 0);
+      if (peeked !== undefined) {
+        values[nid] = peeked;
+        validOutputs.add(outputKey(nid, 0));
+      }
     }
   }
   // ValueNode가 lag=0 incoming을 받으면 initialValue 권위는 엣지로 이양된다.

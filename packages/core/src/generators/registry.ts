@@ -24,30 +24,41 @@ export class GeneratorRegistry {
   }
 
   /** params에 맞는 paradigm을 찾아 cursor 초기값 생성. 미등록이면 throw. */
-  initCursor(params: GeneratorParams): GeneratorCursor {
+  initCursor(params: GeneratorParams, simulationTimeMs: number = 0): GeneratorCursor {
     const p = this.map.get(params.kind);
     if (!p) throw new Error(`GeneratorRegistry: unknown paradigm "${params.kind}"`);
-    return p.initCursor(params as never);
+    return p.initCursor(params as never, simulationTimeMs);
   }
 
   /** params·cursor로 한 번 emit. cursor.kind와 params.kind가 불일치면 cursor를 재초기화. */
   emit(
     params: GeneratorParams,
     cursor: GeneratorCursor,
-  ): { value: Value; nextCursor: GeneratorCursor } {
+    simulationTimeMs: number,
+  ): { value: Value | undefined; nextCursor: GeneratorCursor } {
     const p = this.map.get(params.kind);
     if (!p) throw new Error(`GeneratorRegistry: unknown paradigm "${params.kind}"`);
     // 패러다임이 바뀌어 cursor 모양이 다르면(사용자가 params.kind를 바꾼 직후) 재초기화.
-    const c = cursor.kind === params.kind ? cursor : p.initCursor(params as never);
-    return p.emit(params as never, c as never);
+    const c =
+      cursor.kind === params.kind
+        ? cursor
+        : p.initCursor(params as never, simulationTimeMs);
+    return p.emit(params as never, c as never, simulationTimeMs);
   }
 
   /** cursor를 진행시키지 않고 다음 emit 값만 본다. emit과 동일 라우팅. */
-  peek(params: GeneratorParams, cursor: GeneratorCursor): Value {
+  peek(
+    params: GeneratorParams,
+    cursor: GeneratorCursor,
+    simulationTimeMs: number,
+  ): Value | undefined {
     const p = this.map.get(params.kind);
     if (!p) throw new Error(`GeneratorRegistry: unknown paradigm "${params.kind}"`);
-    const c = cursor.kind === params.kind ? cursor : p.initCursor(params as never);
-    return p.peek(params as never, c as never);
+    const c =
+      cursor.kind === params.kind
+        ? cursor
+        : p.initCursor(params as never, simulationTimeMs);
+    return p.peek(params as never, c as never, simulationTimeMs);
   }
 }
 

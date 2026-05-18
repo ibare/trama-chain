@@ -45,22 +45,32 @@ export interface GeneratorRuntime {
 /**
  * 패러다임 정의 — params를 받아 cursor를 만들고, cursor에서 한 번 emit해 다음 cursor를 반환.
  *
- * - `initCursor`: params로 cursor 초기 상태 생성. seed/start 등이 여기서 cursor로 들어간다.
- * - `emit`: 현재 cursor로 한 번 출력값을 만들고, 다음 cursor를 함께 반환.
- *   결정성: 동일 params + 동일 cursor면 동일 결과.
+ * - `initCursor`: params·현재 시뮬레이션 시간으로 cursor 초기 상태 생성. seed/start
+ *   같은 params 기반 필드와, "지금부터 시작"하는 시간 기반 cursor 필드(예: 펄스의
+ *   다음 발화 시각)가 함께 들어간다.
+ * - `emit`: 현재 cursor와 현재 시뮬레이션 시간으로 한 번 출력값을 만들고, 다음
+ *   cursor를 함께 반환. 출력이 아직 정의되지 않는 시점(예: 스텝 generator의
+ *   t < startMs 구간)이면 `value: undefined`로 freeze — 호출자가 ctx.next·
+ *   validOutputs를 건드리지 않아 마지막 값(또는 invalid)이 유지된다.
+ *   결정성: 동일 params + 동일 cursor + 동일 t면 동일 결과.
  * - `peek`: cursor를 진행시키지 않고 "지금 emit하면 나올 값"만 미리 본다. ▶ 누르기
- *   전 idle 상태 디스플레이와 다운스트림 자연 전파용. peek의 결과는 다음 emit의
- *   value와 일치해야 한다.
+ *   전 idle 상태 디스플레이와 다운스트림 자연 전파용. peek의 결과는 같은 t에
+ *   대한 emit의 value와 일치해야 한다. 미정 시점은 undefined.
  *
  * GeneratorParams는 sum type이라 paradigm은 `kind`로만 매핑되며, registry가 타입을
- * 좁혀 해당 paradigm으로 라우팅한다.
+ * 좁혀 해당 paradigm으로 라우팅한다. 시간 비의존 paradigm(counter/uniform/normal/
+ * sine 등 emit 카운터 기반)은 simulationTimeMs 인자를 무시한다.
  */
 export interface GeneratorParadigm<
   P extends GeneratorParams = GeneratorParams,
   C extends GeneratorCursor = GeneratorCursor,
 > {
   kind: P['kind'];
-  initCursor(params: P): C;
-  emit(params: P, cursor: C): { value: Value; nextCursor: C };
-  peek(params: P, cursor: C): Value;
+  initCursor(params: P, simulationTimeMs: number): C;
+  emit(
+    params: P,
+    cursor: C,
+    simulationTimeMs: number,
+  ): { value: Value | undefined; nextCursor: C };
+  peek(params: P, cursor: C, simulationTimeMs: number): Value | undefined;
 }

@@ -46,12 +46,12 @@ describe('GeneratorNode — counter paradigm', () => {
 
   it('cursor initializes to start, emit sequence is 1,2,3...', () => {
     const params = { kind: 'counter' as const, start: 1, step: 1 };
-    let cursor = counterParadigm.initCursor(params);
+    let cursor = counterParadigm.initCursor(params, 0);
     expect(cursor.nextValue).toBe(1);
     const out: number[] = [];
     for (let i = 0; i < 4; i++) {
-      const r = counterParadigm.emit(params, cursor);
-      if (r.value.kind === 'numeric') out.push(r.value.n);
+      const r = counterParadigm.emit(params, cursor, 0);
+      if (r.value?.kind === 'numeric') out.push(r.value.n);
       cursor = r.nextCursor;
     }
     expect(out).toEqual([1, 2, 3, 4]);
@@ -59,11 +59,11 @@ describe('GeneratorNode — counter paradigm', () => {
 
   it('counter with step=2.5 produces fractional sequence', () => {
     const params = { kind: 'counter' as const, start: 0, step: 2.5 };
-    let cursor = counterParadigm.initCursor(params);
+    let cursor = counterParadigm.initCursor(params, 0);
     const out: number[] = [];
     for (let i = 0; i < 3; i++) {
-      const r = counterParadigm.emit(params, cursor);
-      if (r.value.kind === 'numeric') out.push(r.value.n);
+      const r = counterParadigm.emit(params, cursor, 0);
+      if (r.value?.kind === 'numeric') out.push(r.value.n);
       cursor = r.nextCursor;
     }
     expect(out).toEqual([0, 2.5, 5]);
@@ -75,13 +75,13 @@ describe('GeneratorNode — uniform paradigm', () => {
     const params = { kind: 'uniform' as const, min: 0, max: 100, integer: false, seed: 42 };
     const a: number[] = [];
     const b: number[] = [];
-    let ca = uniformParadigm.initCursor(params);
-    let cb = uniformParadigm.initCursor(params);
+    let ca = uniformParadigm.initCursor(params, 0);
+    let cb = uniformParadigm.initCursor(params, 0);
     for (let i = 0; i < 5; i++) {
-      const ra = uniformParadigm.emit(params, ca);
-      const rb = uniformParadigm.emit(params, cb);
-      if (ra.value.kind === 'numeric') a.push(ra.value.n);
-      if (rb.value.kind === 'numeric') b.push(rb.value.n);
+      const ra = uniformParadigm.emit(params, ca, 0);
+      const rb = uniformParadigm.emit(params, cb, 0);
+      if (ra.value?.kind === 'numeric') a.push(ra.value.n);
+      if (rb.value?.kind === 'numeric') b.push(rb.value.n);
       ca = ra.nextCursor;
       cb = rb.nextCursor;
     }
@@ -90,10 +90,10 @@ describe('GeneratorNode — uniform paradigm', () => {
 
   it('values stay within [min, max]', () => {
     const params = { kind: 'uniform' as const, min: 10, max: 20, integer: false, seed: 7 };
-    let cursor = uniformParadigm.initCursor(params);
+    let cursor = uniformParadigm.initCursor(params, 0);
     for (let i = 0; i < 100; i++) {
-      const r = uniformParadigm.emit(params, cursor);
-      if (r.value.kind === 'numeric') {
+      const r = uniformParadigm.emit(params, cursor, 0);
+      if (r.value?.kind === 'numeric') {
         expect(r.value.n).toBeGreaterThanOrEqual(10);
         expect(r.value.n).toBeLessThanOrEqual(20);
       }
@@ -103,10 +103,10 @@ describe('GeneratorNode — uniform paradigm', () => {
 
   it('integer mode produces only integers', () => {
     const params = { kind: 'uniform' as const, min: 1, max: 6, integer: true, seed: 99 };
-    let cursor = uniformParadigm.initCursor(params);
+    let cursor = uniformParadigm.initCursor(params, 0);
     for (let i = 0; i < 50; i++) {
-      const r = uniformParadigm.emit(params, cursor);
-      if (r.value.kind === 'numeric') {
+      const r = uniformParadigm.emit(params, cursor, 0);
+      if (r.value?.kind === 'numeric') {
         expect(Number.isInteger(r.value.n)).toBe(true);
         expect(r.value.n).toBeGreaterThanOrEqual(1);
         expect(r.value.n).toBeLessThanOrEqual(6);
@@ -121,13 +121,13 @@ describe('GeneratorNode — normal paradigm', () => {
     const params = { kind: 'normal' as const, mean: 0, stdev: 1, seed: 42 };
     const a: number[] = [];
     const b: number[] = [];
-    let ca = normalParadigm.initCursor(params);
-    let cb = normalParadigm.initCursor(params);
+    let ca = normalParadigm.initCursor(params, 0);
+    let cb = normalParadigm.initCursor(params, 0);
     for (let i = 0; i < 5; i++) {
-      const ra = normalParadigm.emit(params, ca);
-      const rb = normalParadigm.emit(params, cb);
-      if (ra.value.kind === 'numeric') a.push(ra.value.n);
-      if (rb.value.kind === 'numeric') b.push(rb.value.n);
+      const ra = normalParadigm.emit(params, ca, 0);
+      const rb = normalParadigm.emit(params, cb, 0);
+      if (ra.value?.kind === 'numeric') a.push(ra.value.n);
+      if (rb.value?.kind === 'numeric') b.push(rb.value.n);
       ca = ra.nextCursor;
       cb = rb.nextCursor;
     }
@@ -138,11 +138,11 @@ describe('GeneratorNode — normal paradigm', () => {
     // N=2000 표본의 표본평균·표본표준편차가 모수 근처에 떨어지는지 검사.
     // 단순 검증 — 정밀 통계 테스트가 아니라 변환이 깨졌을 때 잡는 가드.
     const params = { kind: 'normal' as const, mean: 5, stdev: 2, seed: 12345 };
-    let cursor = normalParadigm.initCursor(params);
+    let cursor = normalParadigm.initCursor(params, 0);
     const samples: number[] = [];
     for (let i = 0; i < 2000; i++) {
-      const r = normalParadigm.emit(params, cursor);
-      if (r.value.kind === 'numeric') samples.push(r.value.n);
+      const r = normalParadigm.emit(params, cursor, 0);
+      if (r.value?.kind === 'numeric') samples.push(r.value.n);
       cursor = r.nextCursor;
     }
     const mean = samples.reduce((s, v) => s + v, 0) / samples.length;
@@ -156,21 +156,21 @@ describe('GeneratorNode — normal paradigm', () => {
 
   it('stdev=0 collapses to dirac at mean (no noise)', () => {
     const params = { kind: 'normal' as const, mean: 7, stdev: 0, seed: 1 };
-    let cursor = normalParadigm.initCursor(params);
+    let cursor = normalParadigm.initCursor(params, 0);
     for (let i = 0; i < 20; i++) {
-      const r = normalParadigm.emit(params, cursor);
-      if (r.value.kind === 'numeric') expect(r.value.n).toBe(7);
+      const r = normalParadigm.emit(params, cursor, 0);
+      if (r.value?.kind === 'numeric') expect(r.value.n).toBe(7);
       cursor = r.nextCursor;
     }
   });
 
   it('peek matches the next emit (cursor preserved)', () => {
     const params = { kind: 'normal' as const, mean: 0, stdev: 1, seed: 77 };
-    const cursor = normalParadigm.initCursor(params);
-    const peeked = normalParadigm.peek(params, cursor);
-    const emitted = normalParadigm.emit(params, cursor);
+    const cursor = normalParadigm.initCursor(params, 0);
+    const peeked = normalParadigm.peek(params, cursor, 0);
+    const emitted = normalParadigm.emit(params, cursor, 0);
     expect(peeked).toEqual(emitted.value);
-    expect(normalParadigm.peek(params, cursor)).toEqual(peeked);
+    expect(normalParadigm.peek(params, cursor, 0)).toEqual(peeked);
   });
 });
 
@@ -278,21 +278,21 @@ describe('GeneratorNode — propagate integration', () => {
 
   it('peek and emit agree on the next value (cursor advances only on emit)', () => {
     const params = { kind: 'counter' as const, start: 42, step: 7 };
-    const cursor = counterParadigm.initCursor(params);
-    const peeked = counterParadigm.peek(params, cursor);
-    const emitted = counterParadigm.emit(params, cursor);
+    const cursor = counterParadigm.initCursor(params, 0);
+    const peeked = counterParadigm.peek(params, cursor, 0);
+    const emitted = counterParadigm.emit(params, cursor, 0);
     expect(peeked).toEqual(emitted.value);
     // peek는 cursor를 진행하지 않음.
-    expect(counterParadigm.peek(params, cursor)).toEqual(peeked);
+    expect(counterParadigm.peek(params, cursor, 0)).toEqual(peeked);
     // emit은 진행.
     expect(emitted.nextCursor.nextValue).toBe(49);
   });
 
   it('uniform peek matches the next emit for the same cursor', () => {
     const params = { kind: 'uniform' as const, min: 0, max: 1, integer: false, seed: 123 };
-    const cursor = uniformParadigm.initCursor(params);
-    const peeked = uniformParadigm.peek(params, cursor);
-    const emitted = uniformParadigm.emit(params, cursor);
+    const cursor = uniformParadigm.initCursor(params, 0);
+    const peeked = uniformParadigm.peek(params, cursor, 0);
+    const emitted = uniformParadigm.emit(params, cursor, 0);
     expect(peeked).toEqual(emitted.value);
   });
 
@@ -608,9 +608,9 @@ describe('GeneratorNode — sine paradigm', () => {
       phase: Math.PI / 6,
       offset: 5,
     };
-    const cursor = sineParadigm.initCursor(params);
+    const cursor = sineParadigm.initCursor(params, 0);
     expect(cursor.step).toBe(0);
-    const r = sineParadigm.emit(params, cursor);
+    const r = sineParadigm.emit(params, cursor, 0);
     expect(r.value).toEqual(numericValue(5 + 2 * Math.sin(Math.PI / 6), 'free'));
     expect(r.nextCursor).toEqual({ kind: 'sine', step: 1 });
   });
@@ -624,15 +624,19 @@ describe('GeneratorNode — sine paradigm', () => {
       phase: 0,
       offset: 0,
     };
-    let cursor = sineParadigm.initCursor(params);
-    const first = sineParadigm.emit(params, cursor).value;
+    let cursor = sineParadigm.initCursor(params, 0);
+    const first = sineParadigm.emit(params, cursor, 0).value;
     for (let i = 0; i < period - 1; i++) {
-      cursor = sineParadigm.emit(params, cursor).nextCursor;
+      cursor = sineParadigm.emit(params, cursor, 0).nextCursor;
     }
     // step=20 일 때 sin(2π) = sin(0) — 부동소수 오차 ε 이내.
-    const afterCycle = sineParadigm.peek(params, sineParadigm.emit(params, cursor).nextCursor);
-    expect(afterCycle.kind).toBe('numeric');
-    if (afterCycle.kind === 'numeric' && first.kind === 'numeric') {
+    const afterCycle = sineParadigm.peek(
+      params,
+      sineParadigm.emit(params, cursor, 0).nextCursor,
+      0,
+    );
+    expect(afterCycle?.kind).toBe('numeric');
+    if (afterCycle?.kind === 'numeric' && first?.kind === 'numeric') {
       expect(Math.abs(afterCycle.n - first.n)).toBeLessThan(1e-10);
     }
   });
@@ -645,12 +649,12 @@ describe('GeneratorNode — sine paradigm', () => {
       phase: 1.2,
       offset: 10,
     };
-    let cursor = sineParadigm.initCursor(params);
+    let cursor = sineParadigm.initCursor(params, 0);
     for (let i = 0; i < 200; i++) {
-      const r = sineParadigm.emit(params, cursor);
+      const r = sineParadigm.emit(params, cursor, 0);
       cursor = r.nextCursor;
-      expect(r.value.kind).toBe('numeric');
-      if (r.value.kind === 'numeric') {
+      expect(r.value?.kind).toBe('numeric');
+      if (r.value?.kind === 'numeric') {
         expect(r.value.n).toBeGreaterThanOrEqual(10 - 3 - 1e-12);
         expect(r.value.n).toBeLessThanOrEqual(10 + 3 + 1e-12);
       }
@@ -665,13 +669,13 @@ describe('GeneratorNode — sine paradigm', () => {
       phase: 0,
       offset: 0,
     };
-    let cursor = sineParadigm.initCursor(params);
-    cursor = sineParadigm.emit(params, cursor).nextCursor;
-    cursor = sineParadigm.emit(params, cursor).nextCursor;
-    const peeked = sineParadigm.peek(params, cursor);
-    const peekedAgain = sineParadigm.peek(params, cursor);
+    let cursor = sineParadigm.initCursor(params, 0);
+    cursor = sineParadigm.emit(params, cursor, 0).nextCursor;
+    cursor = sineParadigm.emit(params, cursor, 0).nextCursor;
+    const peeked = sineParadigm.peek(params, cursor, 0);
+    const peekedAgain = sineParadigm.peek(params, cursor, 0);
     expect(peeked).toEqual(peekedAgain);
-    const emitted = sineParadigm.emit(params, cursor).value;
+    const emitted = sineParadigm.emit(params, cursor, 0).value;
     expect(emitted).toEqual(peeked);
   });
 
@@ -683,11 +687,11 @@ describe('GeneratorNode — sine paradigm', () => {
       phase: 0.7,
       offset: -2,
     };
-    let a = sineParadigm.initCursor(params);
-    let b = sineParadigm.initCursor(params);
+    let a = sineParadigm.initCursor(params, 0);
+    let b = sineParadigm.initCursor(params, 0);
     for (let i = 0; i < 30; i++) {
-      const ra = sineParadigm.emit(params, a);
-      const rb = sineParadigm.emit(params, b);
+      const ra = sineParadigm.emit(params, a, 0);
+      const rb = sineParadigm.emit(params, b, 0);
       expect(ra.value).toEqual(rb.value);
       a = ra.nextCursor;
       b = rb.nextCursor;
@@ -742,6 +746,7 @@ describe('GeneratorRegistry', () => {
     const out = reg.emit(
       { kind: 'counter', start: 100, step: 0 },
       { kind: 'uniform', prngState: 12345 },
+      0,
     );
     expect(out.value).toEqual(numericValue(100, 'free'));
   });
