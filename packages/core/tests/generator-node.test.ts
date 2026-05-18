@@ -612,7 +612,7 @@ describe('GeneratorNode — schema / serialization', () => {
 });
 
 describe('GeneratorNode — sine paradigm', () => {
-  it('emit at step=0 equals offset + amplitude * sin(phase)', () => {
+  it('emit at t=0 equals offset + amplitude * sin(phase)', () => {
     const params = {
       kind: 'sine' as const,
       amplitude: 2,
@@ -621,32 +621,25 @@ describe('GeneratorNode — sine paradigm', () => {
       offset: 5,
     };
     const cursor = sineParadigm.initCursor(params, 0);
-    expect(cursor.step).toBe(0);
     const r = sineParadigm.emit(params, cursor, 0);
     expect(r.value).toEqual(numericValue(5 + 2 * Math.sin(Math.PI / 6), 'free'));
-    expect(r.nextCursor).toEqual({ kind: 'sine', step: 1 });
+    // cursor는 상태 없음 — emit이 진행시키는 필드 없음.
+    expect(r.nextCursor).toEqual({ kind: 'sine' });
   });
 
-  it('one full period returns to start value (period = 2π/omega)', () => {
-    const period = 20;
+  it('one full period returns to start value (T = 2π/omega seconds)', () => {
+    const periodSec = 20;
     const params = {
       kind: 'sine' as const,
       amplitude: 1,
-      omega: (2 * Math.PI) / period,
+      omega: (2 * Math.PI) / periodSec,
       phase: 0,
       offset: 0,
     };
-    let cursor = sineParadigm.initCursor(params, 0);
-    const first = sineParadigm.emit(params, cursor, 0).value;
-    for (let i = 0; i < period - 1; i++) {
-      cursor = sineParadigm.emit(params, cursor, 0).nextCursor;
-    }
-    // step=20 일 때 sin(2π) = sin(0) — 부동소수 오차 ε 이내.
-    const afterCycle = sineParadigm.peek(
-      params,
-      sineParadigm.emit(params, cursor, 0).nextCursor,
-      0,
-    );
+    const cursor = sineParadigm.initCursor(params, 0);
+    const first = sineParadigm.peek(params, cursor, 0);
+    // t = T(ms) = 20000ms 후 sin(2π) = sin(0). 부동소수 오차 ε 이내.
+    const afterCycle = sineParadigm.peek(params, cursor, periodSec * 1000);
     expect(afterCycle?.kind).toBe('numeric');
     if (afterCycle?.kind === 'numeric' && first?.kind === 'numeric') {
       expect(Math.abs(afterCycle.n - first.n)).toBeLessThan(1e-10);
@@ -661,10 +654,9 @@ describe('GeneratorNode — sine paradigm', () => {
       phase: 1.2,
       offset: 10,
     };
-    let cursor = sineParadigm.initCursor(params, 0);
+    const cursor = sineParadigm.initCursor(params, 0);
     for (let i = 0; i < 200; i++) {
-      const r = sineParadigm.emit(params, cursor, 0);
-      cursor = r.nextCursor;
+      const r = sineParadigm.emit(params, cursor, i * 100);
       expect(r.value?.kind).toBe('numeric');
       if (r.value?.kind === 'numeric') {
         expect(r.value.n).toBeGreaterThanOrEqual(10 - 3 - 1e-12);
@@ -673,7 +665,7 @@ describe('GeneratorNode — sine paradigm', () => {
     }
   });
 
-  it('peek returns the value that next emit would produce, without advancing', () => {
+  it('peek matches emit at the same simulation time', () => {
     const params = {
       kind: 'sine' as const,
       amplitude: 1,
@@ -681,17 +673,16 @@ describe('GeneratorNode — sine paradigm', () => {
       phase: 0,
       offset: 0,
     };
-    let cursor = sineParadigm.initCursor(params, 0);
-    cursor = sineParadigm.emit(params, cursor, 0).nextCursor;
-    cursor = sineParadigm.emit(params, cursor, 0).nextCursor;
-    const peeked = sineParadigm.peek(params, cursor, 0);
-    const peekedAgain = sineParadigm.peek(params, cursor, 0);
+    const cursor = sineParadigm.initCursor(params, 0);
+    const t = 1234;
+    const peeked = sineParadigm.peek(params, cursor, t);
+    const peekedAgain = sineParadigm.peek(params, cursor, t);
     expect(peeked).toEqual(peekedAgain);
-    const emitted = sineParadigm.emit(params, cursor, 0).value;
+    const emitted = sineParadigm.emit(params, cursor, t).value;
     expect(emitted).toEqual(peeked);
   });
 
-  it('same params produce identical sequences (deterministic, no seed)', () => {
+  it('same params + same t produce identical values (deterministic, no seed)', () => {
     const params = {
       kind: 'sine' as const,
       amplitude: 1.5,
@@ -699,14 +690,13 @@ describe('GeneratorNode — sine paradigm', () => {
       phase: 0.7,
       offset: -2,
     };
-    let a = sineParadigm.initCursor(params, 0);
-    let b = sineParadigm.initCursor(params, 0);
+    const a = sineParadigm.initCursor(params, 0);
+    const b = sineParadigm.initCursor(params, 0);
     for (let i = 0; i < 30; i++) {
-      const ra = sineParadigm.emit(params, a, 0);
-      const rb = sineParadigm.emit(params, b, 0);
+      const t = i * 50;
+      const ra = sineParadigm.emit(params, a, t);
+      const rb = sineParadigm.emit(params, b, t);
       expect(ra.value).toEqual(rb.value);
-      a = ra.nextCursor;
-      b = rb.nextCursor;
     }
   });
 

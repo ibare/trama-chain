@@ -470,7 +470,7 @@ function SineFields({ params, disabled, onChange }: SineProps): JSX.Element {
         />
       </Form.Field>
       <Form.Field name="omega" className="trama-unit-inspector-range-row">
-        <Form.Label className="trama-unit-inspector-range-label">각속도 ω</Form.Label>
+        <Form.Label className="trama-unit-inspector-range-label">각속도 ω (rad/s)</Form.Label>
         <Form.Control
           type="number"
           value={omegaDraft}

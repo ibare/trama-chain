@@ -19,8 +19,12 @@ export type GeneratorCursor =
   | { kind: 'uniform'; prngState: number; nextFireMs: number }
   /** normal: PRNG의 현재 state + 다음 발화 예정 시각. Box-Muller가 발화마다 2칸 진행. */
   | { kind: 'normal'; prngState: number; nextFireMs: number }
-  /** sine: emit step 카운터. y = A·sin(ω·step + φ) + D. */
-  | { kind: 'sine'; step: number }
+  /**
+   * sine: 상태 없음. 출력은 simulationTimeMs와 params로만 결정.
+   * y(t) = offset + amplitude * sin(omega * t/1000 + phase), t는 ms.
+   * omega 단위는 rad/s — 주기 T(s) = 2π/omega, 주파수 f(Hz) = omega/(2π).
+   */
+  | { kind: 'sine' }
   /** step: 상태 없음. 출력은 simulationTimeMs와 params.startMs로만 결정. */
   | { kind: 'step' }
   /** pulse: 다음 발화 예정 시각(ms). drift-free 누적 — 발화 시 += periodMs. */
