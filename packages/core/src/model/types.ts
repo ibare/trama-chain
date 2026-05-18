@@ -159,7 +159,9 @@ export interface LogicGateNode {
  * - 본체: passthrough. 모델 그래프 계산에는 영향이 없다.
  * - 부가: 통과한 값을 시간순으로 누적해 시각화에 제공. 누적 버퍼는 모델 외부
  *   (`ExecutionState.observeBuffers`)에서 runtime-only로 관리하며 직렬화되지 않는다.
- * - `capacity`: 큐 정책. bounded면 최근 `size`개만, unbounded면 무제한.
+ * - `capacity`: 보관 윈도우. windowed면 시뮬레이션 시간 기준 최근 `windowMs` ms,
+ *   unbounded면 무제한. 샘플 개수가 아니라 시간 길이가 단위 — tick rate와 무관하게
+ *   "최근 N초의 흐름" 이 그대로 의미가 된다.
  * - `visualization`: 시각화 paradigm key (registry에 등록된 표현 방식).
  *
  * "데이터 흐름 도메인 전문가" — ValueNode + Skin이 단위 도메인 전문가인 것과
@@ -169,7 +171,7 @@ export interface LogicGateNode {
  * 1입력 1출력에 한정.
  */
 export type ObserveCapacity =
-  | { kind: 'bounded'; size: number }
+  | { kind: 'windowed'; windowMs: number }
   | { kind: 'unbounded' };
 
 /**

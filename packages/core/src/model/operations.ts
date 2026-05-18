@@ -250,7 +250,7 @@ export function addObserveNode(
     kind: 'observe',
     id,
     label: input.label,
-    capacity: input.capacity ?? { kind: 'bounded', size: 30 },
+    capacity: input.capacity ?? { kind: 'windowed', windowMs: 60_000 },
     extraction: input.extraction ?? { kind: 'realtime' },
     visualization: input.visualization ?? 'last-value',
     position: input.position ?? null,

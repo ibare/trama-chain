@@ -22,11 +22,13 @@ interface Props {
   inferredKind: ValueKind | null;
 }
 
-const PRESET_SIZES = [10, 30, 100];
+/** 보관 윈도우 프리셋 — 시뮬레이션 시간 기준 ms. tick rate와 무관하게 "최근 N초". */
+const PRESET_WINDOWS_MS = [30_000, 60_000, 180_000, 300_000];
 /** 누적 추출 throttle 간격 프리셋 — 시뮬레이션 시간 기준 ms. */
 const PRESET_INTERVALS_MS = [1000, 5000, 10000];
 
-function intervalLabel(ms: number): string {
+function msLabel(ms: number): string {
+  if (ms % 60_000 === 0) return `${ms / 60_000}m`;
   if (ms % 1000 === 0) return `${ms / 1000}s`;
   return `${ms}ms`;
 }
@@ -34,7 +36,7 @@ function intervalLabel(ms: number): string {
 /**
  * Observe 노드 옆에 떠 있는 capacity·visualization 편집 패널.
  *
- * - capacity: bounded(슬라이더 + 프리셋) / unbounded 토글
+ * - capacity: windowed(시간 윈도우 프리셋 + 사용자 지정) / unbounded 토글
  * - visualization: 입력 ValueKind에 맞는 시각만 후보로 띄움. 미연결이면 전체.
  */
 export function ObserveInspector({ node, inferredKind }: Props): JSX.Element {
@@ -42,8 +44,10 @@ export function ObserveInspector({ node, inferredKind }: Props): JSX.Element {
   const updateNode = modelStore((s) => s.updateNode);
 
   const isUnbounded = node.capacity.kind === 'unbounded';
-  const boundedSize = node.capacity.kind === 'bounded' ? node.capacity.size : 30;
-  const [sizeDraft, setSizeDraft] = useState(String(boundedSize));
+  const windowMs =
+    node.capacity.kind === 'windowed' ? node.capacity.windowMs : 60_000;
+  // 사용자 지정 입력은 초 단위 — ms 보다 직관적이고 30s/1m/3m/5m 프리셋과 결이 맞다.
+  const [windowSecDraft, setWindowSecDraft] = useState(String(windowMs / 1000));
 
   const isThrottled = node.extraction.kind === 'throttle';
   const intervalMs =
@@ -73,11 +77,11 @@ export function ObserveInspector({ node, inferredKind }: Props): JSX.Element {
     [node.id, updateNode],
   );
 
-  const onPickSize = useCallback(
-    (n: number) => {
-      if (!Number.isFinite(n) || n <= 0) return;
-      setSizeDraft(String(n));
-      setCapacity({ kind: 'bounded', size: Math.floor(n) });
+  const onPickWindowMs = useCallback(
+    (ms: number) => {
+      if (!Number.isFinite(ms) || ms <= 0) return;
+      setWindowSecDraft(String(ms / 1000));
+      setCapacity({ kind: 'windowed', windowMs: Math.floor(ms) });
     },
     [setCapacity],
   );
@@ -112,17 +116,17 @@ export function ObserveInspector({ node, inferredKind }: Props): JSX.Element {
           <span className="trama-unit-inspector-section-label">누적</span>
           <ToggleGroup.Root
             type="single"
-            value={isUnbounded ? 'unbounded' : 'bounded'}
+            value={isUnbounded ? 'unbounded' : 'windowed'}
             onValueChange={(v) => {
               if (v === 'unbounded') setCapacity({ kind: 'unbounded' });
-              else if (v === 'bounded')
-                setCapacity({ kind: 'bounded', size: boundedSize });
+              else if (v === 'windowed')
+                setCapacity({ kind: 'windowed', windowMs });
             }}
             className="trama-unit-inspector-categories"
             aria-label="누적 정책"
           >
-            <ToggleGroup.Item value="bounded" className="trama-unit-inspector-chip">
-              최근 N개
+            <ToggleGroup.Item value="windowed" className="trama-unit-inspector-chip">
+              최근 시간
             </ToggleGroup.Item>
             <ToggleGroup.Item value="unbounded" className="trama-unit-inspector-chip">
               전체
@@ -137,36 +141,36 @@ export function ObserveInspector({ node, inferredKind }: Props): JSX.Element {
           >
             <ToggleGroup.Root
               type="single"
-              value={String(boundedSize)}
-              onValueChange={(v) => v && onPickSize(parseInt(v, 10))}
+              value={String(windowMs)}
+              onValueChange={(v) => v && onPickWindowMs(parseInt(v, 10))}
               className="trama-unit-inspector-categories"
-              aria-label="누적 크기 프리셋"
+              aria-label="보관 윈도우 프리셋"
             >
-              {PRESET_SIZES.map((n) => (
+              {PRESET_WINDOWS_MS.map((ms) => (
                 <ToggleGroup.Item
-                  key={n}
-                  value={String(n)}
+                  key={ms}
+                  value={String(ms)}
                   className="trama-unit-inspector-chip"
                 >
-                  {n}
+                  {msLabel(ms)}
                 </ToggleGroup.Item>
               ))}
             </ToggleGroup.Root>
-            <Form.Field name="size" className="trama-unit-inspector-range-row">
+            <Form.Field name="windowSec" className="trama-unit-inspector-range-row">
               <Form.Label className="trama-unit-inspector-range-label">
-                사용자 지정
+                사용자 지정 (초)
               </Form.Label>
               <Form.Control
                 type="number"
-                value={sizeDraft}
+                value={windowSecDraft}
                 min={1}
                 step={1}
                 className="trama-unit-inspector-range-input"
                 onChange={(e) => {
-                  setSizeDraft(e.currentTarget.value);
-                  const v = parseInt(e.currentTarget.value, 10);
-                  if (Number.isFinite(v) && v > 0) {
-                    setCapacity({ kind: 'bounded', size: v });
+                  setWindowSecDraft(e.currentTarget.value);
+                  const sec = parseInt(e.currentTarget.value, 10);
+                  if (Number.isFinite(sec) && sec > 0) {
+                    setCapacity({ kind: 'windowed', windowMs: sec * 1000 });
                   }
                 }}
               />
@@ -222,7 +226,7 @@ export function ObserveInspector({ node, inferredKind }: Props): JSX.Element {
                   value={String(ms)}
                   className="trama-unit-inspector-chip"
                 >
-                  {intervalLabel(ms)}
+                  {msLabel(ms)}
                 </ToggleGroup.Item>
               ))}
             </ToggleGroup.Root>

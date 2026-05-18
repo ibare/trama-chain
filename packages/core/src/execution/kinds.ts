@@ -801,8 +801,8 @@ function capacityMatches(
   capacity: Extract<Node, { kind: 'observe' }>['capacity'],
 ): boolean {
   switch (buf.kind) {
-    case 'bounded':
-      return capacity.kind === 'bounded' && buf.capacity === capacity.size;
+    case 'windowed':
+      return capacity.kind === 'windowed' && buf.windowMs === capacity.windowMs;
     case 'unbounded':
       return capacity.kind === 'unbounded';
   }

@@ -94,7 +94,7 @@ export const LogicGateNodeSchema = z.object({
 });
 
 export const ObserveCapacitySchema = z.discriminatedUnion('kind', [
-  z.object({ kind: z.literal('bounded'), size: z.number().int().positive() }),
+  z.object({ kind: z.literal('windowed'), windowMs: z.number().int().positive() }),
   z.object({ kind: z.literal('unbounded') }),
 ]);
 

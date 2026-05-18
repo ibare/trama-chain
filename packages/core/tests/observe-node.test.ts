@@ -38,13 +38,13 @@ function makeNumericPipe() {
 }
 
 describe('ObserveNode', () => {
-  it('addObserveNode persists kind=observe with default capacity=30 + last-value viz', () => {
+  it('addObserveNode persists kind=observe with default windowed capacity + last-value viz', () => {
     let m = createEmptyModel(0);
     m = addObserveNode(m, { id: 'mon', label: 'monitor' }, 0);
     const n = m.nodes['mon']!;
     expect(isObserveNode(n)).toBe(true);
     if (isObserveNode(n)) {
-      expect(n.capacity).toEqual({ kind: 'bounded', size: 30 });
+      expect(n.capacity).toEqual({ kind: 'windowed', windowMs: 60_000 });
       expect(n.visualization).toBe('last-value');
     }
   });
@@ -118,19 +118,21 @@ describe('ObserveNode', () => {
     expect(state.values['mon']).toEqual(numericValue(42, 'free'));
   });
 
-  it('accumulates values into observeBuffers in time order with bounded capacity', () => {
+  it('accumulates values into observeBuffers in time order with windowed eviction', () => {
     let m = createEmptyModel(0);
     m = addConstantNode(
       m,
       { id: 'k', label: 'k', value: numericValue(0, 'free') },
       0,
     );
+    // windowMs=250, stepIntervalMs=100 → step별 t = 100,200,300,400,500.
+    // 마지막 push 후 cutoff = 500-250 = 250 → t<250 인 [100,200] evict.
     m = addObserveNode(
       m,
       {
         id: 'mon',
         label: 'monitor',
-        capacity: { kind: 'bounded', size: 3 },
+        capacity: { kind: 'windowed', windowMs: 250 },
       },
       0,
     );
@@ -138,8 +140,6 @@ describe('ObserveNode', () => {
 
     let state = initializeFromInitialValues(m);
 
-    // ConstantNode는 매 step `node.value`를 그대로 출력하므로, 모델의 value를
-    // 바꿔가며 propagate를 반복하면 모니터 입력이 시간순으로 1·2·3·4·5가 된다.
     for (const n of [1, 2, 3, 4, 5]) {
       const k = m.nodes['k']!;
       if (k.kind === 'constant') {
@@ -151,6 +151,7 @@ describe('ObserveNode', () => {
       state = propagateOneStep(state, m, {
         shapeRegistry: shapes,
         combinerRegistry: combiners,
+        stepIntervalMs: 100,
       });
     }
 
@@ -257,7 +258,7 @@ describe('ObserveNode', () => {
       {
         id: 'mon',
         label: 'monitor',
-        capacity: { kind: 'bounded', size: 7 },
+        capacity: { kind: 'windowed', windowMs: 7000 },
         visualization: 'sparkline',
       },
       0,
@@ -267,7 +268,7 @@ describe('ObserveNode', () => {
     const parsed = TramaDocumentSchema.parse(doc);
     expect(parsed.nodes[0]).toMatchObject({
       kind: 'observe',
-      capacity: { kind: 'bounded', size: 7 },
+      capacity: { kind: 'windowed', windowMs: 7000 },
       visualization: 'sparkline',
     });
     expect(JSON.stringify(doc)).not.toContain('observeBuffers');
@@ -276,7 +277,7 @@ describe('ObserveNode', () => {
     const n = roundTrip.nodes['mon']!;
     expect(isObserveNode(n)).toBe(true);
     if (isObserveNode(n)) {
-      expect(n.capacity).toEqual({ kind: 'bounded', size: 7 });
+      expect(n.capacity).toEqual({ kind: 'windowed', windowMs: 7000 });
       expect(n.visualization).toBe('sparkline');
     }
   });
