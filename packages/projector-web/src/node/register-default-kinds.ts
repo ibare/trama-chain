@@ -139,6 +139,9 @@ registerNodeKindUI({
  * - uniform: [min,max] 균등분포 (모든 값이 동등 확률)
  * - normal: 평균 μ, 표준편차 σ의 정규분포 (종 모양)
  * - sine: y = A·sin(ω·t + φ) + D 결정론 진동
+ * - step: t < startMs는 출력 없음, t ≥ startMs면 value 지속
+ * - pulse: periodMs마다 value를 한 tick 출력
+ * - schedule: (tMs, value) 짝 timeline 재생 (선택적 loop)
  */
 registerNodeKindUI({
   kind: 'generator',
@@ -216,6 +219,58 @@ registerNodeKindUI({
             omega: (2 * Math.PI) / 20,
             phase: 0,
             offset: 0,
+          },
+          position: canvasPos,
+        });
+        if (!node) return null;
+        return node.id;
+      },
+    },
+    {
+      key: 'gen-step',
+      label: '스텝 생성기',
+      symbol: 't↑',
+      createNode: (canvasPos) => {
+        const addGeneratorNode = instance.modelStore.getState().addGeneratorNode;
+        const node = addGeneratorNode({
+          label: '스텝',
+          params: { kind: 'step', startMs: 1000, value: 1 },
+          position: canvasPos,
+        });
+        if (!node) return null;
+        return node.id;
+      },
+    },
+    {
+      key: 'gen-pulse',
+      label: '펄스 생성기',
+      symbol: '▮',
+      createNode: (canvasPos) => {
+        const addGeneratorNode = instance.modelStore.getState().addGeneratorNode;
+        const node = addGeneratorNode({
+          label: '펄스',
+          params: { kind: 'pulse', periodMs: 500, value: 1 },
+          position: canvasPos,
+        });
+        if (!node) return null;
+        return node.id;
+      },
+    },
+    {
+      key: 'gen-schedule',
+      label: '스케줄 생성기',
+      symbol: '≣',
+      createNode: (canvasPos) => {
+        const addGeneratorNode = instance.modelStore.getState().addGeneratorNode;
+        const node = addGeneratorNode({
+          label: '스케줄',
+          params: {
+            kind: 'schedule',
+            points: [
+              { tMs: 0, value: 0 },
+              { tMs: 1000, value: 1 },
+            ],
+            loop: false,
           },
           position: canvasPos,
         });
