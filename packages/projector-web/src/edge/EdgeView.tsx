@@ -4,6 +4,7 @@ import {
   isConditionNode,
   isExpressionNode,
   isNumericValue,
+  isOutputPending,
   isOutputValid,
   isSequence,
   isValueNode,
@@ -96,12 +97,15 @@ function EdgeViewImpl({
     }
     return fallback;
   });
-  // source 출력 슬롯이 현재 valid한가. condition 게이트가 닫히는 등으로 invalid가
-  // 되면 target 끝을 소켓에서 풀어 케이블이 대롱대롱 늘어진 시각을 만든다.
+  // source 가 케이블에 *부착* 되어 있는지. condition 게이트가 닫히는 등으로
+  // 출력이 invalid 가 되면 target 끝을 소켓에서 풀어 대롱대롱 늘어진 시각을 만든다.
+  // pending(첫 신호 미도착) 은 토폴로지가 정상이라 부착 상태로 간주 — 노드 본체의
+  // 점선 보더 + "…" 가 이미 그 의미를 표현한다.
   const edgeSourceSlot = edge?.sourceSlotIndex ?? 0;
   const sourceValid = modelStore((s) => {
     if (!fromId) return true;
-    return isOutputValid(s.executionState, fromId, edgeSourceSlot);
+    if (isOutputValid(s.executionState, fromId, edgeSourceSlot)) return true;
+    return isOutputPending(s.executionState, fromId, edgeSourceSlot);
   });
 
   const openFunctionPicker = uiStore((s) => s.openFunctionPicker);

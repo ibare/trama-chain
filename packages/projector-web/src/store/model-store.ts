@@ -617,14 +617,16 @@ export function createModelStore({
     const isValid = result.isValid;
     const valueChanged =
       result.newValue !== undefined && result.newValue !== prevValue;
-    const validityChanged = wasValid !== isValid;
+    const becameInvalid = wasValid && !isValid;
 
     nodeFlashRegistry.trigger(pulse.targetNodeId);
 
-    // valid↔invalid 전이가 일어났다면 다운스트림 전체에 invalid가 전파되어야 한다.
-    // 펄스 체인은 valid source만 흘리는 시각·증분 경로라 invalid 전파를 표현하지
-    // 못한다. 이 경우엔 전체 재계산으로 정확한 그래프 상태를 한 번에 잡는다.
-    if (validityChanged) {
+    // valid → invalid 전이만 전체 재계산. 펄스 체인은 valid source 만 흘리는
+    // 시각·증분 경로라 invalid 전파를 표현하지 못하므로 한 번에 그래프 상태를
+    // 잡는다. 반대 방향(invalid/pending → valid) 은 증분 경로로 가야 다운스트림이
+    // 펄스 체인을 따라 자연스럽게 cascade — 한 step 에 모두 흡수되면 시각 펄스가
+    // 사라진다.
+    if (becameInvalid) {
       // 펄스 도착은 시간이 흐르는 step — paused=false 로 재계산해 ValueNode 가
       // source 변화를 흡수하도록 한다.
       const recomputed = computeExecutionState(model, undefined, false);
