@@ -2,6 +2,9 @@ import { numericValue } from '../model/index.js';
 import { nextMulberry } from './prng.js';
 import type { GeneratorParadigm } from './types.js';
 
+/** counter/uniform/normal 공유 발화 주기. 임시 결정 — 향후 paradigm 메타로 승격. */
+const FIRE_INTERVAL_MS = 1000 / 6;
+
 /**
  * 정규분포 랜덤 numeric 생성기 패러다임.
  *
@@ -13,22 +16,37 @@ import type { GeneratorParadigm } from './types.js';
  * 구현은 Box-Muller 변환: 두 개의 균등 r1, r2에서 두 개의 표준정규 z0, z1을
  * 만든다. emit은 z0만 쓰고 prngState를 2칸 진행 — z1은 버린다. 결정성 유지를
  * 위해 cursor에 캐시를 두지 않고 매번 두 r을 다시 뽑는 단순 모델.
+ *
+ * cursor.nextFireMs는 자체 시간 결정성이 없는 paradigm을 외부 throttle로
+ * 묶기 위한 필드 — pulse와 동일한 drift-free 누적.
  */
 export const normalParadigm: GeneratorParadigm<
   { kind: 'normal'; mean: number; stdev: number; seed: number },
-  { kind: 'normal'; prngState: number }
+  { kind: 'normal'; prngState: number; nextFireMs: number }
 > = {
   kind: 'normal',
   outputInterpolation: 'continuous',
-  initCursor: (params) => ({ kind: 'normal', prngState: params.seed | 0 }),
-  emit: (params, cursor) => {
+  initCursor: (params, simulationTimeMs) => ({
+    kind: 'normal',
+    prngState: params.seed | 0,
+    nextFireMs: simulationTimeMs,
+  }),
+  emit: (params, cursor, simulationTimeMs) => {
+    if (simulationTimeMs < cursor.nextFireMs) {
+      return { value: undefined, nextCursor: cursor };
+    }
     const { z, nextState } = boxMullerZ0(cursor.prngState);
     return {
       value: numericValue(params.mean + params.stdev * z, 'free'),
-      nextCursor: { kind: 'normal', prngState: nextState },
+      nextCursor: {
+        kind: 'normal',
+        prngState: nextState,
+        nextFireMs: cursor.nextFireMs + FIRE_INTERVAL_MS,
+      },
     };
   },
-  peek: (params, cursor) => {
+  peek: (params, cursor, simulationTimeMs) => {
+    if (simulationTimeMs < cursor.nextFireMs) return undefined;
     const { z } = boxMullerZ0(cursor.prngState);
     return numericValue(params.mean + params.stdev * z, 'free');
   },

@@ -8,12 +8,17 @@ import type { GeneratorParams, Value } from '../model/index.js';
  * 모양을 만들고 갱신해야 하는지 결정한다.
  */
 export type GeneratorCursor =
-  /** counter: 다음 emit 시 출력할 값. start로 초기화, emit마다 += step. */
-  | { kind: 'counter'; nextValue: number }
-  /** uniform: PRNG의 현재 state. seed로 초기화. */
-  | { kind: 'uniform'; prngState: number }
-  /** normal: PRNG의 현재 state. Box-Muller가 emit마다 2칸 진행. */
-  | { kind: 'normal'; prngState: number }
+  /**
+   * counter: 다음 emit 시 출력할 값 + 다음 발화 예정 시각.
+   * - nextValue: start로 초기화, 발화 시 += step.
+   * - nextFireMs: 자체 시간 결정성이 없는 paradigm이라 외부 throttle로 발화 주기를
+   *   고정한다 (현재 ≈167ms = 1초 6회). pulse와 동일한 drift-free 누적.
+   */
+  | { kind: 'counter'; nextValue: number; nextFireMs: number }
+  /** uniform: PRNG의 현재 state + 다음 발화 예정 시각. seed로 초기화. */
+  | { kind: 'uniform'; prngState: number; nextFireMs: number }
+  /** normal: PRNG의 현재 state + 다음 발화 예정 시각. Box-Muller가 발화마다 2칸 진행. */
+  | { kind: 'normal'; prngState: number; nextFireMs: number }
   /** sine: emit step 카운터. y = A·sin(ω·step + φ) + D. */
   | { kind: 'sine'; step: number }
   /** step: 상태 없음. 출력은 simulationTimeMs와 params.startMs로만 결정. */

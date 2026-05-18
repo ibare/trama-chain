@@ -29,10 +29,17 @@ import { createDefaultShapeRegistry } from '../src/functions/index.js';
 const shapes = createDefaultShapeRegistry();
 const combiners = createDefaultCombinerRegistry();
 
+/**
+ * counter/uniform/normal 공유 throttle 주기 (≈167ms). 패러다임 내부 상수와 동기.
+ * 시퀀스 발화 테스트에서 simulationTimeMs를 한 칸씩 진행시킬 때 쓴다.
+ */
+const FIRE_INTERVAL_MS = 1000 / 6;
+
 function step(state: ReturnType<typeof initializeFromInitialValues>, model: Parameters<typeof propagateOneStep>[1]) {
   return propagateOneStep(state, model, {
     shapeRegistry: shapes,
     combinerRegistry: combiners,
+    stepIntervalMs: FIRE_INTERVAL_MS,
   });
 }
 
@@ -53,7 +60,7 @@ describe('GeneratorNode — counter paradigm', () => {
     expect(cursor.nextValue).toBe(1);
     const out: number[] = [];
     for (let i = 0; i < 4; i++) {
-      const r = counterParadigm.emit(params, cursor, 0);
+      const r = counterParadigm.emit(params, cursor, i * FIRE_INTERVAL_MS);
       if (r.value?.kind === 'numeric') out.push(r.value.n);
       cursor = r.nextCursor;
     }
@@ -65,7 +72,7 @@ describe('GeneratorNode — counter paradigm', () => {
     let cursor = counterParadigm.initCursor(params, 0);
     const out: number[] = [];
     for (let i = 0; i < 3; i++) {
-      const r = counterParadigm.emit(params, cursor, 0);
+      const r = counterParadigm.emit(params, cursor, i * FIRE_INTERVAL_MS);
       if (r.value?.kind === 'numeric') out.push(r.value.n);
       cursor = r.nextCursor;
     }
@@ -81,8 +88,9 @@ describe('GeneratorNode — uniform paradigm', () => {
     let ca = uniformParadigm.initCursor(params, 0);
     let cb = uniformParadigm.initCursor(params, 0);
     for (let i = 0; i < 5; i++) {
-      const ra = uniformParadigm.emit(params, ca, 0);
-      const rb = uniformParadigm.emit(params, cb, 0);
+      const t = i * FIRE_INTERVAL_MS;
+      const ra = uniformParadigm.emit(params, ca, t);
+      const rb = uniformParadigm.emit(params, cb, t);
       if (ra.value?.kind === 'numeric') a.push(ra.value.n);
       if (rb.value?.kind === 'numeric') b.push(rb.value.n);
       ca = ra.nextCursor;
@@ -95,7 +103,7 @@ describe('GeneratorNode — uniform paradigm', () => {
     const params = { kind: 'uniform' as const, min: 10, max: 20, integer: false, seed: 7 };
     let cursor = uniformParadigm.initCursor(params, 0);
     for (let i = 0; i < 100; i++) {
-      const r = uniformParadigm.emit(params, cursor, 0);
+      const r = uniformParadigm.emit(params, cursor, i * FIRE_INTERVAL_MS);
       if (r.value?.kind === 'numeric') {
         expect(r.value.n).toBeGreaterThanOrEqual(10);
         expect(r.value.n).toBeLessThanOrEqual(20);
@@ -108,7 +116,7 @@ describe('GeneratorNode — uniform paradigm', () => {
     const params = { kind: 'uniform' as const, min: 1, max: 6, integer: true, seed: 99 };
     let cursor = uniformParadigm.initCursor(params, 0);
     for (let i = 0; i < 50; i++) {
-      const r = uniformParadigm.emit(params, cursor, 0);
+      const r = uniformParadigm.emit(params, cursor, i * FIRE_INTERVAL_MS);
       if (r.value?.kind === 'numeric') {
         expect(Number.isInteger(r.value.n)).toBe(true);
         expect(r.value.n).toBeGreaterThanOrEqual(1);
@@ -127,8 +135,9 @@ describe('GeneratorNode — normal paradigm', () => {
     let ca = normalParadigm.initCursor(params, 0);
     let cb = normalParadigm.initCursor(params, 0);
     for (let i = 0; i < 5; i++) {
-      const ra = normalParadigm.emit(params, ca, 0);
-      const rb = normalParadigm.emit(params, cb, 0);
+      const t = i * FIRE_INTERVAL_MS;
+      const ra = normalParadigm.emit(params, ca, t);
+      const rb = normalParadigm.emit(params, cb, t);
       if (ra.value?.kind === 'numeric') a.push(ra.value.n);
       if (rb.value?.kind === 'numeric') b.push(rb.value.n);
       ca = ra.nextCursor;
@@ -144,7 +153,7 @@ describe('GeneratorNode — normal paradigm', () => {
     let cursor = normalParadigm.initCursor(params, 0);
     const samples: number[] = [];
     for (let i = 0; i < 2000; i++) {
-      const r = normalParadigm.emit(params, cursor, 0);
+      const r = normalParadigm.emit(params, cursor, i * FIRE_INTERVAL_MS);
       if (r.value?.kind === 'numeric') samples.push(r.value.n);
       cursor = r.nextCursor;
     }
@@ -161,7 +170,7 @@ describe('GeneratorNode — normal paradigm', () => {
     const params = { kind: 'normal' as const, mean: 7, stdev: 0, seed: 1 };
     let cursor = normalParadigm.initCursor(params, 0);
     for (let i = 0; i < 20; i++) {
-      const r = normalParadigm.emit(params, cursor, 0);
+      const r = normalParadigm.emit(params, cursor, i * FIRE_INTERVAL_MS);
       if (r.value?.kind === 'numeric') expect(r.value.n).toBe(7);
       cursor = r.nextCursor;
     }
@@ -190,12 +199,12 @@ describe('GeneratorNode — propagate integration', () => {
     expect(state.validOutputs.has('g:0')).toBe(true);
     expect(state.generatorRuntime['g']?.enabled).toBe(false);
     // cursor는 아직 진행되지 않았다 — 다음 emit이 그대로 10을 낸다.
-    expect(state.generatorRuntime['g']?.cursor).toEqual({ kind: 'counter', nextValue: 10 });
+    expect(state.generatorRuntime['g']?.cursor).toEqual({ kind: 'counter', nextValue: 10, nextFireMs: 0 });
     // step을 돌려도 idle 상태면 cursor·값 그대로.
     state = step(state, m);
     expect(state.values['g']).toEqual(numericValue(10, 'free'));
     expect(state.validOutputs.has('g:0')).toBe(true);
-    expect(state.generatorRuntime['g']?.cursor).toEqual({ kind: 'counter', nextValue: 10 });
+    expect(state.generatorRuntime['g']?.cursor).toEqual({ kind: 'counter', nextValue: 10, nextFireMs: 0 });
   });
 
   it('enabled=true: emits per step, cursor advances', () => {
@@ -947,7 +956,7 @@ describe('GeneratorRegistry', () => {
     // counter params + uniform cursor → cursor 재초기화.
     const out = reg.emit(
       { kind: 'counter', start: 100, step: 0 },
-      { kind: 'uniform', prngState: 12345 },
+      { kind: 'uniform', prngState: 12345, nextFireMs: 0 },
       0,
     );
     expect(out.value).toEqual(numericValue(100, 'free'));
