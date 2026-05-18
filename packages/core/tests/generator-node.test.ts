@@ -17,7 +17,10 @@ import {
   normalParadigm,
   numericValue,
   propagateOneStep,
+  pulseParadigm,
+  scheduleParadigm,
   sineParadigm,
+  stepParadigm,
   TramaDocumentSchema,
   uniformParadigm,
 } from '../src/index.js';
@@ -726,6 +729,183 @@ describe('GeneratorNode — sine paradigm', () => {
   });
 });
 
+describe('GeneratorNode — step paradigm', () => {
+  it('t < startMs is freeze (undefined), t ≥ startMs emits value', () => {
+    const params = { kind: 'step' as const, startMs: 1000, value: 3.5 };
+    const cursor = stepParadigm.initCursor(params, 0);
+    expect(stepParadigm.peek(params, cursor, 0)).toBeUndefined();
+    expect(stepParadigm.peek(params, cursor, 999)).toBeUndefined();
+    expect(stepParadigm.peek(params, cursor, 1000)).toEqual(numericValue(3.5, 'free'));
+    expect(stepParadigm.peek(params, cursor, 5000)).toEqual(numericValue(3.5, 'free'));
+  });
+
+  it('emit returns same value/peek and progresses cursor (no state)', () => {
+    const params = { kind: 'step' as const, startMs: 0, value: 42 };
+    const cursor = stepParadigm.initCursor(params, 0);
+    const r = stepParadigm.emit(params, cursor, 0);
+    expect(r.value).toEqual(numericValue(42, 'free'));
+    expect(r.nextCursor.kind).toBe('step');
+  });
+
+  it('round-trip: serialize·parse preserves step params', () => {
+    let m = createEmptyModel(0);
+    m = addGeneratorNode(
+      m,
+      { id: 'g', label: '스텝', params: { kind: 'step', startMs: 1500, value: 7 } },
+      0,
+    );
+    const doc = modelToDocument(m);
+    const parsed = TramaDocumentSchema.parse(JSON.parse(JSON.stringify(doc)));
+    const m2 = documentToModel(parsed);
+    const n = m2.nodes['g']!;
+    if (isGeneratorNode(n)) {
+      expect(n.params).toEqual({ kind: 'step', startMs: 1500, value: 7 });
+    }
+  });
+});
+
+describe('GeneratorNode — pulse paradigm', () => {
+  it('first fire is at simulationTimeMs of initCursor (immediate)', () => {
+    const params = { kind: 'pulse' as const, periodMs: 200, value: 1 };
+    const cursor = pulseParadigm.initCursor(params, 100);
+    expect(cursor.nextFireMs).toBe(100);
+    const r = pulseParadigm.emit(params, cursor, 100);
+    expect(r.value).toEqual(numericValue(1, 'free'));
+    expect(r.nextCursor.nextFireMs).toBe(300);
+  });
+
+  it('freezes between fires (t < nextFireMs)', () => {
+    const params = { kind: 'pulse' as const, periodMs: 200, value: 1 };
+    let cursor = pulseParadigm.initCursor(params, 0);
+    // 첫 발화: t=0
+    let r = pulseParadigm.emit(params, cursor, 0);
+    expect(r.value).toEqual(numericValue(1, 'free'));
+    cursor = r.nextCursor;
+    // t=50, 100, 150 — freeze
+    for (const t of [50, 100, 150, 199]) {
+      const out = pulseParadigm.emit(params, cursor, t);
+      expect(out.value).toBeUndefined();
+      cursor = out.nextCursor; // cursor 그대로 유지
+    }
+    // t=200 — 두 번째 발화
+    r = pulseParadigm.emit(params, cursor, 200);
+    expect(r.value).toEqual(numericValue(1, 'free'));
+    expect(r.nextCursor.nextFireMs).toBe(400);
+  });
+
+  it('drift-free: 10 fires over period=100 reach exactly t=900 at 10th', () => {
+    const params = { kind: 'pulse' as const, periodMs: 100, value: 9 };
+    let cursor = pulseParadigm.initCursor(params, 0);
+    const fireTimes: number[] = [];
+    // 시뮬레이션: 1ms 간격으로 tick. 발화 시각 기록.
+    for (let t = 0; t <= 1000; t++) {
+      const r = pulseParadigm.emit(params, cursor, t);
+      if (r.value !== undefined) fireTimes.push(t);
+      cursor = r.nextCursor;
+    }
+    expect(fireTimes).toEqual([0, 100, 200, 300, 400, 500, 600, 700, 800, 900, 1000]);
+  });
+
+  it('round-trip: serialize·parse preserves pulse params', () => {
+    let m = createEmptyModel(0);
+    m = addGeneratorNode(
+      m,
+      { id: 'g', label: '펄스', params: { kind: 'pulse', periodMs: 250, value: 2 } },
+      0,
+    );
+    const doc = modelToDocument(m);
+    const parsed = TramaDocumentSchema.parse(JSON.parse(JSON.stringify(doc)));
+    const m2 = documentToModel(parsed);
+    const n = m2.nodes['g']!;
+    if (isGeneratorNode(n)) {
+      expect(n.params).toEqual({ kind: 'pulse', periodMs: 250, value: 2 });
+    }
+  });
+});
+
+describe('GeneratorNode — schedule paradigm', () => {
+  it('before first keyframe is freeze, then holds last passed value', () => {
+    const params = {
+      kind: 'schedule' as const,
+      points: [
+        { tMs: 100, value: 10 },
+        { tMs: 200, value: 20 },
+        { tMs: 500, value: 5 },
+      ],
+      loop: false,
+    };
+    const cursor = scheduleParadigm.initCursor(params, 0);
+    expect(scheduleParadigm.peek(params, cursor, 0)).toBeUndefined();
+    expect(scheduleParadigm.peek(params, cursor, 99)).toBeUndefined();
+    expect(scheduleParadigm.peek(params, cursor, 100)).toEqual(numericValue(10, 'free'));
+    expect(scheduleParadigm.peek(params, cursor, 150)).toEqual(numericValue(10, 'free'));
+    expect(scheduleParadigm.peek(params, cursor, 200)).toEqual(numericValue(20, 'free'));
+    expect(scheduleParadigm.peek(params, cursor, 499)).toEqual(numericValue(20, 'free'));
+    expect(scheduleParadigm.peek(params, cursor, 500)).toEqual(numericValue(5, 'free'));
+    expect(scheduleParadigm.peek(params, cursor, 10000)).toEqual(numericValue(5, 'free'));
+  });
+
+  it('empty points: always undefined', () => {
+    const params = { kind: 'schedule' as const, points: [], loop: false };
+    const cursor = scheduleParadigm.initCursor(params, 0);
+    expect(scheduleParadigm.peek(params, cursor, 0)).toBeUndefined();
+    expect(scheduleParadigm.peek(params, cursor, 1000)).toBeUndefined();
+  });
+
+  it('loop: cycles through (last.tMs - first.tMs) interval', () => {
+    const params = {
+      kind: 'schedule' as const,
+      points: [
+        { tMs: 0, value: 1 },
+        { tMs: 100, value: 2 },
+        { tMs: 200, value: 3 },
+      ],
+      loop: true,
+    };
+    const cursor = scheduleParadigm.initCursor(params, 0);
+    // cycle = 200. t=200 → offset 0 → value 1. t=250 → offset 50 → value 1 (last passed).
+    // t=300 → offset 100 → value 2.
+    expect(scheduleParadigm.peek(params, cursor, 200)).toEqual(numericValue(1, 'free'));
+    expect(scheduleParadigm.peek(params, cursor, 250)).toEqual(numericValue(1, 'free'));
+    expect(scheduleParadigm.peek(params, cursor, 300)).toEqual(numericValue(2, 'free'));
+    expect(scheduleParadigm.peek(params, cursor, 500)).toEqual(numericValue(2, 'free'));
+  });
+
+  it('round-trip: serialize·parse preserves schedule params', () => {
+    let m = createEmptyModel(0);
+    m = addGeneratorNode(
+      m,
+      {
+        id: 'g',
+        label: '스케줄',
+        params: {
+          kind: 'schedule',
+          points: [
+            { tMs: 0, value: 1 },
+            { tMs: 100, value: 2 },
+          ],
+          loop: true,
+        },
+      },
+      0,
+    );
+    const doc = modelToDocument(m);
+    const parsed = TramaDocumentSchema.parse(JSON.parse(JSON.stringify(doc)));
+    const m2 = documentToModel(parsed);
+    const n = m2.nodes['g']!;
+    if (isGeneratorNode(n)) {
+      expect(n.params).toEqual({
+        kind: 'schedule',
+        points: [
+          { tMs: 0, value: 1 },
+          { tMs: 100, value: 2 },
+        ],
+        loop: true,
+      });
+    }
+  });
+});
+
 describe('GeneratorRegistry', () => {
   it('routes by kind, throws on unknown', () => {
     const reg = createDefaultGeneratorRegistry();
@@ -737,6 +917,13 @@ describe('GeneratorRegistry', () => {
     expect(n.kind).toBe('normal');
     const s = reg.initCursor({ kind: 'sine', amplitude: 1, omega: 0.1, phase: 0, offset: 0 });
     expect(s.kind).toBe('sine');
+    const st = reg.initCursor({ kind: 'step', startMs: 0, value: 1 });
+    expect(st.kind).toBe('step');
+    const p = reg.initCursor({ kind: 'pulse', periodMs: 100, value: 1 }, 50);
+    expect(p.kind).toBe('pulse');
+    if (p.kind === 'pulse') expect(p.nextFireMs).toBe(50);
+    const sch = reg.initCursor({ kind: 'schedule', points: [], loop: false });
+    expect(sch.kind).toBe('schedule');
     expect(() => reg.initCursor({ kind: 'bogus' as never, start: 0, step: 1 } as never)).toThrow();
   });
 

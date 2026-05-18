@@ -15,7 +15,13 @@ export type GeneratorCursor =
   /** normal: PRNG의 현재 state. Box-Muller가 emit마다 2칸 진행. */
   | { kind: 'normal'; prngState: number }
   /** sine: emit step 카운터. y = A·sin(ω·step + φ) + D. */
-  | { kind: 'sine'; step: number };
+  | { kind: 'sine'; step: number }
+  /** step: 상태 없음. 출력은 simulationTimeMs와 params.startMs로만 결정. */
+  | { kind: 'step' }
+  /** pulse: 다음 발화 예정 시각(ms). drift-free 누적 — 발화 시 += periodMs. */
+  | { kind: 'pulse'; nextFireMs: number }
+  /** schedule: 상태 없음. 출력은 simulationTimeMs와 params.points로만 결정. */
+  | { kind: 'schedule' };
 
 /**
  * 노드별 런타임 상태. enabled=true인 동안 propagate 단계마다 emit한다.

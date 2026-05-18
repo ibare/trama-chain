@@ -154,6 +154,21 @@ export const GeneratorParamsSchema = z.discriminatedUnion('kind', [
     phase: z.number(),
     offset: z.number(),
   }),
+  z.object({
+    kind: z.literal('step'),
+    startMs: z.number(),
+    value: z.number(),
+  }),
+  z.object({
+    kind: z.literal('pulse'),
+    periodMs: z.number(),
+    value: z.number(),
+  }),
+  z.object({
+    kind: z.literal('schedule'),
+    points: z.array(z.object({ tMs: z.number(), value: z.number() })),
+    loop: z.boolean(),
+  }),
 ]);
 
 export const GeneratorNodeSchema = z.object({

@@ -10,7 +10,10 @@ interface Props {
   node: GeneratorNode;
 }
 
-type ParadigmKind = GeneratorParams['kind'];
+// step·pulse·schedule paradigm은 5단계 UI 작업에서 정식 등록 예정 — 현 inspector는
+// 4종 무시간 paradigm만 picker로 노출한다. 노드가 시간 기반 params를 갖더라도
+// 모델은 정상 동작하고 inspector 필드만 null로 폴백한다.
+type ParadigmKind = Exclude<GeneratorParams['kind'], 'step' | 'pulse' | 'schedule'>;
 
 /** counter paradigm 기본값. */
 const COUNTER_DEFAULTS = { kind: 'counter' as const, start: 1, step: 1 };
@@ -139,9 +142,9 @@ export function GeneratorInspector({ node }: Props): JSX.Element {
           <UniformFields params={node.params} disabled={disabled} onChange={setParams} />
         ) : node.params.kind === 'normal' ? (
           <NormalFields params={node.params} disabled={disabled} onChange={setParams} />
-        ) : (
+        ) : node.params.kind === 'sine' ? (
           <SineFields params={node.params} disabled={disabled} onChange={setParams} />
-        )}
+        ) : null}
       </div>
     </>
   );

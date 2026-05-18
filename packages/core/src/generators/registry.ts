@@ -3,6 +3,9 @@ import { counterParadigm } from './counter.js';
 import { uniformParadigm } from './uniform.js';
 import { normalParadigm } from './normal.js';
 import { sineParadigm } from './sine.js';
+import { stepParadigm } from './step.js';
+import { pulseParadigm } from './pulse.js';
+import { scheduleParadigm } from './schedule.js';
 import type { GeneratorCursor, GeneratorParadigm, GeneratorRuntime } from './types.js';
 
 /**
@@ -67,7 +70,10 @@ export function createDefaultGeneratorRegistry(): GeneratorRegistry {
     .register(counterParadigm)
     .register(uniformParadigm)
     .register(normalParadigm)
-    .register(sineParadigm);
+    .register(sineParadigm)
+    .register(stepParadigm)
+    .register(pulseParadigm)
+    .register(scheduleParadigm);
 }
 
 /** 라이브러리 내부 폴백 — 옵션 미주입 경로에서 사용된다. */

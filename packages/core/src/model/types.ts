@@ -238,7 +238,27 @@ export type GeneratorParams =
    * omega는 emit당 라디안 (주기 T = 2π/omega). phase는 라디안. offset은 DC bias.
    * 단진동·일주기·계절 변화 등 결정론적 진동 현상 모델링용. seed 불필요.
    */
-  | { kind: 'sine'; amplitude: number; omega: number; phase: number; offset: number };
+  | { kind: 'sine'; amplitude: number; omega: number; phase: number; offset: number }
+  /**
+   * 스텝: 시뮬레이션 시간 t가 startMs 미만이면 출력이 정의되지 않은 freeze 상태,
+   * t ≥ startMs부터 지정 value를 계속 출력. heaviside 계단함수.
+   */
+  | { kind: 'step'; startMs: number; value: number }
+  /**
+   * 펄스: 매 periodMs마다 한 tick 동안 지정 value를 출력. ▶ 누른 시각이 첫
+   * 발화 시각 — drift-free 누적 모델이라 시간 측정 오차가 누적되지 않는다.
+   */
+  | { kind: 'pulse'; periodMs: number; value: number }
+  /**
+   * 스케줄: (tMs, value) keyframe timeline 재생. emit 시각 t에 대해 t 이하의
+   * 가장 늦은 keyframe value를 유지(계단). loop=true면 첫·마지막 keyframe
+   * 시각 간격으로 모듈로 반복.
+   */
+  | {
+      kind: 'schedule';
+      points: { tMs: number; value: number }[];
+      loop: boolean;
+    };
 
 export interface GeneratorNode {
   kind: 'generator';
