@@ -1,8 +1,10 @@
 import { memo, useEffect, useMemo, useRef, useState } from 'react';
 import { tokens } from '@trama/tokens';
 import {
+  defaultNodeKindRegistry,
   isConditionNode,
   isExpressionNode,
+  isFunctionHandle,
   isNumericValue,
   isOutputPending,
   isOutputValid,
@@ -188,6 +190,29 @@ function EdgeViewImpl({
     sourceValidRef.current = sourceValid;
   }, [sourceValid]);
 
+  // source 노드의 outputInterpolation을 디스크립터 경유로 조회 — 'continuous' 인
+  // source(현재 sine paradigm) 만 매 프레임 stroke 시각을 변조한다. 디스크립터를 직접
+  // 경유해 paradigm 종류 하드코딩 분기를 피한다(principles §3).
+  const isContinuousSource = modelStore((s) => {
+    if (!fromId) return false;
+    const n = s.model.nodes[fromId];
+    if (!n) return false;
+    const desc = defaultNodeKindRegistry.forNode(n);
+    return desc?.outputInterpolation?.(n) === 'continuous';
+  });
+  // ticker 재등록 회피용 ref. fromId 도 ticker 안에서 store.getState() 조회 키로 쓴다.
+  const isContinuousRef = useRef(isContinuousSource);
+  useEffect(() => {
+    isContinuousRef.current = isContinuousSource;
+  }, [isContinuousSource]);
+  const fromIdRef = useRef(fromId);
+  useEffect(() => {
+    fromIdRef.current = fromId;
+  }, [fromId]);
+  // 적응적 normalize 용 누적 min/max. continuous 신호의 도메인을 사전에 알 수 없으므로
+  // 관측 범위를 누적해 intensity ∈ [0,1] 로 환산. 시각 전용 휘발 상태(직렬화·결정론 무관).
+  const peekRangeRef = useRef({ min: Infinity, max: -Infinity });
+
   const lag = edge?.lag ?? 0;
 
   // 첫 렌더용 초기 좌표 — 케이블 점 배열에서 직접 뽑는다.
@@ -239,6 +264,24 @@ function EdgeViewImpl({
         const m = cablePointAt(cable, SHAPE_MARKER_FRACTION);
         shapeMarkerRef.current.setAttribute('transform', `translate(${m.x},${m.y})`);
       }
+
+      // continuous source: ExecValue 가 FunctionHandle 이면 그 프레임의 simulationTimeMs
+      // 로 peek 해 stroke intensity 를 변조. discrete source 는 분기 미진입.
+      if (!isContinuousRef.current) return;
+      const path = pathRef.current;
+      const srcId = fromIdRef.current;
+      if (!path || !srcId) return;
+      const state = modelStore.getState();
+      const ev = state.executionState.values[srcId];
+      if (!ev || !isFunctionHandle(ev)) return;
+      const sampled = ev.peek(state.executionState.simulationTimeMs);
+      if (sampled.kind !== 'numeric') return;
+      const rng = peekRangeRef.current;
+      if (sampled.n < rng.min) rng.min = sampled.n;
+      if (sampled.n > rng.max) rng.max = sampled.n;
+      const span = rng.max - rng.min;
+      const intensity = span > 1e-6 ? (sampled.n - rng.min) / span : 0.5;
+      path.style.setProperty('--continuous-intensity', String(intensity));
     };
     const unregisterTicker = animationLoop.register(tick);
     const unregisterCable = cableRegistry.register(edgeId, cable);
@@ -278,6 +321,7 @@ function EdgeViewImpl({
   if (isFeedback) baseClasses.push('is-feedback');
   if (isStrained) baseClasses.push('is-strained');
   if (introducing) baseClasses.push('is-introducing');
+  if (isContinuousSource) baseClasses.push('is-continuous');
 
   const arrowClass = `trama-arrow${isFeedback ? ' is-feedback' : ''}${isStrained ? ' is-strained' : ''}`;
   const groupCls = `trama-edge-group${morphing ? ' is-morphing' : ''}${isDetaching ? ' is-detaching' : ''}${sourceValid ? '' : ' is-gated'}`;
