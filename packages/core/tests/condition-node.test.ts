@@ -178,7 +178,11 @@ describe('ConditionNode 게이트 시맨틱', () => {
       shapeRegistry: shapes,
       combinerRegistry: combiners,
     });
-    expect(getNumericValue(s2, 'out')).toBe(0);
+    // out 은 lag=0 incoming 을 가진 ValueNode — 신규 의미 모델에서는 첫 신호가
+    // 도착하기 전까지 pending. 차단된 condition 으로 펄스가 흐르지 않았으므로
+    // 출력은 invalid, 값은 undefined.
+    expect(isOutputValid(s2, 'out', 0)).toBe(false);
+    expect(getNumericValue(s2, 'out')).toBeUndefined();
   });
 
   it('차단되면 다운스트림 ValueNode도 invalid (invalid 전파)', () => {

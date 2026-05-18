@@ -47,6 +47,9 @@ function ValueNodeCardImpl({
   const combiner = combinerRegistry.get(node.combiner);
   const combinerLabel = combiner?.labels.ko ?? node.combiner;
   const combinerSym = combinerSymbol(node.combiner);
+  // pending 상태는 stateClass='is-pending' 단일 진입점 — 값 텍스트는 "..." 로
+  // 대체해 "값은 아직 도착하지 않았다" 를 명시한다.
+  const isPending = stateClass === 'is-pending';
 
   return (
     <>
@@ -75,11 +78,17 @@ function ValueNodeCardImpl({
         y={layout.valueY}
         textAnchor="start"
       >
-        {formatted.primary}
-        {formatted.accessory && (
-          <tspan className="trama-node-unit" dx="6">
-            {formatted.accessory}
-          </tspan>
+        {isPending ? (
+          '…'
+        ) : (
+          <>
+            {formatted.primary}
+            {formatted.accessory && (
+              <tspan className="trama-node-unit" dx="6">
+                {formatted.accessory}
+              </tspan>
+            )}
+          </>
         )}
       </text>
       <InteractiveArea

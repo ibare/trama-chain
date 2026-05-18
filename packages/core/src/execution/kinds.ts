@@ -126,6 +126,13 @@ export interface PropagateContext {
   next: Record<NodeId, ExecValue>;
   validOutputs: Set<string>;
   /**
+   * "토폴로지 정상, 첫 신호 미도착" 슬롯 집합. ValueNode 처럼 incoming 엣지가
+   * 있어 stored state(initialValue) 권위를 잃은 노드가 아직 어떤 펄스도
+   * 받지 못한 상태를 표시한다. 디스크립터가 성공적으로 갱신하면 키를
+   * 삭제한다. valid 와 상호 배타.
+   */
+  pendingOutputs: Set<string>;
+  /**
    * 노드별 마지막 실패 사유 (UI invalid 배지/툴팁 노출용).
    * 디스크립터가 평가에 실패하면 여기에 기록하고, 성공하면 키를 삭제한다.
    */
@@ -163,6 +170,13 @@ export interface PropagateContext {
   sequenceNext: Record<string, SequenceValue>;
   /** 현재 simulation time(ms). 이 step 내 누적·emit 시각의 기준. */
   simulationTimeMs: number;
+  /**
+   * 멈춤 상태. true 면 ValueNode 처럼 펄스 도착으로만 갱신되는 노드는 이번
+   * 단계에서 source 변화를 흡수하지 않는다 — pending 이면 pending 유지, valid
+   * 였다면 마지막 수신값 유지. 시간이 흐르는 step(!paused)에서만 contribute
+   * 결합·갱신이 일어난다.
+   */
+  paused: boolean;
 }
 
 /**
@@ -333,7 +347,11 @@ const valueNodeDescriptor: NodeKindDescriptor<Extract<Node, { kind: 'value' }>> 
   },
   propagate: (node, ctx) => {
     const incoming = ctx.incoming;
-    if (incoming.length === 0) return; // 입력 없음: 기존 값 유지
+    if (incoming.length === 0) return; // 입력 없음: initialValue 권위 유지 (init이 valid로 세팅)
+
+    // 멈춤 상태에서는 source 변화를 즉시 흡수하지 않는다 — 펄스 도착으로만 갱신.
+    // 직전 상태가 pending 이면 pending 유지, valid(마지막 수신값) 였다면 그대로 유지.
+    if (ctx.paused) return;
 
     // ValueKind별 propagate 분기 — 같은 'value' 디스크립터 안에서 numeric/boolean을
     // 각자의 경로로 다룬다. 노드 종류를 둘로 쪼개지 않는 이유는 모델·UI·serialize가
@@ -396,6 +414,7 @@ const valueNodeDescriptor: NodeKindDescriptor<Extract<Node, { kind: 'value' }>> 
     const finalNumber = hasRawPassthrough ? combined : clampToUnit(combined, targetUnit);
     ctx.next[node.id] = numericValue(finalNumber, node.initialValue.unitId);
     ctx.validOutputs.add(outputKey(node.id, 0));
+    ctx.pendingOutputs.delete(outputKey(node.id, 0));
   },
 };
 
@@ -432,6 +451,7 @@ function propagateBooleanValueNode(
   }
   ctx.next[node.id] = booleanValue(combiner.combine(contributions));
   ctx.validOutputs.add(outputKey(node.id, 0));
+  ctx.pendingOutputs.delete(outputKey(node.id, 0));
 }
 
 const constantNodeDescriptor: NodeKindDescriptor<Extract<Node, { kind: 'constant' }>> = {

@@ -147,6 +147,8 @@ function patchAffectsValues(patch: NodePatch): boolean {
 function computeExecutionState(
   model: Model,
   prior?: ExecutionState,
+  paused: boolean = true,
+  priorModel?: Model,
 ): {
   executionState: ExecutionState;
   trajectory: ExecutionState[];
@@ -157,6 +159,7 @@ function computeExecutionState(
       shapeRegistry,
       combinerRegistry,
       expressionEvaluator: fizzexExpressionEvaluator,
+      paused,
     });
     fresh = { executionState: traj[traj.length - 1]!, trajectory: traj };
   } catch {
@@ -169,6 +172,35 @@ function computeExecutionState(
   const mergedRuntime: Record<NodeId, GeneratorRuntime> = {};
   const mergedValues: Record<NodeId, ExecValue> = { ...fresh.executionState.values };
   const mergedValid = new Set(fresh.executionState.validOutputs);
+  const mergedPending = new Set(fresh.executionState.pendingOutputs);
+  // ValueNode 의 "마지막 수신값" 은 모델 편집으로 리셋되지 않는다 — 멈춤 상태에서
+  // source(scrub) 가 바뀌어도 펄스가 아직 도착하지 않은 것이므로 target 의 직전
+  // 수신값이 유지돼야 한다. 단, "prior valid" 가 last-received 인지 단순한
+  // initialValue 권위인지 구분이 필요하다. priorModel 에서도 같은 노드가 lag=0
+  // incoming 을 갖고 있던 경우만 "수신값" 으로 간주 — 새로 엣지가 추가된 경우엔
+  // initialValue 권위였을 뿐이므로 pending 으로 두고 첫 펄스 도착을 기다린다.
+  if (priorModel) {
+    const priorLag0Targets = new Set<NodeId>();
+    for (const eid of priorModel.edgeOrder) {
+      const e = priorModel.edges[eid];
+      if (!e) continue;
+      if ((e.lag ?? 0) !== 0) continue;
+      priorLag0Targets.add(e.to);
+    }
+    for (const nid of model.nodeOrder) {
+      const node = model.nodes[nid];
+      if (!node || !isValueNode(node)) continue;
+      const slot = outputKey(nid, 0);
+      if (!fresh.executionState.pendingOutputs.has(slot)) continue;
+      if (!priorLag0Targets.has(nid)) continue;
+      const priorVal = prior.values[nid];
+      if (priorVal === undefined) continue;
+      if (!prior.validOutputs.has(slot)) continue;
+      mergedValues[nid] = priorVal;
+      mergedValid.add(slot);
+      mergedPending.delete(slot);
+    }
+  }
   // ObserveNode 누적·throttle 런타임·sequence 슬롯 출력은 모델 편집(엣지 추가
   // 등) 으로 리셋되면 안 된다. executeModel 은 initializeFromInitialValues 에서
   // 빈 버퍼로 시작하므로 fresh 만 쓰면 한 step 분량만 남는다. prior 에 있던
@@ -219,6 +251,7 @@ function computeExecutionState(
       ...fresh.executionState,
       values: mergedValues,
       validOutputs: mergedValid,
+      pendingOutputs: mergedPending,
       generatorRuntime: mergedRuntime,
       observeBuffers: mergedObserveBuffers,
       observeExtractionRuntime: mergedExtractionRuntime,
@@ -399,6 +432,47 @@ export function createModelStore({
     }, currentStepIntervalMs());
   }
 
+  /**
+   * 재생 진입 시 pending ValueNode 들에 첫 펄스를 흘려준다.
+   *
+   * 멈춤 중 새로 추가된 lag=0 엣지의 target 은 pending 상태로 남아 있다 — 멈춤
+   * 중에는 source 변화를 흡수하지 않기로 했으므로(인과 일관). 재생 진입 순간에야
+   * "시간이 흐르기 시작" 했으니 source 의 첫 펄스를 spawn 해 target 이 시각·인과
+   * 정상 경로로 값을 받게 한다. 효과는 펄스 도착 시점의 handlePulseArrival 에서만
+   * 일어나므로 시각이 효과를 앞서지 않는다.
+   */
+  function flushPendingOnUnpause(): void {
+    const { model, executionState } = store.getState();
+    if (executionState.pendingOutputs.size === 0) return;
+    const pendingTargets = new Set<NodeId>();
+    for (const slot of executionState.pendingOutputs) {
+      const colon = slot.lastIndexOf(':');
+      const nid = colon >= 0 ? slot.slice(0, colon) : slot;
+      const node = model.nodes[nid];
+      if (!node || !isValueNode(node)) continue;
+      pendingTargets.add(nid);
+    }
+    if (pendingTargets.size === 0) return;
+    const sourceToSlots = new Map<NodeId, Set<number>>();
+    for (const eid of model.edgeOrder) {
+      const e = model.edges[eid];
+      if (!e) continue;
+      if ((e.lag ?? 0) !== 0) continue;
+      if (!pendingTargets.has(e.to)) continue;
+      const slot = e.sourceSlotIndex ?? 0;
+      if (!executionState.validOutputs.has(outputKey(e.from, slot))) continue;
+      let set = sourceToSlots.get(e.from);
+      if (!set) {
+        set = new Set();
+        sourceToSlots.set(e.from, set);
+      }
+      set.add(slot);
+    }
+    for (const [sourceId, slots] of sourceToSlots) {
+      spawnOutgoingPulses(model, executionState, sourceId, slots);
+    }
+  }
+
   // timeSettings 변경 구독 — multiplier·paused 변화에 ticker·playback 반영.
   timeSettingsStore.subscribe((state, prev) => {
     if (state.paused !== prev.paused) {
@@ -406,6 +480,9 @@ export function createModelStore({
         stopGeneratorTicker();
         stopPlaybackTimer();
       } else {
+        // pending 흡수는 ticker 시작 전에 한 번 — generator emit 보다 인과적으로
+        // 먼저 시작된 "새 엣지의 첫 신호" 가 시각화되도록.
+        flushPendingOnUnpause();
         startGeneratorTickerIfNeeded();
         const playbackStep = store.getState().playbackStep;
         if (playbackStep !== null) {
@@ -548,7 +625,9 @@ export function createModelStore({
     // 펄스 체인은 valid source만 흘리는 시각·증분 경로라 invalid 전파를 표현하지
     // 못한다. 이 경우엔 전체 재계산으로 정확한 그래프 상태를 한 번에 잡는다.
     if (validityChanged) {
-      const recomputed = computeExecutionState(model);
+      // 펄스 도착은 시간이 흐르는 step — paused=false 로 재계산해 ValueNode 가
+      // source 변화를 흡수하도록 한다.
+      const recomputed = computeExecutionState(model, undefined, false);
       store.setState({
         executionState: recomputed.executionState,
         trajectory: recomputed.trajectory,
@@ -567,6 +646,7 @@ export function createModelStore({
             ...result.newSequenceOutputs,
           },
           validOutputs: result.validOutputs,
+          pendingOutputs: result.pendingOutputs,
           invalidReasons: s.executionState.invalidReasons,
           observeBuffers: result.newObserveBuffers,
           observeExtractionRuntime: result.newObserveExtractionRuntime,
@@ -609,14 +689,15 @@ export function createModelStore({
 
     setModel: (next) => {
       if (!assertEditable()) return;
-      const exec = computeExecutionState(next, get().executionState);
+      const s = get();
+      const exec = computeExecutionState(next, s.executionState, true, s.model);
       set({ model: next, ...exec });
       reconcileGeneratorTicker();
     },
 
     recompute: () => {
       const s = get();
-      const exec = computeExecutionState(s.model, s.executionState);
+      const exec = computeExecutionState(s.model, s.executionState, true, s.model);
       set(exec);
     },
 
@@ -640,7 +721,7 @@ export function createModelStore({
       const after = addValueNodeOp(s.model, input);
       const newId = after.nodeOrder[after.nodeOrder.length - 1]!;
       const node = after.nodes[newId]!;
-      const exec = computeExecutionState(after, s.executionState);
+      const exec = computeExecutionState(after, s.executionState, true, s.model);
       set({ model: after, ...exec });
       return node;
     },
@@ -651,7 +732,7 @@ export function createModelStore({
       const after = addConstantNodeOp(s.model, input);
       const newId = after.nodeOrder[after.nodeOrder.length - 1]!;
       const node = after.nodes[newId]!;
-      const exec = computeExecutionState(after, s.executionState);
+      const exec = computeExecutionState(after, s.executionState, true, s.model);
       set({ model: after, ...exec });
       return node;
     },
@@ -662,7 +743,7 @@ export function createModelStore({
       const after = addConditionNodeOp(s.model, input);
       const newId = after.nodeOrder[after.nodeOrder.length - 1]!;
       const node = after.nodes[newId]!;
-      const exec = computeExecutionState(after, s.executionState);
+      const exec = computeExecutionState(after, s.executionState, true, s.model);
       set({ model: after, ...exec });
       return node;
     },
@@ -673,7 +754,7 @@ export function createModelStore({
       const after = addLogicGateNodeOp(s.model, input);
       const newId = after.nodeOrder[after.nodeOrder.length - 1]!;
       const node = after.nodes[newId]!;
-      const exec = computeExecutionState(after, s.executionState);
+      const exec = computeExecutionState(after, s.executionState, true, s.model);
       set({ model: after, ...exec });
       return node;
     },
@@ -684,7 +765,7 @@ export function createModelStore({
       const after = addObserveNodeOp(s.model, input);
       const newId = after.nodeOrder[after.nodeOrder.length - 1]!;
       const node = after.nodes[newId]!;
-      const exec = computeExecutionState(after, s.executionState);
+      const exec = computeExecutionState(after, s.executionState, true, s.model);
       set({ model: after, ...exec });
       return node;
     },
@@ -695,7 +776,7 @@ export function createModelStore({
       const after = addExpressionNodeOp(s.model, input);
       const newId = after.nodeOrder[after.nodeOrder.length - 1]!;
       const node = after.nodes[newId]!;
-      const exec = computeExecutionState(after, s.executionState);
+      const exec = computeExecutionState(after, s.executionState, true, s.model);
       set({ model: after, ...exec });
       return node;
     },
@@ -706,7 +787,7 @@ export function createModelStore({
       const after = addGeneratorNodeOp(s.model, input);
       const newId = after.nodeOrder[after.nodeOrder.length - 1]!;
       const node = after.nodes[newId]!;
-      const exec = computeExecutionState(after, s.executionState);
+      const exec = computeExecutionState(after, s.executionState, true, s.model);
       set({ model: after, ...exec });
       return node;
     },
@@ -717,7 +798,7 @@ export function createModelStore({
       const after = addAverageNodeOp(s.model, input);
       const newId = after.nodeOrder[after.nodeOrder.length - 1]!;
       const node = after.nodes[newId]!;
-      const exec = computeExecutionState(after, s.executionState);
+      const exec = computeExecutionState(after, s.executionState, true, s.model);
       set({ model: after, ...exec });
       return node;
     },
@@ -796,7 +877,9 @@ export function createModelStore({
       const after = updateNodeOp(before, id, patch);
       if (after === before) return;
 
-      const exec = affectsValues ? computeExecutionState(after, get().executionState) : null;
+      const exec = affectsValues
+        ? computeExecutionState(after, get().executionState, true, before)
+        : null;
       set({ model: after, ...(exec ?? {}) });
       if (affectsValues) {
         nodeFlashRegistry.trigger(id);
@@ -811,7 +894,7 @@ export function createModelStore({
       const s = get();
       const after = removeNodeOp(s.model, id);
       if (after === s.model) return;
-      const exec = computeExecutionState(after, s.executionState);
+      const exec = computeExecutionState(after, s.executionState, true, s.model);
       set({ model: after, ...exec });
     },
 
@@ -865,7 +948,7 @@ export function createModelStore({
       const after = candidate;
       const newId = after.edgeOrder[after.edgeOrder.length - 1]!;
       const edge = after.edges[newId]!;
-      const exec = computeExecutionState(after, get().executionState);
+      const exec = computeExecutionState(after, get().executionState, true, before);
       set({ model: after, ...exec });
       reconcileGeneratorTicker();
       return edge;
@@ -884,7 +967,7 @@ export function createModelStore({
         }
       }
       const after = candidate;
-      const exec = computeExecutionState(after, s.executionState);
+      const exec = computeExecutionState(after, s.executionState, true, s.model);
       set({ model: after, ...exec });
       reconcileGeneratorTicker();
     },
@@ -894,7 +977,7 @@ export function createModelStore({
       const s = get();
       const after = removeEdgeOp(s.model, id);
       if (after === s.model) return;
-      const exec = computeExecutionState(after, s.executionState);
+      const exec = computeExecutionState(after, s.executionState, true, s.model);
       set({ model: after, ...exec });
       reconcileGeneratorTicker();
     },
@@ -910,7 +993,7 @@ export function createModelStore({
       const s = get();
       const after = setExecutionOp(s.model, e);
       if (after === s.model) return;
-      const exec = computeExecutionState(after, s.executionState);
+      const exec = computeExecutionState(after, s.executionState, true, s.model);
       set({ model: after, ...exec });
     },
 
@@ -932,7 +1015,7 @@ export function createModelStore({
       }
       const after = updateNodeOp(before, id, { initialValue: nextValueRecord });
       if (after === before) return;
-      const recomputed = computeExecutionState(after, get().executionState);
+      const recomputed = computeExecutionState(after, get().executionState, true, before);
       const playbackActive = get().playbackStep !== null;
       set((s) => {
         const nextValues: Record<NodeId, ExecValue> = playbackActive
@@ -950,6 +1033,7 @@ export function createModelStore({
                 values: nextValues,
                 sequenceOutputs: s.executionState.sequenceOutputs,
                 validOutputs: nextValid,
+                pendingOutputs: s.executionState.pendingOutputs,
                 invalidReasons: s.executionState.invalidReasons,
                 observeBuffers: s.executionState.observeBuffers,
                 observeExtractionRuntime: s.executionState.observeExtractionRuntime,

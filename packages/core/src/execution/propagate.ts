@@ -52,6 +52,13 @@ export interface PropagateOptions {
    * 정상 ticker 경로는 step 간격(예: STEP_TICK_MS) 을 넘긴다.
    */
   stepIntervalMs?: number;
+  /**
+   * 멈춤 상태 여부. true 면 ValueNode 처럼 *펄스 도착*으로만 갱신되는 노드는
+   * 본 propagate 단계에서 값을 새로 계산하지 않고 직전 상태(pending 또는 마지막
+   * 수신값) 를 보존한다. 시간이 흐르지 않는 동안 source 변화가 즉시 다운스트림에
+   * 반영되는 "시각보다 효과가 먼저 가는" 오작동을 막기 위함.
+   */
+  paused?: boolean;
 }
 
 /**
@@ -71,6 +78,7 @@ export function propagateOneStep(
   const nodeKindRegistry = options.nodeKindRegistry ?? defaultNodeKindRegistry;
   const next: Record<string, ExecValue> = { ...state.values };
   const validOutputs = new Set(state.validOutputs);
+  const pendingOutputs = new Set(state.pendingOutputs);
   const invalidReasons: ExecutionState['invalidReasons'] = {
     ...state.invalidReasons,
   };
@@ -111,6 +119,7 @@ export function propagateOneStep(
       incoming,
       next,
       validOutputs,
+      pendingOutputs,
       invalidReasons,
       catalog,
       shapeRegistry: options.shapeRegistry,
@@ -125,6 +134,7 @@ export function propagateOneStep(
       generatorRegistry,
       sequenceNext,
       simulationTimeMs,
+      paused: options.paused ?? false,
     };
     desc.propagate(node, ctx);
   }
@@ -133,6 +143,7 @@ export function propagateOneStep(
     values: next,
     sequenceOutputs: sequenceNext,
     validOutputs,
+    pendingOutputs,
     invalidReasons,
     observeBuffers,
     observeExtractionRuntime,
@@ -162,6 +173,7 @@ export function applyFeedbackEdges(
   const nodeKindRegistry = options.nodeKindRegistry ?? defaultNodeKindRegistry;
   const next: Record<string, ExecValue> = { ...state.values };
   const validOutputs = new Set(state.validOutputs);
+  const pendingOutputs = new Set(state.pendingOutputs);
 
   // ValueKind별 buckets — numeric은 단위 클램프와 raw passthrough를 따지고
   // boolean은 그저 boolean combiner로 합친다.
@@ -215,6 +227,7 @@ export function applyFeedbackEdges(
       : clampToUnit(combined, getNodeOutputUnit(target, catalog, nodeKindRegistry));
     next[tid] = numericValue(finalNumber, target.initialValue.unitId);
     validOutputs.add(outputKey(tid, 0));
+    pendingOutputs.delete(outputKey(tid, 0));
   }
 
   for (const [tid, contribs] of byTargetBoolean) {
@@ -229,12 +242,14 @@ export function applyFeedbackEdges(
       baseVal && baseVal.kind === 'boolean' ? baseVal.b : target.initialValue.b;
     next[tid] = booleanValue(combiner.combine([baseBool, ...contribs]));
     validOutputs.add(outputKey(tid, 0));
+    pendingOutputs.delete(outputKey(tid, 0));
   }
 
   return {
     values: next,
     sequenceOutputs: { ...state.sequenceOutputs },
     validOutputs,
+    pendingOutputs,
     invalidReasons: { ...state.invalidReasons },
     observeBuffers: { ...state.observeBuffers },
     observeExtractionRuntime: { ...state.observeExtractionRuntime },

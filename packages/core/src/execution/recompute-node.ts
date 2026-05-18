@@ -77,6 +77,8 @@ export interface RecomputeNodeResult {
   isValid: boolean;
   /** 갱신된 validOutputs 집합 (조건 노드 등 다출력 케이스 포함). */
   validOutputs: Set<string>;
+  /** 갱신된 pendingOutputs 집합. 펄스 도착으로 첫 신호가 들어왔다면 키가 삭제됨. */
+  pendingOutputs: Set<string>;
   /** target의 모든 출력 슬롯 키. 호출자가 변경 비교에 쓰기 좋게 같이 반환. */
   outputSlotKeys: string[];
   /**
@@ -135,6 +137,7 @@ export function recomputeNode(
       newValue: undefined,
       isValid: false,
       validOutputs: new Set(state.validOutputs),
+      pendingOutputs: new Set(state.pendingOutputs),
       outputSlotKeys: [],
       newObserveBuffers: seedBuffers,
       newObserveExtractionRuntime: seedExtractionRuntime,
@@ -149,6 +152,7 @@ export function recomputeNode(
       newValue: state.values[nodeId],
       isValid: state.validOutputs.has(outputKey(nodeId, 0)),
       validOutputs: new Set(state.validOutputs),
+      pendingOutputs: new Set(state.pendingOutputs),
       outputSlotKeys: [outputKey(nodeId, 0)],
       newObserveBuffers: seedBuffers,
       newObserveExtractionRuntime: seedExtractionRuntime,
@@ -162,6 +166,7 @@ export function recomputeNode(
   // 작업용 카피. 디스크립터가 mutate해도 caller의 state는 건드리지 않음.
   const workingValues: Record<NodeId, ExecValue> = { ...state.values };
   const workingValid = new Set(state.validOutputs);
+  const workingPending = new Set(state.pendingOutputs);
   const workingInvalidReasons: ExecutionState['invalidReasons'] = {
     ...state.invalidReasons,
   };
@@ -181,6 +186,7 @@ export function recomputeNode(
     incoming,
     next: workingValues,
     validOutputs: workingValid,
+    pendingOutputs: workingPending,
     invalidReasons: workingInvalidReasons,
     catalog: options.unitCatalog ?? defaultUnitCatalog,
     shapeRegistry: options.shapeRegistry,
@@ -196,6 +202,10 @@ export function recomputeNode(
     generatorRegistry: options.generatorRegistry ?? defaultGeneratorRegistry,
     sequenceNext: seedSequenceOutputs,
     simulationTimeMs: options.simulationTimeMs ?? 0,
+    // recomputeNode는 펄스 도착 시점의 단일 노드 갱신 — 시간이 흐르고 있는 step.
+    // 펄스가 실제로 운반된 시점이므로 ValueNode propagate가 source 변화를 흡수해야
+    // pending 상태를 valid 로 승격시킬 수 있다.
+    paused: false,
   };
 
   desc.propagate(node, ctx);
@@ -207,6 +217,7 @@ export function recomputeNode(
     newValue: workingValues[nodeId],
     isValid: workingValid.has(outputKey(nodeId, 0)),
     validOutputs: workingValid,
+    pendingOutputs: workingPending,
     outputSlotKeys,
     newObserveBuffers: seedBuffers,
     newObserveExtractionRuntime: seedExtractionRuntime,

@@ -16,6 +16,12 @@ export interface ExecuteOptions {
   rng?: Rng;
   /** 매 step 직후 호출. UI 시각 흐름용. */
   onStep?: (state: ExecutionState, step: number) => void;
+  /**
+   * 멈춤 상태에서 트리거된 재계산인지. true 면 ValueNode 처럼 펄스 도착으로만
+   * 갱신되는 노드의 source 흡수를 건너뛰어, 모델 편집 시 즉시 다운스트림에
+   * 효과가 가는 "시각 우선" 오작동을 막는다.
+   */
+  paused?: boolean;
 }
 
 /**
@@ -35,6 +41,7 @@ export function executeModel(model: Model, options: ExecuteOptions): ExecutionSt
     expressionEvaluator: options.expressionEvaluator,
     rng,
     topology,
+    paused: options.paused ?? false,
   };
   const N = Math.max(1, model.execution.steps | 0);
   let state = initializeFromInitialValues(model);

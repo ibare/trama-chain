@@ -1,6 +1,13 @@
 import { memo, useCallback, useEffect } from 'react';
 import { tokens } from '@trama/tokens';
-import { isNumericValue, isSequence, isValueNode, unwrap, type NodeId } from '@trama/core';
+import {
+  isNumericValue,
+  isOutputPending,
+  isSequence,
+  isValueNode,
+  unwrap,
+  type NodeId,
+} from '@trama/core';
 import { useTrama } from '../store/index.js';
 import { combinerRegistry } from '../store/registries.js';
 import { formatNodeValue } from '../util/format.js';
@@ -67,6 +74,10 @@ function ValueNodeViewImpl({ id, incomingCount }: Props): JSX.Element | null {
     }
     return false;
   });
+
+  // pending — 토폴로지 정상, 첫 신호 미도착. 멈춤 상태에서 엣지가 연결돼
+  // initialValue 권위를 잃었지만 아직 어떤 펄스도 받지 못한 상태.
+  const isPending = modelStore((s) => isOutputPending(s.executionState, id, 0));
 
   // 좌표는 아래 가드 `!node || !node.position`이 통과해야만 의미를 갖는다.
   // hook 순서를 깨지 않기 위한 primitive 폴백 — 화면에는 도달하지 않는다.
@@ -136,9 +147,10 @@ function ValueNodeViewImpl({ id, incomingCount }: Props): JSX.Element | null {
 
   // 입력성 노드(외부 입력이 없는 ValueNode)는 사용자가 의미를 직접 정한 값이라
   // focal 톤으로 강조. 나머지는 차분한 기본 톤.
+  // pending 상태는 "토폴로지 정상, 첫 신호 미도착" — 점선 보더로 표준화한다.
   const isInputNode = !hasLag0Incoming;
   const isFocal = node.isFocal;
-  const stateClass = isInputNode ? 'is-focal' : 'is-calm';
+  const stateClass = isPending ? 'is-pending' : isInputNode ? 'is-focal' : 'is-calm';
 
   const SkinLazy = node.skin ? getLazySkin(node.skin.kind) : null;
   const hasSkin = SkinLazy !== null;
@@ -301,6 +313,7 @@ function NumericCompactBody({
   // standard에서 맥락 정보로 보이지만 compact에서는 떼어낸다. 단위 suffix(kg 등)는
   // 값의 일부로 간주해 유지 — "현재값과 단위만"이 이전 합의.
   const compactAccessory = unit.kind === 'number' ? formatted.accessory : '';
+  const isPending = stateClass === 'is-pending';
   return (
     <>
       <NodeBody
@@ -328,11 +341,17 @@ function NumericCompactBody({
         textAnchor="middle"
         dominantBaseline="central"
       >
-        {formatted.primary}
-        {compactAccessory && (
-          <tspan className="trama-node-unit" dx="6">
-            {compactAccessory}
-          </tspan>
+        {isPending ? (
+          '…'
+        ) : (
+          <>
+            {formatted.primary}
+            {compactAccessory && (
+              <tspan className="trama-node-unit" dx="6">
+                {compactAccessory}
+              </tspan>
+            )}
+          </>
         )}
       </text>
       <InteractiveArea

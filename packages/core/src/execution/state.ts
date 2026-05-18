@@ -1,5 +1,5 @@
 import type { Model, NodeId, Value } from '../model/index.js';
-import { isGeneratorNode } from '../model/index.js';
+import { isGeneratorNode, isValueNode } from '../model/index.js';
 import {
   defaultGeneratorRegistry,
   type GeneratorRegistry,
@@ -30,6 +30,12 @@ import {
  * `invalidReasons`는 노드별 마지막 실패 사유. 평가가 성공한 step에서는 키가
  * 삭제된다. UI 가 invalid 배지/툴팁에 노출하는 용도이며 propagate 결정에는
  * 영향이 없다.
+ *
+ * `pendingOutputs`는 valid/invalid와 별개의 세 번째 상태 — "토폴로지는 정상,
+ * 아직 첫 신호가 도착하지 않음". ValueNode가 lag=0 incoming을 받으면 stored
+ * state(initialValue)의 권위가 엣지로 이양된다. 시간이 흐르지 않은 상태(멈춤,
+ * 또는 play 시작 직후)에선 신호가 도착하지 않았으므로 출력은 pending. 첫
+ * propagate(또는 pulse) 도착으로 valid 승격. runtime-only.
  */
 export interface ExecutionState {
   values: Record<NodeId, ExecValue>;
@@ -41,6 +47,12 @@ export interface ExecutionState {
    */
   sequenceOutputs: Record<string, SequenceValue>;
   validOutputs: Set<string>;
+  /**
+   * "토폴로지 정상, 첫 신호 미도착" 상태. validOutputs와 상호 배타 — 한 슬롯이
+   * 동시에 valid와 pending이 될 수 없다. 둘 다 아니면 invalid (실패).
+   * runtime-only.
+   */
+  pendingOutputs: Set<string>;
   invalidReasons: Record<NodeId, EvalDiagnosis & { ok: false }>;
   /**
    * ObserveNode가 통과한 값을 시간순으로 누적한 sample 버퍼. 각 sample 은
@@ -82,6 +94,7 @@ export function initializeFromInitialValues(
 ): ExecutionState {
   const values: Record<NodeId, ExecValue> = {};
   const validOutputs = new Set<string>();
+  const pendingOutputs = new Set<string>();
   const generatorRuntime: Record<NodeId, GeneratorRuntime> = {};
   for (const nid of model.nodeOrder) {
     const node = model.nodes[nid];
@@ -103,10 +116,27 @@ export function initializeFromInitialValues(
       validOutputs.add(outputKey(nid, 0));
     }
   }
+  // ValueNode가 lag=0 incoming을 받으면 initialValue 권위는 엣지로 이양된다.
+  // 신호가 아직 도착하지 않은 초기 시점이므로 pending — initialValue는 표시되지
+  // 않는다. 첫 propagate/pulse 도착으로 valid 승격.
+  for (const nid of model.nodeOrder) {
+    const node = model.nodes[nid];
+    if (!node || !isValueNode(node)) continue;
+    const hasLag0Incoming = model.edgeOrder.some((eid) => {
+      const e = model.edges[eid];
+      return !!e && e.to === nid && e.lag === 0;
+    });
+    if (!hasLag0Incoming) continue;
+    const slot = outputKey(nid, 0);
+    validOutputs.delete(slot);
+    pendingOutputs.add(slot);
+    delete values[nid];
+  }
   return {
     values,
     sequenceOutputs: {},
     validOutputs,
+    pendingOutputs,
     invalidReasons: {},
     observeBuffers: {},
     observeExtractionRuntime: {},
@@ -155,4 +185,13 @@ export function isOutputValid(
 /** 단출력 노드 기준 노드 유효성 (= 슬롯 0의 유효성). 호환용 헬퍼. */
 export function isNodeValid(state: ExecutionState, id: NodeId): boolean {
   return isOutputValid(state, id, 0);
+}
+
+/** 슬롯 단위 pending 조회. */
+export function isOutputPending(
+  state: ExecutionState,
+  id: NodeId,
+  slot: number = 0,
+): boolean {
+  return state.pendingOutputs.has(outputKey(id, slot));
 }
