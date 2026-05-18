@@ -22,7 +22,7 @@ export const uniformParadigm: GeneratorParadigm<
   { kind: 'uniform'; prngState: number; nextFireMs: number }
 > = {
   kind: 'uniform',
-  outputInterpolation: 'continuous',
+  outputInterpolation: 'discrete',
   initCursor: (params, simulationTimeMs) => ({
     kind: 'uniform',
     prngState: params.seed | 0,

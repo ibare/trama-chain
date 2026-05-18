@@ -916,14 +916,14 @@ describe('GeneratorNode — schedule paradigm', () => {
 });
 
 describe('GeneratorParadigm — outputInterpolation', () => {
-  it('time-independent paradigms are continuous', () => {
-    expect(counterParadigm.outputInterpolation).toBe('continuous');
-    expect(uniformParadigm.outputInterpolation).toBe('continuous');
-    expect(normalParadigm.outputInterpolation).toBe('continuous');
+  it('sine만 continuous — 매 emit마다 매끄럽게 변하는 신호', () => {
     expect(sineParadigm.outputInterpolation).toBe('continuous');
   });
 
-  it('time-based paradigms are discrete', () => {
+  it('나머지 paradigm은 모두 discrete — 이산 발화/계단/펄스', () => {
+    expect(counterParadigm.outputInterpolation).toBe('discrete');
+    expect(uniformParadigm.outputInterpolation).toBe('discrete');
+    expect(normalParadigm.outputInterpolation).toBe('discrete');
     expect(stepParadigm.outputInterpolation).toBe('discrete');
     expect(pulseParadigm.outputInterpolation).toBe('discrete');
     expect(scheduleParadigm.outputInterpolation).toBe('discrete');

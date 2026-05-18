@@ -24,7 +24,7 @@ export const counterParadigm: GeneratorParadigm<
   { kind: 'counter'; nextValue: number; nextFireMs: number }
 > = {
   kind: 'counter',
-  outputInterpolation: 'continuous',
+  outputInterpolation: 'discrete',
   initCursor: (params, simulationTimeMs) => ({
     kind: 'counter',
     nextValue: params.start,

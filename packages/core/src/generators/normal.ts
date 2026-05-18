@@ -25,7 +25,7 @@ export const normalParadigm: GeneratorParadigm<
   { kind: 'normal'; prngState: number; nextFireMs: number }
 > = {
   kind: 'normal',
-  outputInterpolation: 'continuous',
+  outputInterpolation: 'discrete',
   initCursor: (params, simulationTimeMs) => ({
     kind: 'normal',
     prngState: params.seed | 0,

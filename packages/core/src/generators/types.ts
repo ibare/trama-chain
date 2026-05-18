@@ -75,12 +75,16 @@ export interface GeneratorRuntime {
 /**
  * 출력 시간 분포의 본질.
  *
- * - 'continuous': 출력이 시간에 따라 매끄럽게 변하는 paradigm(counter/uniform/
- *   normal/sine 등 매 emit마다 값이 갱신되는 부류). 시각화 측에서 두 emit 사이를
- *   wallTime 비율로 lerp하면 자연스럽다.
- * - 'discrete': 이산 이벤트로만 값이 바뀌는 paradigm(step·pulse·schedule 등).
- *   계단/펄스 형태라 lerp하면 의도된 sharp 전환이 부드러워져 잘못된 시각.
- *   시각화는 이산 paradigm을 즉시 전환으로 렌더해야 한다.
+ * - 'continuous': 출력이 시간에 따라 매끄럽게 변하는 paradigm. 현재 sine 하나뿐 —
+ *   매 emit마다 phase가 미세하게 진행되어 자연스러운 곡선을 그린다. 시각화 측에서
+ *   두 emit 사이를 wallTime 비율로 lerp하거나 stroke 색온도·opacity를 매 frame
+ *   변조해도 의미가 보존된다.
+ * - 'discrete': 이산 이벤트로만 값이 바뀌는 paradigm. counter·uniform·normal은
+ *   throttle된 발화 사이에 값이 유지되고, step·pulse·schedule은 본질적으로 계단/
+ *   펄스다. 시각화는 즉시 전환(펄스 cascade)으로 렌더해야 한다.
+ *
+ * random(uniform·normal)이 향후 별도 paradigm으로 분화될 때 분류가 다시 흔들릴
+ * 수 있다 — 그때까지는 sine만 continuous, 나머지 모두 discrete.
  *
  * 보간 정책은 시각 계층의 책임 — 모델·실행은 이 플래그를 노출만 한다.
  */
