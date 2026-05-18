@@ -15,6 +15,8 @@ import {
   isObserveNode,
   modelToDocument,
   numericValue,
+  observeBufferLength,
+  observeBufferToArray,
   propagateOneStep,
   TramaDocumentSchema,
 } from '../src/index.js';
@@ -155,7 +157,9 @@ describe('ObserveNode', () => {
     const buf = state.observeBuffers['mon'];
     expect(buf).toBeDefined();
     expect(
-      buf!.map((s) => (s.value.kind === 'numeric' ? s.value.n : null)),
+      observeBufferToArray(buf!).map((s) =>
+        s.value.kind === 'numeric' ? s.value.n : null,
+      ),
     ).toEqual([3, 4, 5]);
   });
 
@@ -193,7 +197,7 @@ describe('ObserveNode', () => {
       });
     }
 
-    expect(state.observeBuffers['mon']!.length).toBe(10);
+    expect(observeBufferLength(state.observeBuffers['mon']!)).toBe(10);
   });
 
   it('passes boolean input through unchanged', () => {

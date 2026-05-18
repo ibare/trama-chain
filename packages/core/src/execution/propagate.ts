@@ -1,7 +1,8 @@
 import type { CombinerRegistry } from '../combiners/index.js';
 import type { Model, NodeId, Value } from '../model/index.js';
 import { booleanValue, isNumericValue, isValueNode, numericValue } from '../model/index.js';
-import { isSequence, resolveScalar, unwrap, type ExecValue, type SequenceSample, type SequenceValue } from './exec-value.js';
+import { isSequence, resolveScalar, unwrap, type ExecValue, type SequenceValue } from './exec-value.js';
+import { cloneObserveBuffer, type ObserveBuffer } from './observe-buffer.js';
 import type { ShapeRegistry } from '../functions/index.js';
 import type { Rng } from '../functions/types.js';
 import {
@@ -82,11 +83,11 @@ export function propagateOneStep(
   const invalidReasons: ExecutionState['invalidReasons'] = {
     ...state.invalidReasons,
   };
-  // ObserveNode 누적 버퍼는 step 간에 이어진다 — 직전 step의 버퍼를 그대로
-  // 카피해 디스크립터가 새 값을 push하면 잘림 정책까지 디스크립터가 적용한다.
-  const observeBuffers: Record<string, SequenceSample[]> = {};
+  // ObserveNode 누적 버퍼는 step 간에 이어진다 — 직전 step의 버퍼를 cloneObserveBuffer로
+  // 독립 인스턴스로 복제하면 디스크립터가 in-place push해도 prior state는 안전하다.
+  const observeBuffers: Record<string, ObserveBuffer> = {};
   for (const [nid, buf] of Object.entries(state.observeBuffers ?? {})) {
-    observeBuffers[nid] = [...buf];
+    observeBuffers[nid] = cloneObserveBuffer(buf);
   }
   const observeExtractionRuntime: Record<NodeId, ObserveExtractionRuntime> = {
     ...(state.observeExtractionRuntime ?? {}),

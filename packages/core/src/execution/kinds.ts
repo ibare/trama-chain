@@ -30,6 +30,12 @@ import {
   type SequenceSample,
   type SequenceValue,
 } from './exec-value.js';
+import {
+  createObserveBuffer,
+  observeBufferToArray,
+  pushSample,
+  type ObserveBuffer,
+} from './observe-buffer.js';
 
 /**
  * ObserveNode 의 누적 추출 슬롯 런타임 상태. throttle 정책의 마지막 emit 시각을
@@ -156,7 +162,7 @@ export interface PropagateContext {
    * 디스크립터가 mutate하며, propagateOneStep 이 결과를 ExecutionState 로 회수한다.
    * runtime-only — 직렬화되지 않는다.
    */
-  observeBuffers: Record<NodeId, SequenceSample[]>;
+  observeBuffers: Record<NodeId, ObserveBuffer>;
   /**
    * ObserveNode 추출 슬롯 throttle 런타임. 마지막 emit 시각(simulation time)을
    * 박제해 다음 propagate 가 발사 여부를 결정. runtime-only.
@@ -789,6 +795,19 @@ function firstIncomingEdgeForNode(model: Model, id: NodeId): Edge | undefined {
   return undefined;
 }
 
+/** 기존 버퍼의 capacity 정책이 현재 모델 설정과 일치하는지. */
+function capacityMatches(
+  buf: ObserveBuffer,
+  capacity: Extract<Node, { kind: 'observe' }>['capacity'],
+): boolean {
+  switch (buf.kind) {
+    case 'bounded':
+      return capacity.kind === 'bounded' && buf.capacity === capacity.size;
+    case 'unbounded':
+      return capacity.kind === 'unbounded';
+  }
+}
+
 /**
  * ObserveNode passthrough 의 source spec 미러링 헬퍼.
  * 입력 엣지가 없거나 source 가 사라졌으면 보수적인 numeric 폴백.
@@ -886,12 +905,15 @@ const observeNodeDescriptor: NodeKindDescriptor<Extract<Node, { kind: 'observe' 
 
     // observeBuffer 에는 (value, t) sample 로 누적 — t 는 현 step 의 simulation time.
     // 메타는 시각화/통계 모두 알맹이만 보면 충분하므로 메타 분리 후 알맹이만 박제.
-    const buf = ctx.observeBuffers[node.id] ? [...ctx.observeBuffers[node.id]!] : [];
-    const sample: SequenceSample = { value: innerOut, t: ctx.simulationTimeMs };
-    buf.push(sample);
-    if (node.capacity.kind === 'bounded') {
-      while (buf.length > node.capacity.size) buf.shift();
+    // bounded는 ring buffer로 O(1) push + 자동 evict, unbounded는 growable array.
+    let buf = ctx.observeBuffers[node.id];
+    if (!buf || !capacityMatches(buf, node.capacity)) {
+      // 미초기화 또는 capacity 정책이 모델에서 바뀐 경우 — 새로 만든다. capacity
+      // 변경은 흔치 않으니 누적 손실은 수용 가능한 트레이드오프.
+      buf = createObserveBuffer(node.capacity);
     }
+    const sample: SequenceSample = { value: innerOut, t: ctx.simulationTimeMs };
+    pushSample(buf, sample);
     ctx.observeBuffers[node.id] = buf;
 
     // 누적 추출 슬롯의 발사 정책 평가. realtime 은 매번, throttle 은 지난 emit
@@ -902,7 +924,10 @@ const observeNodeDescriptor: NodeKindDescriptor<Extract<Node, { kind: 'observe' 
       extraction.kind === 'realtime' ||
       ctx.simulationTimeMs - lastEmit >= extraction.intervalMs;
     if (shouldEmit) {
-      const snapshot: SequenceValue = { kind: 'sequence', samples: buf.slice() };
+      const snapshot: SequenceValue = {
+        kind: 'sequence',
+        samples: observeBufferToArray(buf),
+      };
       ctx.sequenceNext[extractionSlotKey] = snapshot;
       ctx.validOutputs.add(extractionSlotKey);
       ctx.observeExtractionRuntime[node.id] = { lastEmitTimeMs: ctx.simulationTimeMs };

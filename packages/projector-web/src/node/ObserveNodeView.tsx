@@ -1,12 +1,14 @@
-import { memo, useCallback, useEffect } from 'react';
+import { memo, useCallback, useEffect, useMemo } from 'react';
 import { tokens } from '@trama/tokens';
 import {
   isObserveNode,
   isSequence,
+  observeBufferToArray,
   outputKey,
   resolveScalar,
   unwrap,
   type NodeId,
+  type ObserveBuffer,
 } from '@trama/core';
 import type { SequenceSample } from '@trama/core';
 import { useTrama } from '../store/index.js';
@@ -28,12 +30,20 @@ interface Props {
 }
 
 const SOCKET_SIZE = parseFloat(tokens.spacing.socketSize);
-const EMPTY_BUFFER: SequenceSample[] = [];
+const EMPTY_SAMPLES: SequenceSample[] = [];
 
 function ObserveNodeViewImpl({ id, incomingCount }: Props): JSX.Element | null {
   const { modelStore, uiStore, socketRegistry } = useTrama();
   const node = modelStore((s) => s.model.nodes[id]);
-  const samples = modelStore((s) => s.executionState.observeBuffers[id] ?? EMPTY_BUFFER);
+  // selector는 ObserveBuffer 그대로 받고(ref 안정성), array 변환은 ref 기반 useMemo로
+  // 한 번만 — propagate 한 step마다 buf ref가 갱신될 때만 새 array를 만든다.
+  const buffer: ObserveBuffer | undefined = modelStore(
+    (s) => s.executionState.observeBuffers[id],
+  );
+  const samples = useMemo(
+    () => (buffer ? observeBufferToArray(buffer) : EMPTY_SAMPLES),
+    [buffer],
+  );
   // 누적 버퍼는 Value[] 그대로지만 current 는 ExecValue 가 들어올 수 있다 —
   // 시각화는 alue 만 보면 충분하므로 unwrap 후 노출.
   const current = modelStore((s) => {

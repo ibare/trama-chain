@@ -6,8 +6,9 @@ import {
   type GeneratorRuntime,
 } from '../generators/index.js';
 import type { EvalDiagnosis } from './expression-evaluator.js';
-import type { ExecValue, SequenceSample, SequenceValue } from './exec-value.js';
+import type { ExecValue, SequenceValue } from './exec-value.js';
 import { isSequence, resolveScalar, unwrap } from './exec-value.js';
+import type { ObserveBuffer } from './observe-buffer.js';
 import {
   defaultNodeKindRegistry,
   type NodeKindRegistry,
@@ -55,12 +56,13 @@ export interface ExecutionState {
   pendingOutputs: Set<string>;
   invalidReasons: Record<NodeId, EvalDiagnosis & { ok: false }>;
   /**
-   * ObserveNode가 통과한 값을 시간순으로 누적한 sample 버퍼. 각 sample 은
-   * (value, t) 페어 — t 는 누적 당시의 simulation time(ms). runtime-only —
-   * 직렬화되지 않고 세션이 끝나면 사라진다. capacity 정책(bounded/unbounded)은
-   * propagate 시점에 적용되어 이 버퍼에 들어오는 시점부터 잘려있다.
+   * ObserveNode가 통과한 값을 시간순으로 누적한 sample 버퍼. capacity 정책별로
+   * bounded(ring buffer) / unbounded(growable array) 두 모양. push는 O(1)
+   * in-place mutate, snapshot은 [[observeBufferToArray]]가 ordered sample 배열을
+   * 만들어 SequenceValue로 흘려보낸다. runtime-only — 직렬화되지 않고 세션이
+   * 끝나면 사라진다.
    */
-  observeBuffers: Record<NodeId, SequenceSample[]>;
+  observeBuffers: Record<NodeId, ObserveBuffer>;
   /**
    * ObserveNode 추출 슬롯의 throttle 런타임 — 마지막 emit 시각을 기억해 throttle
    * 정책의 다음 emit 여부를 결정. runtime-only.
