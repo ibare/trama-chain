@@ -19,6 +19,7 @@ export const normalParadigm: GeneratorParadigm<
   { kind: 'normal'; prngState: number }
 > = {
   kind: 'normal',
+  outputInterpolation: 'continuous',
   initCursor: (params) => ({ kind: 'normal', prngState: params.seed | 0 }),
   emit: (params, cursor) => {
     const { z, nextState } = boxMullerZ0(cursor.prngState);

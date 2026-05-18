@@ -12,6 +12,7 @@ export const counterParadigm: GeneratorParadigm<
   { kind: 'counter'; nextValue: number }
 > = {
   kind: 'counter',
+  outputInterpolation: 'continuous',
   initCursor: (params) => ({ kind: 'counter', nextValue: params.start }),
   emit: (params, cursor) => ({
     value: numericValue(cursor.nextValue, 'free'),

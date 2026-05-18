@@ -906,6 +906,21 @@ describe('GeneratorNode — schedule paradigm', () => {
   });
 });
 
+describe('GeneratorParadigm — outputInterpolation', () => {
+  it('time-independent paradigms are continuous', () => {
+    expect(counterParadigm.outputInterpolation).toBe('continuous');
+    expect(uniformParadigm.outputInterpolation).toBe('continuous');
+    expect(normalParadigm.outputInterpolation).toBe('continuous');
+    expect(sineParadigm.outputInterpolation).toBe('continuous');
+  });
+
+  it('time-based paradigms are discrete', () => {
+    expect(stepParadigm.outputInterpolation).toBe('discrete');
+    expect(pulseParadigm.outputInterpolation).toBe('discrete');
+    expect(scheduleParadigm.outputInterpolation).toBe('discrete');
+  });
+});
+
 describe('GeneratorRegistry', () => {
   it('routes by kind, throws on unknown', () => {
     const reg = createDefaultGeneratorRegistry();

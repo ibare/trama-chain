@@ -67,11 +67,31 @@ export interface GeneratorRuntime {
  * 좁혀 해당 paradigm으로 라우팅한다. 시간 비의존 paradigm(counter/uniform/normal/
  * sine 등 emit 카운터 기반)은 simulationTimeMs 인자를 무시한다.
  */
+/**
+ * 출력 시간 분포의 본질.
+ *
+ * - 'continuous': 출력이 시간에 따라 매끄럽게 변하는 paradigm(counter/uniform/
+ *   normal/sine 등 매 emit마다 값이 갱신되는 부류). 시각화 측에서 두 emit 사이를
+ *   wallTime 비율로 lerp하면 자연스럽다.
+ * - 'discrete': 이산 이벤트로만 값이 바뀌는 paradigm(step·pulse·schedule 등).
+ *   계단/펄스 형태라 lerp하면 의도된 sharp 전환이 부드러워져 잘못된 시각.
+ *   시각화는 이산 paradigm을 즉시 전환으로 렌더해야 한다.
+ *
+ * 보간 정책은 시각 계층의 책임 — 모델·실행은 이 플래그를 노출만 한다.
+ */
+export type OutputInterpolation = 'continuous' | 'discrete';
+
 export interface GeneratorParadigm<
   P extends GeneratorParams = GeneratorParams,
   C extends GeneratorCursor = GeneratorCursor,
 > {
   kind: P['kind'];
+  /**
+   * 이 paradigm 출력의 시간 분포 본질. 시각화 측에서 lerp 가/부를 판단하는 단일
+   * 근거. NodeKindDescriptor.outputInterpolation()이 generator의 경우 이 값을
+   * 위임한다.
+   */
+  outputInterpolation: OutputInterpolation;
   initCursor(params: P, simulationTimeMs: number): C;
   emit(
     params: P,

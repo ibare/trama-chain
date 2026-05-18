@@ -26,6 +26,7 @@ export const scheduleParadigm: GeneratorParadigm<
   { kind: 'schedule' }
 > = {
   kind: 'schedule',
+  outputInterpolation: 'discrete',
   initCursor: () => ({ kind: 'schedule' }),
   emit: (params, _cursor, simulationTimeMs) => {
     const v = sampleAt(params, simulationTimeMs);

@@ -19,6 +19,7 @@ export const uniformParadigm: GeneratorParadigm<
   { kind: 'uniform'; prngState: number }
 > = {
   kind: 'uniform',
+  outputInterpolation: 'continuous',
   initCursor: (params) => ({ kind: 'uniform', prngState: params.seed | 0 }),
   emit: (params, cursor) => {
     const { r, nextState } = nextMulberry(cursor.prngState);

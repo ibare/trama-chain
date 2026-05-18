@@ -25,6 +25,7 @@ export const sineParadigm: GeneratorParadigm<
   { kind: 'sine'; step: number }
 > = {
   kind: 'sine',
+  outputInterpolation: 'continuous',
   initCursor: () => ({ kind: 'sine', step: 0 }),
   emit: (params, cursor) => ({
     value: numericValue(sampleAt(params, cursor.step), 'free'),

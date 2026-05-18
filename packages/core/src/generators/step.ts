@@ -20,6 +20,7 @@ export const stepParadigm: GeneratorParadigm<
   { kind: 'step' }
 > = {
   kind: 'step',
+  outputInterpolation: 'discrete',
   initCursor: () => ({ kind: 'step' }),
   emit: (params, _cursor, simulationTimeMs) => ({
     value:

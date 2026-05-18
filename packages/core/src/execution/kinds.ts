@@ -3,7 +3,12 @@ import type { ShapeRegistry } from '../functions/index.js';
 import type { Rng } from '../functions/types.js';
 import type { Edge, Model, Node, NodeId, Value, ValueKind } from '../model/index.js';
 import { booleanValue, isValueNode, isNumericValue, numericValue } from '../model/index.js';
-import type { GeneratorRegistry, GeneratorRuntime } from '../generators/index.js';
+import type {
+  GeneratorRegistry,
+  GeneratorRuntime,
+  OutputInterpolation,
+} from '../generators/index.js';
+import { defaultGeneratorRegistry } from '../generators/index.js';
 import {
   clamp01,
   clampToUnit,
@@ -284,6 +289,17 @@ export interface NodeKindDescriptor<N extends Node = Node> {
   outputsRaw: boolean;
   /** lag=1 feedback 엣지의 target이 될 수 있는지. */
   canBeFeedbackTarget: boolean;
+  /**
+   * 이 노드 출력의 시간 분포 본질 — 시각화 측에서 두 emit 사이를 lerp할지
+   * 결정한다. 미정의면 'continuous' 취급(기존 노드의 안전한 기본).
+   *
+   * - 'continuous': 매끄러운 변화 — 시각화가 wallTime 비율로 lerp 가능.
+   * - 'discrete': 이산 이벤트(step·pulse·schedule 등). 보간하면 sharp 전환이
+   *   부드러워져 의도가 왜곡되므로 즉시 전환이어야 한다.
+   *
+   * 모델·실행 계층은 이 플래그를 read-only로 노출만 한다. 보간 정책은 시각 계층 책임.
+   */
+  outputInterpolation?(node: N): OutputInterpolation;
   /**
    * lag=0 전파. incoming을 보고 next[node.id]·validOutputs를 갱신.
    * incoming이 비어 있고 디스크립터가 외부 입력이 없는 종류면 기존 값을 유지하는 것이 일반적.
@@ -913,6 +929,11 @@ const generatorNodeDescriptor: NodeKindDescriptor<
   kind: 'generator',
   outputsRaw: true,
   canBeFeedbackTarget: false,
+  // 시간 분포 본질은 paradigm 고유 속성 — defaultGeneratorRegistry에서 paradigm을
+  // 조회해 그대로 위임한다. paradigm 객체는 static metadata이므로 인스턴스 차이
+  // 없이 안전. 미등록 kind면 안전한 'continuous'로 폴백.
+  outputInterpolation: (node): OutputInterpolation =>
+    defaultGeneratorRegistry.get(node.params.kind)?.outputInterpolation ?? 'continuous',
   initialValue: () => undefined,
   initialValidSlots: () => [],
   // 메타 인지: plain boolean 또는 numeric+meta:boolean (Condition 슬롯) 둘 다 받는다.

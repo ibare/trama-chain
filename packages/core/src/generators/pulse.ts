@@ -25,6 +25,7 @@ export const pulseParadigm: GeneratorParadigm<
   { kind: 'pulse'; nextFireMs: number }
 > = {
   kind: 'pulse',
+  outputInterpolation: 'discrete',
   initCursor: (_params, simulationTimeMs) => ({
     kind: 'pulse',
     nextFireMs: simulationTimeMs,
