@@ -4,7 +4,6 @@ import {
   defaultNodeKindRegistry,
   isConditionNode,
   isExpressionNode,
-  isFunctionHandle,
   isNumericValue,
   isOutputPending,
   isOutputValid,
@@ -200,18 +199,11 @@ function EdgeViewImpl({
     const desc = defaultNodeKindRegistry.forNode(n);
     return desc?.outputInterpolation?.(n) === 'continuous';
   });
-  // ticker 재등록 회피용 ref. fromId 도 ticker 안에서 store.getState() 조회 키로 쓴다.
+  // ticker 재등록 회피용 ref.
   const isContinuousRef = useRef(isContinuousSource);
   useEffect(() => {
     isContinuousRef.current = isContinuousSource;
   }, [isContinuousSource]);
-  const fromIdRef = useRef(fromId);
-  useEffect(() => {
-    fromIdRef.current = fromId;
-  }, [fromId]);
-  // 적응적 normalize 용 누적 min/max. continuous 신호의 도메인을 사전에 알 수 없으므로
-  // 관측 범위를 누적해 intensity ∈ [0,1] 로 환산. 시각 전용 휘발 상태(직렬화·결정론 무관).
-  const peekRangeRef = useRef({ min: Infinity, max: -Infinity });
 
   const lag = edge?.lag ?? 0;
 
@@ -265,22 +257,13 @@ function EdgeViewImpl({
         shapeMarkerRef.current.setAttribute('transform', `translate(${m.x},${m.y})`);
       }
 
-      // continuous source: ExecValue 가 FunctionHandle 이면 그 프레임의 simulationTimeMs
-      // 로 peek 해 stroke intensity 를 변조. discrete source 는 분기 미진입.
+      // continuous source: 데이터 주기와 독립인 1s 자체 진동으로 stroke 시각을 변조.
+      // "유체가 흐른다" 는 추상적 시그널만 전달 — 실제 데이터 값은 ObserveNode 가 담당.
+      // source 의 주기(예: sine 20s)에 시각이 결속되면 너무 느려 흐름이 느껴지지 않음.
       if (!isContinuousRef.current) return;
       const path = pathRef.current;
-      const srcId = fromIdRef.current;
-      if (!path || !srcId) return;
-      const state = modelStore.getState();
-      const ev = state.executionState.values[srcId];
-      if (!ev || !isFunctionHandle(ev)) return;
-      const sampled = ev.peek(state.executionState.simulationTimeMs);
-      if (sampled.kind !== 'numeric') return;
-      const rng = peekRangeRef.current;
-      if (sampled.n < rng.min) rng.min = sampled.n;
-      if (sampled.n > rng.max) rng.max = sampled.n;
-      const span = rng.max - rng.min;
-      const intensity = span > 1e-6 ? (sampled.n - rng.min) / span : 0.5;
+      if (!path) return;
+      const intensity = (Math.sin((performance.now() / 1000) * Math.PI * 2) + 1) / 2;
       path.style.setProperty('--continuous-intensity', String(intensity));
     };
     const unregisterTicker = animationLoop.register(tick);
