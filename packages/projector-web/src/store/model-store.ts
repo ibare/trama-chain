@@ -288,16 +288,13 @@ export function createModelStore({
     return rt.gateOpen === true;
   }
 
-  function hasAnyEnabledGenerator(): boolean {
-    const { model, executionState } = store.getState();
-    for (const nid in executionState.generatorRuntime) {
-      if (isGeneratorEffectivelyEnabled(model, executionState, nid)) return true;
-    }
-    return false;
-  }
   function tickGenerators(): void {
     const { model, executionState, playbackStep } = store.getState();
     if (playbackStep !== null) return;
+    // 시뮬레이션 시간은 generator 유무와 무관하게 paused=false 동안 항상 진행한다.
+    // ticker는 시뮬레이션 시간축의 유일한 출처. generator emit은 그 시간 안에서
+    // 일어나는 부수 효과로, enabled generator가 있을 때만 함께 갱신된다.
+    const stepDelta = currentStepIntervalMs();
     const newValues: Record<NodeId, ExecValue> = { ...executionState.values };
     const newValid = new Set(executionState.validOutputs);
     const newRuntime: Record<NodeId, GeneratorRuntime> = {
@@ -313,20 +310,12 @@ export function createModelStore({
       const { value, nextCursor } = defaultGeneratorRegistry.emit(node.params, rt.cursor);
       newValues[nid] = value;
       newValid.add(outputKey(nid, 0));
-      // runtime.enabled는 사용자 토글 의도를 보존. gateOpen 캐시는 펄스로만
-      // 갱신되는 단일 진입 — ticker tick에서 드롭하면 다음 tick에 게이트 false로
-      // 평가돼 ticker가 즉시 멈춘다.
+      // runtime.enabled는 사용자 토글 의도를 보존. gateOpen 캐시는 펄스로만 갱신되는
+      // 단일 진입 — ticker tick에서 드롭하면 다음 tick에 게이트 false로 평가돼
+      // emit이 멈춘다 (ticker 자체는 계속 시간만 진행).
       newRuntime[nid] = { enabled: rt.enabled, cursor: nextCursor, gateOpen: rt.gateOpen };
       emittedIds.push(nid);
     }
-    if (emittedIds.length === 0) {
-      stopGeneratorTicker();
-      return;
-    }
-    // 시뮬레이션 시간을 한 step 만큼 진행시킨다 — ObserveNode 누적 sample t
-    // 와 throttle 비교의 기준. wall clock 과 별개의 모델 시간축이며, ticker tick
-    // 한 번이 곧 한 step 의 model 시간 진행을 의미.
-    const stepDelta = currentStepIntervalMs();
     store.setState((s) => ({
       executionState: {
         ...s.executionState,
@@ -336,6 +325,7 @@ export function createModelStore({
         simulationTimeMs: s.executionState.simulationTimeMs + stepDelta,
       },
     }));
+    if (emittedIds.length === 0) return;
     const latest = store.getState();
     for (const nid of emittedIds) {
       nodeFlashRegistry.trigger(nid);
@@ -349,7 +339,6 @@ export function createModelStore({
   function startGeneratorTickerIfNeeded(): void {
     if (generatorTicker !== null) return;
     if (timeSettingsStore.getState().paused) return;
-    if (!hasAnyEnabledGenerator()) return;
     generatorTicker = window.setInterval(tickGenerators, currentStepIntervalMs());
   }
   function stopGeneratorTicker(): void {
@@ -367,12 +356,12 @@ export function createModelStore({
   /**
    * 모델·실행상태 변이 후 ticker 상태를 reconcile.
    *
-   * boolean 입력으로 제어되는 generator는 source 값/연결 변화로 effective enabled가
-   * 바뀌므로, 변이 후 매번 ticker를 재평가해야 freeze 시맨틱이 깨지지 않는다.
+   * ticker on/off의 진실의 출처는 paused 상태 — generator 유무와 무관하다.
+   * 변이 후에도 paused=false면 ticker가 계속 돌아야 시뮬레이션 시간이 진행된다.
    */
   function reconcileGeneratorTicker(): void {
-    if (hasAnyEnabledGenerator()) startGeneratorTickerIfNeeded();
-    else stopGeneratorTicker();
+    if (timeSettingsStore.getState().paused) stopGeneratorTicker();
+    else startGeneratorTickerIfNeeded();
   }
 
   /**
@@ -751,8 +740,7 @@ export function createModelStore({
           },
         },
       });
-      if (enabled) startGeneratorTickerIfNeeded();
-      else if (!hasAnyEnabledGenerator()) stopGeneratorTicker();
+      // ticker는 paused 기준만 본다 — enabled가 false여도 시간 진행은 계속.
     },
 
     resetGenerator: (id) => {
@@ -782,7 +770,6 @@ export function createModelStore({
           },
         },
       });
-      if (!hasAnyEnabledGenerator()) stopGeneratorTicker();
     },
 
     updateNode: (id, rawPatch) => {
@@ -826,8 +813,6 @@ export function createModelStore({
       if (after === s.model) return;
       const exec = computeExecutionState(after, s.executionState);
       set({ model: after, ...exec });
-      // 제거된 노드가 enabled 생성기였다면 ticker 중지.
-      if (!hasAnyEnabledGenerator()) stopGeneratorTicker();
     },
 
     addEdge: (input) => {
