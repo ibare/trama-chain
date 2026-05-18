@@ -59,8 +59,30 @@ import { fizzexExpressionEvaluator } from '../expression/fizzex-evaluator.js';
 import type { PulseRegistry, Pulse } from '../pulse/pulse-registry.js';
 import type { NodeFlashRegistry } from '../pulse/node-flash-registry.js';
 import type { TimeSettingsStore } from './time-settings.js';
+import type { AnimationLoop } from '../canvas/animation-loop.js';
 
+/**
+ * N-step playback의 step 간 wall-time 지연. multiplier로 나뉜다. 시뮬레이션
+ * 시간축과는 무관 — playback은 *이미 계산된 trajectory*를 시각적으로 재생할
+ * 뿐이라, 사용자가 "한 step을 보는 시간"을 정의하는 UI 상수.
+ */
 const STEP_TICK_MS = parseFloat(tokens.motion.durationStepTick);
+
+/**
+ * 시뮬레이션 고정 dt — RAF 단일 클락에 결속된 1급 시간축의 step 단위.
+ * 60Hz에 정합. 한 시뮬레이션 step마다 propagate가 호출되고 simulationTimeMs가
+ * 이 값만큼 진행한다. 배속(multiplier)은 dt에 곱하지 않는다 — accumulator가
+ * 빠르게 차서 한 RAF 안에서 step 횟수가 늘어나는 방식으로 흡수한다.
+ */
+const FIXED_DT_MS = 1000 / 60;
+
+/**
+ * spiral-of-death 회피 — propagate 비용이 FIXED_DT를 넘으면 accumulator가
+ * 영원히 못 따라잡는다. 누적량과 한 RAF당 step 횟수에 상한을 둬 시뮬레이션이
+ * 벽시간 대비 *느려지는* 안전한 fallback으로 수렴.
+ */
+const MAX_ACCUM_MS = 250;
+const MAX_STEPS_PER_RAF = 8;
 
 export interface ModelStore {
   model: Model;
@@ -125,6 +147,7 @@ export interface ModelStoreDeps {
   pulseRegistry: PulseRegistry;
   nodeFlashRegistry: NodeFlashRegistry;
   timeSettingsStore: TimeSettingsStore;
+  animationLoop: AnimationLoop;
 }
 
 /** Node patch가 propagation 결과에 영향을 줄 수 있는 필드를 포함하는지. */
@@ -265,6 +288,7 @@ export function createModelStore({
   pulseRegistry,
   nodeFlashRegistry,
   timeSettingsStore,
+  animationLoop,
 }: ModelStoreDeps): ModelStoreInstance {
   const initial = createEmptyModel();
   const initialExec = computeExecutionState(initial);
@@ -285,14 +309,21 @@ export function createModelStore({
   }
 
   /**
-   * GeneratorNode step ticker — enabled가 1개라도 있으면 STEP_TICK_MS 주기로
-   * 모든 enabled generator를 한 칸씩 진행시킨다. 트라마 전역 step과 동기.
+   * 시뮬레이션 클락 — RAF 단일 루프에 결속. 매 RAF에서 wallDt를 측정해
+   * multiplier만큼 시뮬레이션 시간으로 환산하고, FIXED_DT_MS 단위로 잘라
+   * tickGenerators를 N회 호출한다. 한 step에서 simulationTimeMs += FIXED_DT_MS.
+   *
+   * 사용자는 시뮬레이션 시간(simulationTimeMs)을 본다 — wall time이 아니라.
+   * 배속이 변해도 한 step의 dt는 일정(결정성·정밀도 보존), 대신 한 wall
+   * 단위에서 처리되는 step 수가 달라진다.
    *
    * propagateOneStep을 거치지 않고 paradigm.emit으로 cursor만 진행한 뒤 펄스를
    * spawn — 다운스트림 갱신은 기존 펄스 hot-path가 담당하므로 펄스 시각화·flash가
    * 자연스럽게 흐른다.
    */
-  let generatorTicker: number | null = null;
+  let unregisterSimulationTicker: (() => void) | null = null;
+  let simAccumMs = 0;
+  let lastWallNowMs: number | null = null;
 
   /**
    * 한 generator가 실제로 이번 tick에 emit해야 하는지.
@@ -325,9 +356,9 @@ export function createModelStore({
     const { model, executionState, playbackStep } = store.getState();
     if (playbackStep !== null) return;
     // 시뮬레이션 시간은 generator 유무와 무관하게 paused=false 동안 항상 진행한다.
-    // ticker는 시뮬레이션 시간축의 유일한 출처. generator emit은 그 시간 안에서
+    // RAF 루프가 시뮬레이션 시간축의 유일한 출처. generator emit은 그 시간 안에서
     // 일어나는 부수 효과로, enabled generator가 있을 때만 함께 갱신된다.
-    const stepDelta = currentStepIntervalMs();
+    const stepDelta = FIXED_DT_MS;
     const newValues: Record<NodeId, ExecValue> = { ...executionState.values };
     const newValid = new Set(executionState.validOutputs);
     const newRuntime: Record<NodeId, GeneratorRuntime> = {
@@ -365,36 +396,77 @@ export function createModelStore({
       spawnOutgoingPulses(latest.model, latest.executionState, nid);
     }
   }
-  function currentStepIntervalMs(): number {
+  /**
+   * playback step 간 wall-time 지연. multiplier로 나눠 "한 step을 보는 시간"을
+   * 환산한다. 시뮬레이션 ticker와 무관 — trajectory 재생용 setTimeout 경로 전용.
+   */
+  function currentPlaybackStepIntervalMs(): number {
     const m = timeSettingsStore.getState().stepSpeedMultiplier;
     return STEP_TICK_MS / (m > 0 ? m : 1);
   }
-  function startGeneratorTickerIfNeeded(): void {
-    if (generatorTicker !== null) return;
-    if (timeSettingsStore.getState().paused) return;
-    generatorTicker = window.setInterval(tickGenerators, currentStepIntervalMs());
-  }
-  function stopGeneratorTicker(): void {
-    if (generatorTicker !== null) {
-      window.clearInterval(generatorTicker);
-      generatorTicker = null;
+
+  /**
+   * 매 RAF에서 호출되는 시뮬레이션 step 펌프.
+   *
+   * wallDt를 측정 → multiplier 곱해 simAccumMs에 누적 → FIXED_DT_MS 단위로 잘라
+   * 가능한 만큼 tickGenerators 호출. 한 RAF에서 propagate가 너무 많이 일어나
+   * 프레임이 막히는 spiral-of-death는 MAX_ACCUM_MS·MAX_STEPS_PER_RAF로 막는다.
+   *
+   * paused=true 동안은 wallDt 추적만 유지(다음 resume 시 첫 frame이 큰 점프를
+   * 만들지 않도록) accumulator는 0으로 리셋. unregister하지 않고 분기로 처리해
+   * paused 토글의 부수 효과(register/unregister 무한 토글)를 피한다.
+   */
+  function rafSimulationStep(): void {
+    const now = performance.now();
+    if (lastWallNowMs === null) {
+      lastWallNowMs = now;
+      return;
+    }
+    const wallDt = now - lastWallNowMs;
+    lastWallNowMs = now;
+    if (timeSettingsStore.getState().paused) {
+      simAccumMs = 0;
+      return;
+    }
+    if (store.getState().playbackStep !== null) {
+      simAccumMs = 0;
+      return;
+    }
+    const multiplier = timeSettingsStore.getState().stepSpeedMultiplier;
+    const effectiveMult = multiplier > 0 ? multiplier : 1;
+    simAccumMs = Math.min(simAccumMs + wallDt * effectiveMult, MAX_ACCUM_MS);
+    let steps = 0;
+    while (simAccumMs >= FIXED_DT_MS && steps < MAX_STEPS_PER_RAF) {
+      tickGenerators();
+      simAccumMs -= FIXED_DT_MS;
+      steps++;
     }
   }
-  function restartGeneratorTickerIfRunning(): void {
-    // multiplier 변경: 돌고 있던 ticker만 새 주기로 재시작. 정지 상태면 그대로.
-    if (generatorTicker === null) return;
-    stopGeneratorTicker();
-    startGeneratorTickerIfNeeded();
+
+  function startSimulationLoopIfNeeded(): void {
+    if (unregisterSimulationTicker !== null) return;
+    if (timeSettingsStore.getState().paused) return;
+    lastWallNowMs = null;
+    simAccumMs = 0;
+    unregisterSimulationTicker = animationLoop.register(rafSimulationStep);
+  }
+  function stopSimulationLoop(): void {
+    if (unregisterSimulationTicker !== null) {
+      unregisterSimulationTicker();
+      unregisterSimulationTicker = null;
+    }
+    lastWallNowMs = null;
+    simAccumMs = 0;
   }
   /**
-   * 모델·실행상태 변이 후 ticker 상태를 reconcile.
+   * 모델·실행상태 변이 후 시뮬레이션 루프 상태를 reconcile.
    *
-   * ticker on/off의 진실의 출처는 paused 상태 — generator 유무와 무관하다.
-   * 변이 후에도 paused=false면 ticker가 계속 돌아야 시뮬레이션 시간이 진행된다.
+   * on/off의 진실의 출처는 paused 상태 — generator 유무와 무관하다.
+   * 변이 후에도 paused=false면 루프가 계속 돌아야 시뮬레이션 시간이 진행된다.
    */
-  function reconcileGeneratorTicker(): void {
-    if (timeSettingsStore.getState().paused) stopGeneratorTicker();
-    else startGeneratorTickerIfNeeded();
+  function reconcileSimulationLoop(): void {
+    if (timeSettingsStore.getState().paused) stopSimulationLoop();
+    else startSimulationLoopIfNeeded();
   }
 
   /**
@@ -429,7 +501,7 @@ export function createModelStore({
       const isLast = nextIndex === trajNow.length - 1;
       applyStep(s, nextIndex, isLast);
       if (!isLast) schedulePlaybackStep(token, nextIndex + 1);
-    }, currentStepIntervalMs());
+    }, currentPlaybackStepIntervalMs());
   }
 
   /**
@@ -473,27 +545,23 @@ export function createModelStore({
     }
   }
 
-  // timeSettings 변경 구독 — multiplier·paused 변화에 ticker·playback 반영.
+  // timeSettings 변경 구독 — paused 변화에 시뮬레이션 루프·playback 반영.
+  // multiplier는 RAF 콜백이 매 frame마다 읽으므로 별도 재시작 불필요.
   timeSettingsStore.subscribe((state, prev) => {
     if (state.paused !== prev.paused) {
       if (state.paused) {
-        stopGeneratorTicker();
+        stopSimulationLoop();
         stopPlaybackTimer();
       } else {
         // pending 흡수는 ticker 시작 전에 한 번 — generator emit 보다 인과적으로
         // 먼저 시작된 "새 엣지의 첫 신호" 가 시각화되도록.
         flushPendingOnUnpause();
-        startGeneratorTickerIfNeeded();
+        startSimulationLoopIfNeeded();
         const playbackStep = store.getState().playbackStep;
         if (playbackStep !== null) {
           schedulePlaybackStep(activePlaybackToken, playbackStep + 1);
         }
       }
-      return;
-    }
-    if (state.stepSpeedMultiplier !== prev.stepSpeedMultiplier) {
-      restartGeneratorTickerIfRunning();
-      // playback 진행 중이면 다음 간격에 새 multiplier 자동 반영 — 별도 처리 불필요.
     }
   });
 
@@ -597,7 +665,7 @@ export function createModelStore({
         };
       });
       nodeFlashRegistry.trigger(pulse.targetNodeId);
-      reconcileGeneratorTicker();
+      reconcileSimulationLoop();
       return;
     }
 
@@ -694,7 +762,7 @@ export function createModelStore({
       const s = get();
       const exec = computeExecutionState(next, s.executionState, true, s.model);
       set({ model: next, ...exec });
-      reconcileGeneratorTicker();
+      reconcileSimulationLoop();
     },
 
     recompute: () => {
@@ -888,7 +956,7 @@ export function createModelStore({
         const latest = get();
         spawnOutgoingPulses(latest.model, latest.executionState, id);
       }
-      reconcileGeneratorTicker();
+      reconcileSimulationLoop();
     },
 
     removeNode: (id) => {
@@ -952,7 +1020,7 @@ export function createModelStore({
       const edge = after.edges[newId]!;
       const exec = computeExecutionState(after, get().executionState, true, before);
       set({ model: after, ...exec });
-      reconcileGeneratorTicker();
+      reconcileSimulationLoop();
       return edge;
     },
 
@@ -971,7 +1039,7 @@ export function createModelStore({
       const after = candidate;
       const exec = computeExecutionState(after, s.executionState, true, s.model);
       set({ model: after, ...exec });
-      reconcileGeneratorTicker();
+      reconcileSimulationLoop();
     },
 
     removeEdge: (id) => {
@@ -981,7 +1049,7 @@ export function createModelStore({
       if (after === s.model) return;
       const exec = computeExecutionState(after, s.executionState, true, s.model);
       set({ model: after, ...exec });
-      reconcileGeneratorTicker();
+      reconcileSimulationLoop();
     },
 
     setQuestion: (q) => {
@@ -1065,7 +1133,7 @@ export function createModelStore({
     resetSimulation: () => {
       // 재생 중 리셋을 누르면 시간 0 + 정지 상태로 — "처음으로 되감기".
       timeSettingsStore.getState().setPaused(true);
-      stopGeneratorTicker();
+      stopSimulationLoop();
       stopPlaybackTimer();
       activePlaybackToken++;
       pulseRegistry.clearAll();

@@ -45,7 +45,12 @@ export function createTramaInstance(): TramaInstance {
     pulseSettingsStore,
     timeSettingsStore,
   });
-  const modelStore = createModelStore({ pulseRegistry, nodeFlashRegistry, timeSettingsStore });
+  const modelStore = createModelStore({
+    pulseRegistry,
+    nodeFlashRegistry,
+    timeSettingsStore,
+    animationLoop,
+  });
   const uiStore = createUIStore();
 
   return {
