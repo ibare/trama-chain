@@ -69,8 +69,9 @@ export interface ExecutionState {
    */
   observeExtractionRuntime: Record<NodeId, ObserveExtractionRuntime>;
   /**
-   * GeneratorNode의 enabled 플래그와 cursor. runtime-only — 매개변수는 모델에
-   * 영속되지만 시작/정지 상태와 cursor 진행도는 세션 한정이다.
+   * GeneratorNode의 cursor·gate 캐시. runtime-only — 매개변수는 모델에
+   * 영속되지만 cursor 진행도는 세션 한정이다. 글로벌 paused가 시간(=emit)의
+   * 단일 출처라 노드별 enable 토글은 없다.
    */
   generatorRuntime: Record<NodeId, GeneratorRuntime>;
   /**
@@ -108,12 +109,12 @@ export function initializeFromInitialValues(
     for (const slot of desc.initialValidSlots(node)) {
       validOutputs.add(outputKey(nid, slot));
     }
-    // GeneratorNode는 모델 매개변수로 cursor 초기화, enabled=false로 시작.
-    // 사용자가 ▶을 눌러야 emit이 시작된다. 다만 idle 상태에서도 "다음 emit하면
-    // 나올 값"을 peek로 미리 노출해 다운스트림 케이블이 떨어지지 않도록 한다.
+    // GeneratorNode는 모델 매개변수로 cursor 초기화. 글로벌 paused 만이 시간(emit)
+    // 의 단일 출처라 노드별 enable 토글이 없다. ticker가 시작 직후부터 매 step
+    // emit — 다만 paradigm이 t<startMs 처럼 정의되지 않은 시각이면 peek는 undefined.
     if (isGeneratorNode(node)) {
       const cursor = generatorRegistry.initCursor(node.params, 0);
-      generatorRuntime[nid] = { enabled: false, cursor };
+      generatorRuntime[nid] = { cursor };
       // 초기 시점(t=0) peek. 시간 기반 paradigm은 아직 정의되지 않은 시각이면
       // undefined를 반환 — 그 경우 values/validOutputs를 건드리지 않아 invalid를
       // 유지한다 (펄스 첫 발화 전·스텝 t<startMs 등).

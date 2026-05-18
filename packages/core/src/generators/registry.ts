@@ -90,5 +90,5 @@ export function ensureRuntimeMatchesParams(
   registry: GeneratorRegistry = defaultGeneratorRegistry,
 ): GeneratorRuntime {
   if (runtime.cursor.kind === params.kind) return runtime;
-  return { enabled: runtime.enabled, cursor: registry.initCursor(params) };
+  return { cursor: registry.initCursor(params), gateOpen: runtime.gateOpen };
 }

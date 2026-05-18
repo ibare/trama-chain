@@ -8,8 +8,8 @@ import type { GeneratorParadigm } from './types.js';
  * nextFireMs면 발화하고 nextFireMs += periodMs로 진행(drift-free 누적 — 시각
  * 측정 오차 누적 없음). 발화 시각 사이의 tick에서는 undefined로 freeze.
  *
- * - initCursor: nextFireMs = simulationTimeMs. enabled가 된 시각이 곧 첫 발화
- *   시각 — paradigm을 ▶ 누른 순간 즉시 한 번 출력하는 모델.
+ * - initCursor: nextFireMs = simulationTimeMs. cursor 초기화 시각이 곧 첫 발화
+ *   시각 — 시뮬레이션이 시작된 순간 즉시 한 번 출력하는 모델.
  * - emit:
  *   - t ≥ nextFireMs면 numericValue(value), nextCursor.nextFireMs = nextFireMs +
  *     periodMs. 누락된 발화는 한 tick에 한 번씩만 보상(catch-up은 안 함) — 다음

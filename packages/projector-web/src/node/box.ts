@@ -216,11 +216,8 @@ const OBSERVE_EXTRACTION_FROM_TOP = 18;
  *  compact 전용으로 인셋을 줄여 실제 그릴 수 있는 슬롯을 확보. */
 const OBSERVE_BODY_INSET_COMPACT = 6;
 
-/** GeneratorNode 본문 — 라벨 + 현재값 + 컨트롤러(▶/■/↺) 슬롯 내부 패딩. 폭·높이는 STANDARD_PANEL이 정한다. */
+/** GeneratorNode 본문 — 라벨 + 현재값 내부 패딩. 폭·높이는 STANDARD_PANEL이 정한다. */
 const GENERATOR_BODY_INSET = 16;
-const GENERATOR_CONTROLS_H = 26;
-const GENERATOR_CONTROLS_BOTTOM_PAD = 10;
-const GENERATOR_VALUE_FROM_TOP = 62;
 
 /** 식 노드 폭 견적용 — 변수 라벨 평균 글자 폭(px). 정확한 측정은 과함. */
 const EXPR_VAR_CHAR_W = 8;
@@ -331,17 +328,8 @@ function buildCompactLayout(
   const leftPin = buildPin(-halfW, panelCy, inSockets);
   const rightPin = buildPin(halfW, panelCy, outSockets);
 
-  // generator의 ▶/↺ 버튼은 기존 generatorBody 슬롯을 그대로 쓰는 형태로 작성되어
-  // 있으므로, compact에서도 generatorBody에 outer 컨트롤 슬롯 좌표를 채워 호환.
-  const generatorBody =
-    node.kind === 'generator' && outerControlSlot
-      ? {
-          x: -panelW / 2,
-          y: outerControlSlot.cy - COMPACT_CONTROLS_OUTER_H / 2,
-          w: panelW,
-          h: COMPACT_CONTROLS_OUTER_H,
-        }
-      : null;
+  // generator는 외곽 컨트롤이 없다 (사용자 토글 제거). generatorBody는 항상 null.
+  const generatorBody = null;
 
   // numeric ValueNode compact — 외곽 컨트롤 슬롯을 슬라이더와 combiner 칩이 공유한다.
   // lag=0 입력 2개 이상이면 슬라이더가 의미 잃고 combiner 칩으로 자리 교체.
@@ -415,7 +403,7 @@ export function getNodeLayout(
       return buildCompactLayout(node, opts, { hasOuterControls: true });
     }
     if (isGeneratorNode(node)) {
-      return buildCompactLayout(node, opts, { hasOuterControls: true });
+      return buildCompactLayout(node, opts, { hasOuterControls: false });
     }
     if (node.kind === 'logic-gate') {
       return buildCompactLayout(node, opts, { hasOuterControls: false });
@@ -666,7 +654,7 @@ export function getNodeLayout(
     };
   }
 
-  // GeneratorNode — 단일 boolean 입력(emit gate), 단일 출력. 본문에 라벨 + 현재값 + 컨트롤러 슬롯.
+  // GeneratorNode — 단일 boolean 입력(emit gate), 단일 출력. 본문에 라벨 + 현재값.
   if (isGeneratorNode(node)) {
     const halfW = STANDARD_PANEL.w / 2;
     const halfH = STANDARD_PANEL.h / 2;
@@ -674,8 +662,6 @@ export function getNodeLayout(
     // 좌측 핀 — boolean gate 입력 단항. incomingCount와 무관하게 1로 고정.
     const leftPin = buildPin(-halfW, 0, 1);
     const rightPin = buildPin(halfW, 0, 1);
-    const controlsBottom = halfH - GENERATOR_CONTROLS_BOTTOM_PAD;
-    const controlsTop = controlsBottom - GENERATOR_CONTROLS_H;
     return {
       width: STANDARD_PANEL.w,
       height: STANDARD_PANEL.h,
@@ -688,7 +674,7 @@ export function getNodeLayout(
       textX: -halfW + GENERATOR_BODY_INSET,
       labelY: cardTop + NAME_FROM_TOP,
       labelAnchor: 'start',
-      valueY: cardTop + GENERATOR_VALUE_FROM_TOP,
+      valueY: cardTop + VALUE_FROM_TOP,
       sliderY: halfH,
       combinerCenterY: null,
       hasCombiner: false,
@@ -697,12 +683,7 @@ export function getNodeLayout(
       skinBorder: null,
       expressionBody: null,
       observeBody: null,
-      generatorBody: {
-        x: -halfW + GENERATOR_BODY_INSET,
-        y: controlsTop,
-        w: STANDARD_PANEL.w - GENERATOR_BODY_INSET * 2,
-        h: GENERATOR_CONTROLS_H,
-      },
+      generatorBody: null,
       outerControlSlot: null,
     };
   }

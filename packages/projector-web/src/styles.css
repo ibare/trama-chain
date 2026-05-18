@@ -1656,34 +1656,6 @@
   cursor: text;
 }
 
-/* Generator node --------------------------------------------------------- */
-/* 컨트롤러 버튼(▶/■/↺) — hit-rect는 평소 투명, hover 시 어렴풋한 강조.
-   현재 상태와 일치하는 버튼은 .is-active 클래스로 채워서 토글 표시. */
-[data-trama-root] .trama-generator-btn {
-  fill: transparent;
-  stroke: var(--color-node-stroke-calm);
-  stroke-width: 1;
-  cursor: pointer;
-}
-[data-trama-root] .trama-generator-btn:hover {
-  fill: var(--color-node-fill-low);
-}
-[data-trama-root] .trama-generator-btn.is-active {
-  fill: var(--color-node-fill-focal);
-  stroke: var(--color-node-stroke-focal);
-}
-[data-trama-root] .trama-generator-btn.is-paused-dim {
-  opacity: 0.4;
-  cursor: not-allowed;
-}
-[data-trama-root] .trama-generator-btn.is-paused-dim:hover {
-  fill: transparent;
-}
-[data-trama-root] .trama-generator-btn-glyph {
-  color: var(--color-node-text-primary);
-  pointer-events: none;
-}
-
 /* Mode toggle — panel 우상단 안쪽에 얹는 compact/standard 전환 버튼.
    hit-area는 InteractiveArea가 fill:transparent로 제공하므로 cursor만 부여.
    glyph는 항상 흐릿하게 떠 있다가 hit-area hover 시 불투명으로 살아난다. */

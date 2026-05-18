@@ -96,7 +96,6 @@ export function propagateOneStep(
   const generatorRuntime: Record<NodeId, GeneratorRuntime> = {};
   for (const [nid, rt] of Object.entries(state.generatorRuntime ?? {})) {
     generatorRuntime[nid] = {
-      enabled: rt.enabled,
       cursor: { ...rt.cursor },
       gateOpen: rt.gateOpen,
     };

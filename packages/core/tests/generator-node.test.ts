@@ -188,27 +188,21 @@ describe('GeneratorNode — normal paradigm', () => {
 });
 
 describe('GeneratorNode — propagate integration', () => {
-  it('enabled=false (idle): exposes peek value so downstream wiring stays attached', () => {
+  it('init exposes peek value so downstream wiring stays attached before first step', () => {
     let m = createEmptyModel(0);
     m = addGeneratorNode(
       m,
       { id: 'g', label: 'gen', params: { kind: 'counter', start: 10, step: 1 } },
       0,
     );
-    let state = initializeFromInitialValues(m);
+    const state = initializeFromInitialValues(m);
     expect(state.values['g']).toEqual(numericValue(10, 'free'));
     expect(state.validOutputs.has('g:0')).toBe(true);
-    expect(state.generatorRuntime['g']?.enabled).toBe(false);
     // cursor는 아직 진행되지 않았다 — 다음 emit이 그대로 10을 낸다.
-    expect(state.generatorRuntime['g']?.cursor).toEqual({ kind: 'counter', nextValue: 10, nextFireMs: 0 });
-    // step을 돌려도 idle 상태면 cursor·값 그대로.
-    state = step(state, m);
-    expect(state.values['g']).toEqual(numericValue(10, 'free'));
-    expect(state.validOutputs.has('g:0')).toBe(true);
     expect(state.generatorRuntime['g']?.cursor).toEqual({ kind: 'counter', nextValue: 10, nextFireMs: 0 });
   });
 
-  it('enabled=true: emits per step, cursor advances', () => {
+  it('emits per step, cursor advances (no enabled toggle — always on)', () => {
     let m = createEmptyModel(0);
     m = addGeneratorNode(
       m,
@@ -216,10 +210,6 @@ describe('GeneratorNode — propagate integration', () => {
       0,
     );
     let state = initializeFromInitialValues(m);
-    state = {
-      ...state,
-      generatorRuntime: { ...state.generatorRuntime, g: { ...state.generatorRuntime['g']!, enabled: true } },
-    };
     const out: number[] = [];
     for (let i = 0; i < 3; i++) {
       state = step(state, m);
@@ -229,48 +219,8 @@ describe('GeneratorNode — propagate integration', () => {
     expect(out).toEqual([1, 2, 3]);
   });
 
-  it('paused after running: last value retained', () => {
-    let m = createEmptyModel(0);
-    m = addGeneratorNode(
-      m,
-      { id: 'g', label: 'gen', params: { kind: 'counter', start: 1, step: 1 } },
-      0,
-    );
-    let state = initializeFromInitialValues(m);
-    state = {
-      ...state,
-      generatorRuntime: { ...state.generatorRuntime, g: { ...state.generatorRuntime['g']!, enabled: true } },
-    };
-    state = step(state, m);
-    state = step(state, m);
-    expect(state.values['g']).toEqual(numericValue(2, 'free'));
-
-    // 정지 — 값 유지.
-    state = {
-      ...state,
-      generatorRuntime: {
-        ...state.generatorRuntime,
-        g: { ...state.generatorRuntime['g']!, enabled: false },
-      },
-    };
-    state = step(state, m);
-    expect(state.values['g']).toEqual(numericValue(2, 'free'));
-    expect(state.validOutputs.has('g:0')).toBe(true);
-
-    // 재시작 — cursor 이어짐, 다음 값 = 3.
-    state = {
-      ...state,
-      generatorRuntime: {
-        ...state.generatorRuntime,
-        g: { ...state.generatorRuntime['g']!, enabled: true },
-      },
-    };
-    state = step(state, m);
-    expect(state.values['g']).toEqual(numericValue(3, 'free'));
-  });
-
-  it('downstream ValueNode receives idle peek value (no emit yet)', () => {
-    // ▶ 누르기 전에도 generator output이 valid라 케이블이 자연스레 붙고 값이 전파된다.
+  it('downstream ValueNode receives emitted value', () => {
+    // 입력 미연결이면 항상 emit — 첫 step에서 다운스트림으로 자연 전파.
     let m = createEmptyModel(0);
     m = addGeneratorNode(
       m,
@@ -281,12 +231,11 @@ describe('GeneratorNode — propagate integration', () => {
     m = addEdge(m, { from: 'g', to: 'v', shape: { kind: 'none', params: {} } }, 0);
 
     let state = initializeFromInitialValues(m);
-    // idle 상태에서 peek가 다운스트림으로 자연 전파.
     state = step(state, m);
     expect(state.values['v']).toEqual(numericValue(7, 'free'));
-    // cursor는 advance하지 않음 — 다시 step 돌려도 동일.
+    // cursor가 advance하므로 다음 step은 다음 값.
     state = step(state, m);
-    expect(state.values['v']).toEqual(numericValue(7, 'free'));
+    expect(state.values['v']).toEqual(numericValue(10, 'free'));
   });
 
   it('peek and emit agree on the next value (cursor advances only on emit)', () => {
@@ -320,10 +269,6 @@ describe('GeneratorNode — propagate integration', () => {
     m = addEdge(m, { from: 'g', to: 'v', shape: { kind: 'none', params: {} } }, 0);
 
     let state = initializeFromInitialValues(m);
-    state = {
-      ...state,
-      generatorRuntime: { ...state.generatorRuntime, g: { ...state.generatorRuntime['g']!, enabled: true } },
-    };
     state = step(state, m);
     expect(state.values['v']).toEqual(numericValue(10, 'free'));
     state = step(state, m);
@@ -332,9 +277,9 @@ describe('GeneratorNode — propagate integration', () => {
 });
 
 describe('GeneratorNode — boolean gate input', () => {
-  // 입력이 연결되면 generator는 boolean gate가 emit을 결정 — runtime.enabled를 덮어쓴다.
-  // true=emit / false=freeze / source invalid=freeze. 미연결이면 기존 runtime.enabled 경로.
-  it('input=true → emit advances cursor (overrides runtime.enabled=false)', () => {
+  // 입력이 연결되면 generator는 boolean gate가 emit을 결정.
+  // true=emit / false=freeze / source invalid=freeze. 미연결이면 항상 emit.
+  it('input=true → emit advances cursor', () => {
     let m = createEmptyModel(0);
     m = addConstantNode(m, { id: 'gate', label: 'on', value: booleanValue(true) }, 0);
     m = addGeneratorNode(
@@ -345,21 +290,13 @@ describe('GeneratorNode — boolean gate input', () => {
     m = addEdge(m, { from: 'gate', to: 'g', shape: { kind: 'none', params: {} } }, 0);
 
     let state = initializeFromInitialValues(m);
-    // runtime.enabled를 명시적으로 false로 둬도 입력 true가 우선.
-    state = {
-      ...state,
-      generatorRuntime: {
-        ...state.generatorRuntime,
-        g: { ...state.generatorRuntime['g']!, enabled: false },
-      },
-    };
     state = step(state, m);
     expect(state.values['g']).toEqual(numericValue(1, 'free'));
     state = step(state, m);
     expect(state.values['g']).toEqual(numericValue(2, 'free'));
   });
 
-  it('input=false → freeze (last value preserved, runtime.enabled ignored)', () => {
+  it('input=false → freeze (last value preserved)', () => {
     let m = createEmptyModel(0);
     m = addConstantNode(m, { id: 'gate', label: 'off', value: booleanValue(false) }, 0);
     m = addGeneratorNode(
@@ -370,14 +307,6 @@ describe('GeneratorNode — boolean gate input', () => {
     m = addEdge(m, { from: 'gate', to: 'g', shape: { kind: 'none', params: {} } }, 0);
 
     let state = initializeFromInitialValues(m);
-    // runtime.enabled=true여도 입력 false가 우선 — freeze.
-    state = {
-      ...state,
-      generatorRuntime: {
-        ...state.generatorRuntime,
-        g: { ...state.generatorRuntime['g']!, enabled: true },
-      },
-    };
     const beforeValue = state.values['g'];
     state = step(state, m);
     expect(state.values['g']).toEqual(beforeValue);
@@ -385,25 +314,11 @@ describe('GeneratorNode — boolean gate input', () => {
     expect(state.values['g']).toEqual(beforeValue);
   });
 
-  it('no incoming edge → runtime.enabled path preserved', () => {
-    // 입력 미연결 — 기존처럼 사용자 ▶ 토글이 emit을 결정.
+  it('no incoming edge → always emits (글로벌 paused가 시간의 단일 출처)', () => {
     let m = createEmptyModel(0);
     m = addGeneratorNode(m, { id: 'g', label: 'gen' }, 0);
 
     let state = initializeFromInitialValues(m);
-    // enabled=false → freeze
-    const before = state.values['g'];
-    state = step(state, m);
-    expect(state.values['g']).toEqual(before);
-
-    // enabled=true → emit
-    state = {
-      ...state,
-      generatorRuntime: {
-        ...state.generatorRuntime,
-        g: { ...state.generatorRuntime['g']!, enabled: true },
-      },
-    };
     state = step(state, m);
     expect(state.values['g']).toEqual(numericValue(1, 'free'));
     state = step(state, m);
@@ -539,14 +454,6 @@ describe('GeneratorNode — Condition 슬롯 게이트 (메타 인식)', () => {
       0,
     );
     let state = initializeFromInitialValues(m);
-    // 명시적으로 enabled=true 로 두어도 게이트가 닫혀야 한다.
-    state = {
-      ...state,
-      generatorRuntime: {
-        ...state.generatorRuntime,
-        g: { ...state.generatorRuntime['g']!, enabled: true },
-      },
-    };
     const before = state.values['g'];
     state = step(state, m);
     expect(state.generatorRuntime['g']!.gateOpen).toBe(false);

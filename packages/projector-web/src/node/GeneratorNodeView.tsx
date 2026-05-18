@@ -13,11 +13,9 @@ import { resolveDisplayMode } from './display-mode.js';
 import { NodeFrame } from './NodeFrame.js';
 import { NodeBody } from './NodeBody.js';
 import { ModeToggle } from './ModeToggle.js';
-import { InteractiveArea } from './InteractiveArea.js';
 import { Socket } from './Socket.js';
 import { useOutputConnected } from './use-socket-connections.js';
 import { useEdgeDraftSource } from '../canvas/use-edge-draft-source.js';
-import { PhosphorGlyph } from '../icon/phosphor.js';
 
 interface Props {
   id: NodeId;
@@ -25,11 +23,6 @@ interface Props {
 }
 
 const SOCKET_SIZE = parseFloat(tokens.spacing.socketSize);
-// BUTTON_SIZE 는 box.ts 의 GENERATOR_CONTROLS_H(=26) 슬롯 안에 정확히 들어가는
-// 값. compact 모드의 외곽 컨트롤 슬롯(36)에서는 위·아래 여유가 자연스럽게 남는다.
-const BUTTON_SIZE = 26;
-const BUTTON_GAP = 10;
-const GLYPH_SIZE = 16;
 
 function formatGeneratorValue(v: number): string {
   if (!Number.isFinite(v)) return '·';
@@ -40,12 +33,8 @@ function formatGeneratorValue(v: number): string {
 }
 
 function GeneratorNodeViewImpl({ id, incomingCount }: Props): JSX.Element | null {
-  const { modelStore, uiStore, timeSettingsStore, socketRegistry } = useTrama();
-  const paused = timeSettingsStore((s) => s.paused);
+  const { modelStore, uiStore, socketRegistry } = useTrama();
   const node = modelStore((s) => s.model.nodes[id]);
-  const enabled = modelStore(
-    (s) => s.executionState.generatorRuntime[id]?.enabled ?? false,
-  );
   // FunctionHandle.peek 은 매 호출 새 Value 객체를 만든다. selector 가 객체를 반환하면
   // zustand useSyncExternalStore 가 한 render 에서 두 번의 getSnapshot 결과를 다르게 보고
   // 무한 update 루프를 띄운다. UI 는 수치 표시만 필요하므로 primitive 로 환원한다.
@@ -55,8 +44,6 @@ function GeneratorNodeViewImpl({ id, incomingCount }: Props): JSX.Element | null
     const v = unwrap(resolveScalar(ev, s.executionState.simulationTimeMs));
     return v.kind === 'numeric' ? v.n : null;
   });
-  const setGeneratorEnabled = modelStore((s) => s.setGeneratorEnabled);
-  const resetGenerator = modelStore((s) => s.resetGenerator);
   const updateNode = modelStore((s) => s.updateNode);
   const isSelected = uiStore(
     (s) => s.selection.kind === 'node' && s.selection.id === id,
@@ -91,15 +78,6 @@ function GeneratorNodeViewImpl({ id, incomingCount }: Props): JSX.Element | null
       getStartPoint: getOutputStartPoint,
     });
 
-  const onToggle = useCallback(() => {
-    if (!paused) return;
-    setGeneratorEnabled(id, !enabled);
-  }, [enabled, id, paused, setGeneratorEnabled]);
-  const onReset = useCallback(() => {
-    if (!paused) return;
-    resetGenerator(id);
-  }, [id, paused, resetGenerator]);
-
   const currentMode = node ? resolveDisplayMode(node) : 'compact';
   const onToggleMode = useCallback(() => {
     updateNode(id, {
@@ -117,22 +95,10 @@ function GeneratorNodeViewImpl({ id, incomingCount }: Props): JSX.Element | null
   if (!node.position) return null;
   if (!layout) return null;
 
-  const { width, height, labelY, textX, valueY, generatorBody, panelCx, panelCy } = layout;
-  const stateClass = enabled ? 'is-focal' : 'is-calm';
+  const { width, height, labelY, textX, valueY, panelCx, panelCy } = layout;
 
   const valueText =
     currentNumber !== null ? formatGeneratorValue(currentNumber) : '—';
-
-  // 원형 토글 ▶/⏸ + ↺ 리셋 2버튼을 가로로 배치 — body 영역 중앙 정렬.
-  // 미니플레이어와 동일 결: 재생/정지는 한 자리에서 글리프만 토글.
-  const totalButtonsW = BUTTON_SIZE * 2 + BUTTON_GAP;
-  const buttonsStartX = generatorBody
-    ? generatorBody.x + (generatorBody.w - totalButtonsW) / 2
-    : 0;
-  const buttonY = generatorBody
-    ? generatorBody.y + (generatorBody.h - BUTTON_SIZE) / 2
-    : 0;
-  const buttonRadius = BUTTON_SIZE / 2;
 
   return (
     <NodeFrame
@@ -144,7 +110,7 @@ function GeneratorNodeViewImpl({ id, incomingCount }: Props): JSX.Element | null
       panelCy={panelCy}
       panelWidth={layout.panelWidth}
       panelHeight={layout.panelHeight}
-      className={`trama-generator-node${enabled ? ' is-running' : ''}`}
+      className="trama-generator-node"
       onBodyDoubleClick={onBodyDoubleClick}
     >
       <NodeBody
@@ -152,7 +118,7 @@ function GeneratorNodeViewImpl({ id, incomingCount }: Props): JSX.Element | null
         height={layout.panelHeight}
         cx={panelCx}
         cy={panelCy}
-        stateClass={stateClass}
+        stateClass="is-focal"
         isSelected={isSelected}
       />
 
@@ -182,51 +148,6 @@ function GeneratorNodeViewImpl({ id, incomingCount }: Props): JSX.Element | null
           cy={layout.leftPin.sockets[0].y}
           connected={incomingCount > 0}
         />
-      )}
-
-      {/* 입력 연결되면 사용자 토글 컨트롤은 의미를 잃으므로 숨김 — gate가 emit을 결정. */}
-      {generatorBody && incomingCount === 0 && (
-        <>
-          {/* play/pause 토글 — enabled에 따라 글리프만 바뀜. 원형 hit-area. */}
-          <InteractiveArea
-            x={buttonsStartX}
-            y={buttonY}
-            width={BUTTON_SIZE}
-            height={BUTTON_SIZE}
-            rx={buttonRadius}
-            ry={buttonRadius}
-            hitClassName={`trama-generator-btn${paused ? '' : ' is-paused-dim'}`}
-            onClick={onToggle}
-          >
-            <PhosphorGlyph
-              name={enabled ? 'pause' : 'play'}
-              cx={buttonsStartX + BUTTON_SIZE / 2}
-              cy={buttonY + BUTTON_SIZE / 2}
-              size={GLYPH_SIZE}
-              className="trama-generator-btn-glyph"
-            />
-          </InteractiveArea>
-
-          {/* reset — 원형 hit-area. */}
-          <InteractiveArea
-            x={buttonsStartX + BUTTON_SIZE + BUTTON_GAP}
-            y={buttonY}
-            width={BUTTON_SIZE}
-            height={BUTTON_SIZE}
-            rx={buttonRadius}
-            ry={buttonRadius}
-            hitClassName={`trama-generator-btn${paused ? '' : ' is-paused-dim'}`}
-            onClick={onReset}
-          >
-            <PhosphorGlyph
-              name="reset"
-              cx={buttonsStartX + BUTTON_SIZE + BUTTON_GAP + BUTTON_SIZE / 2}
-              cy={buttonY + BUTTON_SIZE / 2}
-              size={GLYPH_SIZE}
-              className="trama-generator-btn-glyph"
-            />
-          </InteractiveArea>
-        </>
       )}
 
       <ModeToggle

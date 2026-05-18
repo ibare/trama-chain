@@ -169,7 +169,7 @@ export interface PropagateContext {
    */
   observeExtractionRuntime: Record<NodeId, ObserveExtractionRuntime>;
   /**
-   * GeneratorNode의 enabled 플래그와 cursor. propagate가 emit할 때 mutate한다.
+   * GeneratorNode의 cursor·gate 캐시. propagate가 emit할 때 mutate한다.
    * runtime-only — 직렬화되지 않는다.
    */
   generatorRuntime: Record<NodeId, GeneratorRuntime>;
@@ -941,12 +941,11 @@ const observeNodeDescriptor: NodeKindDescriptor<Extract<Node, { kind: 'observe' 
  * GeneratorNode 디스크립터 — cursor를 진행하며 자신의 numeric을 emit.
  *
  * 단일 메타 인식 입력 슬롯이 있다 — boolean 또는 numeric(meta:boolean) 을 OR 매칭:
- *  - 미연결: 사용자 ▶/⏸로 토글되는 `generatorRuntime.enabled`가 emit을 결정 (기본 모드).
+ *  - 미연결: 글로벌 paused=false 인 한 매 step emit (노드별 토글 없음).
  *  - 연결 (plain boolean): 알맹이 boolean 이 emit gate.
  *  - 연결 (Condition 슬롯 출력): wrapped value 의 meta(boolean) 가 emit gate —
  *    "조건 슬롯을 통과한 펄스만 emit 진행" 의미가 자동으로 성립한다.
  *  - source 가 invalid 거나 게이트로 해석 못 하면 freeze (안전한 정지).
- *  - 입력이 있는 한 사용자 토글은 의미를 잃는다 (NodeView는 컨트롤을 숨김).
  *
  * - propagate: 위 시맨틱으로 effectivelyEnabled를 산출 후 paradigm.emit. freeze면
  *   ctx.next/validOutputs를 건드리지 않아 마지막 값이 유지된다.
@@ -979,9 +978,7 @@ const generatorNodeDescriptor: NodeKindDescriptor<
   propagate: (node, ctx) => {
     const existing = ctx.generatorRuntime[node.id];
     const runtime: GeneratorRuntime = existing ?? {
-      enabled: false,
       cursor: ctx.generatorRegistry.initCursor(node.params, ctx.simulationTimeMs),
-      gateOpen: undefined,
     };
 
     // 입력 boolean gate 캐시 동기화 — propagate는 모델 변경/전체 재계산 시점이라
@@ -1003,16 +1000,13 @@ const generatorNodeDescriptor: NodeKindDescriptor<
       }
     }
 
+    // 미연결이면 항상 emit, 연결이면 gateOpen만이 결정 — 노드별 토글 없음.
     const effectivelyEnabled =
-      ctx.incoming.length === 0 ? runtime.enabled : gateOpen === true;
+      ctx.incoming.length === 0 ? true : gateOpen === true;
 
     if (!effectivelyEnabled) {
       // 비활성(freeze)이어도 gateOpen은 최신 source 상태로 갱신해 둔다.
-      ctx.generatorRuntime[node.id] = {
-        enabled: runtime.enabled,
-        cursor: runtime.cursor,
-        gateOpen,
-      };
+      ctx.generatorRuntime[node.id] = { cursor: runtime.cursor, gateOpen };
       return;
     }
     const { value, nextCursor } = ctx.generatorRegistry.emit(
@@ -1027,12 +1021,7 @@ const generatorNodeDescriptor: NodeKindDescriptor<
       ctx.next[node.id] = value;
       ctx.validOutputs.add(outputKey(node.id, 0));
     }
-    // runtime.enabled는 사용자 토글 의도를 보존 — 입력 모드에서도 덮어쓰지 않는다.
-    ctx.generatorRuntime[node.id] = {
-      enabled: runtime.enabled,
-      cursor: nextCursor,
-      gateOpen,
-    };
+    ctx.generatorRuntime[node.id] = { cursor: nextCursor, gateOpen };
   },
 };
 

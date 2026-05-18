@@ -116,11 +116,6 @@ export interface ModelStore {
   updateNode: (id: NodeId, patch: NodePatch) => void;
   removeNode: (id: NodeId) => void;
 
-  /** GeneratorNode 시작(true)/정지(false). cursor와 마지막 값은 그대로 유지. */
-  setGeneratorEnabled: (id: NodeId, enabled: boolean) => void;
-  /** GeneratorNode 초기 상태로. cursor를 params로 재초기화하고 enabled=false. */
-  resetGenerator: (id: NodeId) => void;
-
   addEdge: (input: AddEdgeInput) => Edge | null;
   updateEdge: (id: EdgeId, patch: Partial<Omit<Edge, 'id'>>) => void;
   removeEdge: (id: EdgeId) => void;
@@ -191,7 +186,7 @@ function computeExecutionState(
     fresh = { executionState: init, trajectory: [init] };
   }
   if (!prior) return fresh;
-  // 생성기 런타임(enabled·cursor)과 마지막 emit 값은 모델 편집으로 리셋되면 안 된다.
+  // 생성기 런타임(cursor)과 마지막 emit 값은 모델 편집으로 리셋되면 안 된다.
   // paradigm kind가 바뀌었다면 fresh가 params에 맞게 초기화한 cursor를 쓴다.
   const mergedRuntime: Record<NodeId, GeneratorRuntime> = {};
   const mergedValues: Record<NodeId, ExecValue> = { ...fresh.executionState.values };
@@ -252,10 +247,9 @@ function computeExecutionState(
     const priorRt = prior.generatorRuntime[nid];
     const freshRt = fresh.executionState.generatorRuntime[nid]!;
     if (priorRt && priorRt.cursor.kind === freshRt.cursor.kind) {
-      // cursor·enabled는 prior에서 유지(사용자 토글/진행 상태 보존), gateOpen은
-      // 모델 편집 후 새 source 토폴로지를 반영한 fresh 쪽을 채택.
+      // cursor는 prior에서 유지(진행 상태 보존), gateOpen은 모델 편집 후 새 source
+      // 토폴로지를 반영한 fresh 쪽을 채택.
       mergedRuntime[nid] = {
-        enabled: priorRt.enabled,
         cursor: priorRt.cursor,
         gateOpen: freshRt.gateOpen,
       };
@@ -330,10 +324,9 @@ export function createModelStore({
    * 한 generator가 실제로 이번 tick에 emit해야 하는지.
    *
    * 시맨틱은 [[generatorNodeDescriptor]] propagate와 동일:
-   *  - 입력 미연결: runtime.enabled (사용자 ▶ 토글) 사용
+   *  - 입력 미연결: 항상 emit (글로벌 paused가 시간의 단일 출처)
    *  - 입력 연결: incoming boolean이 true여야 emit. invalid·boolean 아님이면 freeze
    *
-   * 입력 미연결: 사용자 토글(`rt.enabled`).
    * 입력 연결: `rt.gateOpen` 캐시만 본다 — `executionState.values[source]`를
    * 직접 읽으면 펄스 도착 전에 ticker가 그래프 변화를 감지해 효과가 사후 펄스보다
    * 먼저 발현되는 비대칭 버그가 생긴다. 캐시는 펄스 도착 시점에만 갱신된다.
@@ -349,7 +342,7 @@ export function createModelStore({
       const e = model.edges[eid];
       return !!e && e.to === nid && e.lag === 0;
     });
-    if (!hasIncoming) return rt.enabled;
+    if (!hasIncoming) return true;
     return rt.gateOpen === true;
   }
 
@@ -358,7 +351,7 @@ export function createModelStore({
     if (playbackStep !== null) return;
     // 시뮬레이션 시간은 generator 유무와 무관하게 paused=false 동안 항상 진행한다.
     // RAF 루프가 시뮬레이션 시간축의 유일한 출처. generator emit은 그 시간 안에서
-    // 일어나는 부수 효과로, enabled generator가 있을 때만 함께 갱신된다.
+    // 일어나는 부수 효과로, gate 조건을 만족하는 generator가 있을 때만 함께 갱신된다.
     const stepDelta = FIXED_DT_MS;
     const nextSimulationTimeMs = executionState.simulationTimeMs + stepDelta;
     const newValues: Record<NodeId, ExecValue> = { ...executionState.values };
@@ -385,10 +378,9 @@ export function createModelStore({
         newValid.add(outputKey(nid, 0));
         emittedIds.push(nid);
       }
-      // runtime.enabled는 사용자 토글 의도를 보존. gateOpen 캐시는 펄스로만 갱신되는
-      // 단일 진입 — ticker tick에서 드롭하면 다음 tick에 게이트 false로 평가돼
-      // emit이 멈춘다 (ticker 자체는 계속 시간만 진행).
-      newRuntime[nid] = { enabled: rt.enabled, cursor: nextCursor, gateOpen: rt.gateOpen };
+      // gateOpen 캐시는 펄스로만 갱신되는 단일 진입 — ticker tick에서 드롭하면
+      // 다음 tick에 게이트 false로 평가돼 emit이 멈춘다 (ticker 자체는 계속 시간만 진행).
+      newRuntime[nid] = { cursor: nextCursor, gateOpen: rt.gateOpen };
     }
     store.setState((s) => ({
       executionState: {
@@ -686,7 +678,6 @@ export function createModelStore({
         const newRuntime = {
           ...s.executionState.generatorRuntime,
           [pulse.targetNodeId]: {
-            enabled: prev.enabled,
             cursor: prev.cursor,
             gateOpen: nextGateOpen,
           },
@@ -905,65 +896,6 @@ export function createModelStore({
       const exec = computeExecutionState(after, s.executionState, true, s.model);
       set({ model: after, ...exec });
       return node;
-    },
-
-    setGeneratorEnabled: (id, enabled) => {
-      if (!assertEditable()) return;
-      const s = get();
-      const node = s.model.nodes[id];
-      if (!node || !isGeneratorNode(node)) return;
-      const current = s.executionState.generatorRuntime[id];
-      // 노드는 있는데 runtime이 비어 있는 경우(레이스) — params·현재 시뮬레이션 시간으로 새 cursor 생성.
-      const cursor =
-        current?.cursor ??
-        defaultGeneratorRegistry.initCursor(node.params, s.executionState.simulationTimeMs);
-      if (current?.enabled === enabled) return;
-      set({
-        executionState: {
-          ...s.executionState,
-          generatorRuntime: {
-            ...s.executionState.generatorRuntime,
-            [id]: { enabled, cursor, gateOpen: current?.gateOpen },
-          },
-        },
-      });
-      // ticker는 paused 기준만 본다 — enabled가 false여도 시간 진행은 계속.
-    },
-
-    resetGenerator: (id) => {
-      if (!assertEditable()) return;
-      const s = get();
-      const node = s.model.nodes[id];
-      if (!node || !isGeneratorNode(node)) return;
-      const nowMs = s.executionState.simulationTimeMs;
-      const cursor = defaultGeneratorRegistry.initCursor(node.params, nowMs);
-      // 값은 비우지 않는다 — idle peek로 다시 "다음 emit 값"을 노출.
-      // (cursor를 origin으로 되돌렸으니 peek 결과는 counter.start / random(seed) 첫 샘플).
-      // 시간 기반 paradigm이 현재 시각에서 undefined를 반환하면 (예: 스텝 t<startMs)
-      // 값/valid를 끄지 않고 기존 상태를 유지한다 — reset은 cursor만의 의미이지
-      // 다운스트림 상태를 invalid로 강제하지 않는다.
-      const newValues: Record<NodeId, ExecValue> = { ...s.executionState.values };
-      const peeked = defaultGeneratorRegistry.peek(node.params, cursor, nowMs);
-      const newValid = new Set(s.executionState.validOutputs);
-      if (peeked !== undefined) {
-        newValues[id] = peeked;
-        newValid.add(outputKey(id, 0));
-      }
-      set({
-        executionState: {
-          ...s.executionState,
-          values: newValues,
-          validOutputs: newValid,
-          generatorRuntime: {
-            ...s.executionState.generatorRuntime,
-            [id]: {
-              enabled: false,
-              cursor,
-              gateOpen: s.executionState.generatorRuntime[id]?.gateOpen,
-            },
-          },
-        },
-      });
     },
 
     updateNode: (id, rawPatch) => {

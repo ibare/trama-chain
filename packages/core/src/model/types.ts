@@ -212,11 +212,11 @@ export interface ObserveNode {
  * - 입력 0개 / 단일 numeric 출력. 데이터 생성 도메인 전문가.
  * - `params`: 패러다임 + 매개변수. 패러다임이 곧 paradigm registry의 키이며
  *   같은 sum type에서 매개변수 모양이 결정된다.
- * - 시작/정지/리셋 컨트롤러는 UI에서 노드별로 노출되고 ExecutionState.
- *   generatorRuntime이 enabled/cursor를 관리한다 (런타임 전용 — 직렬화 안 됨).
+ * - 시간 진행은 글로벌 paused 단일 출처 — 노드별 시작/정지 토글은 없다.
+ *   ExecutionState.generatorRuntime이 cursor·gate 캐시를 관리한다 (런타임 전용).
  *
  * 모델에 영속되는 것은 매개변수까지 — counter의 start/step, uniform·normal의
- * 분포 파라미터·seed. 시작/정지 상태, 현재 cursor는 세션 한정 런타임.
+ * 분포 파라미터·seed. 현재 cursor는 세션 한정 런타임.
  *
  * 단위는 raw('free') — 생성기는 의미적 단위가 없는 raw 수치를 만든다.
  * 단위가 필요하면 다운스트림 ValueNode가 입력으로 받아 흡수.

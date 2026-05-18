@@ -34,15 +34,11 @@ export type GeneratorCursor =
   | { kind: 'schedule' };
 
 /**
- * 노드별 런타임 상태. enabled=true인 동안 propagate 단계마다 emit한다.
- * enabled=false면 마지막 출력값을 그대로 유지.
- *
- * - 시작(▶)        : enabled=false → true. cursor는 *유지* (이어짐).
- * - 정지(■)        : enabled=true  → false. cursor·마지막 값 모두 유지.
- * - 초기 상태(↺)    : enabled=false, cursor를 paradigm.initCursor(params)로 재초기화.
+ * 노드별 런타임 상태. 시뮬레이션 시간이 진행하는 동안 매 step emit한다 — 노드별
+ * 토글은 없고, 글로벌 paused만이 시간(그리고 emit)의 단일 출처. 입력 boolean
+ * gate 가 연결되어 있을 때만 gateOpen 캐시가 emit 여부를 좌우한다.
  */
 export interface GeneratorRuntime {
-  enabled: boolean;
   cursor: GeneratorCursor;
   /**
    * 입력 boolean gate 캐시. 미연결이면 undefined.
@@ -52,7 +48,7 @@ export interface GeneratorRuntime {
    * 발현되어 시각·논리가 어긋난다. 이 캐시는 펄스 도착 시점(또는 모델
    * 변경에 따른 propagate 시점)에만 갱신된다.
    *
-   * - 비연결 generator는 이 필드를 사용하지 않는다 (`enabled`가 게이트 역할).
+   * - 비연결 generator는 이 필드를 사용하지 않는다 (항상 emit).
    * - 연결 직후, 첫 펄스가 도달하기 전까지는 undefined → freeze로 수렴.
    */
   gateOpen?: boolean;
