@@ -974,24 +974,53 @@
 }
 
 [data-trama-root] .trama-mini-player-time {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  box-sizing: border-box;
+  height: 28px;
+  border: 1px solid var(--color-node-stroke-calm);
+  border-radius: var(--spacing-radius-pill);
+  padding: 0 12px;
   font-family: inherit;
   font-size: var(--typography-text-picker-label);
+  line-height: 1;
   font-variant-numeric: tabular-nums;
   color: var(--color-node-text-primary);
-  min-width: 4ch;
+  min-width: 6ch;
   text-align: center;
 }
 
-[data-trama-root] .trama-mini-player-divider {
-  width: 1px;
-  height: 18px;
-  background: var(--color-node-stroke-calm);
-}
-
-[data-trama-root] .trama-mini-player-speed {
+[data-trama-root] .trama-mini-player-speed-trigger {
+  appearance: none;
   display: inline-flex;
   align-items: center;
+  justify-content: center;
+  box-sizing: border-box;
+  height: 28px;
+  background: transparent;
+  border: 1px solid var(--color-node-stroke-calm);
+  border-radius: var(--spacing-radius-pill);
+  padding: 0 12px;
+  font-family: inherit;
+  font-size: var(--typography-text-picker-label);
+  line-height: 1;
+  font-variant-numeric: tabular-nums;
+  cursor: pointer;
+  color: var(--color-node-text-primary);
+  transition: background var(--motion-duration-fade-in) var(--motion-easing-fade-natural);
+}
+
+[data-trama-root] .trama-mini-player-speed-trigger:hover,
+[data-trama-root] .trama-mini-player-speed-trigger[data-state="open"] {
+  background: var(--color-node-fill-calm);
+}
+
+[data-trama-root] .trama-mini-player-speed-popover {
+  display: flex;
+  flex-direction: column;
   gap: 2px;
+  padding: 4px;
 }
 
 [data-trama-root] .trama-mini-player-speed-item {
@@ -999,7 +1028,9 @@
   background: transparent;
   border: 1px solid transparent;
   border-radius: var(--spacing-radius-pill);
-  padding: 3px 8px;
+  padding: 4px 14px;
+  min-width: 56px;
+  text-align: center;
   font-family: inherit;
   font-size: var(--typography-text-picker-label);
   font-variant-numeric: tabular-nums;
