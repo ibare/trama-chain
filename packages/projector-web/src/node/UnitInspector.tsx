@@ -255,6 +255,7 @@ export function UnitInspector({ node }: Props): JSX.Element {
             <NumberField
               label="최소"
               value={unit.min}
+              unit={unit.suffix || undefined}
               precision={precisionFromStep(unit.step)}
               disabled={!paused}
               onChange={(v) => setRange({ min: v })}
@@ -262,6 +263,7 @@ export function UnitInspector({ node }: Props): JSX.Element {
             <NumberField
               label="최대"
               value={unit.max}
+              unit={unit.suffix || undefined}
               precision={precisionFromStep(unit.step)}
               disabled={!paused}
               onChange={(v) => setRange({ max: v })}
@@ -269,6 +271,8 @@ export function UnitInspector({ node }: Props): JSX.Element {
             <NumberField
               label="스텝"
               value={unit.step}
+              unit={unit.suffix || undefined}
+              precision={precisionFromStep(unit.step)}
               min={0}
               disabled={!paused}
               onChange={(v) => {
