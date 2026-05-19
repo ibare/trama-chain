@@ -117,9 +117,13 @@ export function createPulseRegistry({
   }
 
   function advance(): void {
-    // paused면 도착 검사·notifyTick까지 모두 skip — PulseLayer가 subscribeTick에
-    // 묶여 있어 DOM 위치 갱신이 자동으로 freeze되고, 도착 chain도 차단된다.
-    if (pausedAt !== null) return;
+    // paused여도 notifyTick은 호출한다. 노드 드래그로 케이블 경로가 갱신되면
+    // PulseLayer가 새 경로 위 같은 progress 지점으로 펄스를 다시 그려야 하기 때문.
+    // 도착 검사·snapshot 갱신·ticker 정리는 그대로 skip — 시간은 멈춰 있다.
+    if (pausedAt !== null) {
+      notifyTick();
+      return;
+    }
     const now = performance.now();
     const arrived: Pulse[] = [];
     for (const p of pulses.values()) {
@@ -165,7 +169,10 @@ export function createPulseRegistry({
       return pulse;
     },
     pulseProgress(p, now = performance.now()): number {
-      const t = (now - p.startTime) / p.travelDurationMs;
+      // paused 중에는 시간이 pausedAt에 박제된 것처럼 계산한다. unpause 시
+      // startTime을 += delta로 보정하는 핸들러와 정합 — freeze된 progress 그대로 이어서 진행.
+      const effectiveNow = pausedAt !== null ? pausedAt : now;
+      const t = (effectiveNow - p.startTime) / p.travelDurationMs;
       if (!Number.isFinite(t) || t < 0) return 0;
       if (t > 1) return 1;
       return t;
