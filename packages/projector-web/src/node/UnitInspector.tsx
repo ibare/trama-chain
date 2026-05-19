@@ -17,6 +17,8 @@ import { resolveNodeUnit } from '../util/unit-resolver.js';
 import { getSkin, listSkinsForUnit } from '../skin/registry.js';
 import type { SkinDefinition } from '../skin/types.js';
 import { TramaCarousel } from '../util/TramaCarousel.js';
+import { TramaCardStrip } from '../util/TramaCardStrip.js';
+import { PhosphorIcon } from '../icon/phosphor.js';
 import { CellArrayInspector } from './cell-array/CellArrayInspector.js';
 import '../skin/register-default-skins.js';
 
@@ -220,28 +222,17 @@ export function UnitInspector({ node }: Props): JSX.Element {
                 </button>
               )}
             </div>
-            <ToggleGroup.Root
-              type="single"
-              value={currentSkinKey ?? ''}
-              onValueChange={(v) => v && onPickSkin(v)}
-              aria-label="스킨"
-              className="trama-unit-inspector-skin-list"
+            <TramaCardStrip
+              ariaLabel="스킨"
+              value={currentSkinKey}
+              onValueChange={onPickSkin}
               disabled={!paused}
-            >
-              <TramaCarousel ariaLabel="스킨 페이지">
-                {skinCandidates.map((s) => (
-                  <ToggleGroup.Item
-                    key={s.key}
-                    value={s.key}
-                    className="trama-unit-inspector-skin"
-                    title={s.domain.intent}
-                  >
-                    <span className="trama-unit-inspector-skin-label">{s.labels.ko}</span>
-                    <span className="trama-unit-inspector-skin-intent">{s.domain.intent}</span>
-                  </ToggleGroup.Item>
-                ))}
-              </TramaCarousel>
-            </ToggleGroup.Root>
+              items={skinCandidates.map((s) => ({
+                key: s.key,
+                label: s.labels.ko,
+                icon: s.icon ? <PhosphorIcon name={s.icon} size={28} /> : undefined,
+              }))}
+            />
           </div>
         </>
       )}

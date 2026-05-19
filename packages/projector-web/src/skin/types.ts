@@ -86,6 +86,8 @@ export interface SkinDefinition {
   /** 모델에 저장되는 skin.kind. */
   key: string;
   labels: { ko: string };
+  /** 인스펙터 카드의 phosphor 아이콘 이름. */
+  icon?: import('../icon/phosphor.js').PhosphorGlyphName;
   /**
    * 도메인 영역 선언. 노드의 ValueKind와 domain.valueKind가 일치해야 후보가
    * 되고, numeric이면 추가로 unitId가 노드의 단위와 매치돼야 한다.

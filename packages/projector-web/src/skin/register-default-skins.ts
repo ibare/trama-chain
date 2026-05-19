@@ -9,6 +9,7 @@ import { defaultCellArrayParams } from './skins/cell-array.js';
 registerSkin({
   key: 'cell-array',
   labels: { ko: '셀 표시' },
+  icon: 'squares-four',
   domain: {
     valueKind: 'numeric-any-unit',
     intent: '셀 배열로 값을 표현 — 게이지·세그먼트·단계·라이트를 한 패러다임으로',
@@ -20,6 +21,7 @@ registerSkin({
 registerSkin({
   key: 'thermometer-mercury',
   labels: { ko: '상온 온도계' },
+  icon: 'thermometer',
   domain: {
     valueKind: 'numeric',
     unitId: 'celsius',
@@ -33,6 +35,7 @@ registerSkin({
 registerSkin({
   key: 'thermometer-body',
   labels: { ko: '체온계' },
+  icon: 'thermometer-simple',
   domain: {
     valueKind: 'numeric',
     unitId: 'celsius',
@@ -46,6 +49,7 @@ registerSkin({
 registerSkin({
   key: 'thermometer-oven',
   labels: { ko: '오븐 온도계' },
+  icon: 'oven',
   domain: {
     valueKind: 'numeric',
     unitId: 'celsius',
@@ -59,6 +63,7 @@ registerSkin({
 registerSkin({
   key: 'thermometer-kiln',
   labels: { ko: '흑체복사 가마' },
+  icon: 'flame',
   domain: {
     valueKind: 'numeric',
     unitId: 'celsius',
@@ -72,6 +77,7 @@ registerSkin({
 registerSkin({
   key: 'thermometer-cryogenic',
   labels: { ko: '극저온 온도계' },
+  icon: 'snowflake',
   domain: {
     valueKind: 'numeric',
     unitId: 'celsius',

@@ -3,6 +3,8 @@ import * as ToggleGroup from '@radix-ui/react-toggle-group';
 import * as Separator from '@radix-ui/react-separator';
 import { useCallback, useMemo } from 'react';
 import { NumberField } from '../util/NumberField.js';
+import { TramaCardStrip } from '../util/TramaCardStrip.js';
+import { PhosphorIcon } from '../icon/phosphor.js';
 import type {
   ObserveCapacity,
   ObserveExtraction,
@@ -234,25 +236,16 @@ export function ObserveInspector({ node, inferredKind }: Props): JSX.Element {
         <div className="trama-unit-inspector-section-row">
           <span className="trama-unit-inspector-section-label">시각화</span>
         </div>
-        <ToggleGroup.Root
-          type="single"
+        <TramaCardStrip
+          ariaLabel="시각화"
           value={node.visualization}
-          onValueChange={(v) => v && onPickVis(v)}
-          aria-label="시각화"
-          className="trama-unit-inspector-skin-list"
-        >
-          {visCandidates.map((v) => (
-            <ToggleGroup.Item
-              key={v.key}
-              value={v.key}
-              className="trama-unit-inspector-skin"
-              title={v.intent}
-            >
-              <span className="trama-unit-inspector-skin-label">{v.labels.ko}</span>
-              <span className="trama-unit-inspector-skin-intent">{v.intent}</span>
-            </ToggleGroup.Item>
-          ))}
-        </ToggleGroup.Root>
+          onValueChange={onPickVis}
+          items={visCandidates.map((v) => ({
+            key: v.key,
+            label: v.labels.ko,
+            icon: v.icon ? <PhosphorIcon name={v.icon} size={28} /> : undefined,
+          }))}
+        />
       </div>
     </>
   );

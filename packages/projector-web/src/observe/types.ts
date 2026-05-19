@@ -34,6 +34,8 @@ export interface ObserveVisualizationDefinition {
   /** 모델에 저장되는 visualization key (ObserveNode.visualization). */
   key: string;
   labels: { ko: string };
+  /** 인스펙터 카드의 phosphor 아이콘 이름. */
+  icon?: import('../icon/phosphor.js').PhosphorGlyphName;
   /** 사용자에게 보이는 한 줄 설명. */
   intent: string;
   /** 이 시각이 다룰 수 있는 ValueKind 목록. 빈 배열이면 모든 kind 허용. */

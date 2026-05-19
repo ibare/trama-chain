@@ -154,43 +154,6 @@
     color: var(--color-node-text-primary);
 }
 
-[data-trama-root] .trama-unit-inspector-skin {
-    background: var(--color-node-fill-calm);
-    border: 1px solid transparent;
-    border-radius: var(--spacing-radius-card);
-    padding: 6px 12px;
-    font-family: inherit;
-    font-size: var(--typography-text-picker-label);
-    color: var(--color-node-text-primary);
-    cursor: pointer;
-    display: flex;
-    flex-direction: column;
-    align-items: flex-start;
-    gap: 2px;
-    text-align: left;
-    min-width: 180px;
-}
-
-[data-trama-root] .trama-unit-inspector-skin-label {
-    font-weight: 600;
-    white-space: nowrap;
-}
-
-[data-trama-root] .trama-unit-inspector-skin-intent {
-    font-size: 11px;
-    color: var(--color-node-text-low);
-    line-height: 1.3;
-}
-
-[data-trama-root] .trama-unit-inspector-skin:hover {
-    border-color: var(--color-node-stroke-calm);
-}
-
-[data-trama-root] .trama-unit-inspector-skin[data-state="on"] {
-    border-color: var(--color-node-stroke-focal);
-    color: var(--color-node-stroke-focal);
-}
-
 [data-trama-root] .trama-unit-inspector-range {
     display: flex;
     flex-direction: column;
