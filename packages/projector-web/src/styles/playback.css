@@ -1,0 +1,207 @@
+/* Execution control */
+[data-trama-root] .trama-exec-control {
+    position: absolute;
+    bottom: var(--spacing-canvas-margin);
+    left: 50%;
+    transform: translateX(-50%);
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    background: var(--color-canvas-bg);
+    border: 1px solid var(--color-node-stroke-calm);
+    border-radius: var(--spacing-radius-pill);
+    padding: 8px 14px;
+    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.06);
+}
+
+[data-trama-root] .trama-exec-field {
+    display: contents;
+}
+
+[data-trama-root] .trama-exec-control input[type="number"] {
+    width: 72px;
+    text-align: right;
+}
+
+[data-trama-root] .trama-exec-control input[type="text"] {
+    width: 72px;
+}
+
+[data-trama-root] .trama-exec-control button {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    background: var(--color-node-fill-calm);
+    border: 1px solid var(--color-node-stroke-calm);
+    border-radius: var(--spacing-radius-pill);
+    padding: 4px 10px;
+    font-family: inherit;
+    font-size: var(--typography-text-picker-label);
+    cursor: pointer;
+    color: var(--color-node-text-primary);
+    transition: background var(--motion-duration-fade-in)
+        var(--motion-easing-fade-natural);
+}
+
+[data-trama-root] .trama-exec-control button:hover {
+    background: var(--color-node-fill-focal);
+}
+
+[data-trama-root] .trama-exec-step-indicator {
+    font-family: inherit;
+    font-size: var(--typography-text-step-count);
+    font-variant-numeric: tabular-nums;
+    color: var(--color-text-hint);
+    padding-left: 8px;
+    border-left: 1px solid var(--color-node-stroke-calm);
+}
+
+/* Mini player — 우상단 전역 컨트롤. 음악 미니 플레이어 결. */
+[data-trama-root] .trama-mini-player {
+    position: absolute;
+    top: var(--spacing-canvas-margin);
+    right: var(--spacing-canvas-margin);
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    background: var(--color-canvas-bg);
+    border: 1px solid var(--color-node-stroke-calm);
+    border-radius: var(--spacing-radius-pill);
+    padding: 6px 10px;
+    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.06);
+    font-family: inherit;
+}
+
+[data-trama-root] .trama-mini-player-button {
+    appearance: none;
+    background: var(--color-node-fill-calm);
+    border: 1px solid var(--color-node-stroke-calm);
+    border-radius: 50%;
+    width: 28px;
+    height: 28px;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    cursor: pointer;
+    color: var(--color-node-text-primary);
+    font-size: 13px;
+    line-height: 1;
+    padding: 0;
+    transition: background var(--motion-duration-fade-in)
+        var(--motion-easing-fade-natural);
+}
+
+[data-trama-root] .trama-mini-player-button:hover {
+    background: var(--color-node-fill-focal);
+}
+
+[data-trama-root] .trama-mini-player-time {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    box-sizing: border-box;
+    height: 28px;
+    border: 1px solid var(--color-node-stroke-calm);
+    border-radius: var(--spacing-radius-pill);
+    padding: 0 12px;
+    font-family: inherit;
+    font-size: var(--typography-text-picker-label);
+    line-height: 1;
+    font-variant-numeric: tabular-nums;
+    color: var(--color-node-text-primary);
+    min-width: 6ch;
+    text-align: center;
+}
+
+[data-trama-root] .trama-mini-player-speed-trigger {
+    appearance: none;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    box-sizing: border-box;
+    height: 28px;
+    background: transparent;
+    border: 1px solid var(--color-node-stroke-calm);
+    border-radius: var(--spacing-radius-pill);
+    padding: 0 12px;
+    font-family: inherit;
+    font-size: var(--typography-text-picker-label);
+    line-height: 1;
+    font-variant-numeric: tabular-nums;
+    cursor: pointer;
+    color: var(--color-node-text-primary);
+    transition: background var(--motion-duration-fade-in)
+        var(--motion-easing-fade-natural);
+}
+
+[data-trama-root] .trama-mini-player-speed-trigger:hover {
+    background: var(--color-node-fill-calm);
+}
+
+/* Question header */
+[data-trama-root] .trama-question {
+    position: absolute;
+    top: var(--spacing-canvas-margin);
+    left: 50%;
+    transform: translateX(-50%);
+    font-family: var(--typography-font-serif-question);
+    font-size: var(--typography-text-question);
+    color: var(--color-text-question);
+    max-width: 70%;
+    text-align: center;
+    pointer-events: none;
+}
+
+/* Empty state prompt */
+[data-trama-root] .trama-empty-prompt {
+    position: absolute;
+    inset: 0;
+    display: flex;
+    flex-direction: column;
+    gap: 12px;
+    align-items: center;
+    justify-content: center;
+    padding: var(--spacing-canvas-margin);
+}
+
+[data-trama-root] .trama-empty-prompt h2 {
+    font-family: var(--typography-font-serif-question);
+    font-size: var(--typography-text-question);
+    color: var(--color-text-question);
+    margin: 0;
+    text-align: center;
+}
+
+[data-trama-root] .trama-empty-prompt input {
+    font-family: inherit;
+    font-size: var(--typography-text-picker-label);
+    background: transparent;
+    border: none;
+    border-bottom: 1px solid var(--color-node-stroke-calm);
+    outline: none;
+    padding: 6px 10px;
+    text-align: center;
+    width: min(520px, 80vw);
+    color: var(--color-node-text-primary);
+}
+
+[data-trama-root] .trama-empty-prompt input::placeholder {
+    color: var(--color-text-hint);
+}
+
+[data-trama-root] .trama-empty-prompt .trama-empty-hint {
+    font-size: var(--typography-text-hint);
+    color: var(--color-text-hint);
+    text-align: center;
+    max-width: 480px;
+}
+
+/* Step count overlay during iteration */
+[data-trama-root] .trama-step-count {
+    font-size: var(--typography-text-step-count);
+    fill: var(--color-text-hint);
+    text-anchor: middle;
+    font-variant-numeric: tabular-nums;
+    pointer-events: none;
+}
+

@@ -1,0 +1,102 @@
+/* Knob ---------------------------------------------------------------
+ * 생성기 노드 본문에 얹히는 SVG 노브. 3겹 — 외곽 270° 호(프레임) / 내부 다이얼
+ * 본체 원(stroke only) / 다이얼 중심에서 뻗는 시계 침. 호는 값을 표현하지 않고
+ * 침의 각도가 유일한 표시.
+ *
+ * visuals 는 `<g pointer-events="none">` 에 격리, hit `<circle fill="transparent">`
+ * 한 장만 pointer 이벤트를 받는다. 색은 노드 토큰(calm/focal) 재사용.
+ */
+[data-trama-root] .trama-knob {
+    outline: none;
+}
+
+[data-trama-root] .trama-knob-hit {
+    cursor: ns-resize;
+}
+
+[data-trama-root] .trama-knob.is-disabled .trama-knob-hit {
+    cursor: not-allowed;
+}
+
+[data-trama-root] .trama-knob:focus-visible .trama-knob-track {
+    stroke: var(--color-node-stroke-focal);
+}
+
+[data-trama-root] .trama-knob-track {
+    fill: none;
+    stroke: #a89e8c;
+    stroke-opacity: 0.45;
+    stroke-width: 2.5;
+    stroke-linecap: round;
+}
+
+/* 내부 다이얼 본체 — 침이 회전하는 무대. stroke 만, fill 없음. */
+[data-trama-root] .trama-knob-dial {
+    fill: none;
+    stroke: var(--color-node-stroke-focal);
+    stroke-width: 2;
+}
+
+/* 시계 침 — 다이얼 중심에서 바깥으로 뻗는 굵은 line. 색·두께가 가장 강함. */
+[data-trama-root] .trama-knob-needle {
+    stroke: var(--color-node-stroke-focal);
+    stroke-width: 3.5;
+    stroke-linecap: round;
+}
+
+[data-trama-root] .trama-knob-label {
+    font-size: 0.7rem;
+    fill: var(--color-node-text-low);
+    font-weight: 500;
+}
+
+[data-trama-root] .trama-knob-center {
+    font-size: 0.65rem;
+    fill: var(--color-node-text-low);
+    font-variant-numeric: tabular-nums;
+    font-weight: 500;
+    dominant-baseline: middle;
+}
+
+[data-trama-root] .trama-knob.is-disabled .trama-knob-track,
+[data-trama-root] .trama-knob.is-disabled .trama-knob-dial,
+[data-trama-root] .trama-knob.is-disabled .trama-knob-needle {
+    opacity: 0.45;
+}
+
+/* progress arc — 트랙 위에 인디케이터까지 채우는 path. 트랙(calm)과 같은
+ * 굵기·cap 으로 깔고 focal 톤으로 강조해 현재 값을 드러낸다. Pointer/Bipolar
+ * 양쪽이 공유.
+ */
+[data-trama-root] .trama-knob-track-fill {
+    fill: none;
+    stroke: var(--color-node-stroke-focal);
+    stroke-opacity: 0.55;
+    stroke-width: 2.5;
+    stroke-linecap: round;
+}
+
+/* 이하 tick/indicator 는 BipolarKnob 전용 — Bipolar 의 정체성(±/중립)을 살리려 유지. */
+
+[data-trama-root] .trama-knob-tick {
+    stroke: var(--color-node-stroke-calm);
+    stroke-width: 1;
+    stroke-linecap: round;
+}
+
+[data-trama-root] .trama-knob-tick.is-center {
+    stroke: var(--color-node-stroke-focal);
+    stroke-width: 1.5;
+}
+
+[data-trama-root] .trama-knob-indicator {
+    stroke: var(--color-node-stroke-focal);
+    stroke-width: 2.5;
+    stroke-linecap: round;
+}
+
+[data-trama-root] .trama-knob.is-disabled .trama-knob-track-fill,
+[data-trama-root] .trama-knob.is-disabled .trama-knob-indicator,
+[data-trama-root] .trama-knob.is-disabled .trama-knob-tick {
+    opacity: 0.45;
+}

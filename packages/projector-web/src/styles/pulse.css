@@ -1,0 +1,45 @@
+/* Pulse propagation ----------------------------------------------------- */
+/* 노드 flash 오버레이 — 값 변경 / 펄스 도착 / playback step 경계에서 짧고 명확한
+   border ripple. 카드 본체는 절대 침범하지 않고 외곽선만 1회 "팡" 점등 후
+   바깥으로 살짝 펼쳐지며 사라진다. key={flashId}로 매 트리거마다 remount되어
+   CSS 애니메이션이 재시작된다. */
+[data-trama-root] .trama-node-flash-overlay {
+    fill: none;
+    stroke: var(--color-node-flash-border);
+    stroke-width: 3;
+    transform-box: fill-box;
+    transform-origin: center;
+    animation: trama-node-flash-ripple var(--motion-duration-node-flash)
+        var(--motion-easing-node-flash) forwards;
+}
+
+@keyframes trama-node-flash-ripple {
+    0% {
+        transform: scale(0.96);
+        opacity: 0;
+        stroke-width: 3;
+    }
+    14% {
+        transform: scale(1);
+        opacity: 1;
+        stroke-width: 3;
+    }
+    100% {
+        transform: scale(1.08);
+        opacity: 0;
+        stroke-width: 1;
+    }
+}
+
+/* 펄스 — 케이블을 따라 흐르는 두 겹 원. PulseLayer가 매 프레임 cx/cy를 갱신. */
+[data-trama-root] .trama-pulse-halo {
+    fill: var(--color-pulse-halo-fill);
+    opacity: var(--physical-opacity-pulse-halo);
+    pointer-events: none;
+}
+
+[data-trama-root] .trama-pulse-core {
+    fill: var(--color-pulse-core-fill);
+    pointer-events: none;
+}
+

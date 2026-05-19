@@ -1,0 +1,153 @@
+/* Edge ------------------------------------------------------------------- */
+[data-trama-root] .trama-edge {
+    fill: none;
+    stroke: var(--slot-color, var(--color-edge-default));
+    stroke-width: var(--spacing-stroke-edge-default);
+    stroke-linecap: round;
+    pointer-events: stroke;
+    cursor: pointer;
+    transition:
+        stroke var(--motion-duration-fade-in) var(--motion-easing-fade-natural),
+        stroke-width var(--motion-duration-fade-in)
+            var(--motion-easing-fade-natural),
+        opacity var(--motion-duration-fade-in) var(--motion-easing-fade-natural);
+}
+
+[data-trama-root] .trama-edge-hit {
+    fill: none;
+    stroke: transparent;
+    stroke-width: var(--spacing-edge-hit-tolerance);
+    pointer-events: stroke;
+    cursor: pointer;
+}
+
+[data-trama-root] .trama-edge.is-feedback {
+    stroke: var(--color-edge-feedback);
+    stroke-dasharray: var(--physical-dasharray-edge-feedback);
+}
+
+/* continuous source(현재 sine paradigm) 의 sub-frame modulation 시각.
+   --continuous-intensity 는 EdgeView ticker 가 peek 결과를 적응적으로 [0,1] 로
+   환산해 매 프레임 갱신한다. discrete source 엣지는 이 클래스가 붙지 않아 무영향. */
+[data-trama-root] .trama-edge.is-continuous {
+    filter: drop-shadow(
+        0 0 calc(var(--continuous-intensity, 0.5) * 6px)
+            var(--slot-color, var(--color-edge-default))
+    );
+    stroke-width: calc(
+        var(--spacing-stroke-edge-default) *
+            (0.8 + var(--continuous-intensity, 0.5) * 0.6)
+    );
+}
+
+[data-trama-root] .trama-edge.is-strained {
+    stroke: var(--color-edge-strained);
+    stroke-dasharray: var(--physical-dasharray-edge-strained);
+    stroke-width: var(--spacing-stroke-edge-strained);
+}
+
+[data-trama-root] .trama-edge.is-introducing {
+    stroke-dasharray: 1000;
+    stroke-dashoffset: 1000;
+    animation: trama-edge-draw var(--motion-duration-edge-draw)
+        var(--motion-easing-snap-in) forwards;
+}
+
+[data-trama-root] .trama-edge-group {
+    animation: trama-edge-fade-in var(--motion-duration-fade-in)
+        var(--motion-easing-fade-natural) both;
+}
+
+@keyframes trama-edge-draw {
+    to {
+        stroke-dashoffset: 0;
+    }
+}
+
+@keyframes trama-edge-fade-in {
+    from {
+        opacity: 0;
+    }
+    to {
+        opacity: 1;
+    }
+}
+
+/* 함수 변경 시 미세 깜빡임 (§ 11.6) */
+[data-trama-root] .trama-edge-group.is-morphing .trama-edge {
+    animation: trama-edge-shape-morph var(--motion-duration-shape-morph)
+        var(--motion-easing-fade-natural);
+}
+
+@keyframes trama-edge-shape-morph {
+    0% {
+        opacity: 0.95;
+    }
+    50% {
+        opacity: 1;
+        stroke-width: calc(var(--spacing-stroke-edge-default) * 1.6);
+    }
+    100% {
+        opacity: 1;
+    }
+}
+
+/* 화살표 마커 */
+[data-trama-root] .trama-arrow {
+    fill: var(--slot-color, var(--color-edge-default));
+}
+[data-trama-root] .trama-arrow.is-feedback {
+    fill: var(--color-edge-feedback);
+}
+[data-trama-root] .trama-arrow.is-strained {
+    fill: var(--color-edge-strained);
+}
+
+/* 화살촉 끝 detach 핸들 — 화살표 위에 덮여 hover/grab 시작점 역할만. */
+[data-trama-root] .trama-edge-detach-hit {
+    fill: transparent;
+    cursor: grab;
+}
+[data-trama-root] .trama-edge-detach-hit:active {
+    cursor: grabbing;
+}
+
+/* detach 중인 원본 엣지는 흐릿하게 — 드래프트와 시각적으로 구분. */
+[data-trama-root] .trama-edge-group.is-detaching .trama-edge,
+[data-trama-root] .trama-edge-group.is-detaching .trama-arrow {
+    opacity: 0.25;
+}
+
+/* condition 게이트가 닫혀 source 출력이 invalid가 된 엣지 — target 끝이 소켓에서
+   풀려 케이블이 중력으로 늘어진 상태. 점선·반투명으로 "일시 차단"을 표시한다. */
+[data-trama-root] .trama-edge-group.is-gated .trama-edge {
+    opacity: 0.45;
+    stroke-dasharray: 4 4;
+    transition:
+        opacity 200ms ease,
+        stroke-dasharray 200ms ease;
+}
+[data-trama-root] .trama-edge-group.is-gated .trama-arrow {
+    opacity: 0.35;
+    transition: opacity 200ms ease;
+}
+
+/* snap 대상 입력 소켓 위에 떠 있는 강조 링 — pointer-events:none으로 hit 간섭 없음. */
+[data-trama-root] .trama-snap-target-ring {
+    fill: none;
+    stroke: var(--color-edge-default);
+    stroke-width: 2;
+    opacity: 0.8;
+    animation: trama-snap-pulse 0.9s ease-in-out infinite;
+}
+
+@keyframes trama-snap-pulse {
+    0%,
+    100% {
+        opacity: 0.55;
+    }
+    50% {
+        opacity: 0.95;
+    }
+}
+

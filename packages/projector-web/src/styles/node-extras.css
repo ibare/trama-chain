@@ -1,0 +1,62 @@
+/* Function node ---------------------------------------------------------- */
+[data-trama-root] .trama-function-body {
+    fill: var(--color-node-fill-calm);
+    stroke: var(--color-node-stroke-calm);
+}
+[data-trama-root] .trama-function-body.is-low {
+    fill: var(--color-node-fill-low);
+    stroke: var(--color-node-stroke-low);
+    stroke-dasharray: 4 3;
+}
+[data-trama-root] .trama-function-symbol {
+    font-size: 28px;
+    font-weight: 600;
+    fill: var(--color-node-text-primary);
+    text-anchor: middle;
+    pointer-events: none;
+}
+[data-trama-root] .trama-function-symbol.is-compact {
+    font-size: 20px;
+}
+
+[data-trama-root] .trama-function-label {
+    font-size: var(--typography-text-node-unit);
+    fill: var(--color-node-text-low);
+    text-anchor: middle;
+    pointer-events: none;
+}
+
+/* Condition node --------------------------------------------------------- */
+/* invalid한 출력 슬롯은 흐리게 — 핀·소켓·라벨 전반의 opacity. */
+[data-trama-root] .trama-condition-node .is-inactive-output {
+    opacity: 0.38;
+}
+/* operator hit-area — 평소엔 투명, hover 시 어렴풋한 강조로 클릭 affordance. */
+[data-trama-root] .trama-condition-operator-hit {
+    fill: transparent;
+    cursor: pointer;
+}
+[data-trama-root] .trama-condition-operator-hit:hover {
+    fill: var(--color-node-fill-low);
+}
+/* threshold dblclick 영역 — 투명한 hit rect. */
+[data-trama-root] .trama-condition-threshold-hit {
+    cursor: text;
+}
+
+/* Mode toggle — panel 우상단 안쪽에 얹는 compact/standard 전환 버튼.
+   hit-area는 InteractiveArea가 fill:transparent로 제공하므로 cursor만 부여.
+   glyph는 항상 흐릿하게 떠 있다가 hit-area hover 시 불투명으로 살아난다. */
+[data-trama-root] .trama-mode-toggle {
+    cursor: pointer;
+}
+[data-trama-root] .trama-mode-toggle-glyph {
+    color: var(--color-node-text-primary);
+    opacity: 0.45;
+    transition: opacity 0.12s ease-out;
+    pointer-events: none;
+}
+[data-trama-root] .trama-mode-toggle:hover + g .trama-mode-toggle-glyph {
+    opacity: 1;
+}
+

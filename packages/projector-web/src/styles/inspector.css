@@ -1,0 +1,514 @@
+/* Piecewise / Stochastic inline editors */
+[data-trama-root] .trama-shape-editor {
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+    padding-top: 8px;
+    border-top: 1px dashed var(--color-node-stroke-calm);
+    width: 100%;
+}
+
+[data-trama-root] .trama-shape-editor-row {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    font-size: var(--typography-text-picker-label);
+    color: var(--color-node-text-low);
+    gap: 8px;
+}
+
+[data-trama-root] .trama-shape-editor-label {
+    font-size: var(--typography-text-picker-label);
+    color: var(--color-node-text-low);
+}
+
+[data-trama-root] .trama-shape-editor-input {
+    width: 84px;
+    text-align: right;
+}
+
+[data-trama-root] .trama-piecewise-point-row {
+    display: grid;
+    grid-template-columns: 1fr 1fr auto;
+    gap: 8px;
+    align-items: center;
+}
+
+[data-trama-root] .trama-shape-editor button {
+    align-self: flex-start;
+    background: transparent;
+    border: 1px dashed var(--color-node-stroke-calm);
+    border-radius: var(--spacing-radius-pill);
+    padding: 3px 10px;
+    font-family: inherit;
+    font-size: var(--typography-text-picker-label);
+    color: var(--color-node-text-low);
+    cursor: pointer;
+}
+
+/* 단위·범위 인스펙터 ------------------------------------------------ */
+[data-trama-root] .trama-unit-inspector {
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+    padding: 12px;
+    font-family: inherit;
+    width: 380px;
+}
+
+[data-trama-root] .trama-unit-inspector-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    font-size: var(--typography-text-picker-label);
+    color: var(--color-node-text-low);
+}
+
+[data-trama-root] .trama-unit-inspector-close {
+    background: transparent;
+    border: none;
+    cursor: pointer;
+    color: var(--color-node-text-low);
+    font-size: 16px;
+    line-height: 1;
+    padding: 2px 6px;
+}
+
+[data-trama-root] .trama-unit-inspector-sep {
+    height: 1px;
+    background: var(--color-node-stroke-calm);
+    opacity: 0.45;
+    margin: 2px 0;
+}
+
+[data-trama-root] .trama-unit-inspector-chip {
+    background: transparent;
+    border: 1px solid var(--color-node-stroke-calm);
+    border-radius: var(--spacing-radius-pill);
+    padding: 2px 10px;
+    font-family: inherit;
+    font-size: var(--typography-text-picker-label);
+    color: var(--color-node-text-low);
+    cursor: pointer;
+    white-space: nowrap;
+}
+
+[data-trama-root] .trama-unit-inspector-chip[data-state="on"] {
+    border-color: var(--color-node-stroke-focal);
+    color: var(--color-node-text-primary);
+}
+
+[data-trama-root] .trama-unit-inspector-unit {
+    background: var(--color-node-fill-calm);
+    border: 1px solid transparent;
+    border-radius: var(--spacing-radius-card);
+    padding: 4px 12px;
+    font-family: inherit;
+    font-size: var(--typography-text-picker-label);
+    color: var(--color-node-text-primary);
+    cursor: pointer;
+    white-space: nowrap;
+}
+
+[data-trama-root] .trama-unit-inspector-unit:hover {
+    border-color: var(--color-node-stroke-calm);
+}
+
+[data-trama-root] .trama-unit-inspector-unit[data-state="on"] {
+    border-color: var(--color-node-stroke-focal);
+}
+
+[data-trama-root] .trama-unit-inspector-skins {
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+}
+
+[data-trama-root] .trama-unit-inspector-section-row {
+    display: flex;
+    align-items: baseline;
+    justify-content: space-between;
+    gap: 6px;
+}
+
+[data-trama-root] .trama-unit-inspector-section-label {
+    font-size: var(--typography-text-picker-label);
+    color: var(--color-node-text-low);
+    letter-spacing: 0.04em;
+}
+
+[data-trama-root] .trama-unit-inspector-clear {
+    background: transparent;
+    border: none;
+    font-family: inherit;
+    font-size: 11px;
+    color: var(--color-node-text-low);
+    cursor: pointer;
+    padding: 2px 4px;
+    text-decoration: underline;
+    text-decoration-style: dotted;
+    text-underline-offset: 2px;
+}
+
+[data-trama-root] .trama-unit-inspector-clear:hover {
+    color: var(--color-node-text-primary);
+}
+
+[data-trama-root] .trama-unit-inspector-skin {
+    background: var(--color-node-fill-calm);
+    border: 1px solid transparent;
+    border-radius: var(--spacing-radius-card);
+    padding: 6px 12px;
+    font-family: inherit;
+    font-size: var(--typography-text-picker-label);
+    color: var(--color-node-text-primary);
+    cursor: pointer;
+    display: flex;
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 2px;
+    text-align: left;
+    min-width: 180px;
+}
+
+[data-trama-root] .trama-unit-inspector-skin-label {
+    font-weight: 600;
+    white-space: nowrap;
+}
+
+[data-trama-root] .trama-unit-inspector-skin-intent {
+    font-size: 11px;
+    color: var(--color-node-text-low);
+    line-height: 1.3;
+}
+
+[data-trama-root] .trama-unit-inspector-skin:hover {
+    border-color: var(--color-node-stroke-calm);
+}
+
+[data-trama-root] .trama-unit-inspector-skin[data-state="on"] {
+    border-color: var(--color-node-stroke-focal);
+    color: var(--color-node-stroke-focal);
+}
+
+[data-trama-root] .trama-unit-inspector-range {
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+}
+
+[data-trama-root] .trama-unit-inspector-range-row {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 8px;
+}
+
+[data-trama-root] .trama-unit-inspector-range-label {
+    font-size: var(--typography-text-picker-label);
+    color: var(--color-node-text-low);
+}
+
+[data-trama-root] .trama-unit-inspector-range-input {
+    width: 84px;
+    text-align: right;
+}
+
+[data-trama-root] .trama-unit-inspector-footer {
+    display: flex;
+    justify-content: flex-end;
+    margin-top: auto;
+}
+
+[data-trama-root] .trama-unit-inspector-reset {
+    background: transparent;
+    border: 1px dashed var(--color-node-stroke-calm);
+    border-radius: var(--spacing-radius-pill);
+    padding: 3px 10px;
+    font-family: inherit;
+    font-size: var(--typography-text-picker-label);
+    color: var(--color-node-text-low);
+    cursor: pointer;
+}
+
+/* cell-array 스킨 인스펙터 ---------------------------------------- */
+[data-trama-root] .trama-cell-array-inspector {
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+}
+
+[data-trama-root] .trama-cell-array-section {
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+}
+
+[data-trama-root] .trama-cell-array-modes {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 4px;
+}
+
+[data-trama-root] .trama-cell-array-cells {
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+}
+
+[data-trama-root] .trama-cell-array-add {
+    background: transparent;
+    border: 1px dashed var(--color-node-stroke-calm);
+    border-radius: var(--spacing-radius-pill);
+    padding: 3px 10px;
+    font-family: inherit;
+    font-size: var(--typography-text-picker-label);
+    color: var(--color-node-text-low);
+    cursor: pointer;
+    align-self: flex-start;
+}
+
+[data-trama-root] .trama-cell-row {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+}
+
+[data-trama-root] .trama-cell-row-field {
+    display: flex;
+    flex-direction: column;
+    gap: 2px;
+    min-width: 0;
+    flex: 1 1 0;
+}
+
+[data-trama-root] .trama-cell-row-field-label {
+    font-size: var(--typography-text-step-count);
+    color: var(--color-node-text-low);
+    letter-spacing: 0.04em;
+}
+
+[data-trama-root] .trama-cell-row-input {
+    width: 100%;
+    min-width: 0;
+    background: var(--color-node-fill-calm);
+    border: 1px solid var(--color-node-stroke-calm);
+    border-radius: var(--spacing-radius-input);
+    padding: 3px 6px;
+    font-family: inherit;
+    font-size: var(--typography-text-picker-label);
+    color: var(--color-node-text-primary);
+    font-variant-numeric: tabular-nums;
+}
+
+[data-trama-root] .trama-cell-row-remove {
+    background: transparent;
+    border: none;
+    font-family: inherit;
+    font-size: 11px;
+    color: var(--color-node-text-low);
+    cursor: pointer;
+    padding: 2px 4px;
+    text-decoration: underline;
+    text-decoration-style: dotted;
+    text-underline-offset: 2px;
+    flex-shrink: 0;
+}
+
+[data-trama-root] .trama-cell-row-remove:hover {
+    color: var(--color-node-text-primary);
+}
+
+[data-trama-root] .trama-cell-row-remove:disabled {
+    opacity: 0.35;
+    cursor: not-allowed;
+}
+
+/* cell-array 컬러 피커 -------------------------------------------- */
+[data-trama-root] .trama-cell-color-trigger {
+    width: 22px;
+    height: 22px;
+    border-radius: 50%;
+    border: 1px solid var(--color-node-stroke-calm);
+    padding: 0;
+    cursor: pointer;
+    flex-shrink: 0;
+}
+
+[data-trama-root] .trama-cell-color-trigger:hover {
+    border-color: var(--color-node-text-low);
+}
+
+[data-trama-root] .trama-cell-color-popover {
+    background: var(--color-node-fill-calm);
+    border: 1px solid var(--color-node-stroke-calm);
+    border-radius: var(--spacing-radius-card);
+    padding: 8px;
+    box-shadow: 0 8px 24px rgba(0, 0, 0, 0.12);
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+    z-index: 1000;
+}
+
+[data-trama-root] .trama-cell-color-row {
+    display: flex;
+    gap: 4px;
+}
+
+[data-trama-root] .trama-cell-color-swatch {
+    width: 18px;
+    height: 18px;
+    border-radius: 50%;
+    border: 1px solid transparent;
+    padding: 0;
+    cursor: pointer;
+    flex-shrink: 0;
+}
+
+[data-trama-root] .trama-cell-color-swatch:hover {
+    border-color: rgba(0, 0, 0, 0.4);
+}
+
+[data-trama-root] .trama-cell-color-swatch.is-selected {
+    border-color: var(--color-node-text-primary);
+    box-shadow: 0 0 0 1px var(--color-node-fill-calm) inset;
+}
+
+/* inverseU 곡선 직접조작 에디터 ----------------------------------- */
+[data-trama-root] .trama-curve-editor {
+    padding-top: 10px;
+    border-top: 1px dashed var(--color-node-stroke-calm);
+    width: 100%;
+}
+
+[data-trama-root] .trama-curve-axis {
+    stroke: var(--color-node-stroke-calm);
+    stroke-width: 1;
+}
+
+[data-trama-root] .trama-curve-axis-label {
+    font-family: inherit;
+    font-size: var(--typography-text-step-count);
+    fill: var(--color-node-text-low);
+    font-variant-numeric: tabular-nums;
+    pointer-events: none;
+}
+
+[data-trama-root] .trama-curve-axis-name {
+    font-family: inherit;
+    font-size: var(--typography-text-step-count);
+    fill: var(--color-text-hint);
+    pointer-events: none;
+}
+
+[data-trama-root] .trama-curve-guide {
+    stroke: var(--color-node-stroke-calm);
+    stroke-width: 1;
+    stroke-dasharray: 3 3;
+    pointer-events: none;
+}
+
+[data-trama-root] .trama-curve-line {
+    fill: none;
+    stroke: var(--color-node-stroke-focal);
+    stroke-width: 2;
+    pointer-events: none;
+}
+
+[data-trama-root] .trama-curve-handle {
+    fill: var(--color-node-fill-focal);
+    stroke: var(--color-node-stroke-focal);
+    stroke-width: 1.5;
+    cursor: grab;
+    touch-action: none;
+}
+
+[data-trama-root] .trama-curve-handle:active {
+    cursor: grabbing;
+}
+
+[data-trama-root] .trama-curve-handle.is-secondary {
+    fill: var(--color-canvas-bg);
+}
+
+[data-trama-root] .trama-curve-handle.is-point {
+    fill: var(--color-canvas-bg);
+    stroke: var(--color-node-stroke-focal);
+    stroke-width: 1.5;
+}
+
+[data-trama-root] .trama-curve-handle-label {
+    font-family: inherit;
+    font-size: var(--typography-text-step-count);
+    fill: var(--color-node-text-primary);
+    font-variant-numeric: tabular-nums;
+    pointer-events: none;
+}
+
+[data-trama-root] .trama-curve-toolbar {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 8px;
+    padding: 4px 2px 6px;
+    min-height: 22px;
+}
+
+[data-trama-root] .trama-curve-tip {
+    font-family: inherit;
+    font-size: var(--typography-text-step-count);
+    color: var(--color-node-text-low);
+    font-variant-numeric: tabular-nums;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+
+[data-trama-root] .trama-curve-reset {
+    background: transparent;
+    border: 1px dashed var(--color-node-stroke-calm);
+    border-radius: var(--spacing-radius-pill);
+    padding: 2px 10px;
+    font-family: inherit;
+    font-size: var(--typography-text-step-count);
+    color: var(--color-node-text-low);
+    cursor: pointer;
+    flex-shrink: 0;
+}
+
+[data-trama-root] .trama-curve-reset:hover {
+    color: var(--color-node-text-primary);
+    border-color: var(--color-node-stroke-focal);
+}
+
+/* stochastic 시각 보강 — win/lose/expected 세 선 + 확률 막대 */
+[data-trama-root] .trama-stochastic-win {
+    stroke: var(--color-node-stroke-focal);
+    stroke-width: 2;
+}
+
+[data-trama-root] .trama-stochastic-lose {
+    stroke: var(--color-edge-strained);
+    stroke-width: 1.5;
+    stroke-dasharray: 4 3;
+}
+
+[data-trama-root] .trama-stochastic-expected {
+    stroke: var(--color-node-text-low);
+    stroke-width: 1.5;
+    stroke-dasharray: 2 3;
+}
+
+[data-trama-root] .trama-stochastic-bar-track {
+    stroke: var(--color-node-stroke-calm);
+    stroke-width: 4;
+    stroke-linecap: round;
+}
+
+[data-trama-root] .trama-stochastic-bar-fill {
+    stroke: var(--color-edge-feedback);
+    stroke-width: 4;
+    stroke-linecap: round;
+}
+

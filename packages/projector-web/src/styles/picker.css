@@ -1,0 +1,137 @@
+/* Picker ---------------------------------------------------------------- */
+[data-trama-root] .trama-picker {
+    padding: var(--spacing-card-padding);
+    display: flex;
+    flex-direction: column;
+    gap: var(--spacing-card-gap);
+    width: 380px;
+    max-width: 90vw;
+}
+
+[data-trama-root] .trama-picker-tabs {
+    display: flex;
+    flex-direction: column;
+    gap: var(--spacing-card-gap);
+}
+[data-trama-root] .trama-picker-tab-list {
+    display: flex;
+    gap: 4px;
+    border-bottom: 1px solid var(--color-node-stroke-calm);
+    padding-bottom: 4px;
+    overflow-x: auto;
+    scrollbar-width: thin;
+}
+[data-trama-root] .trama-picker-tab {
+    position: relative;
+    background: transparent;
+    border: none;
+    padding: 6px 10px;
+    font-size: 11px;
+    font-weight: 500;
+    color: var(--color-node-text-secondary);
+    cursor: pointer;
+    white-space: nowrap;
+    /* active 상태의 아래 막대용 자리. inactive에선 투명 막대로 layout 안 흔들리게. */
+    border-bottom: 2px solid transparent;
+    margin-bottom: -1px;
+    transition:
+        color var(--motion-duration-fade-in) var(--motion-easing-fade-natural),
+        border-color var(--motion-duration-fade-in)
+            var(--motion-easing-fade-natural);
+}
+[data-trama-root] .trama-picker-tab:hover {
+    color: var(--color-node-text-primary);
+}
+[data-trama-root] .trama-picker-tab[data-state="active"] {
+    color: var(--color-pulse-core-fill);
+    border-bottom-color: var(--color-pulse-core-fill);
+}
+[data-trama-root] .trama-picker-tab-panel {
+    display: flex;
+    flex-direction: column;
+    gap: var(--spacing-card-gap);
+}
+
+[data-trama-root] .trama-picker-card {
+    background: var(--color-node-fill-calm);
+    border: 1px solid transparent;
+    border-radius: var(--spacing-radius-card);
+    padding: 6px;
+    cursor: pointer;
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+    align-items: stretch;
+    width: 110px;
+    font-family: inherit;
+    transition: border-color var(--motion-duration-fade-in)
+        var(--motion-easing-fade-natural);
+}
+[data-trama-root] .trama-picker-card:hover,
+[data-trama-root] .trama-picker-card[data-state="on"] {
+    border-color: var(--color-node-stroke-focal);
+}
+[data-trama-root] .trama-picker-card-label {
+    font-size: 11px;
+    color: var(--color-node-text-primary);
+}
+[data-trama-root] .trama-picker-preview {
+    width: 100%;
+    height: 24px;
+}
+[data-trama-root] .trama-picker-preview-baseline {
+    stroke: var(--color-node-stroke-calm);
+    stroke-width: 1;
+    opacity: 0.35;
+    vector-effect: non-scaling-stroke;
+}
+[data-trama-root] .trama-picker-preview-fill {
+    fill: var(--color-node-stroke-focal);
+    opacity: 0.12;
+    stroke: none;
+}
+[data-trama-root] .trama-picker-preview-stroke {
+    stroke: var(--color-node-stroke-focal);
+    stroke-width: 1.5;
+    stroke-linecap: round;
+    stroke-linejoin: round;
+    fill: none;
+    opacity: 0.7;
+    vector-effect: non-scaling-stroke;
+}
+[data-trama-root]
+    .trama-picker-card[data-state="on"]
+    .trama-picker-preview-stroke {
+    stroke: var(--color-pulse-core-fill);
+    stroke-width: 1.8;
+    opacity: 1;
+}
+[data-trama-root]
+    .trama-picker-card[data-state="on"]
+    .trama-picker-preview-fill {
+    fill: var(--color-pulse-core-fill);
+    opacity: 0.18;
+}
+/* picker 상단 통합 toolbar — [기본값 | 선택 해제]. 'none' kind이 아닐 때만 노출. */
+[data-trama-root] .trama-picker-toolbar {
+    display: flex;
+    gap: 6px;
+    justify-content: flex-end;
+}
+[data-trama-root] .trama-picker-btn {
+    background: transparent;
+    border: 1px dashed var(--color-node-stroke-calm);
+    border-radius: var(--spacing-radius-card);
+    color: var(--color-node-text-secondary);
+    font-size: 11px;
+    padding: 4px 10px;
+    cursor: pointer;
+    transition:
+        border-color var(--motion-duration-fade-in)
+            var(--motion-easing-fade-natural),
+        color var(--motion-duration-fade-in) var(--motion-easing-fade-natural);
+}
+[data-trama-root] .trama-picker-btn:hover {
+    border-color: var(--color-node-stroke-focal);
+    color: var(--color-node-text-primary);
+}

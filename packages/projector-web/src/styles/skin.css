@@ -1,0 +1,272 @@
+/* Skins ----------------------------------------------------------------- */
+/* 노드 시각 스킨. ValueNodeView가 node.skin이 있을 때 본문(label/value/combiner)
+   대신 스킨 컴포넌트를 SVG group으로 렌더한다. 스킨은 자체 표현(말풍선·곡선
+   surface 등)을 책임지고, 소켓·NodeFrame·ValueNodeSlider는 그대로 유지된다. */
+
+/* 모든 스킨에 공통으로 씌우는 silhouette outline. 평소 invisible, 노드가 선택됐을 때
+   stroke로 시각화 — 사용자가 "안 보이던 원형 보더가 보인다"는 단일 진실의 선택 시각. */
+[data-trama-root] .trama-skin-border {
+    fill: none;
+    stroke: transparent;
+    stroke-width: 1.6;
+    transition: stroke 0.18s ease;
+}
+
+[data-trama-root] .trama-skin-border.is-selected {
+    stroke: var(--color-node-selected-outline, #6aa9ff);
+}
+
+[data-trama-root] .trama-skin-thermometer-name {
+    font-size: calc(var(--typography-text-node-label) * 16px);
+    fill: var(--color-node-text-primary);
+    font-weight: 600;
+}
+
+[data-trama-root] .trama-skin-thermometer-name-hit {
+    cursor: pointer;
+}
+
+[data-trama-root] .trama-skin-thermometer-tube {
+    fill: rgba(220, 226, 220, 0.6);
+}
+
+[data-trama-root] .trama-skin-thermometer-surface {
+    stroke: rgba(255, 255, 255, 0.55);
+    stroke-width: 1.5;
+    fill: none;
+}
+
+[data-trama-root] .trama-skin-thermometer-ticks line {
+    stroke: rgba(255, 255, 255, 0.85);
+    stroke-width: 1.5;
+    stroke-linecap: round;
+}
+
+[data-trama-root] .trama-skin-thermometer-shine {
+    fill: rgba(255, 255, 255, 0.45);
+}
+
+[data-trama-root] .trama-skin-thermometer-bubble-bg {
+    fill: #2b2a28;
+}
+
+[data-trama-root] .trama-skin-thermometer-bubble-text {
+    fill: #ffffff;
+    font-size: 13px;
+    font-weight: 700;
+    letter-spacing: 0.02em;
+    pointer-events: none;
+}
+
+[data-trama-root] .trama-skin-thermometer-bubble.is-disabled {
+    opacity: 0.6;
+}
+
+/* =================================================================
+ * Skin: thermometer-cryogenic  (-273 ~ -100 °C)
+ * ================================================================= */
+[data-trama-root] .trama-skin-cryo-name {
+    font-size: calc(var(--typography-text-node-label) * 16px);
+    fill: var(--color-node-text-primary);
+    font-weight: 600;
+}
+[data-trama-root] .trama-skin-cryo-name-hit {
+    cursor: pointer;
+}
+[data-trama-root] .trama-skin-cryo-tube {
+    fill: rgba(20, 26, 48, 0.55);
+}
+[data-trama-root] .trama-skin-cryo-critical-line {
+    stroke: rgba(180, 200, 230, 0.55);
+    stroke-width: 1;
+    stroke-dasharray: 3 2;
+}
+[data-trama-root] .trama-skin-cryo-critical-label {
+    font-size: 10px;
+    fill: rgba(120, 140, 180, 0.9);
+    font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+    letter-spacing: 0.02em;
+}
+[data-trama-root] .trama-skin-cryo-frost circle {
+    fill: rgba(220, 232, 250, 0.55);
+}
+[data-trama-root] .trama-skin-cryo-bubble-bg {
+    fill: #0e1426;
+}
+[data-trama-root] .trama-skin-cryo-bubble-text {
+    fill: #d8e3f5;
+    font-size: 13px;
+    font-weight: 700;
+    letter-spacing: 0.02em;
+    pointer-events: none;
+}
+[data-trama-root] .trama-skin-cryo-bubble.is-disabled {
+    opacity: 0.6;
+}
+
+/* =================================================================
+ * Skin: thermometer-body  (35.0 ~ 42.0 °C)
+ * ================================================================= */
+[data-trama-root] .trama-skin-body-name {
+    font-size: calc(var(--typography-text-node-label) * 16px);
+    fill: var(--color-node-text-primary);
+    font-weight: 600;
+}
+[data-trama-root] .trama-skin-body-name-hit {
+    cursor: pointer;
+}
+[data-trama-root] .trama-skin-body-lcd-bg {
+    fill: #1a1d1f;
+    stroke: rgba(255, 255, 255, 0.06);
+    stroke-width: 1;
+}
+[data-trama-root] .trama-skin-body-lcd-value {
+    font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+    font-size: 36px;
+    font-weight: 700;
+    letter-spacing: 0.04em;
+}
+[data-trama-root] .trama-skin-body-band-seg {
+    /* fill 은 인라인. */
+}
+[data-trama-root] .trama-skin-body-fever-mark {
+    stroke: rgba(42, 38, 32, 0.45);
+    stroke-width: 1.5;
+    stroke-dasharray: 2 2;
+}
+[data-trama-root] .trama-skin-body-needle {
+    fill: var(--color-node-text-primary);
+}
+[data-trama-root] .trama-skin-body-needle-line {
+    stroke: var(--color-node-text-primary);
+    stroke-width: 1.5;
+}
+[data-trama-root] .trama-skin-body-chip {
+    stroke: rgba(0, 0, 0, 0.06);
+    stroke-width: 1;
+}
+[data-trama-root] .trama-skin-body-chip.is-cool {
+    fill: #d8e6f1;
+}
+[data-trama-root] .trama-skin-body-chip.is-normal {
+    fill: #dbe8d2;
+}
+[data-trama-root] .trama-skin-body-chip.is-warm {
+    fill: #f3e5b8;
+}
+[data-trama-root] .trama-skin-body-chip.is-fever {
+    fill: #f4d3b1;
+}
+[data-trama-root] .trama-skin-body-chip.is-hot {
+    fill: #efb9b0;
+}
+[data-trama-root] .trama-skin-body-chip-text {
+    fill: var(--color-node-text-primary);
+    font-size: 12px;
+    font-weight: 600;
+}
+[data-trama-root] .trama-skin-body-band.is-disabled {
+    opacity: 0.55;
+}
+
+/* =================================================================
+ * Skin: thermometer-kiln  (500 ~ 1500 °C, blackbody)
+ * ================================================================= */
+[data-trama-root] .trama-skin-kiln-name {
+    font-size: calc(var(--typography-text-node-label) * 16px);
+    fill: var(--color-node-text-primary);
+    font-weight: 600;
+}
+[data-trama-root] .trama-skin-kiln-name-hit {
+    cursor: pointer;
+}
+[data-trama-root] .trama-skin-kiln-value {
+    font-size: 32px;
+    font-weight: 700;
+    font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+    letter-spacing: 0.02em;
+}
+[data-trama-root] .trama-skin-kiln-milestone {
+    font-size: 12px;
+    font-weight: 600;
+    letter-spacing: 0.05em;
+}
+[data-trama-root] .trama-skin-kiln-core.is-disabled {
+    opacity: 0.6;
+}
+
+/* =================================================================
+ * Skin: thermometer-oven  (50 ~ 300 °C, rotary dial)
+ * ================================================================= */
+[data-trama-root] .trama-skin-oven-name {
+    font-size: calc(var(--typography-text-node-label) * 16px);
+    fill: var(--color-node-text-primary);
+    font-weight: 600;
+}
+[data-trama-root] .trama-skin-oven-name-hit {
+    cursor: pointer;
+}
+[data-trama-root] .trama-skin-oven-base {
+    fill: #fafafa;
+    stroke: var(--color-node-stroke-calm);
+    stroke-width: 1;
+}
+[data-trama-root] .trama-skin-oven-arc {
+    stroke: var(--color-node-stroke-focal);
+    stroke-width: 2;
+    stroke-linecap: round;
+}
+[data-trama-root] .trama-skin-oven-ticks-minor line {
+    stroke: var(--color-node-stroke-calm);
+    stroke-width: 1;
+}
+[data-trama-root] .trama-skin-oven-ticks-major line {
+    stroke: var(--color-node-text-primary);
+    stroke-width: 1.5;
+    stroke-linecap: round;
+}
+[data-trama-root] .trama-skin-oven-tick-label {
+    font-size: 11px;
+    fill: var(--color-node-text-low);
+    font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+}
+[data-trama-root] .trama-skin-oven-milestone-dot {
+    stroke: rgba(0, 0, 0, 0.12);
+    stroke-width: 1;
+}
+[data-trama-root] .trama-skin-oven-milestone-dot.is-bake {
+    fill: #c9a55c;
+}
+[data-trama-root] .trama-skin-oven-milestone-dot.is-cookie {
+    fill: #d68641;
+}
+[data-trama-root] .trama-skin-oven-milestone-dot.is-pizza {
+    fill: #b85a4a;
+}
+[data-trama-root] .trama-skin-oven-milestone-dot.is-roast {
+    fill: #6b2418;
+}
+[data-trama-root] .trama-skin-oven-needle line {
+    stroke: var(--color-node-text-primary);
+    stroke-width: 3;
+    stroke-linecap: round;
+}
+[data-trama-root] .trama-skin-oven-pivot {
+    fill: var(--color-node-text-primary);
+}
+[data-trama-root] .trama-skin-oven-value {
+    font-size: 26px;
+    font-weight: 700;
+    fill: var(--color-node-text-primary);
+    font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+}
+[data-trama-root] .trama-skin-oven-state {
+    font-size: 12px;
+    font-weight: 600;
+    fill: var(--color-node-text-low);
+    letter-spacing: 0.05em;
+}
+[data-trama-root] .trama-skin-oven-dial.is-disabled {
+    opacity: 0.6;
+}
+

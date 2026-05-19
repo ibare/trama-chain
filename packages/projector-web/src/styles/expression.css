@@ -1,0 +1,187 @@
+/* Expression node — fizzex Canvas 임베드 + LaTeX 편집기. */
+[data-trama-root] .trama-expression-canvas {
+    width: 100%;
+    height: 100%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    overflow: hidden;
+    pointer-events: none;
+}
+[data-trama-root] .trama-expression-canvas canvas {
+    display: block;
+    max-width: 100%;
+    max-height: 100%;
+}
+/* LaTeX 인라인 편집 컨테이너 — 다른 인라인 입력(.trama-node-name-input)과
+   동일한 pill 시각: 1px solid border + 6px radius + 흰 배경. MathLive가 내부에
+   렌더되지만 사용자 관점에선 "노드 안 인라인 편집"이라는 동일 시각 언어. */
+[data-trama-root] .trama-expression-editor {
+    width: 100%;
+    height: 100%;
+    font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+    font-size: 13px;
+    line-height: 1.4;
+    background: #ffffff;
+    border: 1px solid var(--color-pin-stroke);
+    border-radius: 6px;
+    padding: 4px 8px;
+    color: var(--color-node-text-primary);
+    outline: none;
+    box-sizing: border-box;
+    transition:
+        border-color 120ms cubic-bezier(0.16, 1, 0.3, 1),
+        box-shadow 120ms cubic-bezier(0.16, 1, 0.3, 1);
+}
+[data-trama-root] .trama-expression-editor:hover {
+    border-color: var(--color-node-stroke-calm);
+}
+[data-trama-root] .trama-expression-editor:focus-within {
+    border-color: var(--color-node-text-primary);
+    box-shadow: 0 0 0 3px rgba(42, 38, 32, 0.08);
+}
+[data-trama-root] .trama-expression-var {
+    font-size: var(--typography-text-node-unit);
+    fill: var(--color-node-text-low);
+    pointer-events: none;
+    font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+}
+
+/* ===================================================================
+ * Form input — Linear-grade unified visual.
+ *
+ * 모든 number/text 입력의 공통 베이스. bordered box + soft focus ring +
+ * native spinner 제거. radix react-form의 unstyled Form.Control이 이
+ * 클래스들을 입어 시각적으로 동일한 입력 컴포넌트로 보인다.
+ *
+ * 상태 매트릭스:
+ *   resting → 약한 border + 흰 배경
+ *   hover   → border 톤 진해짐 (인터랙티브 affordance)
+ *   focus   → text-primary 톤 border + 8% 알파 outer ring
+ *
+ * native number spinner는 시각 일관성을 깬다 — 전부 숨김.
+ * tabular-nums로 자릿수 정렬 안정화.
+ * =================================================================== */
+[data-trama-root]
+    :is(
+        .trama-form-input,
+        .trama-shape-editor-input,
+        .trama-unit-inspector-range-input,
+        .trama-exec-control input,
+        .trama-node-name-input
+    ) {
+    font-family: inherit;
+    font-size: var(--typography-text-picker-label);
+    color: var(--color-node-text-primary);
+    background: #ffffff;
+    border: 1px solid var(--color-pin-stroke);
+    border-radius: 6px;
+    padding: 4px 8px;
+    outline: none;
+    font-variant-numeric: tabular-nums;
+    transition:
+        border-color 120ms cubic-bezier(0.16, 1, 0.3, 1),
+        box-shadow 120ms cubic-bezier(0.16, 1, 0.3, 1),
+        background-color 120ms cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+[data-trama-root]
+    :is(
+        .trama-form-input,
+        .trama-shape-editor-input,
+        .trama-unit-inspector-range-input,
+        .trama-exec-control input,
+        .trama-node-name-input
+    ):hover {
+    border-color: var(--color-node-stroke-calm);
+}
+
+[data-trama-root]
+    :is(
+        .trama-form-input,
+        .trama-shape-editor-input,
+        .trama-unit-inspector-range-input,
+        .trama-exec-control input,
+        .trama-node-name-input
+    ):focus-visible,
+[data-trama-root]
+    :is(
+        .trama-form-input,
+        .trama-shape-editor-input,
+        .trama-unit-inspector-range-input,
+        .trama-exec-control input,
+        .trama-node-name-input
+    ):focus {
+    border-color: var(--color-node-text-primary);
+    box-shadow: 0 0 0 3px rgba(42, 38, 32, 0.08);
+}
+
+/* native number spinner 제거 — Chrome/Safari/Edge */
+[data-trama-root]
+    :is(
+        .trama-form-input,
+        .trama-shape-editor-input,
+        .trama-unit-inspector-range-input,
+        .trama-exec-control input,
+        .trama-node-name-input
+    )::-webkit-outer-spin-button,
+[data-trama-root]
+    :is(
+        .trama-form-input,
+        .trama-shape-editor-input,
+        .trama-unit-inspector-range-input,
+        .trama-exec-control input,
+        .trama-node-name-input
+    )::-webkit-inner-spin-button {
+    -webkit-appearance: none;
+    margin: 0;
+}
+
+/* Firefox */
+[data-trama-root]
+    :is(
+        .trama-form-input,
+        .trama-shape-editor-input,
+        .trama-unit-inspector-range-input,
+        .trama-exec-control input,
+        .trama-node-name-input
+    )[type="number"] {
+    -moz-appearance: textfield;
+    appearance: textfield;
+}
+
+[data-trama-root]
+    :is(
+        .trama-form-input,
+        .trama-shape-editor-input,
+        .trama-unit-inspector-range-input,
+        .trama-exec-control input,
+        .trama-node-name-input
+    )::placeholder {
+    color: var(--color-text-hint);
+}
+
+[data-trama-root]
+    :is(
+        .trama-form-input,
+        .trama-shape-editor-input,
+        .trama-unit-inspector-range-input,
+        .trama-exec-control input,
+        .trama-node-name-input
+    )::selection {
+    background: rgba(42, 38, 32, 0.12);
+}
+
+/* Inline node-name editor — 노드 카드 안의 인라인 편집 input의 단일 진실.
+   foreignObject가 좁으면 input 기본 크기(브라우저 default ~175px)가 컨테이너를
+   초과해 좌·우 border가 잘려 "밑줄 input"처럼 보이던 회귀를 차단하기 위해
+   width:100% + box-sizing:border-box로 항상 foreignObject에 꼭 맞춘다. */
+[data-trama-root] .trama-node-name-input {
+    font-size: var(--typography-text-node-name);
+    text-align: center;
+    padding: 2px 8px;
+    width: 100%;
+    box-sizing: border-box;
+    display: block;
+}
+
