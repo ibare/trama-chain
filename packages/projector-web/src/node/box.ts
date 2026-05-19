@@ -24,7 +24,7 @@ import {
  * 아니다.
  */
 export const STANDARD_PANEL = { w: 240, h: 124 };
-export const COMPACT_PANEL = { w: 128, h: 56 };
+export const COMPACT_PANEL = { w: 162, h: 56 };
 
 /**
  * 스킨별 레이아웃 스펙.

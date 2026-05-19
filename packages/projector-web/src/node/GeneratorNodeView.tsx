@@ -201,9 +201,9 @@ function GeneratorNodeViewImpl({ id, incomingCount }: Props): JSX.Element | null
     );
   })();
 
-  // uniform paradigm 본문 — standard 는 min·max·정수실수 3개, compact 는 max·정수실수
-  // 2개. min/max 는 continuous Knob (정밀 조정은 인스펙터), 정수/실수 토글은
-  // 2-stop SelectorKnob. compact 에서는 sine 과 같이 label 을 끄고 centerLabel 만.
+  // uniform paradigm 본문 — standard·compact 동일하게 min·max·정수실수 3개.
+  // min/max 는 continuous Knob (정밀 조정은 인스펙터), 정수/실수 토글은 2-stop
+  // SelectorKnob. compact 에서는 사이즈만 축소하고 라벨(상단 텍스트)을 끈다.
   const uniformKnobs = (() => {
     if (!isUniform) return null;
     const body = layout.generatorBody;
@@ -232,39 +232,7 @@ function GeneratorNodeViewImpl({ id, incomingCount }: Props): JSX.Element | null
     };
     const integerSelectorValue = params.integer ? 1 : 0;
     const integerCenterLabel = params.integer ? '정수' : '실수';
-    if (currentMode === 'compact') {
-      // 두 컨트롤 — sine 과 같은 28/72 비율.
-      const leftCx = body.x + body.w * 0.28;
-      const rightCx = body.x + body.w * 0.72;
-      return (
-        <>
-          <Knob
-            cx={leftCx}
-            cy={cy}
-            size={knobSize}
-            value={params.max}
-            mode={continuousMode}
-            defaultValue={UNIFORM_MAX_DEFAULT}
-            step={UNIFORM_STEP}
-            onChange={setMax}
-            ariaLabel="최대"
-            centerLabel={formatUniformValue(params.max, params.integer)}
-          />
-          <SelectorKnob
-            cx={rightCx}
-            cy={cy}
-            size={knobSize}
-            value={integerSelectorValue}
-            stops={UNIFORM_INTEGER_STOPS}
-            defaultValue={0}
-            onChange={setInteger}
-            ariaLabel="수형"
-            centerLabel={integerCenterLabel}
-          />
-        </>
-      );
-    }
-    // standard — 세 컨트롤. body.w 를 6:8:14 / 16 비율로 좌·중·우 배치.
+    // body.w 를 6:8:14 / 16 비율로 좌·중·우 배치 — standard·compact 공통.
     const cx0 = body.x + body.w * (3 / 16);
     const cx1 = body.x + body.w * (8 / 16);
     const cx2 = body.x + body.w * (13 / 16);
