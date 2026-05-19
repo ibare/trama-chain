@@ -84,31 +84,17 @@ export function setCableEndpoints(
   cable.end.y = end.y;
 }
 
-export interface StepOptions {
-  /**
-   * true면 target 끝점을 소켓에 핀하지 않고 중력으로 자유 낙하시킨다.
-   * 케이블 길이는 그대로 유지 — 늘어진 손잡이가 대롱대롱 흔들리는 효과.
-   * 조건 게이트가 닫혀 출력이 invalid일 때 다운스트림 엣지에 적용한다.
-   */
-  endFree?: boolean;
-}
-
-export function stepCable(cable: Cable, options?: StepOptions): void {
+export function stepCable(cable: Cable): void {
   const { points, config, start, end } = cable;
   const n = points.length;
-  const endFree = options?.endFree ?? false;
 
-  // start는 언제나 source 소켓에 핀. end는 endFree면 자유.
+  // 양 끝점은 소켓에 핀. 중간 점만 Verlet 적분으로 움직인다.
   points[0]!.x = start.x;
   points[0]!.y = start.y;
-  if (!endFree) {
-    points[n - 1]!.x = end.x;
-    points[n - 1]!.y = end.y;
-  }
+  points[n - 1]!.x = end.x;
+  points[n - 1]!.y = end.y;
 
-  // Verlet 적분 — endFree면 마지막 점도 포함, 아니면 중간 점만.
-  const integrateEnd = endFree ? n : n - 1;
-  for (let i = 1; i < integrateEnd; i++) {
+  for (let i = 1; i < n - 1; i++) {
     const p = points[i]!;
     const vx = p.x - p.oldX;
     const vy = p.y - p.oldY + config.gravity;
@@ -118,12 +104,9 @@ export function stepCable(cable: Cable, options?: StepOptions): void {
     p.y += vy;
   }
 
-  // 거리 제약 완화. start는 항상 pin (i>0 가드). end는 endFree면 같이 풀어준다.
-  // 길이는 endpoint 거리 기반 — endFree면 노드 사이 직선거리가 의미 없으니
-  // 핀 상태 기준 길이(혹은 마지막 valid 거리)를 사용. 여기선 start↔end의 직선
-  // 거리를 그대로 써도 충분 — 노드 위치는 그대로이므로 케이블 길이는 보존된다.
+  // 거리 제약 완화. 양 끝은 핀이므로 i>0 가드, p2는 i<n-2일 때만 이동.
   const segmentLength = (Math.hypot(end.x - start.x, end.y - start.y) * config.slack) / (n - 1);
-  const lastPinned = endFree ? n - 1 : n - 2;
+  const lastPinned = n - 2;
   for (let it = 0; it < config.iterations; it++) {
     for (let i = 0; i < n - 1; i++) {
       const p1 = points[i]!;

@@ -118,17 +118,18 @@
     opacity: 0.25;
 }
 
-/* condition 게이트가 닫혀 source 출력이 invalid가 된 엣지 — target 끝이 소켓에서
-   풀려 케이블이 중력으로 늘어진 상태. 점선·반투명으로 "일시 차단"을 표시한다. */
+/* condition 게이트가 닫혀 source 출력이 invalid가 된 엣지 — 점선·반투명으로
+   "데이터가 흐를 수 없음"을 표시. 코어가 invalid를 다운스트림 자동 전파하므로
+   체인 전체가 동일하게 흐려진다. */
 [data-trama-root] .trama-edge-group.is-gated .trama-edge {
-    opacity: 0.45;
-    stroke-dasharray: 4 4;
+    opacity: var(--physical-opacity-edge-gated);
+    stroke-dasharray: var(--physical-dasharray-edge-gated);
     transition:
         opacity 200ms ease,
         stroke-dasharray 200ms ease;
 }
 [data-trama-root] .trama-edge-group.is-gated .trama-arrow {
-    opacity: 0.35;
+    opacity: var(--physical-opacity-edge-gated);
     transition: opacity 200ms ease;
 }
 

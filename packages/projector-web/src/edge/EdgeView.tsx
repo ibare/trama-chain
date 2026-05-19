@@ -182,13 +182,6 @@ function EdgeViewImpl({
     liveEndpointsRef.current.end = { x: baseEnd.x, y: baseEnd.y };
   }, [baseStart.x, baseStart.y, baseEnd.x, baseEnd.y]);
 
-  // sourceValid는 ticker가 매 프레임 읽도록 ref로도 유지 — effect deps에 넣어
-  // ticker 재등록을 일으키지 않기 위함.
-  const sourceValidRef = useRef(sourceValid);
-  useEffect(() => {
-    sourceValidRef.current = sourceValid;
-  }, [sourceValid]);
-
   // source 노드의 outputInterpolation을 디스크립터 경유로 조회 — 'continuous' 인
   // source(현재 sine paradigm) 만 매 프레임 stroke 시각을 변조한다. 디스크립터를 직접
   // 경유해 paradigm 종류 하드코딩 분기를 피한다(principles §3).
@@ -232,7 +225,7 @@ function EdgeViewImpl({
     const tick = (): void => {
       const live = liveEndpointsRef.current;
       setCableEndpoints(cable, live.start, live.end);
-      stepCable(cable, { endFree: !sourceValidRef.current });
+      stepCable(cable);
 
       const pointsStr = cableToPoints(cable);
       pathRef.current?.setAttribute('points', pointsStr);
