@@ -52,6 +52,12 @@ interface Props {
   label?: string;
   /** Knob 중앙 값 표시 텍스트 (예: "5s"). */
   centerLabel?: string;
+  /**
+   * 모델 저장 직전 값 정규화 — drag/keydown/dblclick 모든 경로에 일괄 적용.
+   * 예: 정수 카운터는 `Math.round`, 100ms quantize 는 `(v) => Math.round(v/100)*100`.
+   * stepped 모드는 이미 stops 로 snap 되므로 무영향.
+   */
+  quantize?: (v: number) => number;
 }
 
 /**
@@ -73,6 +79,7 @@ function KnobImpl({
   ariaLabel,
   label,
   centerLabel,
+  quantize,
 }: Props): JSX.Element {
   const diameter = KNOB_DIAMETER[size];
   const r = diameter / 2;
@@ -81,12 +88,19 @@ function KnobImpl({
   const needleLen = Math.max(0, dialR - NEEDLE_INSET[size]);
   const angleDeg = valueToAngleDeg(value, mode);
 
+  // drag/keydown/dblclick 모든 경로의 onChange 를 동일 quantize 로 통과시켜
+  // 모델에 들어가는 값을 호출자 정책으로 정규화. quantize 없으면 항등.
+  const emitChange = useCallback(
+    (next: number) => onChange(quantize ? quantize(next) : next),
+    [onChange, quantize],
+  );
+
   const { onPointerDown } = useKnobDrag({
     value,
     mode,
     size: diameter,
     disabled,
-    onChange,
+    onChange: emitChange,
   });
 
   const onDoubleClick = useCallback(
@@ -94,12 +108,12 @@ function KnobImpl({
       e.stopPropagation();
       if (disabled || defaultValue === undefined) return;
       if (mode.kind === "continuous") {
-        onChange(clamp(defaultValue, mode.min, mode.max));
+        emitChange(clamp(defaultValue, mode.min, mode.max));
       } else if (mode.stops.length > 0) {
-        onChange(mode.stops[nearestStopIndex(defaultValue, mode.stops)]!);
+        emitChange(mode.stops[nearestStopIndex(defaultValue, mode.stops)]!);
       }
     },
-    [defaultValue, disabled, mode, onChange],
+    [defaultValue, disabled, mode, emitChange],
   );
 
   const onKeyDown = useCallback(
@@ -113,9 +127,9 @@ function KnobImpl({
         mode.kind === "continuous"
           ? continuousStep(value, mode.min, mode.max, step, dir)
           : steppedNeighbor(value, mode.stops, dir);
-      if (next !== value) onChange(next);
+      if (next !== value) emitChange(next);
     },
-    [disabled, mode, onChange, step, value],
+    [disabled, mode, emitChange, step, value],
   );
 
   const trackPath = arcPath(cx, cy, trackR, KNOB_ROT_MIN_DEG, KNOB_ROT_MAX_DEG);

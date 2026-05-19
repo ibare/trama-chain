@@ -214,15 +214,19 @@ function CounterFields({ params, disabled, onChange }: CounterProps): JSX.Elemen
         <Form.Control
           type="number"
           value={startDraft}
-          step="any"
+          step={1}
           disabled={disabled}
           className="trama-unit-inspector-range-input"
           onChange={(e) => {
             const next = e.currentTarget.value;
             setStartDraft(next);
             const v = parseFloat(next);
-            if (Number.isFinite(v) && v !== params.start) {
-              onChange({ ...params, start: v });
+            // counter 는 셈의 의미 — start·step 모두 정수로 강제.
+            if (Number.isFinite(v)) {
+              const rounded = Math.round(v);
+              if (rounded !== params.start) {
+                onChange({ ...params, start: rounded });
+              }
             }
           }}
         />
@@ -232,15 +236,18 @@ function CounterFields({ params, disabled, onChange }: CounterProps): JSX.Elemen
         <Form.Control
           type="number"
           value={stepDraft}
-          step="any"
+          step={1}
           disabled={disabled}
           className="trama-unit-inspector-range-input"
           onChange={(e) => {
             const next = e.currentTarget.value;
             setStepDraft(next);
             const v = parseFloat(next);
-            if (Number.isFinite(v) && v !== params.step) {
-              onChange({ ...params, step: v });
+            if (Number.isFinite(v)) {
+              const rounded = Math.round(v);
+              if (rounded !== params.step) {
+                onChange({ ...params, step: rounded });
+              }
             }
           }}
         />
@@ -273,7 +280,7 @@ function UniformFields({ params, disabled, onChange }: UniformProps): JSX.Elemen
         <Form.Control
           type="number"
           value={minDraft}
-          step="any"
+          step={params.integer ? 1 : 0.1}
           disabled={disabled}
           className="trama-unit-inspector-range-input"
           onChange={(e) => {
@@ -291,7 +298,7 @@ function UniformFields({ params, disabled, onChange }: UniformProps): JSX.Elemen
         <Form.Control
           type="number"
           value={maxDraft}
-          step="any"
+          step={params.integer ? 1 : 0.1}
           disabled={disabled}
           className="trama-unit-inspector-range-input"
           onChange={(e) => {
@@ -313,7 +320,12 @@ function UniformFields({ params, disabled, onChange }: UniformProps): JSX.Elemen
           onValueChange={(v) => {
             if (v !== 'int' && v !== 'real') return;
             const integer = v === 'int';
-            if (integer !== params.integer) onChange({ ...params, integer });
+            if (integer !== params.integer) {
+              // integer 켤 때 기존 min/max 도 정수로 재정규화. 본문 Knob 와 동일 정책.
+              const min = integer ? Math.round(params.min) : params.min;
+              const max = integer ? Math.round(params.max) : params.max;
+              onChange({ ...params, integer, min, max });
+            }
           }}
           className="trama-unit-inspector-categories"
           aria-label="정수 여부"
@@ -374,7 +386,7 @@ function NormalFields({ params, disabled, onChange }: NormalProps): JSX.Element 
         <Form.Control
           type="number"
           value={meanDraft}
-          step="any"
+          step={0.1}
           disabled={disabled}
           className="trama-unit-inspector-range-input"
           onChange={(e) => {
@@ -392,7 +404,7 @@ function NormalFields({ params, disabled, onChange }: NormalProps): JSX.Element 
         <Form.Control
           type="number"
           value={stdevDraft}
-          step="any"
+          step={0.1}
           disabled={disabled}
           className="trama-unit-inspector-range-input"
           onChange={(e) => {
@@ -450,7 +462,7 @@ function SineFields({ params, disabled, onChange }: SineProps): JSX.Element {
         <Form.Control
           type="number"
           value={ampDraft}
-          step="any"
+          step={0.1}
           disabled={disabled}
           className="trama-unit-inspector-range-input"
           onChange={(e) => {
@@ -507,7 +519,7 @@ function StepFields({ params, disabled, onChange }: StepProps): JSX.Element {
         <Form.Control
           type="number"
           value={startDraft}
-          step="any"
+          step={100}
           disabled={disabled}
           className="trama-unit-inspector-range-input"
           onChange={(e) => {
@@ -525,7 +537,7 @@ function StepFields({ params, disabled, onChange }: StepProps): JSX.Element {
         <Form.Control
           type="number"
           value={valueDraft}
-          step="any"
+          step={0.1}
           disabled={disabled}
           className="trama-unit-inspector-range-input"
           onChange={(e) => {
@@ -564,7 +576,7 @@ function PulseFields({ params, disabled, onChange }: PulseProps): JSX.Element {
         <Form.Control
           type="number"
           value={periodDraft}
-          step="any"
+          step={100}
           disabled={disabled}
           className="trama-unit-inspector-range-input"
           onChange={(e) => {
@@ -583,7 +595,7 @@ function PulseFields({ params, disabled, onChange }: PulseProps): JSX.Element {
         <Form.Control
           type="number"
           value={valueDraft}
-          step="any"
+          step={0.1}
           disabled={disabled}
           className="trama-unit-inspector-range-input"
           onChange={(e) => {

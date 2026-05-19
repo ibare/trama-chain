@@ -86,6 +86,21 @@ function formatUniformValue(v: number, integer: boolean): string {
   return integer ? String(Math.round(v)) : v.toFixed(1);
 }
 
+/**
+ * paradigm 별 quantize 정책 — Knob raw float 가 모델에 들어가기 직전 호출되어
+ * 부동소수 잔존(0.0230... 같은)을 제거한다.
+ *
+ * - 정수(`quantizeInteger`): counter.start·counter.step, integer=true 인 uniform.min·max
+ * - 1자리(`quantizeTenth`): normal·uniform 분포 파라미터, sine.amplitude, step·pulse.value
+ * - 100ms 격자(`quantizeHundredMs`): step.startMs, pulse.periodMs — Knob step 100 과 정합
+ *
+ * 표시 포맷(formatFloat 등)이 1자리를 보여주는 곳은 quantize 도 같은 자리수로 맞춰
+ * "보이는 값과 저장 값이 일치" 한다는 단일 규칙.
+ */
+const quantizeInteger = (v: number): number => Math.round(v);
+const quantizeTenth = (v: number): number => Math.round(v * 10) / 10;
+const quantizeHundredMs = (v: number): number => Math.round(v / 100) * 100;
+
 /** ms 를 사람 친화 단위로 표시 — 1000 미만은 "Nms", 이상은 초 단위. */
 function formatMs(ms: number): string {
   if (!Number.isFinite(ms)) return '·';
@@ -247,6 +262,7 @@ function GeneratorNodeViewImpl({ id, incomingCount }: Props): JSX.Element | null
           mode={{ kind: 'continuous', min: SINE_AMP_MIN, max: SINE_AMP_MAX }}
           defaultValue={SINE_AMP_DEFAULT}
           step={0.1}
+          quantize={quantizeTenth}
           onChange={setAmplitude}
           ariaLabel="진폭"
           label={showLabel ? '진폭' : undefined}
@@ -274,10 +290,14 @@ function GeneratorNodeViewImpl({ id, incomingCount }: Props): JSX.Element | null
     const setMax = (v: number) => {
       updateNode(id, { params: { ...params, max: v } });
     };
+    // integer 토글 시 기존 min/max 도 정수로 재정규화 — 토글 즉시 인스펙터·표시값
+    // 일치 보장. quantize 정책은 [[feedback_knob_quantize]] 와 같이 정수/1자리 두 가지.
     const setInteger = (sel: number) => {
       const integer = sel === 1;
       if (integer !== params.integer) {
-        updateNode(id, { params: { ...params, integer } });
+        const min = integer ? Math.round(params.min) : params.min;
+        const max = integer ? Math.round(params.max) : params.max;
+        updateNode(id, { params: { ...params, integer, min, max } });
       }
     };
     const continuousMode = {
@@ -285,6 +305,7 @@ function GeneratorNodeViewImpl({ id, incomingCount }: Props): JSX.Element | null
       min: UNIFORM_RANGE_MIN,
       max: UNIFORM_RANGE_MAX,
     };
+    const uniformQuantize = params.integer ? quantizeInteger : quantizeTenth;
     const integerSelectorValue = params.integer ? 1 : 0;
     const integerCenterLabel = params.integer ? '정수' : '실수';
     // body.w 를 6:8:14 / 16 비율로 좌·중·우 배치 — standard·compact 공통.
@@ -301,6 +322,7 @@ function GeneratorNodeViewImpl({ id, incomingCount }: Props): JSX.Element | null
           mode={continuousMode}
           defaultValue={UNIFORM_MIN_DEFAULT}
           step={UNIFORM_STEP}
+          quantize={uniformQuantize}
           onChange={setMin}
           ariaLabel="최소"
           label={showLabel ? '최소' : undefined}
@@ -314,6 +336,7 @@ function GeneratorNodeViewImpl({ id, incomingCount }: Props): JSX.Element | null
           mode={continuousMode}
           defaultValue={UNIFORM_MAX_DEFAULT}
           step={UNIFORM_STEP}
+          quantize={uniformQuantize}
           onChange={setMax}
           ariaLabel="최대"
           label={showLabel ? '최대' : undefined}
@@ -367,10 +390,11 @@ function GeneratorNodeViewImpl({ id, incomingCount }: Props): JSX.Element | null
           }}
           defaultValue={COUNTER_START_DEFAULT}
           step={COUNTER_KNOB_STEP}
+          quantize={quantizeInteger}
           onChange={setStart}
           ariaLabel="시작"
           label={showLabel ? '시작' : undefined}
-          centerLabel={formatFloat(params.start)}
+          centerLabel={String(Math.round(params.start))}
         />
         <Knob
           cx={rightCx}
@@ -384,10 +408,11 @@ function GeneratorNodeViewImpl({ id, incomingCount }: Props): JSX.Element | null
           }}
           defaultValue={COUNTER_STEP_DEFAULT}
           step={COUNTER_KNOB_STEP}
+          quantize={quantizeInteger}
           onChange={setStep}
           ariaLabel="증가"
           label={showLabel ? '증가' : undefined}
-          centerLabel={formatFloat(params.step)}
+          centerLabel={String(Math.round(params.step))}
         />
       </>
     );
@@ -425,6 +450,7 @@ function GeneratorNodeViewImpl({ id, incomingCount }: Props): JSX.Element | null
           }}
           defaultValue={NORMAL_MEAN_DEFAULT}
           step={NORMAL_KNOB_STEP}
+          quantize={quantizeTenth}
           onChange={setMean}
           ariaLabel="평균"
           label={showLabel ? '평균' : undefined}
@@ -442,6 +468,7 @@ function GeneratorNodeViewImpl({ id, incomingCount }: Props): JSX.Element | null
           }}
           defaultValue={NORMAL_STDEV_DEFAULT}
           step={NORMAL_KNOB_STEP}
+          quantize={quantizeTenth}
           onChange={setStdev}
           ariaLabel="표준편차"
           label={showLabel ? '표준편차' : undefined}
@@ -483,6 +510,7 @@ function GeneratorNodeViewImpl({ id, incomingCount }: Props): JSX.Element | null
           }}
           defaultValue={STEP_START_MS_DEFAULT}
           step={STEP_START_MS_KNOB_STEP}
+          quantize={quantizeHundredMs}
           onChange={setStartMs}
           ariaLabel="시작"
           label={showLabel ? '시작' : undefined}
@@ -500,6 +528,7 @@ function GeneratorNodeViewImpl({ id, incomingCount }: Props): JSX.Element | null
           }}
           defaultValue={STEP_VALUE_DEFAULT}
           step={STEP_VALUE_KNOB_STEP}
+          quantize={quantizeTenth}
           onChange={setValue}
           ariaLabel="값"
           label={showLabel ? '값' : undefined}
@@ -541,6 +570,7 @@ function GeneratorNodeViewImpl({ id, incomingCount }: Props): JSX.Element | null
           }}
           defaultValue={PULSE_PERIOD_MS_DEFAULT}
           step={PULSE_PERIOD_MS_KNOB_STEP}
+          quantize={quantizeHundredMs}
           onChange={setPeriodMs}
           ariaLabel="주기"
           label={showLabel ? '주기' : undefined}
@@ -558,6 +588,7 @@ function GeneratorNodeViewImpl({ id, incomingCount }: Props): JSX.Element | null
           }}
           defaultValue={PULSE_VALUE_DEFAULT}
           step={PULSE_VALUE_KNOB_STEP}
+          quantize={quantizeTenth}
           onChange={setValue}
           ariaLabel="값"
           label={showLabel ? '값' : undefined}
