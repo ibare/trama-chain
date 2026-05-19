@@ -149,6 +149,7 @@ export function propagateOneStep(
     observeBuffers,
     observeExtractionRuntime,
     generatorRuntime,
+    stockRuntime: { ...state.stockRuntime },
     simulationTimeMs,
   };
 }
@@ -264,6 +265,7 @@ export function applyFeedbackEdges(
     observeBuffers: { ...state.observeBuffers },
     observeExtractionRuntime: { ...state.observeExtractionRuntime },
     generatorRuntime: { ...state.generatorRuntime },
+    stockRuntime: { ...state.stockRuntime },
     simulationTimeMs: state.simulationTimeMs ?? 0,
   };
 }

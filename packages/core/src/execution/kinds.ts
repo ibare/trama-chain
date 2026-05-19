@@ -1116,6 +1116,7 @@ const stockNodeDescriptor: NodeKindDescriptor<Extract<Node, { kind: 'stock' }>> 
   outputSlots: () => [
     { index: 0, value: 'numeric', label: 'level' },
     { index: 1, value: 'numeric', label: 'overflow' },
+    { index: 2, value: 'numeric', label: 'rate' },
   ],
   outputUnit: (node, catalog) => {
     const def = catalog.get(node.unitId);
@@ -1126,8 +1127,12 @@ const stockNodeDescriptor: NodeKindDescriptor<Extract<Node, { kind: 'stock' }>> 
   propagate: (node, ctx) => {
     const levelKey = outputKey(node.id, 0);
     const overflowKey = outputKey(node.id, 1);
-    // overflow 는 펄스 도착 사건 전용 — propagate 경로에서는 정의되지 않는다.
+    const rateKey = outputKey(node.id, 2);
+    // overflow / rate 는 펄스 도착 사건 전용 — propagate 경로에서는 invalid.
+    // rate 의 노드 본문 표시값은 UI selector 가 stockRuntime 으로 직접 계산해
+    // RAF 따라 자연 감쇠시킨다. 다운스트림 전파는 handlePulseArrival 의 spawn 만.
     ctx.validOutputs.delete(overflowKey);
+    ctx.validOutputs.delete(rateKey);
 
     // prev level: ctx.next 우선, 없으면 initialLevel 폴백.
     const prevExec = ctx.next[node.id];

@@ -117,12 +117,13 @@ describe('StockNode — propagate 시맨틱 (no-op preserve)', () => {
     expect(getLevel(st, 's')).toBeCloseTo(3, 10);
   });
 
-  it('overflow 슬롯은 propagate 경로에서 항상 invalid (펄스 도착 사건 전용)', () => {
+  it('overflow / rate 슬롯은 propagate 경로에서 항상 invalid (펄스 도착 사건 전용)', () => {
     let m = createEmptyModel(0);
     m = addStockNode(m, { id: 's', label: '탱크', initialLevel: 0 }, 0);
     let st = initializeFromInitialValues(m);
     for (let i = 0; i < 3; i++) st = step(st, m);
     expect(st.validOutputs.has(outputKey('s', 0))).toBe(true);
     expect(st.validOutputs.has(outputKey('s', 1))).toBe(false);
+    expect(st.validOutputs.has(outputKey('s', 2))).toBe(false);
   });
 });

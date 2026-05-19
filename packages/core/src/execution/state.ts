@@ -1,5 +1,5 @@
 import type { Model, NodeId, Value } from '../model/index.js';
-import { isGeneratorNode, isValueNode } from '../model/index.js';
+import { isGeneratorNode, isStockNode, isValueNode } from '../model/index.js';
 import {
   defaultGeneratorRegistry,
   type GeneratorRegistry,
@@ -14,6 +14,25 @@ import {
   type NodeKindRegistry,
   type ObserveExtractionRuntime,
 } from './kinds.js';
+
+/**
+ * Stock 노드의 rate 윈도우 길이(ms). "초당 유량" 직관에 맞춘 1초 고정.
+ * 노드별 override 는 두지 않는다 — 변동성을 사용자가 일관되게 해석할 수 있도록
+ * 카탈로그 차원의 단일 상수로 다룬다.
+ */
+export const STOCK_RATE_WINDOW_MS = 1000;
+
+/** Stock 노드의 rate 슬라이딩 윈도우 항목. */
+export interface StockRuntimeEntry {
+  /** 펄스 도착 시점의 simulationTimeMs. */
+  ts: number;
+  /** 슬롯 부호(incoming/outgoing) 와 inverted 까지 적용된 누적 증분. */
+  delta: number;
+}
+
+export interface StockRuntime {
+  window: StockRuntimeEntry[];
+}
 
 /**
  * 실행 시점의 노드 값들. *모델과 분리* — 모델은 초기값/구조의 source of truth고,
@@ -75,6 +94,14 @@ export interface ExecutionState {
    */
   generatorRuntime: Record<NodeId, GeneratorRuntime>;
   /**
+   * Stock 노드의 rate 슬라이딩 윈도우. 펄스 도착 시 (simulationTimeMs, delta) 한
+   * 항목씩 push, [simulationTimeMs - STOCK_RATE_WINDOW_MS, simulationTimeMs] 밖
+   * 항목은 prune. rate 슬롯의 다운스트림 전파 값은 push 직후 sum(delta) 로
+   * 계산되고, 노드 본문 표시값은 UI selector 가 동일 window 와 현재
+   * simulationTimeMs 로 직접 계산해 RAF 따라 자연 감쇠시킨다. runtime-only.
+   */
+  stockRuntime: Record<NodeId, StockRuntime>;
+  /**
    * 현재 simulation time(ms). 매 propagate step 마다 step 간격만큼 증가한다.
    * wall clock 과 분리된 모델 시간축 — ObserveNode 의 (value, t) sample 누적,
    * throttle 비교 기준이 된다. 0 부터 시작 (reset 시 0 으로 복귀).
@@ -99,9 +126,11 @@ export function initializeFromInitialValues(
   const validOutputs = new Set<string>();
   const pendingOutputs = new Set<string>();
   const generatorRuntime: Record<NodeId, GeneratorRuntime> = {};
+  const stockRuntime: Record<NodeId, StockRuntime> = {};
   for (const nid of model.nodeOrder) {
     const node = model.nodes[nid];
     if (!node) continue;
+    if (isStockNode(node)) stockRuntime[nid] = { window: [] };
     const desc = registry.forNode(node);
     if (!desc) continue;
     const v = desc.initialValue(node);
@@ -150,8 +179,36 @@ export function initializeFromInitialValues(
     observeBuffers: {},
     observeExtractionRuntime: {},
     generatorRuntime,
+    stockRuntime,
     simulationTimeMs: 0,
   };
+}
+
+/**
+ * Stock rate 슬라이딩 윈도우 helper — 만료 항목을 제거한 새 항목 배열을 반환.
+ * 입력 배열은 변경하지 않는다(immutable). cutoff 보다 ts 가 작은 항목을 제거.
+ */
+export function pruneStockWindow(
+  window: readonly StockRuntimeEntry[],
+  nowMs: number,
+): StockRuntimeEntry[] {
+  const cutoff = nowMs - STOCK_RATE_WINDOW_MS;
+  let firstAlive = 0;
+  while (firstAlive < window.length && window[firstAlive]!.ts < cutoff) {
+    firstAlive++;
+  }
+  if (firstAlive === 0) return window.slice();
+  return window.slice(firstAlive);
+}
+
+/**
+ * Stock rate 계산 — pruneStockWindow 결과의 delta 합. 1초 윈도우 고정이므로
+ * 시간 정규화 없이 그대로 사용 (사용자 직관: "지난 1초 동안 들어온 양").
+ */
+export function computeStockRate(window: readonly StockRuntimeEntry[]): number {
+  let sum = 0;
+  for (const e of window) sum += e.delta;
+  return sum;
 }
 
 /**

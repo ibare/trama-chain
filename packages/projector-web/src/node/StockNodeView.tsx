@@ -51,6 +51,7 @@ function StockNodeViewImpl({ id, incomingCount }: Props): JSX.Element | null {
   const updateNode = modelStore((s) => s.updateNode);
   const outputLevelConnected = useOutputConnected(id, 0);
   const outputOverflowConnected = useOutputConnected(id, 1);
+  const outputRateConnected = useOutputConnected(id, 2);
   const isSelected = uiStore(
     (s) => s.selection.kind === 'node' && s.selection.id === id,
   );
@@ -80,6 +81,10 @@ function StockNodeViewImpl({ id, incomingCount }: Props): JSX.Element | null {
     const out = layout?.rightPin.sockets[1];
     return out ? { x: posX + out.x, y: posY + out.y } : { x: posX, y: posY };
   }, [layout, posX, posY]);
+  const getRateStartPoint = useCallback(() => {
+    const out = layout?.rightPin.sockets[2];
+    return out ? { x: posX + out.x, y: posY + out.y } : { x: posX, y: posY };
+  }, [layout, posX, posY]);
   const {
     onPointerDown: onLevelSocketPointerDown,
     onPointerUp: onLevelSocketPointerUp,
@@ -95,6 +100,14 @@ function StockNodeViewImpl({ id, incomingCount }: Props): JSX.Element | null {
     enabled: !!layout,
     getStartPoint: getOverflowStartPoint,
     sourceSlotIndex: 1,
+  });
+  const {
+    onPointerDown: onRateSocketPointerDown,
+    onPointerUp: onRateSocketPointerUp,
+  } = useEdgeDraftSource(id, {
+    enabled: !!layout,
+    getStartPoint: getRateStartPoint,
+    sourceSlotIndex: 2,
   });
 
   const currentMode = node ? resolveDisplayMode(node) : 'standard';
@@ -125,9 +138,10 @@ function StockNodeViewImpl({ id, incomingCount }: Props): JSX.Element | null {
   // 좌측 핀 두 슬롯: 0=inflow, 1=outflow.
   const inflowSocket = layout.leftPin.sockets[0];
   const outflowSocket = layout.leftPin.sockets[1];
-  // 우측 핀 두 슬롯: 0=level, 1=overflow.
+  // 우측 핀 세 슬롯: 0=level, 1=overflow, 2=rate.
   const levelSocket = layout.rightPin.sockets[0];
   const overflowSocket = layout.rightPin.sockets[1];
+  const rateSocket = layout.rightPin.sockets[2];
 
   return (
     <NodeFrame
@@ -217,6 +231,23 @@ function StockNodeViewImpl({ id, incomingCount }: Props): JSX.Element | null {
             r={Math.max(SOCKET_SIZE, 12)}
             onPointerDown={onOverflowSocketPointerDown}
             onPointerUp={onOverflowSocketPointerUp}
+          />
+        </>
+      )}
+      {rateSocket && (
+        <>
+          <Socket
+            cx={rateSocket.x}
+            cy={rateSocket.y}
+            connected={outputRateConnected}
+          />
+          <circle
+            className="trama-node-socket-hit"
+            cx={rateSocket.x}
+            cy={rateSocket.y}
+            r={Math.max(SOCKET_SIZE, 12)}
+            onPointerDown={onRateSocketPointerDown}
+            onPointerUp={onRateSocketPointerUp}
           />
         </>
       )}

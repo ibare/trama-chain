@@ -11,12 +11,14 @@ import {
   addStockNode as addStockNodeOp,
   addValueNode as addValueNodeOp,
   buildTopology,
+  computeStockRate,
   createEmptyModel,
   defaultGeneratorRegistry,
   defaultNodeKindRegistry,
   executeModel,
   hasFeedbackEdges,
   initializeFromInitialValues,
+  pruneStockWindow,
   isConditionNode,
   isExpressionNode,
   isGeneratorNode,
@@ -235,18 +237,25 @@ function computeExecutionState(
   }
   // Stock 노드의 누적 level 은 모델 편집으로 리셋되지 않는다 — 펄스 도착으로
   // 누적된 상태이므로 엣지 추가/제거로 사라져서는 안 된다. priorModel 의 존재
-  // 여부와 상관없이 prior 에 같은 노드가 있다면 그대로 채택.
+  // 여부와 상관없이 prior 에 같은 노드가 있다면 그대로 채택. rate 윈도우(stockRuntime)
+  // 도 동일 — 마지막 1초 누적의 흔적이라 편집으로 비워지면 안 된다.
+  const mergedStockRuntime: typeof fresh.executionState.stockRuntime = {
+    ...fresh.executionState.stockRuntime,
+  };
   for (const nid of model.nodeOrder) {
     const node = model.nodes[nid];
     if (!node || !isStockNode(node)) continue;
     const priorVal = prior.values[nid];
-    if (priorVal === undefined) continue;
-    mergedValues[nid] = priorVal;
-    const levelKey = outputKey(nid, 0);
-    if (prior.validOutputs.has(levelKey)) {
-      mergedValid.add(levelKey);
-      mergedPending.delete(levelKey);
+    if (priorVal !== undefined) {
+      mergedValues[nid] = priorVal;
+      const levelKey = outputKey(nid, 0);
+      if (prior.validOutputs.has(levelKey)) {
+        mergedValid.add(levelKey);
+        mergedPending.delete(levelKey);
+      }
     }
+    const priorRt = prior.stockRuntime?.[nid];
+    if (priorRt) mergedStockRuntime[nid] = priorRt;
   }
   // ObserveNode 누적·throttle 런타임·sequence 슬롯 출력은 모델 편집(엣지 추가
   // 등) 으로 리셋되면 안 된다. executeModel 은 initializeFromInitialValues 에서
@@ -299,6 +308,7 @@ function computeExecutionState(
       validOutputs: mergedValid,
       pendingOutputs: mergedPending,
       generatorRuntime: mergedRuntime,
+      stockRuntime: mergedStockRuntime,
       observeBuffers: mergedObserveBuffers,
       observeExtractionRuntime: mergedExtractionRuntime,
       sequenceOutputs: mergedSequenceOutputs,
@@ -429,12 +439,13 @@ export function createModelStore({
   /**
    * Stock 노드의 단일 슬롯에 대해 lag=0 outgoing 엣지를 순회하며 펄스를 spawn.
    * Stock 은 continuous source 라 시각 입자 없이 즉시 도착 Pulse 로 동기 propagate.
-   * sourceValue 는 호출자가 명시 — slot 0=level, slot 1=overflow 가 다른 값이므로.
+   * sourceValue 는 호출자가 명시 — slot 0=level, slot 1=overflow, slot 2=rate 가
+   * 각각 다른 값이므로.
    */
   function spawnStockSlotPulse(
     model: Model,
     stockId: NodeId,
-    slot: 0 | 1,
+    slot: 0 | 1 | 2,
     sourceValue: ExecValue,
   ): void {
     if (timeSettingsStore.getState().paused) return;
@@ -800,6 +811,22 @@ export function createModelStore({
       }
       const overflowAmount = desired - clamped;
       const newLevelVal = numericValue(clamped, targetNode.unitId);
+      // 누적 후 실제로 level 에 반영된 양 — capacity 클램프 이후의 순 증분.
+      // 윈도우 항목은 desired 가 아니라 clamped 기준이어야 "탱크에 실제로 들어온 양"
+      // 의 직관과 맞는다. overflow 만큼은 다운스트림으로 빠져나간 양이라 rate 합에
+      // 포함시키지 않는다.
+      const effectiveDelta = clamped - prevLevel;
+
+      // 윈도우 push + 만료 prune → rate 계산.
+      const nowMs = executionState.simulationTimeMs;
+      const prevWindow =
+        executionState.stockRuntime[pulse.targetNodeId]?.window ?? [];
+      const prunedPrev = pruneStockWindow(prevWindow, nowMs);
+      const nextWindow =
+        effectiveDelta !== 0
+          ? [...prunedPrev, { ts: nowMs, delta: effectiveDelta }]
+          : prunedPrev;
+      const rate = computeStockRate(nextWindow);
 
       store.setState((s) => {
         const newValues: Record<NodeId, ExecValue> = { ...s.executionState.values };
@@ -808,12 +835,17 @@ export function createModelStore({
         newValid.add(outputKey(pulse.targetNodeId, 0));
         const newPending = new Set(s.executionState.pendingOutputs);
         newPending.delete(outputKey(pulse.targetNodeId, 0));
+        const newStockRuntime = {
+          ...s.executionState.stockRuntime,
+          [pulse.targetNodeId]: { window: nextWindow },
+        };
         return {
           executionState: {
             ...s.executionState,
             values: newValues,
             validOutputs: newValid,
             pendingOutputs: newPending,
+            stockRuntime: newStockRuntime,
           },
         };
       });
@@ -829,11 +861,17 @@ export function createModelStore({
         new Set([0]),
       );
 
-      // overflow 가 발생했다면 슬롯 1 펄스를 명시 값으로 spawn (Stock 과 동일 패턴).
+      // overflow 가 발생했다면 슬롯 1 펄스를 명시 값으로 spawn.
       if (overflowAmount !== 0) {
         const overflowVal = numericValue(overflowAmount, 'free');
         spawnStockSlotPulse(latest.model, pulse.targetNodeId, 1, overflowVal);
       }
+
+      // rate 슬롯(slot 2) 펄스 spawn — 1초 윈도우의 누적 합. effectiveDelta=0 이면
+      // 이번 펄스는 클램프로 흡수되어 새 항목이 푸시되지 않았더라도, 만료 prune 으로
+      // rate 가 바뀌었을 수 있으므로 항상 spawn (외부에서 본 "초당 유량" 의 일관성).
+      const rateVal = numericValue(rate, 'free');
+      spawnStockSlotPulse(latest.model, pulse.targetNodeId, 2, rateVal);
       return;
     }
 
@@ -889,6 +927,7 @@ export function createModelStore({
           observeBuffers: result.newObserveBuffers,
           observeExtractionRuntime: result.newObserveExtractionRuntime,
           generatorRuntime: s.executionState.generatorRuntime,
+          stockRuntime: s.executionState.stockRuntime,
           simulationTimeMs: s.executionState.simulationTimeMs,
         },
       };
@@ -1237,6 +1276,7 @@ export function createModelStore({
                 observeBuffers: s.executionState.observeBuffers,
                 observeExtractionRuntime: s.executionState.observeExtractionRuntime,
                 generatorRuntime: s.executionState.generatorRuntime,
+                stockRuntime: s.executionState.stockRuntime,
                 simulationTimeMs: s.executionState.simulationTimeMs,
               },
           trajectory: recomputed.trajectory,

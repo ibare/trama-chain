@@ -482,11 +482,11 @@ export function getNodeLayout(
       return buildCompactLayout(node, opts, { hasOuterControls: false });
     }
     if (isStockNode(node)) {
-      // Stock 은 입력 2 (inflow/outflow), 출력 2 (level/overflow) 고정.
+      // Stock 은 입력 2 (inflow/outflow), 출력 3 (level/overflow/rate) 고정.
       return buildCompactLayout(node, opts, {
         hasOuterControls: false,
         inSockets: 2,
-        outSockets: 2,
+        outSockets: 3,
       });
     }
     // 위 외의 kind는 compact 사양이 정의되지 않았으므로 standard fallback.
@@ -677,14 +677,14 @@ export function getNodeLayout(
     };
   }
 
-  // StockNode — 두 입력 슬롯(inflow/outflow), 두 출력 슬롯(level/overflow).
+  // StockNode — 두 입력 슬롯(inflow/outflow), 세 출력 슬롯(level/overflow/rate).
   // 본문에 라벨 + 현재 level (읽기 전용 게이지). 콤바이너·슬라이더 없음.
   if (isStockNode(node)) {
     const halfW = STANDARD_PANEL.w / 2;
     const halfH = STANDARD_PANEL.h / 2;
     const cardTop = -halfH;
     const leftPin = buildPin(-halfW, 0, 2);
-    const rightPin = buildPin(halfW, 0, 2);
+    const rightPin = buildPin(halfW, 0, 3);
     return {
       width: STANDARD_PANEL.w,
       height: STANDARD_PANEL.h,
