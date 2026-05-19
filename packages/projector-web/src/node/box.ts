@@ -343,7 +343,12 @@ function buildCompactLayout(
   // GeneratorNodeView 가 이 좌표에 knob 을 배치한다.
   const isGeneratorBodyParadigm =
     node.kind === "generator" &&
-    (node.params.kind === "sine" || node.params.kind === "uniform");
+    (node.params.kind === "sine" ||
+      node.params.kind === "uniform" ||
+      node.params.kind === "counter" ||
+      node.params.kind === "normal" ||
+      node.params.kind === "step" ||
+      node.params.kind === "pulse");
   const generatorBody = isGeneratorBodyParadigm
     ? {
         x: -panelW / 2 + 6,
@@ -702,7 +707,12 @@ export function getNodeLayout(
     const leftPin = buildPin(-halfW, 0, 1);
     const rightPin = buildPin(halfW, 0, 1);
     const usesBodyKnobs =
-      node.params.kind === "sine" || node.params.kind === "uniform";
+      node.params.kind === "sine" ||
+      node.params.kind === "uniform" ||
+      node.params.kind === "counter" ||
+      node.params.kind === "normal" ||
+      node.params.kind === "step" ||
+      node.params.kind === "pulse";
     const bodyTop = cardTop + GENERATOR_BODY_FROM_TOP;
     const bodyBottom = halfH - 12;
     const generatorBody = usesBodyKnobs
