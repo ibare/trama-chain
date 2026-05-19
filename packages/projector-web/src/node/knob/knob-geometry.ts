@@ -130,6 +130,34 @@ export function continuousStep(
   return clamp(value + dir * step, min, max);
 }
 
+/**
+ * Selector Knob — 이산 선택 전용 변형. 인접 stop 사이 항상 45°,
+ * 12시(0°)를 축으로 짝수 n 은 왼쪽 한 칸 더 확장한다 (왼쪽 우선).
+ *
+ * 공식: leftCount = ceil((n-1)/2), angles[i] = (i - leftCount) * 45°.
+ *
+ * - n=2 → [-45, 0]              (10:30, 12)
+ * - n=3 → [-45, 0, +45]         (10:30, 12, 1:30)  대칭
+ * - n=4 → [-90, -45, 0, +45]    (9, 10:30, 12, 1:30)
+ * - n=5 → [-90, -45, 0, +45, +90] 대칭
+ * - n=6 → [-135, -90, -45, 0, +45, +90]
+ * - n=7 → [-135, -90, -45, 0, +45, +90, +135] 270° 풀 점유, 대칭
+ *
+ * n<2 / n>SELECTOR_MAX_STOPS 는 호출자가 검증한다. 공식은 그대로 적용.
+ */
+export const SELECTOR_STEP_DEG = 45;
+export const SELECTOR_MAX_STOPS = 7;
+
+export function selectorStopAngles(n: number): number[] {
+  if (n <= 0) return [];
+  const leftCount = Math.ceil((n - 1) / 2);
+  const out: number[] = [];
+  for (let i = 0; i < n; i++) {
+    out.push((i - leftCount) * SELECTOR_STEP_DEG);
+  }
+  return out;
+}
+
 /** 우리 각도(12시=0°, 시계+) → SVG 표준(3시=0°, 시계+) 라디안 변환. */
 function degToScreenRad(deg: number): number {
   return ((deg - 90) * Math.PI) / 180;

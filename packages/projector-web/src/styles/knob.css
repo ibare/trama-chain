@@ -117,3 +117,47 @@
 [data-trama-root] .trama-knob.is-compact .trama-knob-center {
     font-size: 0.58rem;
 }
+
+/* Selector Knob -------------------------------------------------------
+ * 이산 선택 전용 변형. 호 트랙·침이 없는 대신 본체 원 + 회전하는 line·dot 으로
+ * 현재 stop 방향을 가리킨다. 본체 외곽 바깥쪽에 짧은 방사 tick 이 각 stop 위치에만.
+ * 색은 Pointer/Bipolar Knob 과 같은 토큰을 그대로 — 노드 안 시각 위계 통일.
+ */
+[data-trama-root] .trama-selector-knob-body {
+    fill: none;
+    stroke: var(--color-node-stroke-focal);
+    stroke-width: 2;
+}
+
+[data-trama-root] .trama-selector-knob-line {
+    stroke: var(--color-node-stroke-focal);
+    stroke-width: 2.5;
+    stroke-linecap: round;
+}
+
+[data-trama-root] .trama-selector-knob-dot {
+    fill: var(--color-node-stroke-focal);
+}
+
+[data-trama-root] .trama-selector-knob-tick {
+    stroke: var(--color-node-stroke-calm);
+    stroke-width: 1.5;
+    stroke-linecap: round;
+}
+
+[data-trama-root] .trama-knob.is-disabled .trama-selector-knob-body,
+[data-trama-root] .trama-knob.is-disabled .trama-selector-knob-line,
+[data-trama-root] .trama-knob.is-disabled .trama-selector-knob-dot,
+[data-trama-root] .trama-knob.is-disabled .trama-selector-knob-tick {
+    opacity: 0.45;
+}
+
+[data-trama-root] .trama-knob.is-compact .trama-selector-knob-body {
+    stroke-width: 1.5;
+}
+[data-trama-root] .trama-knob.is-compact .trama-selector-knob-line {
+    stroke-width: 2;
+}
+[data-trama-root] .trama-knob.is-compact .trama-selector-knob-tick {
+    stroke-width: 1;
+}

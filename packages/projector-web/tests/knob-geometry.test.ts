@@ -8,6 +8,7 @@ import {
   continuousStep,
   nearestStopIndex,
   pointOnArc,
+  selectorStopAngles,
   steppedNeighbor,
   tToAngleDeg,
   tToValue,
@@ -138,6 +139,39 @@ describe('keyboard helpers', () => {
     expect(continuousStep(5, 0, 10, 1, -1)).toBe(4);
     expect(continuousStep(10, 0, 10, 5, 1)).toBe(10);
     expect(continuousStep(0, 0, 10, 5, -1)).toBe(0);
+  });
+});
+
+describe('selectorStopAngles — n 별 각도 배열', () => {
+  it('n=2 → 왼쪽 우선 비대칭 [-45, 0]', () => {
+    expect(selectorStopAngles(2)).toEqual([-45, 0]);
+  });
+  it('n=3 → 12시 중심 대칭 [-45, 0, +45]', () => {
+    expect(selectorStopAngles(3)).toEqual([-45, 0, 45]);
+  });
+  it('n=4 → 왼쪽 우선 [-90, -45, 0, +45]', () => {
+    expect(selectorStopAngles(4)).toEqual([-90, -45, 0, 45]);
+  });
+  it('n=5 → 대칭 [-90, -45, 0, +45, +90]', () => {
+    expect(selectorStopAngles(5)).toEqual([-90, -45, 0, 45, 90]);
+  });
+  it('n=6 → 왼쪽 우선 [-135, -90, -45, 0, +45, +90]', () => {
+    expect(selectorStopAngles(6)).toEqual([-135, -90, -45, 0, 45, 90]);
+  });
+  it('n=7 → 270° 풀 점유 대칭 [-135 … +135]', () => {
+    expect(selectorStopAngles(7)).toEqual([-135, -90, -45, 0, 45, 90, 135]);
+  });
+  it('각 stop 사이 간격은 항상 45°', () => {
+    for (let n = 2; n <= 7; n++) {
+      const a = selectorStopAngles(n);
+      for (let i = 1; i < a.length; i++) {
+        expect(a[i]! - a[i - 1]!).toBe(45);
+      }
+    }
+  });
+  it('n<=0 → 빈 배열', () => {
+    expect(selectorStopAngles(0)).toEqual([]);
+    expect(selectorStopAngles(-1)).toEqual([]);
   });
 });
 
