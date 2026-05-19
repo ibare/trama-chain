@@ -32,6 +32,25 @@ export const KNOB_DIAMETER: Record<KnobSize, number> = {
   compact: 40,
 };
 
+/**
+ * Knob 외곽 시각 반지름 — Pointer/Bipolar 의 270° track 호 반지름.
+ */
+export const KNOB_OUTER_INSET: Record<KnobSize, number> = { standard: 3, compact: 2 };
+export const KNOB_OUTER_RADIUS_RATIO = 0.9;
+export function knobOuterRadius(size: KnobSize): number {
+  return (KNOB_DIAMETER[size] / 2 - KNOB_OUTER_INSET[size]) * KNOB_OUTER_RADIUS_RATIO;
+}
+
+/**
+ * Knob 내부 다이얼 본체 원 반지름 — Pointer/Bipolar 의 침이 회전하는 내부 무대와
+ * Selector 의 본체 원이 공유하는 값. 같은 size 의 두 Knob 종류가 옆에 배치될 때
+ * "안쪽 원" 시각이 정확히 정렬되도록 한 출처에서 결정한다.
+ */
+export const KNOB_DIAL_RADIUS_RATIO = 0.3;
+export function knobDialRadius(size: KnobSize): number {
+  return KNOB_DIAMETER[size] * KNOB_DIAL_RADIUS_RATIO;
+}
+
 export const KNOB_ROT_MIN_DEG = -135;
 export const KNOB_ROT_MAX_DEG = 135;
 export const KNOB_ROT_SPAN_DEG = KNOB_ROT_MAX_DEG - KNOB_ROT_MIN_DEG;

@@ -24,7 +24,7 @@
 
 [data-trama-root] .trama-knob-track {
     fill: none;
-    stroke: #a89e8c;
+    stroke: var(--color-node-stroke-calm);
     stroke-opacity: 0.45;
     stroke-width: 2.5;
     stroke-linecap: round;
@@ -129,24 +129,34 @@
     stroke-width: 2;
 }
 
-[data-trama-root] .trama-selector-knob-line {
+/* 회전 캡슐 본체 — rounded rect. 노드 패널과 같은 fill 로 외곽 원·캡슐 outline
+ * 교차부를 깔끔히 덮는다. stroke 는 focal — 다이얼 본체 원과 같은 톤. */
+[data-trama-root] .trama-selector-knob-capsule {
+    fill: var(--color-node-fill-focal);
     stroke: var(--color-node-stroke-focal);
-    stroke-width: 2.5;
-    stroke-linecap: round;
+    stroke-width: 2;
 }
 
 [data-trama-root] .trama-selector-knob-dot {
     fill: var(--color-node-stroke-focal);
 }
 
+/* Pointer/Bipolar Knob 의 track / track-fill 2단 톤과 동일 — 약한 stop 은 calm + 0.45,
+ * 현재 선택된 stop 은 focal + 0.55. SelectorKnob 가 같은 시각 어휘를 공유한다. */
 [data-trama-root] .trama-selector-knob-tick {
     stroke: var(--color-node-stroke-calm);
-    stroke-width: 1.5;
+    stroke-opacity: 0.45;
+    stroke-width: 3;
     stroke-linecap: round;
 }
 
+[data-trama-root] .trama-selector-knob-tick.is-selected {
+    stroke: var(--color-node-stroke-focal);
+    stroke-opacity: 0.55;
+}
+
 [data-trama-root] .trama-knob.is-disabled .trama-selector-knob-body,
-[data-trama-root] .trama-knob.is-disabled .trama-selector-knob-line,
+[data-trama-root] .trama-knob.is-disabled .trama-selector-knob-capsule,
 [data-trama-root] .trama-knob.is-disabled .trama-selector-knob-dot,
 [data-trama-root] .trama-knob.is-disabled .trama-selector-knob-tick {
     opacity: 0.45;
@@ -155,9 +165,9 @@
 [data-trama-root] .trama-knob.is-compact .trama-selector-knob-body {
     stroke-width: 1.5;
 }
-[data-trama-root] .trama-knob.is-compact .trama-selector-knob-line {
-    stroke-width: 2;
+[data-trama-root] .trama-knob.is-compact .trama-selector-knob-capsule {
+    stroke-width: 1.5;
 }
 [data-trama-root] .trama-knob.is-compact .trama-selector-knob-tick {
-    stroke-width: 1;
+    stroke-width: 2;
 }

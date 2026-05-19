@@ -6,6 +6,8 @@ import {
   arcPath,
   clamp,
   continuousStep,
+  knobDialRadius,
+  knobOuterRadius,
   nearestStopIndex,
   pointOnArc,
   steppedNeighbor,
@@ -52,12 +54,6 @@ interface Props {
   centerLabel?: string;
 }
 
-/** 트랙 호 인셋(px) — knob size 별. round cap·stroke 굵기에 맞춰 컴팩트에서 축소. */
-const TRACK_INSET: Record<KnobSize, number> = { standard: 3, compact: 2 };
-/** 트랙 호 반지름 비율 — (r - TRACK_INSET) 대비. 외곽 호를 안쪽으로 당겨 다이얼과 가까워지게. */
-const TRACK_RADIUS_RATIO = 0.9;
-/** 다이얼 본체 반지름 비율 — knob size 대비. 호와 다이얼 사이에 시각 갭이 생길 정도. */
-const DIAL_RADIUS_RATIO = 0.3;
 /**
  * 침 끝과 다이얼 라인 사이 여유(px). needle 의 round cap·dial stroke 반쪽이
  * 좌표 너머로 튀어나가는 보정. compact 에서는 stroke 가 가늘어지므로 동일 비율로 축소.
@@ -80,8 +76,8 @@ function KnobImpl({
 }: Props): JSX.Element {
   const diameter = KNOB_DIAMETER[size];
   const r = diameter / 2;
-  const trackR = (r - TRACK_INSET[size]) * TRACK_RADIUS_RATIO;
-  const dialR = diameter * DIAL_RADIUS_RATIO;
+  const trackR = knobOuterRadius(size);
+  const dialR = knobDialRadius(size);
   const needleLen = Math.max(0, dialR - NEEDLE_INSET[size]);
   const angleDeg = valueToAngleDeg(value, mode);
 
