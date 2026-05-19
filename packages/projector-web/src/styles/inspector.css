@@ -274,31 +274,9 @@
     gap: 6px;
 }
 
-[data-trama-root] .trama-cell-row-field {
-    display: flex;
-    flex-direction: column;
-    gap: 2px;
-    min-width: 0;
+[data-trama-root] .trama-cell-row > .trama-number-field {
     flex: 1 1 0;
-}
-
-[data-trama-root] .trama-cell-row-field-label {
-    font-size: var(--typography-text-step-count);
-    color: var(--color-node-text-low);
-    letter-spacing: 0.04em;
-}
-
-[data-trama-root] .trama-cell-row-input {
-    width: 100%;
     min-width: 0;
-    background: var(--color-node-fill-calm);
-    border: 1px solid var(--color-node-stroke-calm);
-    border-radius: var(--spacing-radius-input);
-    padding: 3px 6px;
-    font-family: inherit;
-    font-size: var(--typography-text-picker-label);
-    color: var(--color-node-text-primary);
-    font-variant-numeric: tabular-nums;
 }
 
 [data-trama-root] .trama-cell-row-remove {

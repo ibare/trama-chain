@@ -14,6 +14,7 @@ import {
 } from '../../skin/skins/cell-array.js';
 import type { SwatchRef } from '../../skin/palette.js';
 import { CellColorPicker } from './CellColorPicker.js';
+import { NumberField } from '../../util/NumberField.js';
 
 interface Props {
   node: ValueNode;
@@ -194,12 +195,12 @@ function CellRow({ cell, canRemove, onChange, onRemove }: CellRowProps): JSX.Ele
         <NumberField
           label="lo"
           value={cell.lo}
-          onCommit={(v) => onChange({ ...cell, lo: v } as RangeCell)}
+          onChange={(v) => onChange({ ...cell, lo: v } as RangeCell)}
         />
         <NumberField
           label="hi"
           value={cell.hi}
-          onCommit={(v) => onChange({ ...cell, hi: v } as RangeCell)}
+          onChange={(v) => onChange({ ...cell, hi: v } as RangeCell)}
         />
         <button
           type="button"
@@ -223,7 +224,7 @@ function CellRow({ cell, canRemove, onChange, onRemove }: CellRowProps): JSX.Ele
       <NumberField
         label="at"
         value={cell.at}
-        onCommit={(v) => onChange({ ...cell, at: v } as PointCell)}
+        onChange={(v) => onChange({ ...cell, at: v } as PointCell)}
       />
       <button
         type="button"
@@ -235,29 +236,6 @@ function CellRow({ cell, canRemove, onChange, onRemove }: CellRowProps): JSX.Ele
         −
       </button>
     </div>
-  );
-}
-
-interface NumberFieldProps {
-  label: string;
-  value: number;
-  onCommit: (v: number) => void;
-}
-
-function NumberField({ label, value, onCommit }: NumberFieldProps): JSX.Element {
-  return (
-    <label className="trama-cell-row-field">
-      <span className="trama-cell-row-field-label">{label}</span>
-      <input
-        type="number"
-        value={value}
-        className="trama-cell-row-input"
-        onChange={(e) => {
-          const v = parseFloat(e.currentTarget.value);
-          if (Number.isFinite(v)) onCommit(v);
-        }}
-      />
-    </label>
   );
 }
 
