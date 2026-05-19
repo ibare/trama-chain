@@ -184,6 +184,13 @@ export interface PropagateContext {
   /** 현재 simulation time(ms). 이 step 내 누적·emit 시각의 기준. */
   simulationTimeMs: number;
   /**
+   * 이번 step 의 시뮬레이션 시간 증분(ms). 시간 적분이 필요한 노드(Stock 등)가
+   * `dt = stepIntervalMs / 1000` 로 환산해 사용. 0 이면 시간이 흐르지 않은 step
+   * (수동 recompute·노드 편집 후 재계산 등) — 시간 적분 노드는 이번 step 에서
+   * 적분하지 않고 직전 상태를 보존한다.
+   */
+  stepIntervalMs: number;
+  /**
    * 멈춤 상태. true 면 ValueNode 처럼 펄스 도착으로만 갱신되는 노드는 이번
    * 단계에서 source 변화를 흡수하지 않는다 — pending 이면 pending 유지, valid
    * 였다면 마지막 수신값 유지. 시간이 흐르는 step(!paused)에서만 contribute
@@ -1082,6 +1089,62 @@ const averageNodeDescriptor: NodeKindDescriptor<Extract<Node, { kind: 'average' 
   },
 };
 
+/**
+ * Stock 노드 디스크립터 — pulse 도착 시 값을 그대로 누적하는 이산 누적 노드.
+ *
+ * 입력 슬롯 2개:
+ *   - slot 0: inflow (가산, numeric).
+ *   - slot 1: outflow (감산, numeric).
+ *
+ * 출력 슬롯 2개:
+ *   - slot 0: level (현재 누적량, unitId 보존). 항상 valid (초기 level 부터).
+ *   - slot 1: overflow (capacity 경계를 넘쳐 사라지는 양, raw). propagate 경로에서는
+ *     항상 invalid — overflow 는 펄스 도착 시점 사건이라 RAF/scrub/initial 경로에서는
+ *     의미를 갖지 않는다. handlePulseArrival 에서 누적 발생 시 spawn.
+ *
+ * 누적 시맨틱은 propagate 가 아니라 호스트(model-store) 의 handlePulseArrival 에서
+ * 직접 수행한다. propagate 는 prev level 을 유지하는 노옵 — RAF/scrub/initial 등
+ * 누적과 무관한 경로에서는 값을 흔들지 않는다.
+ */
+const stockNodeDescriptor: NodeKindDescriptor<Extract<Node, { kind: 'stock' }>> = {
+  kind: 'stock',
+  outputsRaw: false,
+  canBeFeedbackTarget: true,
+  initialValue: (node) => numericValue(node.initialLevel, node.unitId),
+  initialValidSlots: () => [0],
+  inputAccepts: () => [{ value: 'numeric' }],
+  outputSlots: () => [
+    { index: 0, value: 'numeric', label: 'level' },
+    { index: 1, value: 'numeric', label: 'overflow' },
+  ],
+  outputUnit: (node, catalog) => {
+    const def = catalog.get(node.unitId);
+    if (!def) return FREE_FALLBACK;
+    return resolveUnit(def, node.unitOverride);
+  },
+  outputInterpolation: () => 'continuous',
+  propagate: (node, ctx) => {
+    const levelKey = outputKey(node.id, 0);
+    const overflowKey = outputKey(node.id, 1);
+    // overflow 는 펄스 도착 사건 전용 — propagate 경로에서는 정의되지 않는다.
+    ctx.validOutputs.delete(overflowKey);
+
+    // prev level: ctx.next 우선, 없으면 initialLevel 폴백.
+    const prevExec = ctx.next[node.id];
+    let prevLevel = node.initialLevel;
+    if (prevExec && !isSequence(prevExec)) {
+      const v = unwrap(resolveScalar(prevExec, ctx.simulationTimeMs));
+      if (v.kind === 'numeric') prevLevel = v.n;
+    }
+
+    // 누적은 호스트의 handlePulseArrival 에서 일어난다. 이 propagate 경로는
+    // RAF/scrub/initial 등 누적과 무관한 경로 — prev level 을 그대로 유지.
+    ctx.next[node.id] = numericValue(prevLevel, node.unitId);
+    ctx.validOutputs.add(levelKey);
+    ctx.pendingOutputs.delete(levelKey);
+  },
+};
+
 export function createDefaultNodeKindRegistry(): NodeKindRegistry {
   return createNodeKindRegistry()
     .register(valueNodeDescriptor)
@@ -1091,7 +1154,8 @@ export function createDefaultNodeKindRegistry(): NodeKindRegistry {
     .register(observeNodeDescriptor)
     .register(expressionNodeDescriptor)
     .register(generatorNodeDescriptor)
-    .register(averageNodeDescriptor);
+    .register(averageNodeDescriptor)
+    .register(stockNodeDescriptor);
 }
 
 /**

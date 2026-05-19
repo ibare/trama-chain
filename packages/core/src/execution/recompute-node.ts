@@ -207,6 +207,9 @@ export function recomputeNode(
     // 펄스가 실제로 운반된 시점이므로 ValueNode propagate가 source 변화를 흡수해야
     // pending 상태를 valid 로 승격시킬 수 있다.
     paused: false,
+    // 펄스 도착은 시각·논리적 단위 갱신 — 시간 적분(Stock 등) 은 일어나지 않는다.
+    // RAF tickStocks 가 적분의 단일 출처이므로 여기서는 dt=0 로 prev level 유지.
+    stepIntervalMs: 0,
   };
 
   desc.propagate(node, ctx);

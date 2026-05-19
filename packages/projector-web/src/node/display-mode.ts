@@ -5,6 +5,7 @@ import {
   isGeneratorNode,
   isLogicGateNode,
   isObserveNode,
+  isStockNode,
   isValueNode,
   type Node,
 } from '@trama/core';
@@ -25,6 +26,7 @@ export function getDefaultDisplayMode(node: Node): NodeDisplayMode {
     case 'logic-gate':
     case 'condition':
     case 'average':
+    case 'stock':
       return 'compact';
     case 'expression':
       return 'standard';
@@ -50,7 +52,8 @@ export function resolveDisplayMode(node: Node): NodeDisplayMode {
     isGeneratorNode(node) ||
     isLogicGateNode(node) ||
     isObserveNode(node) ||
-    isAverageNode(node)
+    isAverageNode(node) ||
+    isStockNode(node)
   ) {
     if (node.displayMode) return node.displayMode;
   }
@@ -76,6 +79,7 @@ export function supportsDisplayModeToggle(node: Node): boolean {
     isGeneratorNode(node) ||
     isLogicGateNode(node) ||
     isObserveNode(node) ||
-    isAverageNode(node)
+    isAverageNode(node) ||
+    isStockNode(node)
   );
 }

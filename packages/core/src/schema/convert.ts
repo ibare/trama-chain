@@ -9,6 +9,7 @@ import type {
   Model,
   Node,
   ObserveNode,
+  StockNode,
   ValueNode,
 } from '../model/index.js';
 import {
@@ -19,6 +20,7 @@ import {
   isGeneratorNode,
   isLogicGateNode,
   isObserveNode,
+  isStockNode,
   isValueNode,
 } from '../model/index.js';
 import type {
@@ -32,6 +34,7 @@ import type {
   TramaLogicGateNode,
   TramaNode,
   TramaObserveNode,
+  TramaStockNode,
   TramaValueNode,
 } from './document.js';
 
@@ -144,6 +147,22 @@ function nodeToDoc(n: Node): TramaNode {
       kind: 'average',
       id: n.id,
       label: n.label,
+      position: n.position,
+      isFocal: n.isFocal,
+      description: n.description ?? null,
+      displayMode: n.displayMode,
+    };
+    return doc;
+  }
+  if (isStockNode(n)) {
+    const doc: TramaStockNode = {
+      kind: 'stock',
+      id: n.id,
+      label: n.label,
+      unitId: n.unitId,
+      unitOverride: n.unitOverride,
+      initialLevel: n.initialLevel,
+      capacity: n.capacity,
       position: n.position,
       isFocal: n.isFocal,
       description: n.description ?? null,
@@ -264,6 +283,21 @@ export function documentToModel(doc: TramaDocument): Model {
         kind: 'average',
         id: n.id,
         label: n.label,
+        position: n.position,
+        isFocal: n.isFocal,
+        description: n.description ?? null,
+        displayMode: n.displayMode,
+      };
+      nodes[n.id] = node;
+    } else if (n.kind === 'stock') {
+      const node: StockNode = {
+        kind: 'stock',
+        id: n.id,
+        label: n.label,
+        unitId: n.unitId,
+        unitOverride: n.unitOverride,
+        initialLevel: n.initialLevel,
+        capacity: n.capacity,
         position: n.position,
         isFocal: n.isFocal,
         description: n.description ?? null,

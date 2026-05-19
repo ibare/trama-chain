@@ -5,6 +5,7 @@ import {
   isExpressionNode,
   isGeneratorNode,
   isObserveNode,
+  isStockNode,
   isValueNode,
   type Node,
 } from "@trama/core";
@@ -265,6 +266,11 @@ interface CompactOpts {
   hasOuterControls: boolean;
   /** 우측 출력 슬롯 수. 미지정이면 1. ConditionNode 만 2 (true·false 게이트). */
   outSockets?: number;
+  /**
+   * 좌측 입력 슬롯 수 override. 미지정이면 node.kind 기반 기본값.
+   * StockNode 처럼 종류가 정한 고정 슬롯 수(inflow+outflow=2)가 있는 경우에 사용.
+   */
+  inSockets?: number;
 }
 
 /**
@@ -283,13 +289,15 @@ function buildCompactLayout(
   const isConstant = node.kind === "constant";
   const isLogicGate = node.kind === "logic-gate";
   const isUnaryLogicGate = isLogicGate && node.operator === "not";
-  const inSockets = isConstant
-    ? 0
-    : isLogicGate
-      ? isUnaryLogicGate
-        ? 1
-        : Math.max(1, incomingCount)
-      : 1;
+  const inSockets =
+    compactOpts.inSockets ??
+    (isConstant
+      ? 0
+      : isLogicGate
+        ? isUnaryLogicGate
+          ? 1
+          : Math.max(1, incomingCount)
+        : 1);
 
   const labelBlockH = COMPACT_LABEL_OUTER_H + COMPACT_PANEL_LABEL_GAP;
   const controlsBlockH = compactOpts.hasOuterControls
@@ -472,6 +480,14 @@ export function getNodeLayout(
     }
     if (isAverageNode(node)) {
       return buildCompactLayout(node, opts, { hasOuterControls: false });
+    }
+    if (isStockNode(node)) {
+      // Stock 은 입력 2 (inflow/outflow), 출력 2 (level/overflow) 고정.
+      return buildCompactLayout(node, opts, {
+        hasOuterControls: false,
+        inSockets: 2,
+        outSockets: 2,
+      });
     }
     // 위 외의 kind는 compact 사양이 정의되지 않았으므로 standard fallback.
   }
@@ -656,6 +672,40 @@ export function getNodeLayout(
       skinBorder: null,
       expressionBody: null,
       observeBody: { x: bodyX, y: bodyY, w: bodyW, h: bodyH },
+      generatorBody: null,
+      outerControlSlot: null,
+    };
+  }
+
+  // StockNode — 두 입력 슬롯(inflow/outflow), 두 출력 슬롯(level/overflow).
+  // 본문에 라벨 + 현재 level (읽기 전용 게이지). 콤바이너·슬라이더 없음.
+  if (isStockNode(node)) {
+    const halfW = STANDARD_PANEL.w / 2;
+    const halfH = STANDARD_PANEL.h / 2;
+    const cardTop = -halfH;
+    const leftPin = buildPin(-halfW, 0, 2);
+    const rightPin = buildPin(halfW, 0, 2);
+    return {
+      width: STANDARD_PANEL.w,
+      height: STANDARD_PANEL.h,
+      panelWidth: STANDARD_PANEL.w,
+      panelHeight: STANDARD_PANEL.h,
+      panelCx: 0,
+      panelCy: 0,
+      halfW,
+      halfH,
+      textX: -halfW + SIDE_INSET,
+      labelY: cardTop + NAME_FROM_TOP,
+      labelAnchor: "middle",
+      valueY: cardTop + VALUE_FROM_TOP,
+      sliderY: halfH,
+      combinerCenterY: null,
+      hasCombiner: false,
+      leftPin,
+      rightPin,
+      skinBorder: null,
+      expressionBody: null,
+      observeBody: null,
       generatorBody: null,
       outerControlSlot: null,
     };

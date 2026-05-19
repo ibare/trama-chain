@@ -299,6 +299,40 @@ export interface AverageNode {
   displayMode?: NodeDisplayMode;
 }
 
+/**
+ * Stock 노드(탱크) — 펄스 도착 시 입력값을 그대로 누적하는 상태 노드.
+ *
+ * - 입력 슬롯 2개: slot 0 inflow(가산), slot 1 outflow(감산). 둘 다 numeric.
+ *   slot 의미가 부호를 결정 — outflow 슬롯은 *항상 빼는 양*. 사용자는 양수로
+ *   유입/유출량을 적는다.
+ * - 출력 슬롯 2개: slot 0 level (현재 누적량, unitId 보존), slot 1 overflow
+ *   (capacity 경계를 넘쳐 사라지는 양, raw).
+ * - 누적 시맨틱: 펄스 도착 시 `level += pulseValue` (outflow 슬롯은 부호 반전).
+ *   시간 의존성 없음 — RAF tick 이나 paused/scrub 에서는 누적되지 않는다.
+ *   "연속적 흐름"을 모델링하려면 Generator 의 주기로 펄스 빈도를 사용자가 명시한다.
+ * - capacity 는 hard clamp. desired 가 [min, max] 를 벗어나면 그만큼 overflow 슬롯
+ *   으로 spawn (양수=상한 초과, 음수=하한 미달). overflow 가 0 이면 spawn 없음.
+ * - 초기 level = initialLevel. capacity null 측면은 무한대로 취급(클램프 없음).
+ */
+export interface StockNode {
+  kind: 'stock';
+  id: NodeId;
+  label: string;
+  /** 누적량의 단위. raw 가 아니라 일급 numeric 신호. */
+  unitId: string;
+  /** 카탈로그 기본값을 노드별로 좁힐 때만 채운다. */
+  unitOverride?: UnitOverride;
+  /** 시뮬레이션 시작/리셋 시점의 level. */
+  initialLevel: number;
+  /** 하한·상한 capacity. null 이면 그 방향은 무한대(언클램프). */
+  capacity: { min: number | null; max: number | null };
+  position: { x: number; y: number } | null;
+  isFocal: boolean;
+  description?: string | null;
+  /** 디스플레이 모드 인스턴스 오버라이드. 비어 있으면 kind 기본을 따른다. */
+  displayMode?: NodeDisplayMode;
+}
+
 export type Node =
   | ValueNode
   | ConstantNode
@@ -307,7 +341,8 @@ export type Node =
   | ExpressionNode
   | ObserveNode
   | GeneratorNode
-  | AverageNode;
+  | AverageNode
+  | StockNode;
 
 export function isValueNode(n: Node): n is ValueNode {
   return n.kind === 'value';
@@ -332,6 +367,9 @@ export function isGeneratorNode(n: Node): n is GeneratorNode {
 }
 export function isAverageNode(n: Node): n is AverageNode {
   return n.kind === 'average';
+}
+export function isStockNode(n: Node): n is StockNode {
+  return n.kind === 'stock';
 }
 
 export interface Edge {

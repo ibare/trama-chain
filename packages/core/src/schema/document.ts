@@ -190,6 +190,25 @@ export const AverageNodeSchema = z.object({
   displayMode: NodeDisplayModeSchema.optional(),
 });
 
+export const StockCapacitySchema = z.object({
+  min: z.number().nullable(),
+  max: z.number().nullable(),
+});
+
+export const StockNodeSchema = z.object({
+  kind: z.literal('stock'),
+  id: z.string(),
+  label: z.string(),
+  unitId: z.string(),
+  unitOverride: UnitOverrideSchema.optional(),
+  initialLevel: z.number(),
+  capacity: StockCapacitySchema,
+  position: z.object({ x: z.number(), y: z.number() }).nullable(),
+  isFocal: z.boolean(),
+  description: z.string().nullable().optional(),
+  displayMode: NodeDisplayModeSchema.optional(),
+});
+
 export const NodeSchema = z.discriminatedUnion('kind', [
   ValueNodeSchema,
   ConstantNodeSchema,
@@ -199,6 +218,7 @@ export const NodeSchema = z.discriminatedUnion('kind', [
   ExpressionNodeSchema,
   GeneratorNodeSchema,
   AverageNodeSchema,
+  StockNodeSchema,
 ]);
 
 export const EdgeSchema = z.object({
@@ -243,4 +263,5 @@ export type TramaObserveNode = z.infer<typeof ObserveNodeSchema>;
 export type TramaExpressionNode = z.infer<typeof ExpressionNodeSchema>;
 export type TramaGeneratorNode = z.infer<typeof GeneratorNodeSchema>;
 export type TramaAverageNode = z.infer<typeof AverageNodeSchema>;
+export type TramaStockNode = z.infer<typeof StockNodeSchema>;
 export type TramaEdge = z.infer<typeof EdgeSchema>;

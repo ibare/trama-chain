@@ -16,6 +16,7 @@ import type {
   ObserveCapacity,
   ObserveExtraction,
   ObserveNode,
+  StockNode,
   ValueNode,
 } from './types.js';
 import { makeEdgeId, makeModelId, makeNodeId } from './ids.js';
@@ -320,6 +321,46 @@ export function addAverageNode(
     kind: 'average',
     id,
     label: input.label,
+    position: input.position ?? null,
+    isFocal: input.isFocal ?? false,
+    description: input.description ?? null,
+  };
+  return touch(
+    {
+      ...model,
+      nodes: { ...model.nodes, [id]: node },
+      nodeOrder: [...model.nodeOrder, id],
+    },
+    now,
+  );
+}
+
+export interface AddStockNodeInput {
+  label: string;
+  unitId?: string;
+  unitOverride?: StockNode['unitOverride'];
+  initialLevel?: number;
+  capacity?: StockNode['capacity'];
+  position?: { x: number; y: number } | null;
+  isFocal?: boolean;
+  description?: string | null;
+  id?: NodeId;
+}
+
+export function addStockNode(
+  model: Model,
+  input: AddStockNodeInput,
+  now?: number,
+): Model {
+  const id = input.id ?? makeNodeId();
+  const node: StockNode = {
+    kind: 'stock',
+    id,
+    label: input.label,
+    unitId: input.unitId ?? 'free',
+    unitOverride: input.unitOverride,
+    initialLevel: input.initialLevel ?? 0,
+    capacity: input.capacity ?? { min: null, max: null },
     position: input.position ?? null,
     isFocal: input.isFocal ?? false,
     description: input.description ?? null,

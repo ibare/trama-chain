@@ -134,6 +134,7 @@ export function propagateOneStep(
       generatorRegistry,
       sequenceNext,
       simulationTimeMs,
+      stepIntervalMs: stepDelta,
       paused: options.paused ?? false,
     };
     desc.propagate(node, ctx);

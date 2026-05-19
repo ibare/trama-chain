@@ -8,6 +8,7 @@ import {
   addEdge as addEdgeOp,
   addExpressionNode as addExpressionNodeOp,
   addGeneratorNode as addGeneratorNodeOp,
+  addStockNode as addStockNodeOp,
   addValueNode as addValueNodeOp,
   buildTopology,
   createEmptyModel,
@@ -20,6 +21,7 @@ import {
   isExpressionNode,
   isGeneratorNode,
   isLogicGateNode,
+  isStockNode,
   modelToDocument,
   outputKey,
   propagateOneStep,
@@ -41,6 +43,7 @@ import type {
   AddEdgeInput,
   AddExpressionNodeInput,
   AddGeneratorNodeInput,
+  AddStockNodeInput,
   AddValueNodeInput,
   Edge,
   EdgeId,
@@ -53,7 +56,16 @@ import type {
   NodePatch,
   Value,
 } from '@trama/core';
-import { asBooleanGate, booleanValue, isNumericValue, isValueNode, numericValue } from '@trama/core';
+import {
+  asBooleanGate,
+  booleanValue,
+  isNumericValue,
+  isSequence,
+  isValueNode,
+  numericValue,
+  resolveScalar,
+  unwrap,
+} from '@trama/core';
 import { tokens } from '@trama/tokens';
 import { combinerRegistry, shapeRegistry } from './registries.js';
 import { fizzexExpressionEvaluator } from '../expression/fizzex-evaluator.js';
@@ -113,6 +125,7 @@ export interface ModelStore {
   addExpressionNode: (input: AddExpressionNodeInput) => Node | null;
   addGeneratorNode: (input: AddGeneratorNodeInput) => Node | null;
   addAverageNode: (input: AddAverageNodeInput) => Node | null;
+  addStockNode: (input: AddStockNodeInput) => Node | null;
   updateNode: (id: NodeId, patch: NodePatch) => void;
   removeNode: (id: NodeId) => void;
 
@@ -218,6 +231,21 @@ function computeExecutionState(
       mergedValues[nid] = priorVal;
       mergedValid.add(slot);
       mergedPending.delete(slot);
+    }
+  }
+  // Stock 노드의 누적 level 은 모델 편집으로 리셋되지 않는다 — 펄스 도착으로
+  // 누적된 상태이므로 엣지 추가/제거로 사라져서는 안 된다. priorModel 의 존재
+  // 여부와 상관없이 prior 에 같은 노드가 있다면 그대로 채택.
+  for (const nid of model.nodeOrder) {
+    const node = model.nodes[nid];
+    if (!node || !isStockNode(node)) continue;
+    const priorVal = prior.values[nid];
+    if (priorVal === undefined) continue;
+    mergedValues[nid] = priorVal;
+    const levelKey = outputKey(nid, 0);
+    if (prior.validOutputs.has(levelKey)) {
+      mergedValid.add(levelKey);
+      mergedPending.delete(levelKey);
     }
   }
   // ObserveNode 누적·throttle 런타임·sequence 슬롯 출력은 모델 편집(엣지 추가
@@ -398,6 +426,37 @@ export function createModelStore({
       spawnOutgoingPulses(latest.model, latest.executionState, nid);
     }
   }
+  /**
+   * Stock 노드의 단일 슬롯에 대해 lag=0 outgoing 엣지를 순회하며 펄스를 spawn.
+   * Stock 은 continuous source 라 시각 입자 없이 즉시 도착 Pulse 로 동기 propagate.
+   * sourceValue 는 호출자가 명시 — slot 0=level, slot 1=overflow 가 다른 값이므로.
+   */
+  function spawnStockSlotPulse(
+    model: Model,
+    stockId: NodeId,
+    slot: 0 | 1,
+    sourceValue: ExecValue,
+  ): void {
+    if (timeSettingsStore.getState().paused) return;
+    if (store.getState().playbackStep !== null) return;
+    for (const eid of model.edgeOrder) {
+      const e = model.edges[eid];
+      if (!e || e.from !== stockId) continue;
+      if ((e.lag ?? 0) !== 0) continue;
+      if ((e.sourceSlotIndex ?? 0) !== slot) continue;
+      handlePulseArrival({
+        id: `direct-${nextDirectPulseSerial++}`,
+        edgeId: eid,
+        sourceNodeId: stockId,
+        sourceSlotIndex: slot,
+        targetNodeId: e.to,
+        sourceValue,
+        startTime: performance.now(),
+        travelDurationMs: 0,
+      });
+    }
+  }
+
   /**
    * playback step 간 wall-time 지연. multiplier로 나눠 "한 step을 보는 시간"을
    * 환산한다. 시뮬레이션 ticker와 무관 — trajectory 재생용 setTimeout 경로 전용.
@@ -694,6 +753,90 @@ export function createModelStore({
       return;
     }
 
+    // Stock — pulse 도착 시 값을 그대로 누적. propagate descriptor 는
+    // RAF/scrub 경로에서 level 을 유지만 하므로, 누적의 단일 출처가 여기에 박힌다.
+    if (isStockNode(targetNode)) {
+      const edge = model.edgeOrder
+        .map((eid) => model.edges[eid])
+        .find(
+          (e): e is Edge =>
+            !!e &&
+            e.to === pulse.targetNodeId &&
+            e.from === pulse.sourceNodeId &&
+            (e.lag ?? 0) === 0 &&
+            (e.sourceSlotIndex ?? 0) === (pulse.sourceSlotIndex ?? 0),
+        );
+      if (!edge) return;
+
+      // pulse 가 운반한 값에서 numeric 추출. sequence 거나 비-numeric 이면 무시.
+      const sv = pulse.sourceValue;
+      let n: number | undefined;
+      if (!isSequence(sv)) {
+        const v = unwrap(resolveScalar(sv, executionState.simulationTimeMs));
+        if (v.kind === 'numeric') n = v.n;
+      }
+      if (n === undefined) return;
+
+      const signed = edge.inverted ? -n : n;
+      const slot = edge.slotIndex ?? 0;
+      // slot 0=incoming (가산), slot 1=outgoing (감산).
+      const delta = slot === 0 ? signed : -signed;
+
+      // prev level
+      const prevEv = executionState.values[pulse.targetNodeId];
+      let prevLevel = targetNode.initialLevel;
+      if (prevEv && !isSequence(prevEv)) {
+        const v = unwrap(resolveScalar(prevEv, executionState.simulationTimeMs));
+        if (v.kind === 'numeric') prevLevel = v.n;
+      }
+
+      const desired = prevLevel + delta;
+      let clamped = desired;
+      if (targetNode.capacity.min !== null && clamped < targetNode.capacity.min) {
+        clamped = targetNode.capacity.min;
+      }
+      if (targetNode.capacity.max !== null && clamped > targetNode.capacity.max) {
+        clamped = targetNode.capacity.max;
+      }
+      const overflowAmount = desired - clamped;
+      const newLevelVal = numericValue(clamped, targetNode.unitId);
+
+      store.setState((s) => {
+        const newValues: Record<NodeId, ExecValue> = { ...s.executionState.values };
+        newValues[pulse.targetNodeId] = newLevelVal;
+        const newValid = new Set(s.executionState.validOutputs);
+        newValid.add(outputKey(pulse.targetNodeId, 0));
+        const newPending = new Set(s.executionState.pendingOutputs);
+        newPending.delete(outputKey(pulse.targetNodeId, 0));
+        return {
+          executionState: {
+            ...s.executionState,
+            values: newValues,
+            validOutputs: newValid,
+            pendingOutputs: newPending,
+          },
+        };
+      });
+
+      nodeFlashRegistry.trigger(pulse.targetNodeId);
+
+      // level 변경 → 슬롯 0 outgoing 펄스 spawn.
+      const latest = store.getState();
+      spawnOutgoingPulses(
+        latest.model,
+        latest.executionState,
+        pulse.targetNodeId,
+        new Set([0]),
+      );
+
+      // overflow 가 발생했다면 슬롯 1 펄스를 명시 값으로 spawn (Stock 과 동일 패턴).
+      if (overflowAmount !== 0) {
+        const overflowVal = numericValue(overflowAmount, 'free');
+        spawnStockSlotPulse(latest.model, pulse.targetNodeId, 1, overflowVal);
+      }
+      return;
+    }
+
     const result = recomputeNode(pulse.targetNodeId, executionState, model, {
       shapeRegistry,
       combinerRegistry,
@@ -891,6 +1034,17 @@ export function createModelStore({
       if (!assertEditable()) return null;
       const s = get();
       const after = addAverageNodeOp(s.model, input);
+      const newId = after.nodeOrder[after.nodeOrder.length - 1]!;
+      const node = after.nodes[newId]!;
+      const exec = computeExecutionState(after, s.executionState, true, s.model);
+      set({ model: after, ...exec });
+      return node;
+    },
+
+    addStockNode: (input) => {
+      if (!assertEditable()) return null;
+      const s = get();
+      const after = addStockNodeOp(s.model, input);
       const newId = after.nodeOrder[after.nodeOrder.length - 1]!;
       const node = after.nodes[newId]!;
       const exec = computeExecutionState(after, s.executionState, true, s.model);

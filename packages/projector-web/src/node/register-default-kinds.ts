@@ -9,6 +9,7 @@ import { ExpressionNodeView } from './ExpressionNodeView.js';
 import { GeneratorNodeView } from './GeneratorNodeView.js';
 import { ObserveNodeView } from './ObserveNodeView.js';
 import { AverageNodeView } from './AverageNodeView.js';
+import { StockNodeView } from './StockNodeView.js';
 import { fizzexExpressionEvaluator } from '../expression/fizzex-evaluator.js';
 import { registerNodeKindUI } from './kind-catalog.js';
 
@@ -316,6 +317,31 @@ registerNodeKindUI({
         const addAverageNode = instance.modelStore.getState().addAverageNode;
         const node = addAverageNode({
           label: '평균',
+          position: canvasPos,
+        });
+        if (!node) return null;
+        return node.id;
+      },
+    },
+  ],
+});
+
+registerNodeKindUI({
+  kind: 'stock',
+  menuSectionLabel: '상태',
+  menuSectionOrder: 12.5,
+  View: StockNodeView,
+  buildMenuItems: (instance) => [
+    {
+      key: 'stock',
+      label: '탱크',
+      symbol: '⏳',
+      createNode: (canvasPos) => {
+        const addStockNode = instance.modelStore.getState().addStockNode;
+        const node = addStockNode({
+          label: '탱크',
+          initialLevel: 0,
+          capacity: { min: null, max: null },
           position: canvasPos,
         });
         if (!node) return null;

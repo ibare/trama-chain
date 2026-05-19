@@ -9,6 +9,7 @@ import type {
   TramaLogicGateNode,
   TramaNode,
   TramaObserveNode,
+  TramaStockNode,
   TramaValueNode,
 } from './document.js';
 
@@ -91,6 +92,20 @@ const AVERAGE_NODE_KEY_ORDER: (keyof TramaAverageNode)[] = [
   'description',
 ];
 
+const STOCK_NODE_KEY_ORDER: (keyof TramaStockNode)[] = [
+  'kind',
+  'id',
+  'label',
+  'unitId',
+  'unitOverride',
+  'initialLevel',
+  'capacity',
+  'position',
+  'isFocal',
+  'displayMode',
+  'description',
+];
+
 const GENERATOR_NODE_KEY_ORDER: (keyof TramaGeneratorNode)[] = [
   'kind',
   'id',
@@ -152,6 +167,7 @@ function orderNode(n: TramaNode): TramaNode {
   if (n.kind === 'observe') return orderObject(n, OBSERVE_NODE_KEY_ORDER);
   if (n.kind === 'generator') return orderObject(n, GENERATOR_NODE_KEY_ORDER);
   if (n.kind === 'average') return orderObject(n, AVERAGE_NODE_KEY_ORDER);
+  if (n.kind === 'stock') return orderObject(n, STOCK_NODE_KEY_ORDER);
   return orderObject(n, EXPRESSION_NODE_KEY_ORDER);
 }
 
