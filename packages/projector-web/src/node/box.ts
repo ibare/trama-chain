@@ -338,8 +338,19 @@ function buildCompactLayout(
   const leftPin = buildPin(-halfW, panelCy, inSockets);
   const rightPin = buildPin(halfW, panelCy, outSockets);
 
-  // generator는 외곽 컨트롤이 없다 (사용자 토글 제거). generatorBody는 항상 null.
-  const generatorBody = null;
+  // generator는 외곽 컨트롤이 없다 (사용자 토글 제거). sine paradigm 일 때는
+  // 패널 내부를 knob 두 개를 위한 본문 영역으로 노출 — standard 와 동일하게
+  // GeneratorNodeView 가 이 좌표에 knob 을 배치한다.
+  const isSineGenerator =
+    node.kind === "generator" && node.params.kind === "sine";
+  const generatorBody = isSineGenerator
+    ? {
+        x: -panelW / 2 + 6,
+        y: panelCy - panelH / 2 + 6,
+        w: panelW - 12,
+        h: panelH - 12,
+      }
+    : null;
 
   // numeric ValueNode compact — 외곽 컨트롤 슬롯을 슬라이더와 combiner 칩이 공유한다.
   // lag=0 입력 2개 이상이면 슬라이더가 의미 잃고 combiner 칩으로 자리 교체.

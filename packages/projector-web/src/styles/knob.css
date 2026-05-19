@@ -100,3 +100,20 @@
 [data-trama-root] .trama-knob.is-disabled .trama-knob-tick {
     opacity: 0.45;
 }
+
+/* compact knob — diameter 40 기준. stroke·텍스트를 standard 대비 비례 축소해
+ * 시각 무게가 standard 와 어긋나지 않게 한다. SVG 스케일이 아니라 픽셀 절대값
+ * 분기 — round cap·텍스트 가독성이 같이 줄어드는 부작용을 피하기 위함. */
+[data-trama-root] .trama-knob.is-compact .trama-knob-track,
+[data-trama-root] .trama-knob.is-compact .trama-knob-track-fill {
+    stroke-width: 2;
+}
+[data-trama-root] .trama-knob.is-compact .trama-knob-dial {
+    stroke-width: 1.5;
+}
+[data-trama-root] .trama-knob.is-compact .trama-knob-needle {
+    stroke-width: 2.5;
+}
+[data-trama-root] .trama-knob.is-compact .trama-knob-center {
+    font-size: 0.58rem;
+}

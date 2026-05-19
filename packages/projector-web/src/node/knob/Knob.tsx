@@ -52,17 +52,17 @@ interface Props {
   centerLabel?: string;
 }
 
-const TRACK_INSET = 3;
+/** 트랙 호 인셋(px) — knob size 별. round cap·stroke 굵기에 맞춰 컴팩트에서 축소. */
+const TRACK_INSET: Record<KnobSize, number> = { standard: 3, compact: 2 };
 /** 트랙 호 반지름 비율 — (r - TRACK_INSET) 대비. 외곽 호를 안쪽으로 당겨 다이얼과 가까워지게. */
 const TRACK_RADIUS_RATIO = 0.9;
 /** 다이얼 본체 반지름 비율 — knob size 대비. 호와 다이얼 사이에 시각 갭이 생길 정도. */
 const DIAL_RADIUS_RATIO = 0.3;
 /**
- * 침 끝과 다이얼 라인 사이 여유(px). needle 의 round cap(폭 3.5 → 반쪽 1.75)이
- * 좌표 너머로 튀어나가고 dial stroke(폭 2)의 반쪽이 안쪽으로 들어오기 때문에
- * 시각 갭 ≈ NEEDLE_INSET - 2.75. 시각적으로 2px 정도 떨어뜨리려면 5 정도 필요.
+ * 침 끝과 다이얼 라인 사이 여유(px). needle 의 round cap·dial stroke 반쪽이
+ * 좌표 너머로 튀어나가는 보정. compact 에서는 stroke 가 가늘어지므로 동일 비율로 축소.
  */
-const NEEDLE_INSET = 5;
+const NEEDLE_INSET: Record<KnobSize, number> = { standard: 5, compact: 3 };
 
 function KnobImpl({
   cx,
@@ -80,9 +80,9 @@ function KnobImpl({
 }: Props): JSX.Element {
   const diameter = KNOB_DIAMETER[size];
   const r = diameter / 2;
-  const trackR = (r - TRACK_INSET) * TRACK_RADIUS_RATIO;
+  const trackR = (r - TRACK_INSET[size]) * TRACK_RADIUS_RATIO;
   const dialR = diameter * DIAL_RADIUS_RATIO;
-  const needleLen = Math.max(0, dialR - NEEDLE_INSET);
+  const needleLen = Math.max(0, dialR - NEEDLE_INSET[size]);
   const angleDeg = valueToAngleDeg(value, mode);
 
   const { onPointerDown } = useKnobDrag({
@@ -132,7 +132,7 @@ function KnobImpl({
 
   return (
     <g
-      className={`trama-knob${disabled ? " is-disabled" : ""}`}
+      className={`trama-knob${size === "compact" ? " is-compact" : ""}${disabled ? " is-disabled" : ""}`}
       tabIndex={disabled ? -1 : 0}
       role="slider"
       aria-label={ariaLabel}

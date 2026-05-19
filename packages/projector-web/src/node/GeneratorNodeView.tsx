@@ -129,6 +129,8 @@ function GeneratorNodeViewImpl({ id, incomingCount }: Props): JSX.Element | null
   const isSine = node.params.kind === 'sine';
   // sine paradigm 본문 — knob 두 개(주기·진폭) 배치.
   // 주기는 stepped (사용자 옵션 B), 진폭은 continuous.
+  // compact 모드는 패널이 좁아 knob 위쪽 라벨("주기"/"진폭")을 끄고 centerLabel
+  // (값+단위)만 남긴다 — 좌·우 위치로 두 knob 을 식별.
   const sineKnobs = (() => {
     if (!isSine) return null;
     const body = layout.generatorBody;
@@ -140,6 +142,8 @@ function GeneratorNodeViewImpl({ id, incomingCount }: Props): JSX.Element | null
     const cy = body.y + body.h / 2;
     const leftCx = body.x + body.w * 0.28;
     const rightCx = body.x + body.w * 0.72;
+    const knobSize = currentMode === 'compact' ? 'compact' : 'standard';
+    const showLabel = currentMode !== 'compact';
     const setPeriod = (T: number) => {
       const omega = (2 * Math.PI) / T;
       updateNode(id, { params: { ...params, omega } });
@@ -152,26 +156,26 @@ function GeneratorNodeViewImpl({ id, incomingCount }: Props): JSX.Element | null
         <Knob
           cx={leftCx}
           cy={cy}
-          size="standard"
+          size={knobSize}
           value={periodSnap}
           mode={{ kind: 'stepped', stops: SINE_PERIOD_STOPS_S }}
           defaultValue={SINE_PERIOD_DEFAULT_S}
           onChange={setPeriod}
           ariaLabel="주기"
-          label="주기"
+          label={showLabel ? '주기' : undefined}
           centerLabel={`${periodSnap}s`}
         />
         <Knob
           cx={rightCx}
           cy={cy}
-          size="standard"
+          size={knobSize}
           value={params.amplitude}
           mode={{ kind: 'continuous', min: SINE_AMP_MIN, max: SINE_AMP_MAX }}
           defaultValue={SINE_AMP_DEFAULT}
           step={0.1}
           onChange={setAmplitude}
           ariaLabel="진폭"
-          label="진폭"
+          label={showLabel ? '진폭' : undefined}
           centerLabel={params.amplitude.toFixed(1)}
         />
       </>
