@@ -40,6 +40,23 @@ interface Props {
    * `editor.options.editable === false`일 때 켜는 용도.
    */
   readOnly?: boolean;
+  /**
+   * 캔버스 휠 줌 모드. 기본 'modifier'.
+   * - 'modifier': ctrl/meta 누른 휠만 줌. 그 외 휠은 호스트로 전파 — Tiptap 등
+   *   임베드 환경에서 호스트 페이지 스크롤이 캔버스 위에서 끊기지 않게 한다.
+   * - 'always': 모든 휠이 줌. 캔버스가 페이지 전체를 차지하는 풀스크린
+   *   (Playground 등)에서 자연스러운 동작.
+   * - 'never': 줌 비활성. 휠은 호스트로 그대로 전파. 정적 시연 용도.
+   */
+  wheelZoom?: 'modifier' | 'always' | 'never';
+  /**
+   * 캔버스 마운트 시 1회 자동 정렬. 기본 'none'.
+   * - 'content': 노드 위치 평균을 캔버스 중앙으로 끌어와 panX/panY 보정. 가변 폭
+   *   호스트에 임베드된 시연 모델이 좌상단으로 쏠리는 걸 막는다.
+   * - 'none': 보정 없음. 빈 캔버스로 시작하는 Playground 동작.
+   * 사용자가 한 번 패닝/줌하면 이후엔 적용되지 않는다 (mount-only one-shot).
+   */
+  initialFit?: 'content' | 'none';
 }
 
 export function TramaEditor(props: Props): JSX.Element {
@@ -59,18 +76,31 @@ export function TramaEditor(props: Props): JSX.Element {
   );
 }
 
-function TramaEditorInner({ value, onChange, options, readOnly = false }: Props): JSX.Element {
+function TramaEditorInner({
+  value,
+  onChange,
+  options,
+  readOnly = false,
+  wheelZoom = 'modifier',
+  initialFit = 'none',
+}: Props): JSX.Element {
   const { modelStore, uiStore } = useTrama();
   const setModel = modelStore((s) => s.setModel);
   const model = modelStore((s) => s.model);
   const setQuestion = modelStore((s) => s.setQuestion);
   const setReadOnly = uiStore((s) => s.setReadOnly);
+  const setWheelZoom = uiStore((s) => s.setWheelZoom);
   const isReadOnly = uiStore((s) => s.readOnly);
 
   // readOnly prop을 UI store에 동기화. mount + prop 변경 시.
   useEffect(() => {
     setReadOnly(readOnly);
   }, [readOnly, setReadOnly]);
+
+  // wheelZoom prop을 UI store에 동기화.
+  useEffect(() => {
+    setWheelZoom(wheelZoom);
+  }, [wheelZoom, setWheelZoom]);
 
   // controlled `value`를 source of truth로 둔다.
   // - mount + 외부 변경 시 parse → setModel
@@ -142,7 +172,7 @@ function TramaEditorInner({ value, onChange, options, readOnly = false }: Props)
         </Form.Root>
       ) : null}
 
-      <Canvas />
+      <Canvas initialFit={initialFit} />
       {!isReadOnly && <FunctionPicker />}
       {!isReadOnly && <UnitInspectorLayer />}
       {!isReadOnly && <ExecutionControl />}

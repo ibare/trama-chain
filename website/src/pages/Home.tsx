@@ -1,4 +1,68 @@
+import { useMemo, useState } from 'react';
 import { Link } from 'react-router-dom';
+import { TramaEditor } from '@trama/projector-web';
+import {
+  addEdge,
+  addGeneratorNode,
+  addObserveNode,
+  addStockNode,
+  createEmptyModel,
+  modelToDocument,
+  serializeTrama,
+} from '@trama/core';
+
+function buildRainTankJson(): string {
+  // 빗물 탱크 — 강수 펄스가 탱크를 채우고 사용 펄스가 빼낸다. 관찰 노드는 현재 수위
+  // 를 last-value 로 비춘다. 엣지 shape 는 모두 identity('none') — 함수 변환 없이
+  // 펄스가 그대로 누적/감산되는 가장 기본 형태.
+  let m = createEmptyModel();
+  m = addGeneratorNode(m, {
+    id: 'rain',
+    label: '강수',
+    params: { kind: 'pulse', periodMs: 2000, value: 5 },
+    position: { x: 160, y: 120 },
+  });
+  m = addGeneratorNode(m, {
+    id: 'use',
+    label: '사용',
+    params: { kind: 'pulse', periodMs: 1000, value: 1 },
+    position: { x: 160, y: 320 },
+  });
+  m = addStockNode(m, {
+    id: 'tank',
+    label: '탱크',
+    initialLevel: 10,
+    capacity: { min: 0, max: 30 },
+    position: { x: 430, y: 220 },
+  });
+  m = addObserveNode(m, {
+    id: 'gauge',
+    label: '수위',
+    position: { x: 700, y: 220 },
+  });
+  m = addEdge(m, {
+    id: 'e_in',
+    from: 'rain',
+    to: 'tank',
+    shape: { kind: 'none', params: {} },
+    slotIndex: 0,
+  });
+  m = addEdge(m, {
+    id: 'e_out',
+    from: 'use',
+    to: 'tank',
+    shape: { kind: 'none', params: {} },
+    slotIndex: 1,
+  });
+  m = addEdge(m, {
+    id: 'e_lvl',
+    from: 'tank',
+    to: 'gauge',
+    shape: { kind: 'none', params: {} },
+    sourceSlotIndex: 0,
+  });
+  return serializeTrama(modelToDocument(m));
+}
 
 const SAMPLE_FENCE = `\`\`\`trama
 {
@@ -36,6 +100,9 @@ new Editor({
 });`;
 
 export default function Home(): JSX.Element {
+  const initialJson = useMemo(() => buildRainTankJson(), []);
+  const [json, setJson] = useState<string>(initialJson);
+
   return (
     <div className="trama-home">
       <section className="trama-hero">
@@ -70,44 +137,9 @@ export default function Home(): JSX.Element {
         </div>
       </section>
 
-      <section className="trama-section">
-        <h2>다섯 가지 결정</h2>
-        <p className="trama-section-lead">
-          이 다섯을 위반하는 기능은 추가하지 않는다.
-        </p>
-        <ol className="trama-five">
-          <li>
-            <strong>자동 추론 없음.</strong> 도구는 사용자가 명시적으로 그린 것만 다룬다.
-          </li>
-          <li>
-            <strong>함수의 형태가 핵심 인지 노동.</strong> +/− 극성이 아니라 모양으로 표현한다.
-          </li>
-          <li>
-            <strong>물성 시각화.</strong> 값 변화는 데이터 시각화가 아니라 물건이 반응하는 모습이다.
-          </li>
-          <li>
-            <strong>관점의 다양성 존중.</strong> 같은 상황을 다르게 모델링하는 게 정상이다.
-          </li>
-          <li>
-            <strong>시각적 아름다움은 비협상.</strong>
-          </li>
-        </ol>
-      </section>
-
-      <section className="trama-section trama-section-soft">
-        <h2>한 그래프, 두 종류의 엣지</h2>
-        <p className="trama-section-lead">
-          같은 모델 안에서 정적·동적·확률 시뮬레이션을 통합 표현한다.
-        </p>
-        <div className="trama-edge-grid">
-          <article className="trama-card">
-            <h3>일반 엣지 <code>lag = 0</code></h3>
-            <p>같은 timestep 안에서 source → target. 모든 일반 엣지는 instantaneous DAG.</p>
-          </article>
-          <article className="trama-card">
-            <h3>Feedback 엣지 <code>lag = 1</code></h3>
-            <p>다음 timestep의 target으로 전달. 시간 차원에서 사이클이 가능. Feedback이 없으면 N 컨트롤은 자동 숨김.</p>
-          </article>
+      <section className="trama-section trama-section-soft trama-demo-section">
+        <div className="trama-demo-canvas">
+          <TramaEditor value={json} onChange={setJson} initialFit="content" />
         </div>
       </section>
 
@@ -252,38 +284,20 @@ export default function Home(): JSX.Element {
           font-size: 0.9375rem;
           margin: 1.25rem 0 0;
         }
-        .trama-five {
+        .trama-demo-section {
+          padding: 0;
+        }
+        .trama-demo-section > .trama-demo-canvas {
+          max-width: none;
           margin: 0;
-          padding-left: 1.25rem;
-          display: grid;
-          gap: 0.75rem;
         }
-        .trama-five li { color: var(--trama-fg-soft); }
-        .trama-five li strong { color: var(--trama-fg); margin-right: 0.25rem; }
-        .trama-edge-grid {
-          display: grid;
-          grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
-          gap: 1rem;
-        }
-        .trama-card {
+        .trama-demo-canvas {
+          position: relative;
+          height: clamp(280px, 47vh, 480px);
           background: var(--trama-bg);
-          border: 1px solid var(--trama-border);
-          border-radius: var(--trama-radius);
-          padding: 1.25rem 1.5rem;
+          overflow: hidden;
         }
-        .trama-card h3 {
-          margin: 0 0 0.5rem;
-          font-size: 1.0625rem;
-        }
-        .trama-card code {
-          font-size: 0.8125rem;
-          color: var(--trama-fg-muted);
-          background: var(--trama-bg-soft);
-          padding: 0.0625rem 0.375rem;
-          border-radius: 4px;
-          margin-left: 0.25rem;
-        }
-        .trama-card p { color: var(--trama-fg-soft); margin: 0; font-size: 0.9375rem; }
+        .trama-demo-canvas > * { position: absolute; inset: 0; }
         .trama-code {
           margin: 0;
           padding: 1.25rem 1.5rem;

@@ -15,7 +15,18 @@ const PAN_THRESHOLD_PX = 3;
 /** 스냅 적용 반경 — screen pixel 기준. canvas 거리 × zoom 으로 비교한다. */
 const SNAP_RADIUS_PX = 12;
 
-export function Canvas(): JSX.Element {
+interface CanvasProps {
+  /**
+   * 마운트 시 1회 자동 정렬.
+   * - 'content': 노드 위치 평균을 캔버스 중앙으로 끌어와 panX/panY 보정 (zoom=1 유지).
+   *   가변 폭 호스트에 임베드된 시연 모델이 좌상단으로 쏠리는 걸 막는다.
+   * - 'none' (기본): 보정 없음. Playground 같은 빈/사용자 시작 캔버스.
+   * 사용자가 한 번 패닝/줌하면 이후엔 적용되지 않는다 (mount-only one-shot).
+   */
+  initialFit?: 'content' | 'none';
+}
+
+export function Canvas({ initialFit = 'none' }: CanvasProps = {}): JSX.Element {
   const {
     modelStore,
     uiStore,
@@ -52,6 +63,36 @@ export function Canvas(): JSX.Element {
   useEffect(() => {
     viewportContainer.set(viewport);
   }, [viewport, viewportContainer]);
+
+  // initialFit='content' — mount 시 1회만 노드 위치 평균을 캔버스 중앙으로 정렬.
+  // RAF 1프레임 대기 후 svg getBoundingClientRect 를 측정 (mount 직후엔 0일 수 있음).
+  // didFitRef 가드로 dev StrictMode 더블 마운트에서도 한 번만 실행.
+  const didFitRef = useRef(false);
+  useEffect(() => {
+    if (initialFit !== 'content') return;
+    if (didFitRef.current) return;
+    const raf = requestAnimationFrame(() => {
+      const el = svgRef.current;
+      if (!el) return;
+      const rect = el.getBoundingClientRect();
+      if (rect.width === 0 || rect.height === 0) return;
+      const m = modelStore.getState().model;
+      const positions = m.nodeOrder
+        .map((id) => m.nodes[id]?.position)
+        .filter((p): p is { x: number; y: number } => !!p);
+      if (positions.length === 0) return;
+      const cx = positions.reduce((s, p) => s + p.x, 0) / positions.length;
+      const cy = positions.reduce((s, p) => s + p.y, 0) / positions.length;
+      const z = viewportRef.current.zoom;
+      setViewport({
+        panX: rect.width / 2 - cx * z,
+        panY: rect.height / 2 - cy * z,
+        zoom: z,
+      });
+      didFitRef.current = true;
+    });
+    return () => cancelAnimationFrame(raf);
+  }, [initialFit, modelStore]);
 
   const toCanvasCoords = useCallback((clientX: number, clientY: number) => {
     const svg = svgRef.current;
@@ -239,10 +280,19 @@ export function Canvas(): JSX.Element {
 
   // 휠 줌 — 마우스 포커스 줌. React onWheel은 passive로 등록될 수 있어
   // preventDefault가 막힐 수 있으므로 native addEventListener({passive:false}).
+  //
+  // wheelZoom 모드 분기:
+  // - 'never': preventDefault 없이 즉시 리턴 → 호스트 페이지 스크롤 정상.
+  // - 'modifier': ctrl/meta 안 눌리면 preventDefault 없이 리턴 → 호스트 스크롤 살림.
+  //   호스트(Tiptap 등) 임베드 기본값.
+  // - 'always': 모든 휠을 줌으로 가로챔 (Playground 같이 캔버스가 페이지 전체일 때).
   useEffect(() => {
     const el = svgRef.current;
     if (!el) return undefined;
     const onWheel = (e: WheelEvent) => {
+      const mode = uiStore.getState().wheelZoom;
+      if (mode === 'never') return;
+      if (mode === 'modifier' && !(e.ctrlKey || e.metaKey)) return;
       e.preventDefault();
       const v = viewportRef.current;
       const factor = Math.exp(-e.deltaY * ZOOM_WHEEL_INTENSITY);

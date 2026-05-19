@@ -79,6 +79,14 @@ export interface UIStore {
    * pan/zoom·셀렉션·플래시 같은 비파괴 인터랙션은 그대로 유지.
    */
   readOnly: boolean;
+  /**
+   * 캔버스 휠 동작.
+   * - 'modifier': ctrl/meta 누른 휠만 줌. 그 외 휠은 preventDefault 없이 호스트로
+   *   전파 — Tiptap 등 호스트 페이지 스크롤이 캔버스 위에서 끊기지 않게.
+   * - 'always': 휠은 항상 줌(현재 풀스크린 Playground 동작).
+   * - 'never': 줌 비활성. 휠은 모두 호스트로 전파(완전 정적 시연용).
+   */
+  wheelZoom: 'modifier' | 'always' | 'never';
   /** 진행 중인 엣지 드래그 */
   edgeDraft: EdgeDraft | null;
   /** 노드 추가 패널(NodePicker) 열림 의도. 캔버스/엣지-분할 진입을 단일 상태로 통합. */
@@ -102,6 +110,7 @@ export interface UIStore {
   runFlash: RunFlashState | null;
 
   setReadOnly: (v: boolean) => void;
+  setWheelZoom: (v: UIStore['wheelZoom']) => void;
 
   selectNode: (id: NodeId) => void;
   selectEdge: (id: EdgeId) => void;
@@ -149,6 +158,7 @@ export function createUIStore(): UIStoreInstance {
   return create<UIStore>((set, get) => ({
     selection: { kind: 'none' },
     readOnly: false,
+    wheelZoom: 'modifier',
     edgeDraft: null,
     nodePickerIntent: null,
     functionPicker: null,
@@ -170,6 +180,11 @@ export function createUIStore(): UIStoreInstance {
       } else {
         set({ readOnly: false });
       }
+    },
+
+    setWheelZoom: (v) => {
+      if (get().wheelZoom === v) return;
+      set({ wheelZoom: v });
     },
 
     selectNode: (id) => set({ selection: { kind: 'node', id } }),

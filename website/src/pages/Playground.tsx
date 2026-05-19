@@ -15,7 +15,7 @@ export default function Playground(): JSX.Element {
   return (
     <div className="trama-playground">
       <div className="trama-playground-canvas">
-        <TramaEditor value={currentJson} onChange={setCurrentJson} />
+        <TramaEditor value={currentJson} onChange={setCurrentJson} wheelZoom="always" />
       </div>
 
       {previewOpen && (
