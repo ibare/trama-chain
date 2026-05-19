@@ -68,6 +68,17 @@ function defaultsFor(kind: ParadigmKind): GeneratorParams {
   }
 }
 
+/**
+ * ms 값을 사람 친화 단위로 — 1000 미만은 그대로, 이상은 "Ns"/"N.Ns".
+ * Knob 본문의 formatMs 와 동일 의도. 인스펙터에서는 보조 표기로만 노출 (모델 단위는 ms 유지).
+ */
+function humanizeMs(ms: number): string {
+  if (!Number.isFinite(ms)) return '·';
+  if (ms < 1000) return `${Math.round(ms)}ms`;
+  const s = ms / 1000;
+  return Number.isInteger(s) ? `${s}s` : `${s.toFixed(1)}s`;
+}
+
 function isParadigmKind(v: string): v is ParadigmKind {
   return (
     v === 'counter' ||
@@ -447,10 +458,16 @@ interface SineProps {
 }
 
 function SineFields({ params, disabled, onChange }: SineProps): JSX.Element {
+  // 모델은 omega(rad/s) 그대로 저장. 인스펙터는 사용자 친화 단위 T(초)로 표시·입력.
+  // T = 2π/ω, ω = 2π/T. 본문 Knob 와 동일 변환.
+  const periodS = (2 * Math.PI) / params.omega;
   const [ampDraft, setAmpDraft] = useState(String(params.amplitude));
-  const [omegaDraft, setOmegaDraft] = useState(String(params.omega));
+  const [periodDraft, setPeriodDraft] = useState(periodS.toFixed(2));
   useEffect(() => setAmpDraft(String(params.amplitude)), [params.amplitude]);
-  useEffect(() => setOmegaDraft(String(params.omega)), [params.omega]);
+  useEffect(() => {
+    const T = (2 * Math.PI) / params.omega;
+    setPeriodDraft(T.toFixed(2));
+  }, [params.omega]);
 
   return (
     <Form.Root
@@ -475,20 +492,24 @@ function SineFields({ params, disabled, onChange }: SineProps): JSX.Element {
           }}
         />
       </Form.Field>
-      <Form.Field name="omega" className="trama-unit-inspector-range-row">
-        <Form.Label className="trama-unit-inspector-range-label">각속도 ω (rad/s)</Form.Label>
+      <Form.Field name="period" className="trama-unit-inspector-range-row">
+        <Form.Label className="trama-unit-inspector-range-label">주기 T (초)</Form.Label>
         <Form.Control
           type="number"
-          value={omegaDraft}
-          step="any"
+          value={periodDraft}
+          step={0.1}
           disabled={disabled}
           className="trama-unit-inspector-range-input"
           onChange={(e) => {
             const next = e.currentTarget.value;
-            setOmegaDraft(next);
-            const v = parseFloat(next);
-            if (Number.isFinite(v) && v !== params.omega) {
-              onChange({ ...params, omega: v });
+            setPeriodDraft(next);
+            const T = parseFloat(next);
+            // T 는 양수 — 0 이하면 ω 발산. 본문 Knob stops 와 정합 보장은 사용자 책임.
+            if (Number.isFinite(T) && T > 0) {
+              const omega = (2 * Math.PI) / T;
+              if (omega !== params.omega) {
+                onChange({ ...params, omega });
+              }
             }
           }}
         />
@@ -515,7 +536,9 @@ function StepFields({ params, disabled, onChange }: StepProps): JSX.Element {
       onSubmit={(e) => e.preventDefault()}
     >
       <Form.Field name="startMs" className="trama-unit-inspector-range-row">
-        <Form.Label className="trama-unit-inspector-range-label">시작 (ms)</Form.Label>
+        <Form.Label className="trama-unit-inspector-range-label">
+          시작 ({humanizeMs(params.startMs)})
+        </Form.Label>
         <Form.Control
           type="number"
           value={startDraft}
@@ -572,7 +595,9 @@ function PulseFields({ params, disabled, onChange }: PulseProps): JSX.Element {
       onSubmit={(e) => e.preventDefault()}
     >
       <Form.Field name="periodMs" className="trama-unit-inspector-range-row">
-        <Form.Label className="trama-unit-inspector-range-label">주기 (ms)</Form.Label>
+        <Form.Label className="trama-unit-inspector-range-label">
+          주기 ({humanizeMs(params.periodMs)})
+        </Form.Label>
         <Form.Control
           type="number"
           value={periodDraft}
