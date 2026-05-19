@@ -655,6 +655,9 @@ export function getNodeLayout(
   }
 
   // GeneratorNode — 단일 boolean 입력(emit gate), 단일 출력. 본문에 라벨 + 현재값.
+  // sine paradigm 일 때는 본문이 knob 두 개(주기·진폭)로 대체되므로 generatorBody
+  // 좌표를 채워 NodeView 에 그 영역을 알려 준다 — valueText 자리(VALUE_FROM_TOP)는
+  // sine 에서 더 이상 그려지지 않는다.
   if (isGeneratorNode(node)) {
     const halfW = STANDARD_PANEL.w / 2;
     const halfH = STANDARD_PANEL.h / 2;
@@ -662,6 +665,17 @@ export function getNodeLayout(
     // 좌측 핀 — boolean gate 입력 단항. incomingCount와 무관하게 1로 고정.
     const leftPin = buildPin(-halfW, 0, 1);
     const rightPin = buildPin(halfW, 0, 1);
+    const isSine = node.params.kind === 'sine';
+    const bodyTop = cardTop + NAME_FROM_TOP + 12;
+    const bodyBottom = halfH - 12;
+    const generatorBody = isSine
+      ? {
+          x: -halfW + GENERATOR_BODY_INSET,
+          y: bodyTop,
+          w: STANDARD_PANEL.w - GENERATOR_BODY_INSET * 2,
+          h: bodyBottom - bodyTop,
+        }
+      : null;
     return {
       width: STANDARD_PANEL.w,
       height: STANDARD_PANEL.h,
@@ -683,7 +697,7 @@ export function getNodeLayout(
       skinBorder: null,
       expressionBody: null,
       observeBody: null,
-      generatorBody: null,
+      generatorBody,
       outerControlSlot: null,
     };
   }
