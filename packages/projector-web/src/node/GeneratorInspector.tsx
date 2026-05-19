@@ -5,6 +5,7 @@ import * as Form from '@radix-ui/react-form';
 import { useCallback, useEffect, useState } from 'react';
 import type { GeneratorNode, GeneratorParams } from '@trama/core';
 import { useTrama } from '../store/index.js';
+import { NumberField } from '../util/NumberField.js';
 
 interface Props {
   node: GeneratorNode;
@@ -68,17 +69,6 @@ function defaultsFor(kind: ParadigmKind): GeneratorParams {
   }
 }
 
-/**
- * ms 값을 사람 친화 단위로 — 1000 미만은 그대로, 이상은 "Ns"/"N.Ns".
- * Knob 본문의 formatMs 와 동일 의도. 인스펙터에서는 보조 표기로만 노출 (모델 단위는 ms 유지).
- */
-function humanizeMs(ms: number): string {
-  if (!Number.isFinite(ms)) return '·';
-  if (ms < 1000) return `${Math.round(ms)}ms`;
-  const s = ms / 1000;
-  return Number.isInteger(s) ? `${s}s` : `${s.toFixed(1)}s`;
-}
-
 function isParadigmKind(v: string): v is ParadigmKind {
   return (
     v === 'counter' ||
@@ -103,6 +93,9 @@ function isParadigmKind(v: string): v is ParadigmKind {
  * - step: startMs·value.
  * - pulse: periodMs·value.
  * - schedule: points[]·loop.
+ *
+ * 숫자 입력은 모두 NumberField 공통 컴포넌트 — scrub(상하 드래그)·dblclick→type·
+ * 키보드 ↑/↓ 세 모드. 표시·증감 자릿수는 precision 으로 통일.
  *
  * 매개변수 변경은 model에만 즉시 반영. 실행 중인 cursor는 다음 emit 시 paradigm
  * 불일치가 감지되면 자동 재초기화되므로 (registry.ensureRuntimeMatchesParams 경로)
@@ -210,60 +203,23 @@ interface CounterProps {
 }
 
 function CounterFields({ params, disabled, onChange }: CounterProps): JSX.Element {
-  const [startDraft, setStartDraft] = useState(String(params.start));
-  const [stepDraft, setStepDraft] = useState(String(params.step));
-  useEffect(() => setStartDraft(String(params.start)), [params.start]);
-  useEffect(() => setStepDraft(String(params.step)), [params.step]);
-
   return (
-    <Form.Root
-      className="trama-observe-inspector-size"
-      onSubmit={(e) => e.preventDefault()}
-    >
-      <Form.Field name="start" className="trama-unit-inspector-range-row">
-        <Form.Label className="trama-unit-inspector-range-label">시작</Form.Label>
-        <Form.Control
-          type="number"
-          value={startDraft}
-          step={1}
-          disabled={disabled}
-          className="trama-unit-inspector-range-input"
-          onChange={(e) => {
-            const next = e.currentTarget.value;
-            setStartDraft(next);
-            const v = parseFloat(next);
-            // counter 는 셈의 의미 — start·step 모두 정수로 강제.
-            if (Number.isFinite(v)) {
-              const rounded = Math.round(v);
-              if (rounded !== params.start) {
-                onChange({ ...params, start: rounded });
-              }
-            }
-          }}
-        />
-      </Form.Field>
-      <Form.Field name="step" className="trama-unit-inspector-range-row">
-        <Form.Label className="trama-unit-inspector-range-label">증분</Form.Label>
-        <Form.Control
-          type="number"
-          value={stepDraft}
-          step={1}
-          disabled={disabled}
-          className="trama-unit-inspector-range-input"
-          onChange={(e) => {
-            const next = e.currentTarget.value;
-            setStepDraft(next);
-            const v = parseFloat(next);
-            if (Number.isFinite(v)) {
-              const rounded = Math.round(v);
-              if (rounded !== params.step) {
-                onChange({ ...params, step: rounded });
-              }
-            }
-          }}
-        />
-      </Form.Field>
-    </Form.Root>
+    <div className="trama-unit-inspector-range">
+      <NumberField
+        label="시작"
+        value={params.start}
+        precision={0}
+        disabled={disabled}
+        onChange={(v) => onChange({ ...params, start: v })}
+      />
+      <NumberField
+        label="증분"
+        value={params.step}
+        precision={0}
+        disabled={disabled}
+        onChange={(v) => onChange({ ...params, step: v })}
+      />
+    </div>
   );
 }
 
@@ -274,54 +230,26 @@ interface UniformProps {
 }
 
 function UniformFields({ params, disabled, onChange }: UniformProps): JSX.Element {
-  const [minDraft, setMinDraft] = useState(String(params.min));
-  const [maxDraft, setMaxDraft] = useState(String(params.max));
-  const [seedDraft, setSeedDraft] = useState(String(params.seed));
-  useEffect(() => setMinDraft(String(params.min)), [params.min]);
-  useEffect(() => setMaxDraft(String(params.max)), [params.max]);
-  useEffect(() => setSeedDraft(String(params.seed)), [params.seed]);
-
+  // integer 토글이 외부에 있어 precision 을 동적으로 — integer=true 이면 정수 모드.
+  // false 이면 첫 value 에서 추론(=undefined). 토글 시 외부에서 min/max 가 정수로
+  // 재정규화되어 들어오므로 NumberField 의 useEffect 가 새 자릿수로 draft 재포맷.
+  const precision = params.integer ? 0 : undefined;
   return (
-    <Form.Root
-      className="trama-observe-inspector-size"
-      onSubmit={(e) => e.preventDefault()}
-    >
-      <Form.Field name="min" className="trama-unit-inspector-range-row">
-        <Form.Label className="trama-unit-inspector-range-label">최소</Form.Label>
-        <Form.Control
-          type="number"
-          value={minDraft}
-          step={params.integer ? 1 : 0.1}
-          disabled={disabled}
-          className="trama-unit-inspector-range-input"
-          onChange={(e) => {
-            const next = e.currentTarget.value;
-            setMinDraft(next);
-            const v = parseFloat(next);
-            if (Number.isFinite(v) && v !== params.min) {
-              onChange({ ...params, min: v });
-            }
-          }}
-        />
-      </Form.Field>
-      <Form.Field name="max" className="trama-unit-inspector-range-row">
-        <Form.Label className="trama-unit-inspector-range-label">최대</Form.Label>
-        <Form.Control
-          type="number"
-          value={maxDraft}
-          step={params.integer ? 1 : 0.1}
-          disabled={disabled}
-          className="trama-unit-inspector-range-input"
-          onChange={(e) => {
-            const next = e.currentTarget.value;
-            setMaxDraft(next);
-            const v = parseFloat(next);
-            if (Number.isFinite(v) && v !== params.max) {
-              onChange({ ...params, max: v });
-            }
-          }}
-        />
-      </Form.Field>
+    <div className="trama-unit-inspector-range">
+      <NumberField
+        label="최소"
+        value={params.min}
+        precision={precision}
+        disabled={disabled}
+        onChange={(v) => onChange({ ...params, min: v })}
+      />
+      <NumberField
+        label="최대"
+        value={params.max}
+        precision={precision}
+        disabled={disabled}
+        onChange={(v) => onChange({ ...params, max: v })}
+      />
 
       <div className="trama-unit-inspector-section-row">
         <span className="trama-unit-inspector-section-label">정수</span>
@@ -351,25 +279,14 @@ function UniformFields({ params, disabled, onChange }: UniformProps): JSX.Elemen
         </ToggleGroup.Root>
       </div>
 
-      <Form.Field name="seed" className="trama-unit-inspector-range-row">
-        <Form.Label className="trama-unit-inspector-range-label">시드</Form.Label>
-        <Form.Control
-          type="number"
-          value={seedDraft}
-          step={1}
-          disabled={disabled}
-          className="trama-unit-inspector-range-input"
-          onChange={(e) => {
-            const next = e.currentTarget.value;
-            setSeedDraft(next);
-            const v = parseInt(next, 10);
-            if (Number.isFinite(v) && v !== params.seed) {
-              onChange({ ...params, seed: v });
-            }
-          }}
-        />
-      </Form.Field>
-    </Form.Root>
+      <NumberField
+        label="시드"
+        value={params.seed}
+        precision={0}
+        disabled={disabled}
+        onChange={(v) => onChange({ ...params, seed: v })}
+      />
+    </div>
   );
 }
 
@@ -380,74 +297,29 @@ interface NormalProps {
 }
 
 function NormalFields({ params, disabled, onChange }: NormalProps): JSX.Element {
-  const [meanDraft, setMeanDraft] = useState(String(params.mean));
-  const [stdevDraft, setStdevDraft] = useState(String(params.stdev));
-  const [seedDraft, setSeedDraft] = useState(String(params.seed));
-  useEffect(() => setMeanDraft(String(params.mean)), [params.mean]);
-  useEffect(() => setStdevDraft(String(params.stdev)), [params.stdev]);
-  useEffect(() => setSeedDraft(String(params.seed)), [params.seed]);
-
   return (
-    <Form.Root
-      className="trama-observe-inspector-size"
-      onSubmit={(e) => e.preventDefault()}
-    >
-      <Form.Field name="mean" className="trama-unit-inspector-range-row">
-        <Form.Label className="trama-unit-inspector-range-label">평균</Form.Label>
-        <Form.Control
-          type="number"
-          value={meanDraft}
-          step={0.1}
-          disabled={disabled}
-          className="trama-unit-inspector-range-input"
-          onChange={(e) => {
-            const next = e.currentTarget.value;
-            setMeanDraft(next);
-            const v = parseFloat(next);
-            if (Number.isFinite(v) && v !== params.mean) {
-              onChange({ ...params, mean: v });
-            }
-          }}
-        />
-      </Form.Field>
-      <Form.Field name="stdev" className="trama-unit-inspector-range-row">
-        <Form.Label className="trama-unit-inspector-range-label">표준편차</Form.Label>
-        <Form.Control
-          type="number"
-          value={stdevDraft}
-          step={0.1}
-          disabled={disabled}
-          className="trama-unit-inspector-range-input"
-          onChange={(e) => {
-            const next = e.currentTarget.value;
-            setStdevDraft(next);
-            const v = parseFloat(next);
-            // 표준편차는 음수일 수 없다. 0은 dirac-delta(=mean 상수)로 해석.
-            if (Number.isFinite(v) && v >= 0 && v !== params.stdev) {
-              onChange({ ...params, stdev: v });
-            }
-          }}
-        />
-      </Form.Field>
-      <Form.Field name="seed" className="trama-unit-inspector-range-row">
-        <Form.Label className="trama-unit-inspector-range-label">시드</Form.Label>
-        <Form.Control
-          type="number"
-          value={seedDraft}
-          step={1}
-          disabled={disabled}
-          className="trama-unit-inspector-range-input"
-          onChange={(e) => {
-            const next = e.currentTarget.value;
-            setSeedDraft(next);
-            const v = parseInt(next, 10);
-            if (Number.isFinite(v) && v !== params.seed) {
-              onChange({ ...params, seed: v });
-            }
-          }}
-        />
-      </Form.Field>
-    </Form.Root>
+    <div className="trama-unit-inspector-range">
+      <NumberField
+        label="평균"
+        value={params.mean}
+        disabled={disabled}
+        onChange={(v) => onChange({ ...params, mean: v })}
+      />
+      <NumberField
+        label="표준편차"
+        value={params.stdev}
+        min={0}
+        disabled={disabled}
+        onChange={(v) => onChange({ ...params, stdev: v })}
+      />
+      <NumberField
+        label="시드"
+        value={params.seed}
+        precision={0}
+        disabled={disabled}
+        onChange={(v) => onChange({ ...params, seed: v })}
+      />
+    </div>
   );
 }
 
@@ -461,60 +333,26 @@ function SineFields({ params, disabled, onChange }: SineProps): JSX.Element {
   // 모델은 omega(rad/s) 그대로 저장. 인스펙터는 사용자 친화 단위 T(초)로 표시·입력.
   // T = 2π/ω, ω = 2π/T. 본문 Knob 와 동일 변환.
   const periodS = (2 * Math.PI) / params.omega;
-  const [ampDraft, setAmpDraft] = useState(String(params.amplitude));
-  const [periodDraft, setPeriodDraft] = useState(periodS.toFixed(2));
-  useEffect(() => setAmpDraft(String(params.amplitude)), [params.amplitude]);
-  useEffect(() => {
-    const T = (2 * Math.PI) / params.omega;
-    setPeriodDraft(T.toFixed(2));
-  }, [params.omega]);
-
   return (
-    <Form.Root
-      className="trama-observe-inspector-size"
-      onSubmit={(e) => e.preventDefault()}
-    >
-      <Form.Field name="amplitude" className="trama-unit-inspector-range-row">
-        <Form.Label className="trama-unit-inspector-range-label">진폭 A</Form.Label>
-        <Form.Control
-          type="number"
-          value={ampDraft}
-          step={0.1}
-          disabled={disabled}
-          className="trama-unit-inspector-range-input"
-          onChange={(e) => {
-            const next = e.currentTarget.value;
-            setAmpDraft(next);
-            const v = parseFloat(next);
-            if (Number.isFinite(v) && v !== params.amplitude) {
-              onChange({ ...params, amplitude: v });
-            }
-          }}
-        />
-      </Form.Field>
-      <Form.Field name="period" className="trama-unit-inspector-range-row">
-        <Form.Label className="trama-unit-inspector-range-label">주기 T (초)</Form.Label>
-        <Form.Control
-          type="number"
-          value={periodDraft}
-          step={0.1}
-          disabled={disabled}
-          className="trama-unit-inspector-range-input"
-          onChange={(e) => {
-            const next = e.currentTarget.value;
-            setPeriodDraft(next);
-            const T = parseFloat(next);
-            // T 는 양수 — 0 이하면 ω 발산. 본문 Knob stops 와 정합 보장은 사용자 책임.
-            if (Number.isFinite(T) && T > 0) {
-              const omega = (2 * Math.PI) / T;
-              if (omega !== params.omega) {
-                onChange({ ...params, omega });
-              }
-            }
-          }}
-        />
-      </Form.Field>
-    </Form.Root>
+    <div className="trama-unit-inspector-range">
+      <NumberField
+        label="진폭"
+        value={params.amplitude}
+        disabled={disabled}
+        onChange={(v) => onChange({ ...params, amplitude: v })}
+      />
+      <NumberField
+        label="주기"
+        value={periodS}
+        unit="s"
+        min={0.01}
+        disabled={disabled}
+        onChange={(T) => {
+          if (T <= 0) return;
+          onChange({ ...params, omega: (2 * Math.PI) / T });
+        }}
+      />
+    </div>
   );
 }
 
@@ -525,55 +363,24 @@ interface StepProps {
 }
 
 function StepFields({ params, disabled, onChange }: StepProps): JSX.Element {
-  const [startDraft, setStartDraft] = useState(String(params.startMs));
-  const [valueDraft, setValueDraft] = useState(String(params.value));
-  useEffect(() => setStartDraft(String(params.startMs)), [params.startMs]);
-  useEffect(() => setValueDraft(String(params.value)), [params.value]);
-
   return (
-    <Form.Root
-      className="trama-observe-inspector-size"
-      onSubmit={(e) => e.preventDefault()}
-    >
-      <Form.Field name="startMs" className="trama-unit-inspector-range-row">
-        <Form.Label className="trama-unit-inspector-range-label">
-          시작 ({humanizeMs(params.startMs)})
-        </Form.Label>
-        <Form.Control
-          type="number"
-          value={startDraft}
-          step={100}
-          disabled={disabled}
-          className="trama-unit-inspector-range-input"
-          onChange={(e) => {
-            const next = e.currentTarget.value;
-            setStartDraft(next);
-            const v = parseFloat(next);
-            if (Number.isFinite(v) && v >= 0 && v !== params.startMs) {
-              onChange({ ...params, startMs: v });
-            }
-          }}
-        />
-      </Form.Field>
-      <Form.Field name="value" className="trama-unit-inspector-range-row">
-        <Form.Label className="trama-unit-inspector-range-label">값</Form.Label>
-        <Form.Control
-          type="number"
-          value={valueDraft}
-          step={0.1}
-          disabled={disabled}
-          className="trama-unit-inspector-range-input"
-          onChange={(e) => {
-            const next = e.currentTarget.value;
-            setValueDraft(next);
-            const v = parseFloat(next);
-            if (Number.isFinite(v) && v !== params.value) {
-              onChange({ ...params, value: v });
-            }
-          }}
-        />
-      </Form.Field>
-    </Form.Root>
+    <div className="trama-unit-inspector-range">
+      <NumberField
+        label="시작"
+        value={params.startMs}
+        unit="ms"
+        precision={0}
+        min={0}
+        disabled={disabled}
+        onChange={(v) => onChange({ ...params, startMs: v })}
+      />
+      <NumberField
+        label="값"
+        value={params.value}
+        disabled={disabled}
+        onChange={(v) => onChange({ ...params, value: v })}
+      />
+    </div>
   );
 }
 
@@ -584,56 +391,24 @@ interface PulseProps {
 }
 
 function PulseFields({ params, disabled, onChange }: PulseProps): JSX.Element {
-  const [periodDraft, setPeriodDraft] = useState(String(params.periodMs));
-  const [valueDraft, setValueDraft] = useState(String(params.value));
-  useEffect(() => setPeriodDraft(String(params.periodMs)), [params.periodMs]);
-  useEffect(() => setValueDraft(String(params.value)), [params.value]);
-
   return (
-    <Form.Root
-      className="trama-observe-inspector-size"
-      onSubmit={(e) => e.preventDefault()}
-    >
-      <Form.Field name="periodMs" className="trama-unit-inspector-range-row">
-        <Form.Label className="trama-unit-inspector-range-label">
-          주기 ({humanizeMs(params.periodMs)})
-        </Form.Label>
-        <Form.Control
-          type="number"
-          value={periodDraft}
-          step={100}
-          disabled={disabled}
-          className="trama-unit-inspector-range-input"
-          onChange={(e) => {
-            const next = e.currentTarget.value;
-            setPeriodDraft(next);
-            const v = parseFloat(next);
-            // 주기는 양수 — 0 이하면 매 tick 발화로 발산.
-            if (Number.isFinite(v) && v > 0 && v !== params.periodMs) {
-              onChange({ ...params, periodMs: v });
-            }
-          }}
-        />
-      </Form.Field>
-      <Form.Field name="value" className="trama-unit-inspector-range-row">
-        <Form.Label className="trama-unit-inspector-range-label">값</Form.Label>
-        <Form.Control
-          type="number"
-          value={valueDraft}
-          step={0.1}
-          disabled={disabled}
-          className="trama-unit-inspector-range-input"
-          onChange={(e) => {
-            const next = e.currentTarget.value;
-            setValueDraft(next);
-            const v = parseFloat(next);
-            if (Number.isFinite(v) && v !== params.value) {
-              onChange({ ...params, value: v });
-            }
-          }}
-        />
-      </Form.Field>
-    </Form.Root>
+    <div className="trama-unit-inspector-range">
+      <NumberField
+        label="주기"
+        value={params.periodMs}
+        unit="ms"
+        precision={0}
+        min={1}
+        disabled={disabled}
+        onChange={(v) => onChange({ ...params, periodMs: v })}
+      />
+      <NumberField
+        label="값"
+        value={params.value}
+        disabled={disabled}
+        onChange={(v) => onChange({ ...params, value: v })}
+      />
+    </div>
   );
 }
 
@@ -661,7 +436,7 @@ function ScheduleFields({ params, disabled, onChange }: ScheduleProps): JSX.Elem
 
   return (
     <Form.Root
-      className="trama-observe-inspector-size"
+      className="trama-unit-inspector-range"
       onSubmit={(e) => e.preventDefault()}
     >
       <Form.Field name="points" className="trama-unit-inspector-range-row">

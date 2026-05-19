@@ -1,8 +1,8 @@
 import * as Popover from '@radix-ui/react-popover';
 import * as ToggleGroup from '@radix-ui/react-toggle-group';
 import * as Separator from '@radix-ui/react-separator';
-import * as Form from '@radix-ui/react-form';
 import { useCallback, useMemo, useState } from 'react';
+import { NumberField } from '../util/NumberField.js';
 import {
   categoryLabels,
   defaultUnitCatalog,
@@ -251,24 +251,31 @@ export function UnitInspector({ node }: Props): JSX.Element {
       {showRangeEditor && (
         <>
           <Separator.Root className="trama-unit-inspector-sep" decorative orientation="horizontal" />
-          <Form.Root
-            className="trama-unit-inspector-range"
-            onSubmit={(e) => e.preventDefault()}
-          >
-            <RangeField name="min" label="최소" value={unit.min} step={unit.step} disabled={!paused} onCommit={(v) => setRange({ min: v })} />
-            <RangeField name="max" label="최대" value={unit.max} step={unit.step} disabled={!paused} onCommit={(v) => setRange({ max: v })} />
-            <RangeField
-              name="step"
+          <div className="trama-unit-inspector-range">
+            <NumberField
+              label="최소"
+              value={unit.min}
+              precision={precisionFromStep(unit.step)}
+              disabled={!paused}
+              onChange={(v) => setRange({ min: v })}
+            />
+            <NumberField
+              label="최대"
+              value={unit.max}
+              precision={precisionFromStep(unit.step)}
+              disabled={!paused}
+              onChange={(v) => setRange({ max: v })}
+            />
+            <NumberField
               label="스텝"
               value={unit.step}
-              step={unit.step / 10}
               min={0}
               disabled={!paused}
-              onCommit={(v) => {
+              onChange={(v) => {
                 if (v > 0) setRange({ step: v });
               }}
             />
-          </Form.Root>
+          </div>
         </>
       )}
 
@@ -286,32 +293,10 @@ export function UnitInspector({ node }: Props): JSX.Element {
   );
 }
 
-interface RangeFieldProps {
-  name: string;
-  label: string;
-  value: number;
-  step: number;
-  min?: number;
-  disabled?: boolean;
-  onCommit: (v: number) => void;
-}
-
-function RangeField({ name, label, value, step, min, disabled, onCommit }: RangeFieldProps): JSX.Element {
-  return (
-    <Form.Field name={name} className="trama-unit-inspector-range-row">
-      <Form.Label className="trama-unit-inspector-range-label">{label}</Form.Label>
-      <Form.Control
-        type="number"
-        value={value}
-        step={step}
-        min={min}
-        disabled={disabled}
-        className="trama-unit-inspector-range-input"
-        onChange={(e) => {
-          const v = parseFloat(e.currentTarget.value);
-          if (Number.isFinite(v)) onCommit(v);
-        }}
-      />
-    </Form.Field>
-  );
+/** unit.step 의 소수점 자리수를 그대로 min/max NumberField 의 precision 으로 사용. */
+function precisionFromStep(step: number): number {
+  if (!Number.isFinite(step) || step <= 0) return 0;
+  const s = String(step);
+  const dot = s.indexOf('.');
+  return dot < 0 ? 0 : s.length - dot - 1;
 }

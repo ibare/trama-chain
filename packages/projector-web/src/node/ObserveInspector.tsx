@@ -1,8 +1,8 @@
 import * as Popover from '@radix-ui/react-popover';
 import * as ToggleGroup from '@radix-ui/react-toggle-group';
 import * as Separator from '@radix-ui/react-separator';
-import * as Form from '@radix-ui/react-form';
-import { useCallback, useMemo, useState } from 'react';
+import { useCallback, useMemo } from 'react';
+import { NumberField } from '../util/NumberField.js';
 import type {
   ObserveCapacity,
   ObserveExtraction,
@@ -46,13 +46,10 @@ export function ObserveInspector({ node, inferredKind }: Props): JSX.Element {
   const isUnbounded = node.capacity.kind === 'unbounded';
   const windowMs =
     node.capacity.kind === 'windowed' ? node.capacity.windowMs : 60_000;
-  // 사용자 지정 입력은 초 단위 — ms 보다 직관적이고 30s/1m/3m/5m 프리셋과 결이 맞다.
-  const [windowSecDraft, setWindowSecDraft] = useState(String(windowMs / 1000));
 
   const isThrottled = node.extraction.kind === 'throttle';
   const intervalMs =
     node.extraction.kind === 'throttle' ? node.extraction.intervalMs : 1000;
-  const [intervalDraft, setIntervalDraft] = useState(String(intervalMs));
 
   const setExtraction = useCallback(
     (next: ObserveExtraction) => {
@@ -64,7 +61,6 @@ export function ObserveInspector({ node, inferredKind }: Props): JSX.Element {
   const onPickInterval = useCallback(
     (ms: number) => {
       if (!Number.isFinite(ms) || ms <= 0) return;
-      setIntervalDraft(String(ms));
       setExtraction({ kind: 'throttle', intervalMs: Math.floor(ms) });
     },
     [setExtraction],
@@ -80,7 +76,6 @@ export function ObserveInspector({ node, inferredKind }: Props): JSX.Element {
   const onPickWindowMs = useCallback(
     (ms: number) => {
       if (!Number.isFinite(ms) || ms <= 0) return;
-      setWindowSecDraft(String(ms / 1000));
       setCapacity({ kind: 'windowed', windowMs: Math.floor(ms) });
     },
     [setCapacity],
@@ -135,10 +130,7 @@ export function ObserveInspector({ node, inferredKind }: Props): JSX.Element {
         </div>
 
         {!isUnbounded && (
-          <Form.Root
-            className="trama-observe-inspector-size"
-            onSubmit={(e) => e.preventDefault()}
-          >
+          <div className="trama-observe-inspector-size">
             <ToggleGroup.Root
               type="single"
               value={String(windowMs)}
@@ -156,26 +148,17 @@ export function ObserveInspector({ node, inferredKind }: Props): JSX.Element {
                 </ToggleGroup.Item>
               ))}
             </ToggleGroup.Root>
-            <Form.Field name="windowSec" className="trama-unit-inspector-range-row">
-              <Form.Label className="trama-unit-inspector-range-label">
-                사용자 지정 (초)
-              </Form.Label>
-              <Form.Control
-                type="number"
-                value={windowSecDraft}
-                min={1}
-                step={1}
-                className="trama-unit-inspector-range-input"
-                onChange={(e) => {
-                  setWindowSecDraft(e.currentTarget.value);
-                  const sec = parseInt(e.currentTarget.value, 10);
-                  if (Number.isFinite(sec) && sec > 0) {
-                    setCapacity({ kind: 'windowed', windowMs: sec * 1000 });
-                  }
-                }}
-              />
-            </Form.Field>
-          </Form.Root>
+            <NumberField
+              label="사용자 지정"
+              value={windowMs / 1000}
+              unit="s"
+              precision={0}
+              min={1}
+              onChange={(sec) => {
+                if (sec > 0) setCapacity({ kind: 'windowed', windowMs: Math.floor(sec * 1000) });
+              }}
+            />
+          </div>
         )}
       </div>
 
@@ -209,10 +192,7 @@ export function ObserveInspector({ node, inferredKind }: Props): JSX.Element {
         </div>
 
         {isThrottled && (
-          <Form.Root
-            className="trama-observe-inspector-size"
-            onSubmit={(e) => e.preventDefault()}
-          >
+          <div className="trama-observe-inspector-size">
             <ToggleGroup.Root
               type="single"
               value={String(intervalMs)}
@@ -230,26 +210,17 @@ export function ObserveInspector({ node, inferredKind }: Props): JSX.Element {
                 </ToggleGroup.Item>
               ))}
             </ToggleGroup.Root>
-            <Form.Field name="interval" className="trama-unit-inspector-range-row">
-              <Form.Label className="trama-unit-inspector-range-label">
-                사용자 지정 (ms)
-              </Form.Label>
-              <Form.Control
-                type="number"
-                value={intervalDraft}
-                min={1}
-                step={1}
-                className="trama-unit-inspector-range-input"
-                onChange={(e) => {
-                  setIntervalDraft(e.currentTarget.value);
-                  const v = parseInt(e.currentTarget.value, 10);
-                  if (Number.isFinite(v) && v > 0) {
-                    setExtraction({ kind: 'throttle', intervalMs: v });
-                  }
-                }}
-              />
-            </Form.Field>
-          </Form.Root>
+            <NumberField
+              label="사용자 지정"
+              value={intervalMs}
+              unit="ms"
+              precision={0}
+              min={1}
+              onChange={(v) => {
+                if (v > 0) setExtraction({ kind: 'throttle', intervalMs: Math.floor(v) });
+              }}
+            />
+          </div>
         )}
       </div>
 

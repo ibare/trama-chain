@@ -308,11 +308,12 @@ function GeneratorNodeViewImpl({ id, incomingCount }: Props): JSX.Element | null
     const uniformQuantize = params.integer ? quantizeInteger : quantizeTenth;
     const integerSelectorValue = params.integer ? 1 : 0;
     const integerCenterLabel = params.integer ? '정수' : '실수';
-    // 좌·중·우 등간 1/4·1/2·3/4. 좌단 knob 외곽이 panel 좌단으로부터 충분히
-    // 안쪽에 들어와 좌상단 brand mark(예: 'uniform')와 시각이 분리된다.
-    const cx0 = body.x + body.w * 0.25;
+    // compact: 좁은 패널(180)에서 brand mark 와 좌단 분리를 우선해 안쪽으로 모은다 (0.25/0.5/0.75).
+    // standard: 넓은 패널(240)에선 노브 간 호흡을 우선해 외곽까지 벌린다 (0.18/0.5/0.82).
+    const isCompact = currentMode === 'compact';
+    const cx0 = body.x + body.w * (isCompact ? 0.25 : 0.18);
     const cx1 = body.x + body.w * 0.5;
-    const cx2 = body.x + body.w * 0.75;
+    const cx2 = body.x + body.w * (isCompact ? 0.75 : 0.82);
     return (
       <>
         <Knob
