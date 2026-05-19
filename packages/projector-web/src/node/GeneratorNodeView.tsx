@@ -308,10 +308,11 @@ function GeneratorNodeViewImpl({ id, incomingCount }: Props): JSX.Element | null
     const uniformQuantize = params.integer ? quantizeInteger : quantizeTenth;
     const integerSelectorValue = params.integer ? 1 : 0;
     const integerCenterLabel = params.integer ? '정수' : '실수';
-    // body.w 를 6:8:14 / 16 비율로 좌·중·우 배치 — standard·compact 공통.
-    const cx0 = body.x + body.w * (3 / 16);
-    const cx1 = body.x + body.w * (8 / 16);
-    const cx2 = body.x + body.w * (13 / 16);
+    // 좌·중·우 등간 1/4·1/2·3/4. 좌단 knob 외곽이 panel 좌단으로부터 충분히
+    // 안쪽에 들어와 좌상단 brand mark(예: 'uniform')와 시각이 분리된다.
+    const cx0 = body.x + body.w * 0.25;
+    const cx1 = body.x + body.w * 0.5;
+    const cx2 = body.x + body.w * 0.75;
     return (
       <>
         <Knob
@@ -627,6 +628,15 @@ function GeneratorNodeViewImpl({ id, incomingCount }: Props): JSX.Element | null
         stateClass="is-focal"
         isSelected={isSelected}
       />
+
+      <text
+        className="trama-generator-brand"
+        x={panelCx - layout.panelWidth / 2 + 8}
+        y={panelCy - layout.panelHeight / 2 + 12}
+        textAnchor="start"
+      >
+        {node.params.kind}
+      </text>
 
       <text
         className="trama-node-label"

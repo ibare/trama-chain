@@ -110,6 +110,19 @@
     font-weight: 500;
 }
 
+/* 생성기 좌상단 paradigm brand mark — 오디오 기기 패널 각인처럼 본문 안쪽에
+   작은 이탤릭으로 표기한다. 사용자가 붙인 라벨과는 별도로 "어떤 생성기인지"를
+   상시 인지시키는 장치. pointer 무관, 시각 전용. */
+[data-trama-root] .trama-generator-brand {
+    font-size: 0.4375rem;
+    font-style: italic;
+    font-weight: 500;
+    letter-spacing: -0.02em;
+    fill: var(--color-node-text-low);
+    opacity: 0.7;
+    pointer-events: none;
+}
+
 [data-trama-root] .trama-node-value {
     font-size: 1.75rem;
     fill: var(--color-node-text-primary);
