@@ -338,12 +338,13 @@ function buildCompactLayout(
   const leftPin = buildPin(-halfW, panelCy, inSockets);
   const rightPin = buildPin(halfW, panelCy, outSockets);
 
-  // generator는 외곽 컨트롤이 없다 (사용자 토글 제거). sine paradigm 일 때는
-  // 패널 내부를 knob 두 개를 위한 본문 영역으로 노출 — standard 와 동일하게
+  // generator는 외곽 컨트롤이 없다 (사용자 토글 제거). sine·uniform paradigm 일
+  // 때는 패널 내부를 knob 들을 위한 본문 영역으로 노출 — standard 와 동일하게
   // GeneratorNodeView 가 이 좌표에 knob 을 배치한다.
-  const isSineGenerator =
-    node.kind === "generator" && node.params.kind === "sine";
-  const generatorBody = isSineGenerator
+  const isGeneratorBodyParadigm =
+    node.kind === "generator" &&
+    (node.params.kind === "sine" || node.params.kind === "uniform");
+  const generatorBody = isGeneratorBodyParadigm
     ? {
         x: -panelW / 2 + 6,
         y: panelCy - panelH / 2 + 6,
@@ -690,9 +691,9 @@ export function getNodeLayout(
   }
 
   // GeneratorNode — 단일 boolean 입력(emit gate), 단일 출력. 본문에 라벨 + 현재값.
-  // sine paradigm 일 때는 본문이 knob 두 개(주기·진폭)로 대체되므로 generatorBody
-  // 좌표를 채워 NodeView 에 그 영역을 알려 준다 — valueText 자리(VALUE_FROM_TOP)는
-  // sine 에서 더 이상 그려지지 않는다.
+  // sine·uniform paradigm 일 때는 본문이 knob 들로 대체되므로 generatorBody 좌표를
+  // 채워 NodeView 에 그 영역을 알려 준다 — valueText 자리(VALUE_FROM_TOP)는 본문
+  // knob 이 있는 paradigm 에서는 더 이상 그려지지 않는다.
   if (isGeneratorNode(node)) {
     const halfW = STANDARD_PANEL.w / 2;
     const halfH = STANDARD_PANEL.h / 2;
@@ -700,10 +701,11 @@ export function getNodeLayout(
     // 좌측 핀 — boolean gate 입력 단항. incomingCount와 무관하게 1로 고정.
     const leftPin = buildPin(-halfW, 0, 1);
     const rightPin = buildPin(halfW, 0, 1);
-    const isSine = node.params.kind === "sine";
+    const usesBodyKnobs =
+      node.params.kind === "sine" || node.params.kind === "uniform";
     const bodyTop = cardTop + GENERATOR_BODY_FROM_TOP;
     const bodyBottom = halfH - 12;
-    const generatorBody = isSine
+    const generatorBody = usesBodyKnobs
       ? {
           x: -halfW + GENERATOR_BODY_INSET,
           y: bodyTop,

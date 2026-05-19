@@ -16,7 +16,7 @@ import { ModeToggle } from './ModeToggle.js';
 import { Socket } from './Socket.js';
 import { useOutputConnected } from './use-socket-connections.js';
 import { useEdgeDraftSource } from '../canvas/use-edge-draft-source.js';
-import { Knob } from './knob/index.js';
+import { Knob, SelectorKnob } from './knob/index.js';
 
 /**
  * sine paradigm 주기(초) stops. 사용자 옵션 B — 주기는 의미 있는 프리셋만 노드
@@ -29,6 +29,24 @@ const SINE_AMP_MIN = 0.1;
 const SINE_AMP_MAX = 10;
 const SINE_AMP_DEFAULT = 1;
 const SINE_PERIOD_DEFAULT_S = 5;
+
+/**
+ * uniform paradigm 본문 Knob 의 min/max 표면 범위. 정밀 조정은 인스펙터로
+ * 빠짐 — 본문 Knob 은 빠른 셋업용. 대칭 [-10, 10] · step 0.1 면 정수 모드의
+ * 주사위(1~6) · 실수 모드 디폴트([0,1])를 모두 표현.
+ */
+const UNIFORM_RANGE_MIN = -10;
+const UNIFORM_RANGE_MAX = 10;
+const UNIFORM_STEP = 0.1;
+const UNIFORM_MIN_DEFAULT = 0;
+const UNIFORM_MAX_DEFAULT = 1;
+/** SelectorKnob 정수/실수 stops — 인덱스 0=실수, 1=정수. 인스펙터 토글 순서와 일치. */
+const UNIFORM_INTEGER_STOPS: readonly number[] = [0, 1] as const;
+
+function formatUniformValue(v: number, integer: boolean): string {
+  if (!Number.isFinite(v)) return '·';
+  return integer ? String(Math.round(v)) : v.toFixed(1);
+}
 
 function nearestStop(value: number, stops: readonly number[]): number {
   let best = stops[0]!;
@@ -127,6 +145,7 @@ function GeneratorNodeViewImpl({ id, incomingCount }: Props): JSX.Element | null
     currentNumber !== null ? formatGeneratorValue(currentNumber) : '—';
 
   const isSine = node.params.kind === 'sine';
+  const isUniform = node.params.kind === 'uniform';
   // sine paradigm 본문 — knob 두 개(주기·진폭) 배치.
   // 주기는 stepped (사용자 옵션 B), 진폭은 continuous.
   // compact 모드는 패널이 좁아 knob 위쪽 라벨("주기"/"진폭")을 끄고 centerLabel
@@ -182,6 +201,119 @@ function GeneratorNodeViewImpl({ id, incomingCount }: Props): JSX.Element | null
     );
   })();
 
+  // uniform paradigm 본문 — standard 는 min·max·정수실수 3개, compact 는 max·정수실수
+  // 2개. min/max 는 continuous Knob (정밀 조정은 인스펙터), 정수/실수 토글은
+  // 2-stop SelectorKnob. compact 에서는 sine 과 같이 label 을 끄고 centerLabel 만.
+  const uniformKnobs = (() => {
+    if (!isUniform) return null;
+    const body = layout.generatorBody;
+    if (!body) return null;
+    const params = node.params;
+    if (params.kind !== 'uniform') return null;
+    const cy = body.y + body.h / 2;
+    const knobSize = currentMode === 'compact' ? 'compact' : 'standard';
+    const showLabel = currentMode !== 'compact';
+    const setMin = (v: number) => {
+      updateNode(id, { params: { ...params, min: v } });
+    };
+    const setMax = (v: number) => {
+      updateNode(id, { params: { ...params, max: v } });
+    };
+    const setInteger = (sel: number) => {
+      const integer = sel === 1;
+      if (integer !== params.integer) {
+        updateNode(id, { params: { ...params, integer } });
+      }
+    };
+    const continuousMode = {
+      kind: 'continuous' as const,
+      min: UNIFORM_RANGE_MIN,
+      max: UNIFORM_RANGE_MAX,
+    };
+    const integerSelectorValue = params.integer ? 1 : 0;
+    const integerCenterLabel = params.integer ? '정수' : '실수';
+    if (currentMode === 'compact') {
+      // 두 컨트롤 — sine 과 같은 28/72 비율.
+      const leftCx = body.x + body.w * 0.28;
+      const rightCx = body.x + body.w * 0.72;
+      return (
+        <>
+          <Knob
+            cx={leftCx}
+            cy={cy}
+            size={knobSize}
+            value={params.max}
+            mode={continuousMode}
+            defaultValue={UNIFORM_MAX_DEFAULT}
+            step={UNIFORM_STEP}
+            onChange={setMax}
+            ariaLabel="최대"
+            centerLabel={formatUniformValue(params.max, params.integer)}
+          />
+          <SelectorKnob
+            cx={rightCx}
+            cy={cy}
+            size={knobSize}
+            value={integerSelectorValue}
+            stops={UNIFORM_INTEGER_STOPS}
+            defaultValue={0}
+            onChange={setInteger}
+            ariaLabel="수형"
+            centerLabel={integerCenterLabel}
+          />
+        </>
+      );
+    }
+    // standard — 세 컨트롤. body.w 를 6:8:14 / 16 비율로 좌·중·우 배치.
+    const cx0 = body.x + body.w * (3 / 16);
+    const cx1 = body.x + body.w * (8 / 16);
+    const cx2 = body.x + body.w * (13 / 16);
+    return (
+      <>
+        <Knob
+          cx={cx0}
+          cy={cy}
+          size={knobSize}
+          value={params.min}
+          mode={continuousMode}
+          defaultValue={UNIFORM_MIN_DEFAULT}
+          step={UNIFORM_STEP}
+          onChange={setMin}
+          ariaLabel="최소"
+          label={showLabel ? '최소' : undefined}
+          centerLabel={formatUniformValue(params.min, params.integer)}
+        />
+        <Knob
+          cx={cx1}
+          cy={cy}
+          size={knobSize}
+          value={params.max}
+          mode={continuousMode}
+          defaultValue={UNIFORM_MAX_DEFAULT}
+          step={UNIFORM_STEP}
+          onChange={setMax}
+          ariaLabel="최대"
+          label={showLabel ? '최대' : undefined}
+          centerLabel={formatUniformValue(params.max, params.integer)}
+        />
+        <SelectorKnob
+          cx={cx2}
+          cy={cy}
+          size={knobSize}
+          value={integerSelectorValue}
+          stops={UNIFORM_INTEGER_STOPS}
+          defaultValue={0}
+          onChange={setInteger}
+          ariaLabel="수형"
+          label={showLabel ? '수형' : undefined}
+          centerLabel={integerCenterLabel}
+        />
+      </>
+    );
+  })();
+
+  const bodyKnobs = sineKnobs ?? uniformKnobs;
+
   return (
     <NodeFrame
       id={id}
@@ -213,7 +345,7 @@ function GeneratorNodeViewImpl({ id, incomingCount }: Props): JSX.Element | null
         {node.label}
       </text>
 
-      {sineKnobs ?? (
+      {bodyKnobs ?? (
         <text
           className={`trama-node-value${currentMode === 'compact' ? ' is-compact' : ''}`}
           x={0}
