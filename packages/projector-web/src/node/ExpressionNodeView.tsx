@@ -307,9 +307,10 @@ function ExpressionNodeViewImpl({ id }: Props): JSX.Element | null {
       />
       <NodeLabel
         text={node.label}
-        x={textX}
+        x={layout.labelAnchor === 'middle' ? 0 : textX}
         y={labelY}
         width={width - (textX - -halfW) * 2}
+        textAnchor={layout.labelAnchor}
         isEditing={isEditingLabel}
         onCommit={commitLabel}
         onCancel={cancelLabel}

@@ -1,4 +1,4 @@
-import { tokens } from '@trama/tokens';
+import { tokens } from "@trama/tokens";
 import {
   isAverageNode,
   isConditionNode,
@@ -7,7 +7,7 @@ import {
   isObserveNode,
   isValueNode,
   type Node,
-} from '@trama/core';
+} from "@trama/core";
 
 /**
  * 모드별 패널 기준 사이즈 — 노드 *종류*가 아니라 *모드*가 크기를 정한다.
@@ -57,7 +57,7 @@ interface SkinLayoutSpec {
 const SKIN_LAYOUTS: Record<string, SkinLayoutSpec> = {
   // 220×244 = 원(r=110, cy=12) + 상단 라벨 슬롯 24. 캡슐 visual(64×220)은 원 안 정중앙.
   // 엣지 앵커는 원 좌·우 끝(±110, 12).
-  'thermometer-mercury': {
+  "thermometer-mercury": {
     width: 220,
     height: 244,
     circleR: 110,
@@ -65,7 +65,7 @@ const SKIN_LAYOUTS: Record<string, SkinLayoutSpec> = {
     labelSlotH: 24,
   },
   // 극저온 — 캡슐 메타포 그대로, 색만 다른 자매 스킨.
-  'thermometer-cryogenic': {
+  "thermometer-cryogenic": {
     width: 220,
     height: 244,
     circleR: 110,
@@ -73,7 +73,7 @@ const SKIN_LAYOUTS: Record<string, SkinLayoutSpec> = {
     labelSlotH: 24,
   },
   // 체온계 — LCD 패널 + 가로 색 밴드. 종횡비 살짝 가로형.
-  'thermometer-body': {
+  "thermometer-body": {
     width: 220,
     height: 220,
     circleR: 110,
@@ -81,7 +81,7 @@ const SKIN_LAYOUTS: Record<string, SkinLayoutSpec> = {
     labelSlotH: 24,
   },
   // 흑체복사 가마 — 컴팩트 원. 보더 자체가 발광.
-  'thermometer-kiln': {
+  "thermometer-kiln": {
     width: 200,
     height: 220,
     circleR: 96,
@@ -89,7 +89,7 @@ const SKIN_LAYOUTS: Record<string, SkinLayoutSpec> = {
     labelSlotH: 24,
   },
   // 오븐 다이얼 — 회전 게이지. 정사각형 가까운 비율.
-  'thermometer-oven': {
+  "thermometer-oven": {
     width: 260,
     height: 260,
     circleR: 124,
@@ -98,7 +98,7 @@ const SKIN_LAYOUTS: Record<string, SkinLayoutSpec> = {
   },
 };
 const COMBINER_ADD_H = 44;
-export const NAME_FROM_TOP = 28;
+export const NAME_FROM_TOP = 20;
 const VALUE_FROM_TOP = 78;
 const COMBINER_CENTER_FROM_TOP = 156;
 const TRACK_FROM_BOTTOM = 24;
@@ -129,7 +129,7 @@ export interface PinLayout {
  * 담고, compact는 패널을 데이터 디스플레이로 순수화해 외곽 부속(라벨 위, 슬롯
  * 좌우 바깥, 컨트롤 아래)으로 분리한다.
  */
-export type NodeDisplayMode = 'standard' | 'compact';
+export type NodeDisplayMode = "standard" | "compact";
 
 export interface NodeLayout {
   /**
@@ -157,7 +157,7 @@ export interface NodeLayout {
   textX: number;
   labelY: number;
   /** 라벨 정렬 — standard는 'start'(좌측 정렬), compact는 'middle'(중앙 정렬). */
-  labelAnchor: 'start' | 'middle';
+  labelAnchor: "start" | "middle";
   valueY: number;
   /** 입력성 ValueNode의 슬라이더 y 좌표 (노드 카드 안쪽 하단). */
   sliderY: number;
@@ -185,7 +185,10 @@ export interface NodeLayout {
 }
 
 function buildPin(cx: number, cy: number, nSockets: number): PinLayout {
-  const minH = PIN_PAD * 2 + nSockets * SOCKET_SIZE + Math.max(0, nSockets - 1) * PIN_SOCKET_GAP;
+  const minH =
+    PIN_PAD * 2 +
+    nSockets * SOCKET_SIZE +
+    Math.max(0, nSockets - 1) * PIN_SOCKET_GAP;
   const height = Math.max(PIN_W, minH);
   const top = cy - height / 2;
   const sockets: SocketPoint[] = [];
@@ -218,6 +221,9 @@ const OBSERVE_BODY_INSET_COMPACT = 6;
 
 /** GeneratorNode 본문 — 라벨 + 현재값 내부 패딩. 폭·높이는 STANDARD_PANEL이 정한다. */
 const GENERATOR_BODY_INSET = 16;
+/** GeneratorNode sine 본문(knob 영역) 상단 — 라벨 baseline과 독립.
+ *  NAME_FROM_TOP을 조정해도 knob 본문이 끌려가지 않게 분리. */
+const GENERATOR_BODY_FROM_TOP = 46;
 
 /** 식 노드 폭 견적용 — 변수 라벨 평균 글자 폭(px). 정확한 측정은 과함. */
 const EXPR_VAR_CHAR_W = 8;
@@ -274,9 +280,9 @@ function buildCompactLayout(
   const incomingCount = Math.max(0, opts.incomingCount);
   // 입력 슬롯 수 — constant는 입력 없음, boolean ValueNode·condition·observe·
   // generator는 단일 입력, logic-gate는 N항(NOT만 1).
-  const isConstant = node.kind === 'constant';
-  const isLogicGate = node.kind === 'logic-gate';
-  const isUnaryLogicGate = isLogicGate && node.operator === 'not';
+  const isConstant = node.kind === "constant";
+  const isLogicGate = node.kind === "logic-gate";
+  const isUnaryLogicGate = isLogicGate && node.operator === "not";
   const inSockets = isConstant
     ? 0
     : isLogicGate
@@ -297,9 +303,13 @@ function buildCompactLayout(
   const panelH = COMPACT_PANEL.h;
   const outSockets = Math.max(1, compactOpts.outSockets ?? 1);
   const inMinH =
-    PIN_PAD * 2 + inSockets * SOCKET_SIZE + Math.max(0, inSockets - 1) * PIN_SOCKET_GAP;
+    PIN_PAD * 2 +
+    inSockets * SOCKET_SIZE +
+    Math.max(0, inSockets - 1) * PIN_SOCKET_GAP;
   const outMinH =
-    PIN_PAD * 2 + outSockets * SOCKET_SIZE + Math.max(0, outSockets - 1) * PIN_SOCKET_GAP;
+    PIN_PAD * 2 +
+    outSockets * SOCKET_SIZE +
+    Math.max(0, outSockets - 1) * PIN_SOCKET_GAP;
   const pinDemandH = Math.max(PIN_W, inMinH, outMinH);
   const socketOverflow = Math.max(0, (pinDemandH - panelH) / 2);
 
@@ -334,16 +344,18 @@ function buildCompactLayout(
   // numeric ValueNode compact — 외곽 컨트롤 슬롯을 슬라이더와 combiner 칩이 공유한다.
   // lag=0 입력 2개 이상이면 슬라이더가 의미 잃고 combiner 칩으로 자리 교체.
   const isNumericValueNode =
-    node.kind === 'value' && node.initialValue.kind === 'numeric';
+    node.kind === "value" && node.initialValue.kind === "numeric";
   const hasCombiner = isNumericValueNode && incomingCount > 1;
-  const sliderY = outerControlSlot && isNumericValueNode ? outerControlSlot.cy : halfH;
-  const combinerCenterY = hasCombiner && outerControlSlot ? outerControlSlot.cy : null;
+  const sliderY =
+    outerControlSlot && isNumericValueNode ? outerControlSlot.cy : halfH;
+  const combinerCenterY =
+    hasCombiner && outerControlSlot ? outerControlSlot.cy : null;
 
   // observe compact — 패널 안쪽 패딩만 두고 panel 전체를 시각화 슬롯으로 쓴다.
   // standard에서 라벨이 차지했던 상단 공간이 외곽으로 빠졌으므로 시각화가 패널을
   // 통째로 점유 가능. 인셋은 compact 전용 작은 값을 써서 56px 패널 안에 실효 높이를 확보.
   const observeBody =
-    node.kind === 'observe'
+    node.kind === "observe"
       ? {
           x: -panelW / 2 + OBSERVE_BODY_INSET_COMPACT,
           y: panelCy - panelH / 2 + OBSERVE_BODY_INSET_COMPACT,
@@ -363,7 +375,7 @@ function buildCompactLayout(
     halfH,
     textX: 0,
     labelY,
-    labelAnchor: 'middle',
+    labelAnchor: "middle",
     valueY: panelCy,
     sliderY,
     combinerCenterY,
@@ -395,25 +407,36 @@ export function getNodeLayout(
 ): NodeLayout {
   // compact 모드 — 외곽 부속(라벨 위 / 슬롯 좌우 / 컨트롤 아래)으로 분리.
   // 스킨이 적용된 ValueNode는 별도 분기에서 처리되므로 여기 도달하지 않는다.
-  if (opts.displayMode === 'compact') {
-    if (isValueNode(node) && !node.skin && node.initialValue.kind === 'boolean') {
+  if (opts.displayMode === "compact") {
+    if (
+      isValueNode(node) &&
+      !node.skin &&
+      node.initialValue.kind === "boolean"
+    ) {
       return buildCompactLayout(node, opts, { hasOuterControls: true });
     }
-    if (isValueNode(node) && !node.skin && node.initialValue.kind === 'numeric') {
+    if (
+      isValueNode(node) &&
+      !node.skin &&
+      node.initialValue.kind === "numeric"
+    ) {
       return buildCompactLayout(node, opts, { hasOuterControls: true });
     }
     if (isGeneratorNode(node)) {
       return buildCompactLayout(node, opts, { hasOuterControls: false });
     }
-    if (node.kind === 'logic-gate') {
+    if (node.kind === "logic-gate") {
       return buildCompactLayout(node, opts, { hasOuterControls: false });
     }
-    if (node.kind === 'constant') {
+    if (node.kind === "constant") {
       return buildCompactLayout(node, opts, { hasOuterControls: false });
     }
     if (isConditionNode(node)) {
       // Condition 은 true/false 두 출력 슬롯 — compact 에서도 두 소켓을 노출.
-      return buildCompactLayout(node, opts, { hasOuterControls: false, outSockets: 2 });
+      return buildCompactLayout(node, opts, {
+        hasOuterControls: false,
+        outSockets: 2,
+      });
     }
     if (isObserveNode(node)) {
       // ObserveNode compact — 출력 슬롯 2개 (passthrough + 누적 추출).
@@ -458,7 +481,7 @@ export function getNodeLayout(
         halfH,
         textX: 0,
         labelY: 0,
-        labelAnchor: 'start',
+        labelAnchor: "start",
         valueY: 0,
         sliderY: halfH,
         combinerCenterY: null,
@@ -490,14 +513,15 @@ export function getNodeLayout(
         : 0;
 
     const bodyW = Math.max(EXPR_MIN_BODY_W, fizW);
-    const width =
-      EXPR_LEFT_INSET + varGutterW + bodyW + EXPR_RIGHT_INSET;
+    const width = EXPR_LEFT_INSET + varGutterW + bodyW + EXPR_RIGHT_INSET;
 
     const bodyH = Math.max(EXPR_MIN_BODY_H, fizH);
     const baseH = EXPR_LABEL_SLOT_H + bodyH + EXPR_BOTTOM_PADDING;
 
     const inMinH =
-      PIN_PAD * 2 + inSockets * SOCKET_SIZE + Math.max(0, inSockets - 1) * PIN_SOCKET_GAP;
+      PIN_PAD * 2 +
+      inSockets * SOCKET_SIZE +
+      Math.max(0, inSockets - 1) * PIN_SOCKET_GAP;
     const pinDemand = Math.max(PIN_W, inMinH) + 12;
     const height = Math.max(baseH, pinDemand);
 
@@ -522,7 +546,7 @@ export function getNodeLayout(
       halfH,
       textX: -halfW + EXPR_LEFT_INSET,
       labelY,
-      labelAnchor: 'start',
+      labelAnchor: "middle",
       valueY: bodyY,
       sliderY: halfH,
       combinerCenterY: null,
@@ -557,7 +581,7 @@ export function getNodeLayout(
       halfH,
       textX: -halfW + SIDE_INSET,
       labelY: cardTop + NAME_FROM_TOP,
-      labelAnchor: 'start',
+      labelAnchor: "middle",
       valueY: 0,
       sliderY: halfH,
       combinerCenterY: null,
@@ -605,7 +629,7 @@ export function getNodeLayout(
       halfH,
       textX: -halfW + SIDE_INSET,
       labelY: cardTop + OBSERVE_LABEL_FROM_TOP,
-      labelAnchor: 'start',
+      labelAnchor: "middle",
       valueY: 0,
       sliderY: halfH,
       combinerCenterY: null,
@@ -639,7 +663,7 @@ export function getNodeLayout(
       halfH,
       textX: -halfW + SIDE_INSET,
       labelY: cardTop + NAME_FROM_TOP,
-      labelAnchor: 'start',
+      labelAnchor: "middle",
       valueY: cardTop + VALUE_FROM_TOP,
       sliderY: halfH,
       combinerCenterY: null,
@@ -665,8 +689,8 @@ export function getNodeLayout(
     // 좌측 핀 — boolean gate 입력 단항. incomingCount와 무관하게 1로 고정.
     const leftPin = buildPin(-halfW, 0, 1);
     const rightPin = buildPin(halfW, 0, 1);
-    const isSine = node.params.kind === 'sine';
-    const bodyTop = cardTop + NAME_FROM_TOP + 12;
+    const isSine = node.params.kind === "sine";
+    const bodyTop = cardTop + GENERATOR_BODY_FROM_TOP;
     const bodyBottom = halfH - 12;
     const generatorBody = isSine
       ? {
@@ -687,7 +711,7 @@ export function getNodeLayout(
       halfH,
       textX: -halfW + GENERATOR_BODY_INSET,
       labelY: cardTop + NAME_FROM_TOP,
-      labelAnchor: 'start',
+      labelAnchor: "middle",
       valueY: cardTop + VALUE_FROM_TOP,
       sliderY: halfH,
       combinerCenterY: null,
@@ -707,14 +731,19 @@ export function getNodeLayout(
   // 공유한다 (Condition/Observe/Generator는 각자 위 분기에서 처리). combiner 칩
   // 유무·소켓 pin overflow 만 baseline 위에 *덧붙는* 형태로 높이를 늘린다 —
   // 종류 자체가 폭·높이를 정하지 않는다.
-  const isLogicGate = node.kind === 'logic-gate';
+  const isLogicGate = node.kind === "logic-gate";
   // NOT 게이트는 단항 — 입력 슬롯이 항상 1로 고정.
-  const isUnaryLogicGate = isLogicGate && node.operator === 'not';
+  const isUnaryLogicGate = isLogicGate && node.operator === "not";
   const hasCombiner = !isLogicGate && incomingCount > 1;
-  const baseH = hasCombiner ? STANDARD_PANEL.h + COMBINER_ADD_H : STANDARD_PANEL.h;
+  const baseH = hasCombiner
+    ? STANDARD_PANEL.h + COMBINER_ADD_H
+    : STANDARD_PANEL.h;
 
   const inSockets = isUnaryLogicGate ? 1 : Math.max(1, incomingCount);
-  const inMinH = PIN_PAD * 2 + inSockets * SOCKET_SIZE + Math.max(0, inSockets - 1) * PIN_SOCKET_GAP;
+  const inMinH =
+    PIN_PAD * 2 +
+    inSockets * SOCKET_SIZE +
+    Math.max(0, inSockets - 1) * PIN_SOCKET_GAP;
   const pinDemand = Math.max(PIN_W, inMinH) + 12;
   const height = Math.max(baseH, pinDemand);
 
@@ -724,7 +753,9 @@ export function getNodeLayout(
 
   const labelY = cardTop + NAME_FROM_TOP;
   const valueY = cardTop + VALUE_FROM_TOP;
-  const combinerCenterY = hasCombiner ? cardTop + COMBINER_CENTER_FROM_TOP : null;
+  const combinerCenterY = hasCombiner
+    ? cardTop + COMBINER_CENTER_FROM_TOP
+    : null;
   const sliderY = halfH - TRACK_FROM_BOTTOM;
 
   const leftPin = buildPin(-halfW, 0, inSockets);
@@ -741,7 +772,7 @@ export function getNodeLayout(
     halfH,
     textX: -halfW + SIDE_INSET,
     labelY,
-    labelAnchor: 'start',
+    labelAnchor: "middle",
     valueY,
     sliderY,
     combinerCenterY,

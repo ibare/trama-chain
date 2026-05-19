@@ -63,7 +63,7 @@ function ValueNodeCardImpl({
       />
       <NodeLabel
         text={node.label}
-        x={layout.textX}
+        x={layout.labelAnchor === 'middle' ? 0 : layout.textX}
         y={layout.labelY}
         width={width - (layout.textX - -halfW) * 2}
         textAnchor={layout.labelAnchor}
