@@ -3,7 +3,7 @@ import { functionHandle } from '../execution/exec-value.js';
 import type { GeneratorParadigm } from './types.js';
 
 /**
- * 사인파 생성기 패러다임 — y(t) = offset + amplitude * sin(omega * t/1000 + phase).
+ * 사인파 생성기 패러다임 — y(t) = amplitude * sin(omega * t/1000).
  *
  * 시간 기반(time-based) — emit·peek는 simulationTimeMs를 직접 받아 그 시각의
  * 신호값을 계산한다. cursor에는 상태가 없다. counter/uniform/normal과 달리
@@ -21,11 +21,12 @@ import type { GeneratorParadigm } from './types.js';
  * params:
  * - amplitude (A): 신호 진폭
  * - omega (ω): 각속도 rad/s — 주기 T(s) = 2π/ω, 주파수 f(Hz) = ω/(2π)
- * - phase (φ): 위상 오프셋 rad
- * - offset (D): 평균값(y축 shift)
+ *
+ * 위상(φ)·영점(D)은 0으로 고정 — 노드 본문 노출 가치가 낮아 UI에서 빠졌고,
+ * 결정성·물성 시각 영향도 amplitude·omega 두 축으로 충분히 표현된다.
  *
  * 활용:
- * - 수학: A·ω·φ 슬라이더로 사인파 변형 시연.
+ * - 수학: A·ω 슬라이더로 사인파 변형 시연.
  * - 물리: 단진동(용수철·진자), 파동, 음파.
  * - 생물: 호르몬 일주기, 수면 사이클.
  * - 지구과학: 계절 기온·일조량·조수.
@@ -34,7 +35,7 @@ import type { GeneratorParadigm } from './types.js';
  * 결정성: 동일 params + 동일 simulationTimeMs ⇒ 동일 결과. seed 불필요.
  */
 export const sineParadigm: GeneratorParadigm<
-  { kind: 'sine'; amplitude: number; omega: number; phase: number; offset: number },
+  { kind: 'sine'; amplitude: number; omega: number },
   { kind: 'sine' }
 > = {
   kind: 'sine',
@@ -50,12 +51,8 @@ export const sineParadigm: GeneratorParadigm<
 
 /** y(t) — t는 simulationTimeMs(ms). omega는 rad/s이므로 t/1000으로 환산. */
 function sampleAt(
-  params: { amplitude: number; omega: number; phase: number; offset: number },
+  params: { amplitude: number; omega: number },
   simulationTimeMs: number,
 ): number {
-  return (
-    params.offset +
-    params.amplitude *
-      Math.sin(params.omega * (simulationTimeMs / 1000) + params.phase)
-  );
+  return params.amplitude * Math.sin(params.omega * (simulationTimeMs / 1000));
 }

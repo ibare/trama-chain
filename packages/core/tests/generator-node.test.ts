@@ -520,20 +520,17 @@ describe('GeneratorNode — schema / serialization', () => {
 });
 
 describe('GeneratorNode — sine paradigm', () => {
-  it('emit at t=0 equals offset + amplitude * sin(phase)', () => {
+  it('emit at t=0 equals 0 (sin(0))', () => {
     const params = {
       kind: 'sine' as const,
       amplitude: 2,
       omega: (2 * Math.PI) / 20,
-      phase: Math.PI / 6,
-      offset: 5,
     };
     const cursor = sineParadigm.initCursor(params, 0);
     const r = sineParadigm.emit(params, cursor, 0);
     // sine emit은 FunctionHandle을 반환 — 그 시점 t로 환원해 Value 비교.
-    expect(resolveScalar(r.value!, 0)).toEqual(
-      numericValue(5 + 2 * Math.sin(Math.PI / 6), 'free'),
-    );
+    // 위상·영점 0 고정 — t=0이면 amplitude * sin(0) = 0.
+    expect(resolveScalar(r.value!, 0)).toEqual(numericValue(0, 'free'));
     // cursor는 상태 없음 — emit이 진행시키는 필드 없음.
     expect(r.nextCursor).toEqual({ kind: 'sine' });
   });
@@ -544,8 +541,6 @@ describe('GeneratorNode — sine paradigm', () => {
       kind: 'sine' as const,
       amplitude: 1,
       omega: (2 * Math.PI) / periodSec,
-      phase: 0,
-      offset: 0,
     };
     const cursor = sineParadigm.initCursor(params, 0);
     // peek는 FunctionHandle을 반환 — 각 시점으로 환원해 Value 비교.
@@ -562,13 +557,11 @@ describe('GeneratorNode — sine paradigm', () => {
     }
   });
 
-  it('values stay within [offset - amplitude, offset + amplitude]', () => {
+  it('values stay within [-amplitude, amplitude]', () => {
     const params = {
       kind: 'sine' as const,
       amplitude: 3,
       omega: 0.37,
-      phase: 1.2,
-      offset: 10,
     };
     const cursor = sineParadigm.initCursor(params, 0);
     for (let i = 0; i < 200; i++) {
@@ -577,8 +570,8 @@ describe('GeneratorNode — sine paradigm', () => {
       const v = resolveScalar(r.value!, t);
       expect(v.kind).toBe('numeric');
       if (v.kind === 'numeric') {
-        expect(v.n).toBeGreaterThanOrEqual(10 - 3 - 1e-12);
-        expect(v.n).toBeLessThanOrEqual(10 + 3 + 1e-12);
+        expect(v.n).toBeGreaterThanOrEqual(-3 - 1e-12);
+        expect(v.n).toBeLessThanOrEqual(3 + 1e-12);
       }
     }
   });
@@ -588,8 +581,6 @@ describe('GeneratorNode — sine paradigm', () => {
       kind: 'sine' as const,
       amplitude: 1,
       omega: 0.5,
-      phase: 0,
-      offset: 0,
     };
     const cursor = sineParadigm.initCursor(params, 0);
     const t = 1234;
@@ -610,8 +601,6 @@ describe('GeneratorNode — sine paradigm', () => {
       kind: 'sine' as const,
       amplitude: 1.5,
       omega: 0.21,
-      phase: 0.7,
-      offset: -2,
     };
     const a = sineParadigm.initCursor(params, 0);
     const b = sineParadigm.initCursor(params, 0);
@@ -631,7 +620,7 @@ describe('GeneratorNode — sine paradigm', () => {
       {
         id: 'g',
         label: '사인파',
-        params: { kind: 'sine', amplitude: 2, omega: 0.314, phase: 1, offset: -1 },
+        params: { kind: 'sine', amplitude: 2, omega: 0.314 },
       },
       0,
     );
@@ -645,8 +634,6 @@ describe('GeneratorNode — sine paradigm', () => {
         kind: 'sine',
         amplitude: 2,
         omega: 0.314,
-        phase: 1,
-        offset: -1,
       });
     }
   });
@@ -853,7 +840,7 @@ describe('GeneratorRegistry', () => {
     expect(u.kind).toBe('uniform');
     const n = reg.initCursor({ kind: 'normal', mean: 0, stdev: 1, seed: 1 });
     expect(n.kind).toBe('normal');
-    const s = reg.initCursor({ kind: 'sine', amplitude: 1, omega: 0.1, phase: 0, offset: 0 });
+    const s = reg.initCursor({ kind: 'sine', amplitude: 1, omega: 0.1 });
     expect(s.kind).toBe('sine');
     const st = reg.initCursor({ kind: 'step', startMs: 0, value: 1 });
     expect(st.kind).toBe('step');

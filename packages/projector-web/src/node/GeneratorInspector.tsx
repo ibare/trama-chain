@@ -29,13 +29,11 @@ const NORMAL_DEFAULTS = {
   stdev: 1,
   seed: 0,
 };
-/** 사인파 기본값 — 진폭 1, 주기 20 emit (ω = 2π/20), 위상 0, 영점 0. */
+/** 사인파 기본값 — 진폭 1, 주기 5s (ω = 2π/5). 위상·영점은 paradigm 내부 0 고정. */
 const SINE_DEFAULTS = {
   kind: 'sine' as const,
   amplitude: 1,
   omega: (2 * Math.PI) / 5,
-  phase: 0,
-  offset: 0,
 };
 /** 스텝 기본값 — 1초 후 1을 계속 출력. */
 const STEP_DEFAULTS = { kind: 'step' as const, startMs: 1000, value: 1 };
@@ -90,7 +88,7 @@ function isParadigmKind(v: string): v is ParadigmKind {
  * - counter: start·step.
  * - uniform: min·max·integer·seed.
  * - normal: mean·stdev·seed.
- * - sine: amplitude·omega·phase·offset.
+ * - sine: amplitude·omega. (위상·영점은 paradigm 내부 0 고정 — UI 미노출)
  * - step: startMs·value.
  * - pulse: periodMs·value.
  * - schedule: points[]·loop.
@@ -439,12 +437,8 @@ interface SineProps {
 function SineFields({ params, disabled, onChange }: SineProps): JSX.Element {
   const [ampDraft, setAmpDraft] = useState(String(params.amplitude));
   const [omegaDraft, setOmegaDraft] = useState(String(params.omega));
-  const [phaseDraft, setPhaseDraft] = useState(String(params.phase));
-  const [offsetDraft, setOffsetDraft] = useState(String(params.offset));
   useEffect(() => setAmpDraft(String(params.amplitude)), [params.amplitude]);
   useEffect(() => setOmegaDraft(String(params.omega)), [params.omega]);
-  useEffect(() => setPhaseDraft(String(params.phase)), [params.phase]);
-  useEffect(() => setOffsetDraft(String(params.offset)), [params.offset]);
 
   return (
     <Form.Root
@@ -483,42 +477,6 @@ function SineFields({ params, disabled, onChange }: SineProps): JSX.Element {
             const v = parseFloat(next);
             if (Number.isFinite(v) && v !== params.omega) {
               onChange({ ...params, omega: v });
-            }
-          }}
-        />
-      </Form.Field>
-      <Form.Field name="phase" className="trama-unit-inspector-range-row">
-        <Form.Label className="trama-unit-inspector-range-label">위상 φ</Form.Label>
-        <Form.Control
-          type="number"
-          value={phaseDraft}
-          step="any"
-          disabled={disabled}
-          className="trama-unit-inspector-range-input"
-          onChange={(e) => {
-            const next = e.currentTarget.value;
-            setPhaseDraft(next);
-            const v = parseFloat(next);
-            if (Number.isFinite(v) && v !== params.phase) {
-              onChange({ ...params, phase: v });
-            }
-          }}
-        />
-      </Form.Field>
-      <Form.Field name="offset" className="trama-unit-inspector-range-row">
-        <Form.Label className="trama-unit-inspector-range-label">영점 D</Form.Label>
-        <Form.Control
-          type="number"
-          value={offsetDraft}
-          step="any"
-          disabled={disabled}
-          className="trama-unit-inspector-range-input"
-          onChange={(e) => {
-            const next = e.currentTarget.value;
-            setOffsetDraft(next);
-            const v = parseFloat(next);
-            if (Number.isFinite(v) && v !== params.offset) {
-              onChange({ ...params, offset: v });
             }
           }}
         />

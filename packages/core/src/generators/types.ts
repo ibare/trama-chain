@@ -22,7 +22,7 @@ export type GeneratorCursor =
   | { kind: 'normal'; prngState: number; nextFireMs: number }
   /**
    * sine: 상태 없음. 출력은 simulationTimeMs와 params로만 결정.
-   * y(t) = offset + amplitude * sin(omega * t/1000 + phase), t는 ms.
+   * y(t) = amplitude * sin(omega * t/1000), t는 ms. 위상·영점 0 고정.
    * omega 단위는 rad/s — 주기 T(s) = 2π/omega, 주파수 f(Hz) = omega/(2π).
    */
   | { kind: 'sine' }

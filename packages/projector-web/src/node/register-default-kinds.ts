@@ -217,8 +217,6 @@ registerNodeKindUI({
             kind: 'sine',
             amplitude: 1,
             omega: (2 * Math.PI) / 5,
-            phase: 0,
-            offset: 0,
           },
           position: canvasPos,
         });

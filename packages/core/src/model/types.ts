@@ -236,11 +236,12 @@ export type GeneratorParams =
    */
   | { kind: 'normal'; mean: number; stdev: number; seed: number }
   /**
-   * 사인파. y = offset + amplitude * sin(omega * t + phase). t는 emit step.
-   * omega는 emit당 라디안 (주기 T = 2π/omega). phase는 라디안. offset은 DC bias.
+   * 사인파. y = amplitude * sin(omega * t). t는 emit step.
+   * omega는 emit당 라디안 (주기 T = 2π/omega). 위상·영점은 0으로 고정 —
+   * 노드 본문 노출 가치가 낮아 모델 표면에서 빠졌다.
    * 단진동·일주기·계절 변화 등 결정론적 진동 현상 모델링용. seed 불필요.
    */
-  | { kind: 'sine'; amplitude: number; omega: number; phase: number; offset: number }
+  | { kind: 'sine'; amplitude: number; omega: number }
   /**
    * 스텝: 시뮬레이션 시간 t가 startMs 미만이면 출력이 정의되지 않은 freeze 상태,
    * t ≥ startMs부터 지정 value를 계속 출력. heaviside 계단함수.
