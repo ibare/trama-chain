@@ -896,8 +896,10 @@ export function createModelStore({
     // 사라진다.
     if (becameInvalid) {
       // 펄스 도착은 시간이 흐르는 step — paused=false 로 재계산해 ValueNode 가
-      // source 변화를 흡수하도록 한다.
-      const recomputed = computeExecutionState(model, undefined, false);
+      // source 변화를 흡수하도록 한다. prior+priorModel 을 함께 전달해 Stock
+      // level, observe buffer, generator cursor 의 누적이 fresh 빈 값으로
+      // 덮이지 않게 한다 (펄스 도착 사이에 모델은 변하지 않으므로 priorModel===model).
+      const recomputed = computeExecutionState(model, executionState, false, model);
       store.setState({
         executionState: recomputed.executionState,
         trajectory: recomputed.trajectory,
