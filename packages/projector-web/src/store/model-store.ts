@@ -204,6 +204,11 @@ function computeExecutionState(
       combinerRegistry,
       expressionEvaluator: fizzexExpressionEvaluator,
       paused,
+      // trajectory[i] 의 simulationTimeMs 축이 step 누적으로 박히도록 STEP_TICK_MS
+      // 전달. ObserveNode throttle 비교가 정상 작동하려면 step 간 시간 증분이
+      // 필요. paused=true 호출(모델 편집 직후 새 graph 의 한 step) 도 같은 dt 로
+      // 들어가지만 paused 가드가 ValueNode 흡수를 차단해 효과는 발현되지 않음.
+      stepIntervalMs: STEP_TICK_MS,
     });
     fresh = { executionState: traj[traj.length - 1]!, trajectory: traj };
   } catch {

@@ -22,6 +22,13 @@ export interface ExecuteOptions {
    * 효과가 가는 "시각 우선" 오작동을 막는다.
    */
   paused?: boolean;
+  /**
+   * 한 step 의 simulation time 증분(ms). trajectory 의 simulationTimeMs 축
+   * 누적과 ObserveNode throttle 비교의 기준. 미지정이면 0 — 정적 재계산(모델
+   * 편집 직후 새 graph 의 한 step 등) 으로 간주해 시간이 흐르지 않는다.
+   * ticker 경로(model-store 의 step 호출) 는 STEP_TICK_MS 같은 일정 간격을 넘긴다.
+   */
+  stepIntervalMs?: number;
 }
 
 /**
@@ -42,6 +49,7 @@ export function executeModel(model: Model, options: ExecuteOptions): ExecutionSt
     rng,
     topology,
     paused: options.paused ?? false,
+    stepIntervalMs: options.stepIntervalMs ?? 0,
   };
   const N = Math.max(1, model.execution.steps | 0);
   let state = initializeFromInitialValues(model);
