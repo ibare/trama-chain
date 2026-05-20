@@ -211,11 +211,13 @@ function computeExecutionState(
       combinerRegistry,
       expressionEvaluator: fizzexExpressionEvaluator,
       paused,
-      // trajectory[i] 의 simulationTimeMs 축이 step 누적으로 박히도록 STEP_TICK_MS
-      // 전달. ObserveNode throttle 비교가 정상 작동하려면 step 간 시간 증분이
-      // 필요. paused=true 호출(모델 편집 직후 새 graph 의 한 step) 도 같은 dt 로
-      // 들어가지만 paused 가드가 ValueNode 흡수를 차단해 효과는 발현되지 않음.
-      stepIntervalMs: STEP_TICK_MS,
+      // stepIntervalMs 는 *호출자가 명시적으로 시간이 흐르는 step* 임을 선언할
+      // 때만 전달한다. computeExecutionState 의 호출 경로는 전부 모델 편집 직후
+      // fresh 재구성 — 시간이 흐르지 않는 정적 재계산이므로 0 유지 (기본).
+      // 실 시뮬레이션 시간 누적은 RAF stepTicker 가 simulationTimeMs += stepDelta
+      // 로 단독 책임 (:416). 여기서 STEP_TICK_MS 를 전달하면 첫 ▶ 시드 sentinel
+      // (`executionState.simulationTimeMs === 0`) 과 UI 의 isInitial sentinel
+      // (ValueNodeView, BooleanValueNodeView) 이 모델 편집 한 번에 깨진다.
     });
     fresh = { executionState: traj[traj.length - 1]!, trajectory: traj };
   } catch {
