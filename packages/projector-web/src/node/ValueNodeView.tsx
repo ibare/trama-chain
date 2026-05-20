@@ -274,6 +274,7 @@ function ValueNodeViewImpl({ id, incomingCount }: Props): JSX.Element | null {
           node={node}
           halfW={isCompactNumeric ? layout.panelWidth / 2 : halfW}
           sliderY={layout.sliderY}
+          mode={isCompactNumeric ? 'compact' : 'standard'}
         />
       )}
     </NodeFrame>

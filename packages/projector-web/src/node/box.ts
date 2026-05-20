@@ -100,7 +100,7 @@ const SKIN_LAYOUTS: Record<string, SkinLayoutSpec> = {
 };
 const COMBINER_ADD_H = 44;
 export const NAME_FROM_TOP = 20;
-const VALUE_FROM_TOP = 78;
+const VALUE_FROM_TOP = 70;
 const COMBINER_CENTER_FROM_TOP = 156;
 const TRACK_FROM_BOTTOM = 24;
 const SIDE_INSET = 18;
@@ -174,8 +174,7 @@ export interface NodeLayout {
   expressionBody: { x: number; y: number; w: number; h: number } | null;
   /** Observe 노드의 시각화 본문 영역(노드 중심 기준). ObserveNode가 아니면 null. */
   observeBody: { x: number; y: number; w: number; h: number } | null;
-  /** Generator 노드의 컨트롤러(▶/■/↺) 슬롯 영역. GeneratorNode가 아니면 null.
-   *  compact에서는 패널 *밖 아래쪽* 외곽 컨트롤 슬롯으로 재배치된다. */
+  /** Generator 노드의 본문 시각 영역(노드 중심 기준). GeneratorNode가 아니면 null. */
   generatorBody: { x: number; y: number; w: number; h: number } | null;
   /**
    * compact 모드에서 패널 아래쪽에 마련되는 외곽 컨트롤 슬롯 — 토글·버튼이
