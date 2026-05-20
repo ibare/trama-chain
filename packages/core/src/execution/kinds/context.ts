@@ -47,8 +47,12 @@ export const FREE_FALLBACK: ResolvedUnit = {
 
 /**
  * 한 노드의 lag=0 전파 단계에서 디스크립터가 사용하는 컨텍스트.
- * next/validOutputs는 의도적으로 가변(mutate) — 한 step 내에서 디스크립터가
- * 직접 갱신해 다음 노드로 흘러간다.
+ *
+ * 출력값 저장(`next[id] = ...`)을 제외한 모든 runtime record 는 readonly 로
+ * 노출된다 — 디스크립터는 PropagateContext 의 헬퍼(`setSlotValid` 등)로만
+ * mutate 한다. invariant(valid ↔ pending 상호 배타, observeBuffer capacity
+ * 정책, sequence emit 동시 valid 마킹) 가 헬퍼 한 자리에 모이도록 강제하는
+ * 구조 — set/record 직접 add/delete/index-assign 은 컴파일 에러.
  */
 export interface PropagateContext {
   model: Model;
@@ -58,21 +62,25 @@ export interface PropagateContext {
    * 디스크립터가 알맹이만 보고 싶다면 `unwrap(ctx.next[id])` 또는 헬퍼
    * `getNumericNext`/`getBooleanNext`/`getAnyNext` 를 통해 자동 unwrap 된 값을 사용.
    * 메타까지 보고 분기하는 디스크립터(예: Generator gate)는 raw 그대로 읽는다.
+   *
+   * 유일하게 mutable 한 record — 출력값 저장은 디스크립터의 정상 경로다.
+   * 슬롯 valid/invalid 마킹은 별도 (setSlotValid/setSlotInvalid).
    */
   next: Record<NodeId, ExecValue>;
-  validOutputs: Set<string>;
+  /** 슬롯별 valid 마킹. 디스크립터는 `setSlotValid`/`setSlotInvalid` 로만 변경. */
+  validOutputs: ReadonlySet<string>;
   /**
    * "토폴로지 정상, 첫 신호 미도착" 슬롯 집합. ValueNode 처럼 incoming 엣지가
    * 있어 stored state(initialValue) 권위를 잃은 노드가 아직 어떤 펄스도
-   * 받지 못한 상태를 표시한다. 디스크립터가 성공적으로 갱신하면 키를
-   * 삭제한다. valid 와 상호 배타.
+   * 받지 못한 상태를 표시한다. valid 와 상호 배타 — `setSlotValid` 가 자동
+   * 으로 pending 도 정리.
    */
-  pendingOutputs: Set<string>;
+  pendingOutputs: ReadonlySet<string>;
   /**
    * 노드별 마지막 실패 사유 (UI invalid 배지/툴팁 노출용).
-   * 디스크립터가 평가에 실패하면 여기에 기록하고, 성공하면 키를 삭제한다.
+   * 디스크립터는 `setInvalidReason`/`clearInvalidReason` 로만 변경.
    */
-  invalidReasons: Record<NodeId, EvalDiagnosis & { ok: false }>;
+  invalidReasons: Readonly<Record<NodeId, EvalDiagnosis & { ok: false }>>;
   catalog: UnitCatalog;
   shapeRegistry: ShapeRegistry;
   combinerRegistry: CombinerRegistry;
@@ -82,28 +90,29 @@ export interface PropagateContext {
   /**
    * ObserveNode 가 통과한 값을 시간순으로 누적해 두는 sample 버퍼.
    * 각 sample 은 (value, t) — t 는 누적 당시 simulation time(ms).
-   * 디스크립터가 mutate하며, propagateOneStep 이 결과를 ExecutionState 로 회수한다.
-   * runtime-only — 직렬화되지 않는다.
+   * 디스크립터는 `pushObserveSample` 로만 추가. propagateOneStep 이 결과를
+   * ExecutionState 로 회수한다. runtime-only — 직렬화되지 않는다.
    */
-  observeBuffers: Record<NodeId, ObserveBuffer>;
+  observeBuffers: Readonly<Record<NodeId, ObserveBuffer>>;
   /**
    * ObserveNode 추출 슬롯 throttle 런타임. 마지막 emit 시각(simulation time)을
-   * 박제해 다음 propagate 가 발사 여부를 결정. runtime-only.
+   * 박제해 다음 propagate 가 발사 여부를 결정. 디스크립터는 `markExtractionEmitted`
+   * 로만 갱신. runtime-only.
    */
-  observeExtractionRuntime: Record<NodeId, ObserveExtractionRuntime>;
+  observeExtractionRuntime: Readonly<Record<NodeId, ObserveExtractionRuntime>>;
   /**
-   * GeneratorNode의 cursor·gate 캐시. propagate가 emit할 때 mutate한다.
-   * runtime-only — 직렬화되지 않는다.
+   * GeneratorNode의 cursor·gate 캐시. 디스크립터는 `advanceGeneratorCursor`
+   * 로만 갱신. runtime-only — 직렬화되지 않는다.
    */
-  generatorRuntime: Record<NodeId, GeneratorRuntime>;
+  generatorRuntime: Readonly<Record<NodeId, GeneratorRuntime>>;
   /** 등록된 패러다임 모음. emit 라우팅에 사용. */
   generatorRegistry: GeneratorRegistry;
   /**
    * Sequence 채널 출력 작업 버퍼. 키: outputKey(nodeId, slot). 누적 추출 등
-   * sequence PortSpec slot 의 SequenceValue 스냅샷을 디스크립터가 여기 기록한다.
-   * 스칼라 [[next]] 와 분리된 채널.
+   * sequence PortSpec slot 의 SequenceValue 스냅샷이 머문다. 스칼라 [[next]] 와
+   * 분리된 채널 — 디스크립터는 `emitSequence` 로만 기록 (valid 마킹도 자동).
    */
-  sequenceNext: Record<string, SequenceValue>;
+  sequenceNext: Readonly<Record<string, SequenceValue>>;
   /** 현재 simulation time(ms). 이 step 내 누적·emit 시각의 기준. */
   simulationTimeMs: number;
   /**
@@ -122,9 +131,8 @@ export interface PropagateContext {
   paused: boolean;
   /**
    * 슬롯을 valid 로 켜고 pending 에서 제거 — `validOutputs.add(k) +
-   * pendingOutputs.delete(k)` 의 캡슐화. 디스크립터는 set 을 직접 mutate 하는
-   * 대신 이 헬퍼를 통해 valid ↔ pending 상호 배타 invariant 를 자동 보장한다.
-   * 직접 set 노출도 호환 유지 — 점진 교체.
+   * pendingOutputs.delete(k)` 의 캡슐화. valid ↔ pending 상호 배타 invariant
+   * 의 단일 진입점.
    */
   setSlotValid(slotKey: string): void;
   /**

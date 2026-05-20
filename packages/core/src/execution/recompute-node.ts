@@ -4,6 +4,7 @@ import type { Rng } from '../functions/types.js';
 import {
   defaultGeneratorRegistry,
   type GeneratorRegistry,
+  type GeneratorRuntime,
 } from '../generators/index.js';
 import type { Model, NodeId } from '../model/index.js';
 import { defaultUnitCatalog, type UnitCatalog } from '../units/index.js';
@@ -226,6 +227,11 @@ export function recomputeNode(
     workingValid.add(outputKey(sourceNodeId, sourceSlotIndex));
   }
 
+  // recomputeNode 는 단일 target 만 propagate — generator 는 target 이 될 수 없으니
+  // 빈 runtime 으로 충분하지만, advanceGeneratorCursor 헬퍼가 record 에 mutate 하므로
+  // ctx self-reference 가 아닌 클로저 변수로 잡아둔다.
+  const generatorRuntime: Record<NodeId, GeneratorRuntime> = {};
+
   const ctx: PropagateContext = {
     model,
     incoming,
@@ -241,9 +247,7 @@ export function recomputeNode(
     rng: options.rng ?? defaultRng,
     observeBuffers: seedBuffers,
     observeExtractionRuntime: seedExtractionRuntime,
-    // recomputeNode는 단일 target만 propagate — generator는 target이 될 수 없으니
-    // 빈 runtime + 기본 registry로 충분. ctx 인터페이스 만족을 위해 채워둔다.
-    generatorRuntime: {},
+    generatorRuntime,
     generatorRegistry: options.generatorRegistry ?? defaultGeneratorRegistry,
     sequenceNext: seedSequenceOutputs,
     simulationTimeMs: options.simulationTimeMs ?? 0,
@@ -283,7 +287,7 @@ export function recomputeNode(
       seedExtractionRuntime[nodeId] = { lastEmitTimeMs: timeMs };
     },
     advanceGeneratorCursor(nodeId, runtime) {
-      ctx.generatorRuntime[nodeId] = runtime;
+      generatorRuntime[nodeId] = runtime;
     },
   };
 
