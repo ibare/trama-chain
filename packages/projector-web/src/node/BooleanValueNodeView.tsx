@@ -39,13 +39,10 @@ const SOCKET_SIZE = parseFloat(tokens.spacing.socketSize);
  * 별 표현을 분기한다.
  */
 function BooleanValueNodeViewImpl({ id, incomingCount }: Props): JSX.Element | null {
-  const { modelStore, uiStore, socketRegistry, timeSettingsStore } = useTrama();
+  const { modelStore, uiStore, socketRegistry } = useTrama();
   const node = modelStore((s) => s.model.nodes[id]);
-  // 사용자 매뉴얼 송출기 UI 가시성 — numeric ValueNodeView 와 동일 정책.
-  // 초기(t=0)이거나 재생 중일 때만 토글 노출. 일시정지엔 미렌더.
-  const paused = timeSettingsStore((s) => s.paused);
-  const isInitial = modelStore((s) => s.executionState.simulationTimeMs === 0);
-  const userAuthoredVisible = isInitial || !paused;
+  // 사용자 매뉴얼 송출기 UI — 항상 노출. paused 중 토글한 값은 ▶ 재진입 시
+  // pausedTransitionHandler 가 snapshot 비교로 1회 송출 (model-store.ts).
   const currentBoolean = modelStore((s) => {
     const n = s.model.nodes[id];
     const fallback =
@@ -134,7 +131,9 @@ function BooleanValueNodeViewImpl({ id, incomingCount }: Props): JSX.Element | n
   const onToggleClick = useCallback(() => {
     if (readOnly) return;
     scrubInitialValue(id, !currentBoolean);
-    // 토글은 단일 click — drag 단계 없이 즉시 다운스트림 emit.
+    // 토글은 단일 click — drag 단계 없이 즉시 다운스트림 emit. paused 중에는
+    // emitValueOutput 이 t=0 가드 또는 spawnOutgoingPulses 의 paused 가드에서
+    // 무시되고, ▶ 재진입 시 pausedTransitionHandler 가 snapshot 비교로 1회 송출.
     emitValueOutput(id);
   }, [id, currentBoolean, readOnly, scrubInitialValue, emitValueOutput]);
 
@@ -203,7 +202,7 @@ function BooleanValueNodeViewImpl({ id, incomingCount }: Props): JSX.Element | n
         />
       )}
 
-      {isInputNode && userAuthoredVisible && (
+      {isInputNode && (
         <BooleanToggleSwitch
           cx={toggleCx}
           cy={toggleCy}

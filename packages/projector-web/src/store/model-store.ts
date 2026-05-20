@@ -211,6 +211,14 @@ export function createModelStore({
     return false;
   }
 
+  // paused 진입 시점의 ValueNode initialValue snapshot — paused 중 사용자가
+  // 슬라이더/토글로 값을 바꾸고 ▶ 재진입 시, snapshot 과 다른 노드만 1회 송출하기
+  // 위한 비교 기준. paused 진입 시점의 initialValue = "그 시점에 마지막으로 송출된
+  // 값" (scrubInitialValue 가 model 과 executionState 를 동시 박제하고, RAF 는
+  // paused 직전 펄스 cascade 까지 처리 후 멈추므로). 한번도 송출 안 된 첫 ▶ 분기는
+  // simulationTimeMs === 0 으로 분기되어 일괄 시드 경로로 빠지므로 비교 대상 외.
+  const pausedAtValueSnapshot = new Map<NodeId, Value>();
+
   // orchestrator 의 'effects' phase 핸들러 — pulse-registry 의 'time-axis' 가
   // pausedAt·startTime 봉합을 마친 *후* 에 시드·spawn·loop 가 일어나도록 순서가
   // 강제된다. multiplier 는 RAF 콜백이 매 frame 마다 읽으므로 별도 재시작 불필요.
@@ -220,22 +228,49 @@ export function createModelStore({
   ): void => {
     if (state.paused === prev.paused) return;
     if (state.paused) {
+      // 현재 ValueNode initialValue 들을 snapshot — 다음 ▶ 진입 시 비교 기준.
+      pausedAtValueSnapshot.clear();
+      const pm = store.getState().model;
+      for (const nid of pm.nodeOrder) {
+        const n = pm.nodes[nid];
+        if (n && isValueNode(n)) pausedAtValueSnapshot.set(nid, n.initialValue);
+      }
       stopSimulationLoop();
       playbackController.pause();
       return;
     }
     // 첫 ▶ 진입 (직전 t=0) 이면 ValueNode 매뉴얼 송출기들의 초기값을 일괄
-    // 시드한다. nodeOrder 순회로 결정성 유지. 이후 ▶/||/▶ 토글에는 시뮬레이션
-    // 시간이 진행된 상태이므로 시드하지 않는다.
+    // 시드한다. nodeOrder 순회로 결정성 유지.
     // (다른 source 시드는 generator ticker / pulse arrival propagate 가 책임.)
     const seedState = store.getState();
-    if (seedState.executionState.simulationTimeMs === 0) {
-      const seedModel = seedState.model;
-      const seedExec = seedState.executionState;
+    const seedModel = seedState.model;
+    const seedExec = seedState.executionState;
+    if (seedExec.simulationTimeMs === 0) {
       for (const nid of seedModel.nodeOrder) {
         const node = seedModel.nodes[nid];
         if (!node || !isValueNode(node)) continue;
         spawnOutgoingPulses(seedModel, seedExec, nid);
+      }
+    } else {
+      // ▶/||/▶ 재진입 — paused 중 사용자가 슬라이더/토글로 값을 바꾼 ValueNode 만
+      // 1회 송출. 멈춤 직전 값과 동일하면 흐름을 새로 일으키지 않는다. trama
+      // 사상상 효과는 펄스 도착 시점에만 발현되므로, 변경된 값도 재생 재개와 함께
+      // 펄스로 전달되어야 한다.
+      for (const nid of seedModel.nodeOrder) {
+        const node = seedModel.nodes[nid];
+        if (!node || !isValueNode(node)) continue;
+        const before = pausedAtValueSnapshot.get(nid);
+        if (!before) continue;
+        const after = node.initialValue;
+        if (before.kind !== after.kind) {
+          spawnOutgoingPulses(seedModel, seedExec, nid);
+          continue;
+        }
+        if (before.kind === 'numeric' && after.kind === 'numeric') {
+          if (before.n !== after.n) spawnOutgoingPulses(seedModel, seedExec, nid);
+        } else if (before.kind === 'boolean' && after.kind === 'boolean') {
+          if (before.b !== after.b) spawnOutgoingPulses(seedModel, seedExec, nid);
+        }
       }
     }
     startSimulationLoopIfNeeded();
@@ -491,9 +526,13 @@ export function createModelStore({
     //    이때 휘발되면 ConditionNode 평가가 stale.
     // 차이는 trajectory 재계산뿐: paused 는 play() baseline 이므로 재계산하고, 실행 중
     // 에는 RAF stepTicker 와 펄스 cascade 가 단독 출처이므로 trajectory 는 그대로 둔다.
+    // paused 분기에서도 다운스트림 ValueNode 의 executionState 는 즉시 변하지 않는다 —
+    // executeModel 의 paused 가드가 source propagation 을 차단하기 때문. trama 사상상
+    // 효과는 펄스 도착 시점에만 발현되므로, paused 중 변경값은 ▶ 재진입 시
+    // pausedTransitionHandler 의 t>0 분기가 snapshot 비교로 1회 송출한다.
     // assertEditable 의 "재생 중 모델 mutation 차단" 단언은 구조 편집(노드/엣지 추가·
     // 삭제, 파라미터 변경) 을 대상으로 하지 ValueNode 의 매뉴얼 송출 값 변경은 우회 경로.
-    // 다운스트림 펄스 발사는 호출자가 emitValueOutput 으로 별도 트리거.
+    // 다운스트림 펄스 발사는 호출자가 emitValueOutput 으로 별도 트리거 (실행 중 한정).
     scrubInitialValue: (id, nextValue) => {
       const before = get().model;
       const node = before.nodes[id];
