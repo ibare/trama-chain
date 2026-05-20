@@ -1311,10 +1311,16 @@ export function createModelStore({
     },
 
     // ValueNode 는 "사용자 매뉴얼 송출기" — paused/실행 중 모두 슬라이더로 값
-    // 박제 가능. 단, paused 일 때만 *모델 initialValue 자체* 도 변경 (reset 후에도
-    // 유지될 새 baseline). 실행 중에는 모델은 건드리지 않고 run-time value 만 박제
-    // — assertEditable 의 "재생 중 모델 mutation 차단" 단언과 충돌하지 않으며,
-    // 사용자 관점의 "실행 중 슬라이더로 값을 흘려보낸다" 의도도 살린다.
+    // 박제 가능. 두 분기 모두 model.initialValue 를 mutate 한다:
+    //  - ValueNodeSlider 의 핸들 위치가 node.initialValue.n 에서 계산 — 박제 후
+    //    핸들이 사용자 손을 따라가게 하려면 모델이 동기되어야 한다.
+    //  - 펄스 도착 시 handlePulseArrival 의 becameInvalid 분기가 computeExecutionState
+    //    를 fresh 호출하면 ValueNode 의 값이 model.initialValue 로 복원된다 — 박제값이
+    //    이때 휘발되면 ConditionNode 평가가 stale.
+    // 차이는 trajectory 재계산뿐: paused 는 play() baseline 이므로 재계산하고, 실행 중
+    // 에는 RAF stepTicker 와 펄스 cascade 가 단독 출처이므로 trajectory 는 그대로 둔다.
+    // assertEditable 의 "재생 중 모델 mutation 차단" 단언은 구조 편집(노드/엣지 추가·
+    // 삭제, 파라미터 변경) 을 대상으로 하지 ValueNode 의 매뉴얼 송출 값 변경은 우회 경로.
     // 다운스트림 펄스 발사는 호출자가 emitValueOutput 으로 별도 트리거.
     scrubInitialValue: (id, nextValue) => {
       const before = get().model;
@@ -1331,47 +1337,29 @@ export function createModelStore({
       } else {
         return;
       }
+      const after = updateNodeOp(before, id, { initialValue: nextValueRecord });
+      if (after === before) return;
       const isPaused = timeSettingsStore.getState().paused;
-      if (isPaused) {
-        const after = updateNodeOp(before, id, { initialValue: nextValueRecord });
-        if (after === before) return;
-        // trajectory 는 play() baseline 이라 모델 변경과 함께 재계산.
-        const recomputed = computeExecutionState(after, get().executionState, true, before);
-        set((s) => {
-          const nextValues: Record<NodeId, ExecValue> = {
-            ...s.executionState.values,
-            [id]: nextValueRecord,
-          };
-          const nextValid = new Set(s.executionState.validOutputs);
-          nextValid.add(outputKey(id, 0));
-          return {
-            model: after,
-            executionState: {
-              ...s.executionState,
-              values: nextValues,
-              validOutputs: nextValid,
-            },
-            trajectory: recomputed.trajectory,
-          };
-        });
-      } else {
-        // 실행 중: 모델은 무변경. run-time value 만 박제 + 슬롯 0 valid 유지.
-        set((s) => {
-          const nextValues: Record<NodeId, ExecValue> = {
-            ...s.executionState.values,
-            [id]: nextValueRecord,
-          };
-          const nextValid = new Set(s.executionState.validOutputs);
-          nextValid.add(outputKey(id, 0));
-          return {
-            executionState: {
-              ...s.executionState,
-              values: nextValues,
-              validOutputs: nextValid,
-            },
-          };
-        });
-      }
+      const nextTrajectory = isPaused
+        ? computeExecutionState(after, get().executionState, true, before).trajectory
+        : null;
+      set((s) => {
+        const nextValues: Record<NodeId, ExecValue> = {
+          ...s.executionState.values,
+          [id]: nextValueRecord,
+        };
+        const nextValid = new Set(s.executionState.validOutputs);
+        nextValid.add(outputKey(id, 0));
+        return {
+          model: after,
+          executionState: {
+            ...s.executionState,
+            values: nextValues,
+            validOutputs: nextValid,
+          },
+          ...(nextTrajectory ? { trajectory: nextTrajectory } : {}),
+        };
+      });
       nodeFlashRegistry.trigger(id);
     },
 

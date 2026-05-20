@@ -81,7 +81,7 @@ describe('단기+중기 통합 회귀 (T20)', () => {
     }
   });
 
-  it('실행 중 scrubInitialValue 는 모델 무변경 + executionState.values 만 박제 (사용자 매뉴얼 송출)', () => {
+  it('실행 중 scrubInitialValue — model.initialValue + executionState.values 둘 다 박제, trajectory 는 보존 (사용자 매뉴얼 송출)', () => {
     // paused 상태에서 노드를 만들고 (assertEditable 우회), 실행으로 전환한 뒤
     // scrubInitialValue 의 실행 중 분기를 검증.
     env = createTestModelStore({ paused: true });
@@ -94,18 +94,24 @@ describe('단기+중기 통합 회귀 (T20)', () => {
     const a = env.modelStore.getState().model.nodeOrder[0]!;
     env.timeSettingsStore.getState().setPaused(false);
 
-    const before = env.modelStore.getState();
-    const aNodeBefore = before.model.nodes[a]!;
+    const trajectoryBefore = env.modelStore.getState().trajectory;
 
     env.modelStore.getState().scrubInitialValue(a, 7);
 
     const after = env.modelStore.getState();
-    // 실행 중에는 모델 mutation 금지 — assertEditable 단언과 충돌 없이 통과.
-    expect(after.model.nodes[a]).toBe(aNodeBefore);
-    // executionState.values 는 박제됨 — 사용자 슬라이더 → 즉시 표시 + 다음
-    // 펄스 송출 시 새 값이 흘러간다.
+    // 모델 initialValue 도 박제 — 슬라이더 핸들 위치(model.initialValue.n 기반)
+    // 가 사용자 손을 따라가고, 펄스 도착의 fresh 재계산이 stale 로 복원하지 않음.
+    const aNodeAfter = after.model.nodes[a]!;
+    expect(aNodeAfter.kind).toBe('value');
+    const iv = (aNodeAfter as { initialValue: { kind: string; n?: number } })
+      .initialValue;
+    expect(iv.kind === 'numeric' ? iv.n : null).toBe(7);
+    // executionState.values 도 새 값.
     const v = after.executionState.values[a];
     expect(v && v.kind === 'numeric' ? v.n : null).toBe(7);
+    // trajectory 는 play() baseline 이라 실행 중에는 재계산하지 않음 (RAF stepTicker
+    // 와 펄스 cascade 가 단독 출처).
+    expect(after.trajectory).toBe(trajectoryBefore);
   });
 
   it('paused 중 scrubInitialValue 는 노드 값만 박제, 다운스트림 ValueNode 는 즉시 변하지 않음 (단기 P5)', () => {
