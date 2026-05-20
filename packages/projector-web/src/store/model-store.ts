@@ -1268,10 +1268,12 @@ export function createModelStore({
       set({ model: after, ...exec });
     },
 
-    // ValueNode 는 "사용자 매뉴얼 송출기" — 재생 중에도 슬라이드/토글 가능해야 하므로
-    // assertEditable (재생 중 차단) 가드를 두지 않는 유일한 mutation. UI 의
-    // userAuthoredVisible (초기 OR !paused) 가 호출 시점 자체를 닫는다.
+    // ValueNode 는 "사용자 매뉴얼 송출기" — 초기 또는 paused 일 때만 scrub 가능.
+    // assertEditable 의 "*모든* mutation 액션은 재생 중 차단" 단언과 일관되게 paused
+    // 게이트를 직접 적용한다. UI 의 userAuthoredVisible 가드가 호출 시점을 1차로
+    // 닫지만, UI 회귀 시 모델 mutation 이 슬립스루되지 않도록 store 단에서도 차단.
     scrubInitialValue: (id, nextValue) => {
+      if (!timeSettingsStore.getState().paused) return;
       const before = get().model;
       const node = before.nodes[id];
       if (!node || !isValueNode(node)) return;
