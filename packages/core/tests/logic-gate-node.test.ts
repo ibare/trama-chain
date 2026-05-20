@@ -3,10 +3,8 @@ import {
   addConstantNode,
   addEdge,
   addLogicGateNode,
-  addValueNode,
   booleanValue,
   buildTopology,
-  checkEdgeCompatibility,
   createDefaultCombinerRegistry,
   createEmptyModel,
   defaultNodeKindRegistry,
@@ -14,7 +12,6 @@ import {
   getOutputPortType,
   initializeFromInitialValues,
   isLogicGateNode,
-  numericValue,
   propagateOneStep,
 } from '../src/index.js';
 import { createDefaultShapeRegistry } from '../src/functions/index.js';
@@ -130,28 +127,6 @@ describe('LogicGateNode', () => {
     });
     expect(next.values['g']).toBeUndefined();
     expect(next.validOutputs.has('g:0')).toBe(false);
-  });
-
-  it('PortType compatibility: boolean→gate ok, numeric→gate rejected', () => {
-    let m = createEmptyModel(0);
-    m = addValueNode(
-      m,
-      { id: 'numSrc', label: 'N', unitId: 'free', initialValue: numericValue(0, 'free') },
-      0,
-    );
-    m = addValueNode(
-      m,
-      { id: 'boolSrc', label: 'B', unitId: 'free', initialValue: booleanValue(false) },
-      0,
-    );
-    m = addLogicGateNode(m, { id: 'g', label: 'AND', operator: 'and' }, 0);
-
-    expect(
-      checkEdgeCompatibility(m.nodes['boolSrc']!, m.nodes['g']!).compatible,
-    ).toBe(true);
-    expect(
-      checkEdgeCompatibility(m.nodes['numSrc']!, m.nodes['g']!).compatible,
-    ).toBe(false);
   });
 
   it('NOT inverts a single boolean source', () => {

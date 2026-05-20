@@ -12,17 +12,12 @@ import {
   type ScalarPortSpec,
   type SequencePortSpec,
 } from './port-spec.js';
-import {
-  checkEdgeCompatibility,
-  type EdgeCompatibility,
-} from './edge-compatibility.js';
 import type { NodeKindDescriptor } from './descriptor.js';
 
 // C1 (kinds-split): 분리된 4 모듈의 심볼을 public surface 보존 위해 re-export.
 // 외부 (projector-web/embed) 가 `@trama/core` 에서 보던 이름은 그대로 유효.
-export { FREE_FALLBACK, isIdentityShape, isSequencePortSpec, checkEdgeCompatibility };
+export { FREE_FALLBACK, isIdentityShape, isSequencePortSpec };
 export type {
-  EdgeCompatibility,
   NodeKindDescriptor,
   ObserveExtractionRuntime,
   OutputSlotSpec,

@@ -1,6 +1,6 @@
 import type { Edge, Model, Node, NodeId } from '../../model/index.js';
 import { isValueNode, isNumericValue } from '../../model/index.js';
-import { isSequence, resolveScalar, unwrap } from '../exec-value.js';
+import { asBooleanGate, isSequence, resolveScalar, unwrap } from '../exec-value.js';
 import type { ObserveBuffer } from '../observe-buffer.js';
 import { outputKey } from '../state.js';
 import type { PortTypeContext, PropagateContext } from './context.js';
@@ -33,18 +33,17 @@ export function getNumericNext(ctx: PropagateContext, id: NodeId): number | unde
 }
 
 /**
- * boolean Value 버전. boolean ValueNode propagate가 사용.
- * WrappedValue 면 알맹이 Value 로 unwrap 후 분기. FunctionHandle은 ctx 시각의
- * peek로 환원 후 동일 분기.
- * source가 numeric이면 undefined — PortType 검사가 막아야 하지만 안전망.
+ * boolean Value 추출. boolean ValueNode / LogicGate propagate 가 사용.
+ * 알맹이가 boolean 이면 그대로, 아니면 wrapped meta 에 boolean 이 있으면 그것을
+ * 소비 — Condition 슬롯 출력(meta:boolean) 이 boolean 입력으로 흐를 수 있게 한다.
+ * 시맨틱은 [[asBooleanGate]] 와 일원화 (Generator gate / model-store pulse 와 공유).
+ * FunctionHandle 은 ctx 시각의 peek 로 환원 후 동일 분기.
  */
 export function getBooleanNext(ctx: PropagateContext, id: NodeId): boolean | undefined {
   const ev = ctx.next[id];
   if (ev) {
     if (isSequence(ev)) return undefined;
-    const v = unwrap(resolveScalar(ev, ctx.simulationTimeMs));
-    if (v.kind === 'boolean') return v.b;
-    return undefined;
+    return asBooleanGate(resolveScalar(ev, ctx.simulationTimeMs));
   }
   const source = ctx.model.nodes[id];
   if (source && isValueNode(source) && source.initialValue.kind === 'boolean') {

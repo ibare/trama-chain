@@ -5,7 +5,6 @@ import {
   addObserveNode,
   addValueNode,
   booleanValue,
-  checkEdgeCompatibility,
   createDefaultCombinerRegistry,
   createEmptyModel,
   documentToModel,
@@ -47,41 +46,6 @@ describe('ObserveNode', () => {
       expect(n.capacity).toEqual({ kind: 'windowed', windowMs: 60_000 });
       expect(n.visualization).toBe('last-value');
     }
-  });
-
-  it('PortType: unconnected ObserveNode accepts any input via acceptsAnyInput', () => {
-    let m = createEmptyModel(0);
-    m = addValueNode(
-      m,
-      { id: 'numSrc', label: 'n', unitId: 'free', initialNumber: 1 },
-      0,
-    );
-    m = addValueNode(
-      m,
-      {
-        id: 'boolSrc',
-        label: 'b',
-        unitId: 'free',
-        initialValue: booleanValue(true),
-        combiner: 'and',
-      },
-      0,
-    );
-    m = addObserveNode(m, { id: 'mon', label: 'monitor' }, 0);
-    const numToMon = checkEdgeCompatibility(
-      m.nodes['numSrc']!,
-      m.nodes['mon']!,
-      undefined,
-      m,
-    );
-    const boolToMon = checkEdgeCompatibility(
-      m.nodes['boolSrc']!,
-      m.nodes['mon']!,
-      undefined,
-      m,
-    );
-    expect(numToMon.compatible).toBe(true);
-    expect(boolToMon.compatible).toBe(true);
   });
 
   it('PortType: once connected, output PortType mirrors source', () => {
