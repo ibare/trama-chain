@@ -168,6 +168,14 @@ export function propagateOneStep(
         validOutputs.add(slotKey);
       },
       markExtractionEmitted(nodeId, timeMs) {
+        // lifecycle invariant — lastEmitTimeMs 는 simulation 시간축의 유한·비음 값.
+        // throttle 비교(`time - lastEmit >= interval`) 의 기준이라 NaN/Infinity/음수면
+        // 다음 emit 가 영원히 게이트되거나 즉시 통과해 throttle 정책이 깨진다.
+        if (!Number.isFinite(timeMs) || timeMs < 0) {
+          throw new Error(
+            `markExtractionEmitted: timeMs must be finite and >= 0, got ${timeMs} for node ${nodeId}`,
+          );
+        }
         observeExtractionRuntime[nodeId] = { lastEmitTimeMs: timeMs };
       },
       advanceGeneratorCursor(nodeId, runtime) {

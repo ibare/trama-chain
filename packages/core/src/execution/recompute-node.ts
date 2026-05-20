@@ -284,6 +284,12 @@ export function recomputeNode(
       workingValid.add(slotKey);
     },
     markExtractionEmitted(nodeId, timeMs) {
+      // lifecycle invariant — propagate.ts 의 동일 헬퍼와 시맨틱 일치.
+      if (!Number.isFinite(timeMs) || timeMs < 0) {
+        throw new Error(
+          `markExtractionEmitted: timeMs must be finite and >= 0, got ${timeMs} for node ${nodeId}`,
+        );
+      }
       seedExtractionRuntime[nodeId] = { lastEmitTimeMs: timeMs };
     },
     advanceGeneratorCursor(nodeId, runtime) {
