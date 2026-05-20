@@ -148,11 +148,11 @@ export interface ModelStoreDeps {
   timeSettingsStore: TimeSettingsStore;
   animationLoop: AnimationLoop;
   /**
-   * paused 전이 진입점. 미지정이면 timeSettingsStore.subscribe 직접 사용 (호환).
-   * 지정하면 'effects' phase 에 등록 — pulse-registry 의 'time-axis' 가 시간 축을
-   * 봉합한 후에 시드·loop 변경이 일어나도록 순서가 강제된다.
+   * paused 전이의 단일 진입점. 'effects' phase 에 등록되어 pulse-registry 의
+   * 'time-axis' 가 시간 축을 봉합한 후에 시드·loop 변경이 일어나도록 순서가
+   * 강제된다. trama-instance 가 항상 주입 — optional 호환 분기 없음 (L5-5).
    */
-  simulationOrchestrator?: SimulationOrchestrator;
+  simulationOrchestrator: SimulationOrchestrator;
 }
 
 /** Node patch가 propagation 결과에 영향을 줄 수 있는 필드를 포함하는지. */
@@ -254,10 +254,9 @@ export function createModelStore({
     }, currentPlaybackStepIntervalMs());
   }
 
-  // timeSettings 변경 구독 — paused 변화에 시뮬레이션 루프·playback 반영.
-  // multiplier는 RAF 콜백이 매 frame마다 읽으므로 별도 재시작 불필요.
-  // orchestrator 가 있으면 'effects' phase 로 — pulse-registry 의 'time-axis' 가
-  // pausedAt·startTime 봉합을 마친 후에 시드·spawn 이 일어나도록 보장된다.
+  // orchestrator 의 'effects' phase 핸들러 — pulse-registry 의 'time-axis' 가
+  // pausedAt·startTime 봉합을 마친 *후* 에 시드·spawn·loop 가 일어나도록 순서가
+  // 강제된다. multiplier 는 RAF 콜백이 매 frame 마다 읽으므로 별도 재시작 불필요.
   const pausedTransitionHandler = (
     state: { paused: boolean },
     prev: { paused: boolean },
@@ -289,11 +288,7 @@ export function createModelStore({
       }
     }
   };
-  if (simulationOrchestrator) {
-    simulationOrchestrator.onPauseTransition('effects', pausedTransitionHandler);
-  } else {
-    timeSettingsStore.subscribe(pausedTransitionHandler);
-  }
+  simulationOrchestrator.onPauseTransition('effects', pausedTransitionHandler);
 
   const store = create<ModelStore>((set, get) => ({
     model: initial,
