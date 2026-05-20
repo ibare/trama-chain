@@ -69,6 +69,7 @@ import {
   unwrap,
 } from '@trama/core';
 import { tokens } from '@trama/tokens';
+import { commitExecutionState } from './execution-commit.js';
 import { combinerRegistry, shapeRegistry } from './registries.js';
 import { fizzexExpressionEvaluator } from '../expression/fizzex-evaluator.js';
 import type { PulseRegistry, Pulse } from '../pulse/pulse-registry.js';
@@ -326,8 +327,7 @@ function computeExecutionState(
     }
   }
   return {
-    executionState: {
-      ...fresh.executionState,
+    executionState: commitExecutionState(fresh.executionState, {
       values: mergedValues,
       validOutputs: mergedValid,
       pendingOutputs: mergedPending,
@@ -336,7 +336,7 @@ function computeExecutionState(
       observeBuffers: mergedObserveBuffers,
       observeExtractionRuntime: mergedExtractionRuntime,
       sequenceOutputs: mergedSequenceOutputs,
-    },
+    }),
     trajectory: fresh.trajectory,
   };
 }
@@ -445,13 +445,12 @@ export function createModelStore({
       newRuntime[nid] = { cursor: nextCursor, gateOpen: rt.gateOpen };
     }
     store.setState((s) => ({
-      executionState: {
-        ...s.executionState,
+      executionState: commitExecutionState(s.executionState, {
         values: newValues,
         validOutputs: newValid,
         generatorRuntime: newRuntime,
         simulationTimeMs: s.executionState.simulationTimeMs + stepDelta,
-      },
+      }),
     }));
     if (emittedIds.length === 0) return;
     const latest = store.getState();
@@ -491,11 +490,10 @@ export function createModelStore({
       const newPending = new Set(s.executionState.pendingOutputs);
       newPending.delete(slotKey);
       return {
-        executionState: {
-          ...s.executionState,
+        executionState: commitExecutionState(s.executionState, {
           validOutputs: newValid,
           pendingOutputs: newPending,
-        },
+        }),
       };
     });
     for (const eid of model.edgeOrder) {
@@ -781,10 +779,9 @@ export function createModelStore({
           },
         };
         return {
-          executionState: {
-            ...s.executionState,
+          executionState: commitExecutionState(s.executionState, {
             generatorRuntime: newRuntime,
-          },
+          }),
         };
       });
       nodeFlashRegistry.trigger(pulse.targetNodeId);
@@ -868,13 +865,12 @@ export function createModelStore({
           [pulse.targetNodeId]: { window: nextWindow },
         };
         return {
-          executionState: {
-            ...s.executionState,
+          executionState: commitExecutionState(s.executionState, {
             values: newValues,
             validOutputs: newValid,
             pendingOutputs: newPending,
             stockRuntime: newStockRuntime,
-          },
+          }),
         };
       });
 
@@ -976,7 +972,7 @@ export function createModelStore({
       const newValues: Record<NodeId, ExecValue> = { ...s.executionState.values };
       if (result.newValue !== undefined) newValues[pulse.targetNodeId] = result.newValue;
       return {
-        executionState: {
+        executionState: commitExecutionState(s.executionState, {
           values: newValues,
           sequenceOutputs: {
             ...s.executionState.sequenceOutputs,
@@ -987,10 +983,8 @@ export function createModelStore({
           invalidReasons: result.newInvalidReasons,
           observeBuffers: result.newObserveBuffers,
           observeExtractionRuntime: result.newObserveExtractionRuntime,
-          generatorRuntime: s.executionState.generatorRuntime,
-          stockRuntime: s.executionState.stockRuntime,
-          simulationTimeMs: s.executionState.simulationTimeMs,
-        },
+          // generatorRuntime / stockRuntime / simulationTimeMs 는 prev 자동 보존.
+        }),
       };
     });
 
@@ -1352,11 +1346,10 @@ export function createModelStore({
         nextValid.add(outputKey(id, 0));
         return {
           model: after,
-          executionState: {
-            ...s.executionState,
+          executionState: commitExecutionState(s.executionState, {
             values: nextValues,
             validOutputs: nextValid,
-          },
+          }),
           ...(nextTrajectory ? { trajectory: nextTrajectory } : {}),
         };
       });
