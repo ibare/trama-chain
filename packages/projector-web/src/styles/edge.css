@@ -118,10 +118,11 @@
     opacity: 0.25;
 }
 
-/* 분기 source(Condition true/false 슬롯, LogicGate 출력)에서 나가는 케이블 —
-   점선·반투명으로 "라우팅이 런타임에만 확정됨" 을 표시. 활성 슬롯이든 비활성
-   슬롯이든 동일하게 dashed — 어디로 흐르는지는 펄스 운반 자체가 보여준다.
-   데이터 미도착/평가 보류 같은 상태성은 노드 본체의 "…" + 점선 보더로 표현. */
+/* 분기 source(Condition true/false 슬롯, LogicGate 출력)의 *비활성* 슬롯에서
+   나가는 케이블 — 점선·반투명으로 "이 경로로는 데이터가 흐르지 않음" 을 표시.
+   활성으로 평가된 슬롯은 solid 로 굳어 펄스 운반의 끝을 시각적으로도 표현한다.
+   비분기 source 는 valid 여부와 무관하게 항상 solid — 미도착/평가 보류 같은
+   상태성은 노드 본체의 "…" + 점선 보더로 표현. */
 [data-trama-root] .trama-edge-group.is-branching .trama-edge {
     opacity: var(--physical-opacity-edge-gated);
     stroke-dasharray: var(--physical-dasharray-edge-gated);

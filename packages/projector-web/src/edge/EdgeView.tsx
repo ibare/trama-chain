@@ -5,6 +5,7 @@ import {
   isConditionNode,
   isExpressionNode,
   isNumericValue,
+  isOutputValid,
   isSequence,
   isValueNode,
   normalize,
@@ -98,12 +99,14 @@ function EdgeViewImpl({
     }
     return fallback;
   });
-  // 케이블 dashed 시맨틱은 "분기 — 라우팅이 런타임에만 확정됨" 단일 의미.
-  // source 슬롯이 디스크립터에서 branching: true 로 표시되어 있으면 항상 dashed.
-  // 그 외 케이블은 source valid 여부와 무관하게 항상 solid — 데이터 미도착/평가
-  // 보류 같은 상태성은 노드 본체의 "…" + 점선 보더로 이미 표현된다.
+  // 케이블 dashed 시맨틱은 "분기 슬롯의 비활성 케이블" 단일 의미.
+  // source 슬롯이 디스크립터에서 branching: true 로 표시되어 있고 (Condition true/
+  // false, LogicGate 출력 등) 현재 그 슬롯이 valid 가 아닐 때만 dashed. 평가 결과
+  // 활성으로 확정된 슬롯은 solid 로 굳어 펄스 운반의 끝을 시각적으로도 표현한다.
+  // 비분기 source 는 valid 여부와 무관하게 항상 solid — 데이터 미도착/평가 보류
+  // 같은 상태성은 노드 본체의 "…" + 점선 보더로 이미 표현된다.
   const edgeSourceSlot = edge?.sourceSlotIndex ?? 0;
-  const isBranchingSource = modelStore((s) => {
+  const isBranchingInactive = modelStore((s) => {
     if (!fromId) return false;
     const n = s.model.nodes[fromId];
     if (!n) return false;
@@ -113,7 +116,8 @@ function EdgeViewImpl({
       model: s.model,
       registry: defaultNodeKindRegistry,
     });
-    return slots[edgeSourceSlot]?.branching === true;
+    if (slots[edgeSourceSlot]?.branching !== true) return false;
+    return !isOutputValid(s.executionState, fromId, edgeSourceSlot);
   });
 
   const openFunctionPicker = uiStore((s) => s.openFunctionPicker);
@@ -306,7 +310,7 @@ function EdgeViewImpl({
   if (isContinuousSource) baseClasses.push('is-continuous');
 
   const arrowClass = `trama-arrow${isFeedback ? ' is-feedback' : ''}${isStrained ? ' is-strained' : ''}`;
-  const groupCls = `trama-edge-group${morphing ? ' is-morphing' : ''}${isDetaching ? ' is-detaching' : ''}${isBranchingSource ? ' is-branching' : ''}`;
+  const groupCls = `trama-edge-group${morphing ? ' is-morphing' : ''}${isDetaching ? ' is-detaching' : ''}${isBranchingInactive ? ' is-branching' : ''}`;
 
   // 멀티슬롯 노드에 연결된 엣지에 슬롯 식별색을 CSS 변수로 부여.
   // feedback·strained는 styles.css 우선순위로 이 색을 덮어 시맨틱 상태가 우선됨.
