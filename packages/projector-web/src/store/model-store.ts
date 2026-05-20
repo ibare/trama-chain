@@ -12,7 +12,6 @@ import {
   addValueNode as addValueNodeOp,
   buildTopology,
   createEmptyModel,
-  defaultGeneratorRegistry,
   hasFeedbackEdges,
   initializeFromInitialValues,
   isConditionNode,
@@ -45,7 +44,6 @@ import type {
   EdgeId,
   ExecutionState,
   ExecValue,
-  GeneratorRuntime,
   Model,
   Node,
   NodeId,
@@ -63,6 +61,7 @@ import { commitExecutionState } from './execution-commit.js';
 import { computeExecutionState } from './execution-merge.js';
 import { createSpawnPolicy, type SpawnPolicy } from './spawn-policy.js';
 import { createPulseArrivalHandler } from './pulse-arrival.js';
+import { createSimulationLoop } from './simulation-loop.js';
 import { combinerRegistry, shapeRegistry } from './registries.js';
 import { fizzexExpressionEvaluator } from '../expression/fizzex-evaluator.js';
 import type { PulseRegistry, Pulse } from '../pulse/pulse-registry.js';
@@ -77,22 +76,6 @@ import type { AnimationLoop } from '../canvas/animation-loop.js';
  * 뿐이라, 사용자가 "한 step을 보는 시간"을 정의하는 UI 상수.
  */
 const STEP_TICK_MS = parseFloat(tokens.motion.durationStepTick);
-
-/**
- * 시뮬레이션 고정 dt — RAF 단일 클락에 결속된 1급 시간축의 step 단위.
- * 60Hz에 정합. 한 시뮬레이션 step마다 propagate가 호출되고 simulationTimeMs가
- * 이 값만큼 진행한다. 배속(multiplier)은 dt에 곱하지 않는다 — accumulator가
- * 빠르게 차서 한 RAF 안에서 step 횟수가 늘어나는 방식으로 흡수한다.
- */
-const FIXED_DT_MS = 1000 / 60;
-
-/**
- * spiral-of-death 회피 — propagate 비용이 FIXED_DT를 넘으면 accumulator가
- * 영원히 못 따라잡는다. 누적량과 한 RAF당 step 횟수에 상한을 둬 시뮬레이션이
- * 벽시간 대비 *느려지는* 안전한 fallback으로 수렴.
- */
-const MAX_ACCUM_MS = 250;
-const MAX_STEPS_PER_RAF = 8;
 
 export interface ModelStore {
   model: Model;
@@ -208,6 +191,12 @@ export function createModelStore({
   let spawnOutgoingPulses!: SpawnPolicy['spawnOutgoingPulses'];
   let spawnStockSlotPulse!: SpawnPolicy['spawnStockSlotPulse'];
   let handlePulseArrival!: (pulse: Pulse) => void;
+  // L5-4: simulation-loop 모듈로 추출된 RAF 시뮬레이션 펌프의 표면.
+  // closure 변수(accumulator·lastWallNow·ticker handle) 는 모두 simulation-loop
+  // factory 안으로 이전. 본 모듈은 lazy-let 으로 호출 표면만 보유한다.
+  let startSimulationLoopIfNeeded!: () => void;
+  let stopSimulationLoop!: () => void;
+  let reconcileSimulationLoop!: () => void;
   /**
    * 모델 편집 가능 여부 — paused일 때만 true. 재생 중에는 console.warn 후 false.
    * 단일 진입점으로 모든 mutation 액션이 통과해 "정지 중에만 편집"을 강제한다.
@@ -222,170 +211,12 @@ export function createModelStore({
   }
 
   /**
-   * 시뮬레이션 클락 — RAF 단일 루프에 결속. 매 RAF에서 wallDt를 측정해
-   * multiplier만큼 시뮬레이션 시간으로 환산하고, FIXED_DT_MS 단위로 잘라
-   * tickGenerators를 N회 호출한다. 한 step에서 simulationTimeMs += FIXED_DT_MS.
-   *
-   * 사용자는 시뮬레이션 시간(simulationTimeMs)을 본다 — wall time이 아니라.
-   * 배속이 변해도 한 step의 dt는 일정(결정성·정밀도 보존), 대신 한 wall
-   * 단위에서 처리되는 step 수가 달라진다.
-   *
-   * propagateOneStep을 거치지 않고 paradigm.emit으로 cursor만 진행한 뒤 펄스를
-   * spawn — 다운스트림 갱신은 기존 펄스 hot-path가 담당하므로 펄스 시각화·flash가
-   * 자연스럽게 흐른다.
-   */
-  let unregisterSimulationTicker: (() => void) | null = null;
-  let simAccumMs = 0;
-  let lastWallNowMs: number | null = null;
-
-  /**
-   * 한 generator가 실제로 이번 tick에 emit해야 하는지.
-   *
-   * 시맨틱은 [[generatorNodeDescriptor]] propagate와 동일:
-   *  - 입력 미연결: 항상 emit (글로벌 paused가 시간의 단일 출처)
-   *  - 입력 연결: incoming boolean이 true여야 emit. invalid·boolean 아님이면 freeze
-   *
-   * 입력 연결: `rt.gateOpen` 캐시만 본다 — `executionState.values[source]`를
-   * 직접 읽으면 펄스 도착 전에 ticker가 그래프 변화를 감지해 효과가 사후 펄스보다
-   * 먼저 발현되는 비대칭 버그가 생긴다. 캐시는 펄스 도착 시점에만 갱신된다.
-   */
-  function isGeneratorEffectivelyEnabled(
-    model: ReturnType<typeof store.getState>['model'],
-    executionState: ReturnType<typeof store.getState>['executionState'],
-    nid: NodeId,
-  ): boolean {
-    const rt = executionState.generatorRuntime[nid];
-    if (!rt) return false;
-    const hasIncoming = model.edgeOrder.some((eid) => {
-      const e = model.edges[eid];
-      return !!e && e.to === nid && e.lag === 0;
-    });
-    if (!hasIncoming) return true;
-    return rt.gateOpen === true;
-  }
-
-  function tickGenerators(): void {
-    const { model, executionState, playbackStep } = store.getState();
-    if (playbackStep !== null) return;
-    // 시뮬레이션 시간은 generator 유무와 무관하게 paused=false 동안 항상 진행한다.
-    // RAF 루프가 시뮬레이션 시간축의 유일한 출처. generator emit은 그 시간 안에서
-    // 일어나는 부수 효과로, gate 조건을 만족하는 generator가 있을 때만 함께 갱신된다.
-    const stepDelta = FIXED_DT_MS;
-    const nextSimulationTimeMs = executionState.simulationTimeMs + stepDelta;
-    const newValues: Record<NodeId, ExecValue> = { ...executionState.values };
-    const newValid = new Set(executionState.validOutputs);
-    const newRuntime: Record<NodeId, GeneratorRuntime> = {
-      ...executionState.generatorRuntime,
-    };
-    const emittedIds: NodeId[] = [];
-    for (const nid in executionState.generatorRuntime) {
-      const rt = executionState.generatorRuntime[nid];
-      if (!rt) continue;
-      if (!isGeneratorEffectivelyEnabled(model, executionState, nid)) continue;
-      const node = model.nodes[nid];
-      if (!node || !isGeneratorNode(node)) continue;
-      const { value, nextCursor } = defaultGeneratorRegistry.emit(
-        node.params,
-        rt.cursor,
-        nextSimulationTimeMs,
-      );
-      // value=undefined는 paradigm이 freeze한 경우(스텝 t<startMs 등). values/validOutputs를
-      // 건드리지 않아 이전 상태를 유지하고 cursor만 진행. 다운스트림 펄스도 띄우지 않는다.
-      if (value !== undefined) {
-        newValues[nid] = value;
-        newValid.add(outputKey(nid, 0));
-        emittedIds.push(nid);
-      }
-      // gateOpen 캐시는 펄스로만 갱신되는 단일 진입 — ticker tick에서 드롭하면
-      // 다음 tick에 게이트 false로 평가돼 emit이 멈춘다 (ticker 자체는 계속 시간만 진행).
-      newRuntime[nid] = { cursor: nextCursor, gateOpen: rt.gateOpen };
-    }
-    store.setState((s) => ({
-      executionState: commitExecutionState(s.executionState, {
-        values: newValues,
-        validOutputs: newValid,
-        generatorRuntime: newRuntime,
-        simulationTimeMs: s.executionState.simulationTimeMs + stepDelta,
-      }),
-    }));
-    if (emittedIds.length === 0) return;
-    const latest = store.getState();
-    for (const nid of emittedIds) {
-      nodeFlashRegistry.trigger(nid);
-      spawnOutgoingPulses(latest.model, latest.executionState, nid);
-    }
-  }
-  /**
    * playback step 간 wall-time 지연. multiplier로 나눠 "한 step을 보는 시간"을
    * 환산한다. 시뮬레이션 ticker와 무관 — trajectory 재생용 setTimeout 경로 전용.
    */
   function currentPlaybackStepIntervalMs(): number {
     const m = timeSettingsStore.getState().stepSpeedMultiplier;
     return STEP_TICK_MS / (m > 0 ? m : 1);
-  }
-
-  /**
-   * 매 RAF에서 호출되는 시뮬레이션 step 펌프.
-   *
-   * wallDt를 측정 → multiplier 곱해 simAccumMs에 누적 → FIXED_DT_MS 단위로 잘라
-   * 가능한 만큼 tickGenerators 호출. 한 RAF에서 propagate가 너무 많이 일어나
-   * 프레임이 막히는 spiral-of-death는 MAX_ACCUM_MS·MAX_STEPS_PER_RAF로 막는다.
-   *
-   * paused=true 동안은 wallDt 추적만 유지(다음 resume 시 첫 frame이 큰 점프를
-   * 만들지 않도록) accumulator는 0으로 리셋. unregister하지 않고 분기로 처리해
-   * paused 토글의 부수 효과(register/unregister 무한 토글)를 피한다.
-   */
-  function rafSimulationStep(): void {
-    const now = performance.now();
-    if (lastWallNowMs === null) {
-      lastWallNowMs = now;
-      return;
-    }
-    const wallDt = now - lastWallNowMs;
-    lastWallNowMs = now;
-    if (timeSettingsStore.getState().paused) {
-      simAccumMs = 0;
-      return;
-    }
-    if (store.getState().playbackStep !== null) {
-      simAccumMs = 0;
-      return;
-    }
-    const multiplier = timeSettingsStore.getState().stepSpeedMultiplier;
-    const effectiveMult = multiplier > 0 ? multiplier : 1;
-    simAccumMs = Math.min(simAccumMs + wallDt * effectiveMult, MAX_ACCUM_MS);
-    let steps = 0;
-    while (simAccumMs >= FIXED_DT_MS && steps < MAX_STEPS_PER_RAF) {
-      tickGenerators();
-      simAccumMs -= FIXED_DT_MS;
-      steps++;
-    }
-  }
-
-  function startSimulationLoopIfNeeded(): void {
-    if (unregisterSimulationTicker !== null) return;
-    if (timeSettingsStore.getState().paused) return;
-    lastWallNowMs = null;
-    simAccumMs = 0;
-    unregisterSimulationTicker = animationLoop.register(rafSimulationStep);
-  }
-  function stopSimulationLoop(): void {
-    if (unregisterSimulationTicker !== null) {
-      unregisterSimulationTicker();
-      unregisterSimulationTicker = null;
-    }
-    lastWallNowMs = null;
-    simAccumMs = 0;
-  }
-  /**
-   * 모델·실행상태 변이 후 시뮬레이션 루프 상태를 reconcile.
-   *
-   * on/off의 진실의 출처는 paused 상태 — generator 유무와 무관하다.
-   * 변이 후에도 paused=false면 루프가 계속 돌아야 시뮬레이션 시간이 진행된다.
-   */
-  function reconcileSimulationLoop(): void {
-    if (timeSettingsStore.getState().paused) stopSimulationLoop();
-    else startSimulationLoopIfNeeded();
   }
 
   /**
@@ -830,16 +661,29 @@ export function createModelStore({
     },
   }));
 
-  // L5-2/L5-3 의 늦은 init — store/reconcileSimulationLoop 가 모두 정의된 *지금*
-  // 시점에 한 번만 assign. createSpawnPolicy 의 getHandlePulseArrival 은 lazy
-  // ref 라 두 factory 의 호출 순서에 무관하게 안전. pulse-arrival 은 deps 로
-  // spawn 함수를 즉시 받아 본문에서 직접 호출 — 순환은 lazy 한 쪽에서만.
+  // L5-2/L5-3/L5-4 의 늦은 init — store 가 정의된 *지금* 시점에 한 번만 assign.
+  //
+  // 호출 순서가 중요:
+  //  1. createSpawnPolicy  — pulse-arrival/sim-loop 가 spawn 함수를 deps 로 받음
+  //  2. createSimulationLoop — pulse-arrival 이 reconcile 을 deps 로 받음
+  //  3. createPulseArrivalHandler — 마지막
+  //
+  // 순환 (spawn-policy → handlePulseArrival → spawn-policy) 은 spawn-policy 의
+  // getHandlePulseArrival lazy ref 한 곳으로만 우회. 나머지는 즉시 주입.
   ({ spawnOutgoingPulses, spawnStockSlotPulse } = createSpawnPolicy({
     store,
     timeSettingsStore,
     pulseRegistry,
     getHandlePulseArrival: () => handlePulseArrival,
   }));
+  ({ startSimulationLoopIfNeeded, stopSimulationLoop, reconcileSimulationLoop } =
+    createSimulationLoop({
+      store,
+      timeSettingsStore,
+      animationLoop,
+      nodeFlashRegistry,
+      spawnOutgoingPulses,
+    }));
   handlePulseArrival = createPulseArrivalHandler({
     store,
     nodeFlashRegistry,
