@@ -14,7 +14,6 @@ import {
   computeStockRate,
   createEmptyModel,
   defaultGeneratorRegistry,
-  defaultNodeKindRegistry,
   executeModel,
   hasFeedbackEdges,
   initializeFromInitialValues,
@@ -70,6 +69,11 @@ import {
 } from '@trama/core';
 import { tokens } from '@trama/tokens';
 import { commitExecutionState } from './execution-commit.js';
+import {
+  selectIsContinuousSource,
+  selectIsSlotActive,
+  selectSourceExecValue,
+} from './edge-selectors.js';
 import { combinerRegistry, shapeRegistry } from './registries.js';
 import { fizzexExpressionEvaluator } from '../expression/fizzex-evaluator.js';
 import type { PulseRegistry, Pulse } from '../pulse/pulse-registry.js';
@@ -690,19 +694,15 @@ export function createModelStore({
     // 흐름을 표현하므로 시각 펄스는 띄우지 않고, 그래도 다운스트림 상태(예:
     // ObserveNode 누적 버퍼) 는 갱신되어야 하므로 즉시 도착한 합성 Pulse 로
     // 동기 propagate 만 수행한다.
-    const sourceNode = model.nodes[sourceNodeId];
-    const sourceInterp =
-      sourceNode &&
-      defaultNodeKindRegistry.forNode(sourceNode)?.outputInterpolation?.(sourceNode);
-    const isContinuousSource = sourceInterp === 'continuous';
+    const isContinuousSource = selectIsContinuousSource(model, sourceNodeId);
     for (const eid of model.edgeOrder) {
       const e = model.edges[eid];
       if (!e || e.from !== sourceNodeId) continue;
       if ((e.lag ?? 0) !== 0) continue;
       const slot = e.sourceSlotIndex ?? 0;
       if (allowedSlots && !allowedSlots.has(slot)) continue;
-      if (!executionState.validOutputs.has(outputKey(sourceNodeId, slot))) continue;
-      const sourceValue = executionState.values[sourceNodeId];
+      if (!selectIsSlotActive(executionState, sourceNodeId, slot)) continue;
+      const sourceValue = selectSourceExecValue(executionState, sourceNodeId);
       if (!sourceValue) continue;
       if (isContinuousSource) {
         handlePulseArrival({
