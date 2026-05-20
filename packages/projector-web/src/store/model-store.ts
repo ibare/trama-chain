@@ -942,7 +942,7 @@ export function createModelStore({
           },
           validOutputs: result.validOutputs,
           pendingOutputs: result.pendingOutputs,
-          invalidReasons: s.executionState.invalidReasons,
+          invalidReasons: result.newInvalidReasons,
           observeBuffers: result.newObserveBuffers,
           observeExtractionRuntime: result.newObserveExtractionRuntime,
           generatorRuntime: s.executionState.generatorRuntime,

@@ -107,6 +107,13 @@ export interface RecomputeNodeResult {
    * sequenceOutputs 와 머지.
    */
   newSequenceOutputs: Record<string, SequenceValue>;
+  /**
+   * 재계산 후의 invalid 사유 맵. 디스크립터가 평가 실패(예: ExpressionNode 의
+   * 변수 미정의) 를 ctx.invalidReasons 에 기록했거나, 평가 성공으로 직전 사유가
+   * 제거됐을 수 있다. 호출자가 결과를 state.invalidReasons 에 반영하지 않으면
+   * UI 의 invalid 배지가 stale 상태로 남는다.
+   */
+  newInvalidReasons: ExecutionState['invalidReasons'];
 }
 
 /**
@@ -151,6 +158,7 @@ export function recomputeNode(
       newObserveBuffers: seedBuffers,
       newObserveExtractionRuntime: seedExtractionRuntime,
       newSequenceOutputs: seedSequenceOutputs,
+      newInvalidReasons: { ...state.invalidReasons },
     };
   }
 
@@ -166,6 +174,7 @@ export function recomputeNode(
       newObserveBuffers: seedBuffers,
       newObserveExtractionRuntime: seedExtractionRuntime,
       newSequenceOutputs: seedSequenceOutputs,
+      newInvalidReasons: { ...state.invalidReasons },
     };
   }
 
@@ -260,5 +269,6 @@ export function recomputeNode(
     newObserveBuffers: seedBuffers,
     newObserveExtractionRuntime: seedExtractionRuntime,
     newSequenceOutputs: seedSequenceOutputs,
+    newInvalidReasons: workingInvalidReasons,
   };
 }
