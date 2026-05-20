@@ -81,6 +81,33 @@ describe('단기+중기 통합 회귀 (T20)', () => {
     }
   });
 
+  it('실행 중 scrubInitialValue 는 모델 무변경 + executionState.values 만 박제 (사용자 매뉴얼 송출)', () => {
+    // paused 상태에서 노드를 만들고 (assertEditable 우회), 실행으로 전환한 뒤
+    // scrubInitialValue 의 실행 중 분기를 검증.
+    env = createTestModelStore({ paused: true });
+    env.modelStore.getState().addNode({
+      label: 'A',
+      unitId: 'count',
+      unitOverride: { min: 0, max: 10 },
+      initialNumber: 3,
+    });
+    const a = env.modelStore.getState().model.nodeOrder[0]!;
+    env.timeSettingsStore.getState().setPaused(false);
+
+    const before = env.modelStore.getState();
+    const aNodeBefore = before.model.nodes[a]!;
+
+    env.modelStore.getState().scrubInitialValue(a, 7);
+
+    const after = env.modelStore.getState();
+    // 실행 중에는 모델 mutation 금지 — assertEditable 단언과 충돌 없이 통과.
+    expect(after.model.nodes[a]).toBe(aNodeBefore);
+    // executionState.values 는 박제됨 — 사용자 슬라이더 → 즉시 표시 + 다음
+    // 펄스 송출 시 새 값이 흘러간다.
+    const v = after.executionState.values[a];
+    expect(v && v.kind === 'numeric' ? v.n : null).toBe(7);
+  });
+
   it('paused 중 scrubInitialValue 는 노드 값만 박제, 다운스트림 ValueNode 는 즉시 변하지 않음 (단기 P5)', () => {
     env = createTestModelStore({ paused: true });
     env.modelStore.getState().addNode({
