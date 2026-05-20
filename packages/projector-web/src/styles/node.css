@@ -204,25 +204,23 @@
     color: var(--color-node-text-low);
 }
 
-/* 토글 스위치 — track 색이 on/off 상태를 알린다. 외부 입력이 없을 때만 렌더되며
-   노드 본체와 다른 인터랙션이므로 hit-area 자체가 클릭/포인터를 캡쳐한다. */
-[data-trama-root] .trama-boolean-toggle-track {
-    stroke: none;
-    transition: fill 120ms ease;
+/* 토글 스위치 — 시안 비례 5요소(배경 캡슐 + 트랙 rest + 트랙 fill + thumb outer/inner).
+   색·stroke 는 값노드 슬라이더와 같은 --color-slider-* 토큰을 그대로 참조. */
+[data-trama-root] .trama-boolean-toggle-capsule {
+    stroke: var(--color-slider-capsule-stroke);
+    stroke-width: 1px;
 }
 
-[data-trama-root] .trama-boolean-toggle-track.is-on {
-    fill: var(--color-node-stroke-focal);
+[data-trama-root] .trama-boolean-toggle-thumb-outer {
+    fill: var(--color-slider-thumb-fill);
+    stroke: var(--color-slider-thumb-stroke);
+    stroke-width: 1px;
+    transition: x 120ms ease;
 }
 
-[data-trama-root] .trama-boolean-toggle-track.is-off {
-    fill: var(--color-node-stroke-calm);
-}
-
-[data-trama-root] .trama-boolean-toggle-handle {
-    fill: #ffffff;
-    pointer-events: none;
-    transition: cx 120ms ease;
+[data-trama-root] .trama-boolean-toggle-thumb-inner {
+    fill: var(--color-slider-thumb-fill);
+    transition: x 120ms ease;
 }
 
 [data-trama-root] .trama-boolean-toggle-hit {
