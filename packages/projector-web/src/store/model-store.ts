@@ -56,13 +56,16 @@ import {
   isValueNode,
   numericValue,
 } from '@trama/core';
-import { tokens } from '@trama/tokens';
 import { commitExecutionState } from './execution-commit.js';
 import { computeExecutionState } from './execution-merge.js';
 import { createSpawnPolicy, type SpawnPolicy } from './spawn-policy.js';
 import { createPulseArrivalHandler } from './pulse-arrival.js';
 import { createSimulationLoop } from './simulation-loop.js';
 import { createExecutionStore, type ExecutionStore } from './execution-store.js';
+import {
+  createPlaybackController,
+  type PlaybackController,
+} from './playback-controller.js';
 import { combinerRegistry, shapeRegistry } from './registries.js';
 import { fizzexExpressionEvaluator } from '../expression/fizzex-evaluator.js';
 import type { PulseRegistry, Pulse } from '../pulse/pulse-registry.js';
@@ -70,13 +73,6 @@ import type { NodeFlashRegistry } from '../pulse/node-flash-registry.js';
 import type { SimulationOrchestrator } from './simulation-orchestrator.js';
 import type { TimeSettingsStore } from './time-settings.js';
 import type { AnimationLoop } from '../canvas/animation-loop.js';
-
-/**
- * N-step playback의 step 간 wall-time 지연. multiplier로 나뉜다. 시뮬레이션
- * 시간축과는 무관 — playback은 *이미 계산된 trajectory*를 시각적으로 재생할
- * 뿐이라, 사용자가 "한 step을 보는 시간"을 정의하는 UI 상수.
- */
-const STEP_TICK_MS = parseFloat(tokens.motion.durationStepTick);
 
 export interface ModelStore {
   model: Model;
@@ -182,8 +178,6 @@ export function createModelStore({
 }: ModelStoreDeps): ModelStoreInstance {
   const initial = createEmptyModel();
   const initialExec = computeExecutionState(initial);
-  let activePlaybackToken = 0;
-  let playbackTimeoutId: number | null = null;
   // spawn 정책(L5-2)·펄스 도착 처리(L5-3)는 외부 모듈이 캡슐화. 호출 표면은
   // free function 그대로 유지하기 위해 let + 늦은 assign — definite assignment
   // assertion 으로 TS 의 "used before assigned" 검사를 우회한다. 호출 시점에는
@@ -201,6 +195,9 @@ export function createModelStore({
   // L5-6: model+executionState commit 경로의 단일 헬퍼. 위 lazy-let 들과 동일
   // 패턴 — store 생성 이후 createExecutionStore 가 합쳐 init.
   let commitModelMutation!: ExecutionStore['commitModelMutation'];
+  // L5-7: trajectory playback 컨트롤러. token / timer / scheduleStep 모두 factory
+  // closure 로 캡슐화. play / pause / resumeIfActive / invalidate 표면만 호출.
+  let playbackController!: PlaybackController;
   /**
    * 모델 편집 가능 여부 — paused일 때만 true. 재생 중에는 console.warn 후 false.
    * 단일 진입점으로 모든 mutation 액션이 통과해 "정지 중에만 편집"을 강제한다.
@@ -214,50 +211,6 @@ export function createModelStore({
     return false;
   }
 
-  /**
-   * playback step 간 wall-time 지연. multiplier로 나눠 "한 step을 보는 시간"을
-   * 환산한다. 시뮬레이션 ticker와 무관 — trajectory 재생용 setTimeout 경로 전용.
-   */
-  function currentPlaybackStepIntervalMs(): number {
-    const m = timeSettingsStore.getState().stepSpeedMultiplier;
-    return STEP_TICK_MS / (m > 0 ? m : 1);
-  }
-
-  /**
-   * N-step playback. 자가 reschedule 패턴 — 다음 step 하나만 setTimeout으로 예약하고
-   * 발화 시 다음 step을 다시 예약한다. 이렇게 하면 multiplier 변경이 자연스럽게
-   * 다음 간격에 반영되고, pause는 timer 한 개만 끊으면 끝.
-   */
-  function applyStep(s: ExecutionState, stepIndex: number, isLast: boolean): void {
-    const prev = store.getState().executionState;
-    for (const nid of Object.keys(s.values)) {
-      if (s.values[nid] !== prev.values[nid]) nodeFlashRegistry.trigger(nid);
-    }
-    store.setState({ executionState: s, playbackStep: isLast ? null : stepIndex });
-  }
-  function stopPlaybackTimer(): void {
-    if (playbackTimeoutId !== null) {
-      window.clearTimeout(playbackTimeoutId);
-      playbackTimeoutId = null;
-    }
-  }
-  function schedulePlaybackStep(token: number, nextIndex: number): void {
-    if (activePlaybackToken !== token) return;
-    if (timeSettingsStore.getState().paused) return;
-    const traj = store.getState().trajectory;
-    if (nextIndex >= traj.length) return;
-    playbackTimeoutId = window.setTimeout(() => {
-      playbackTimeoutId = null;
-      if (activePlaybackToken !== token) return;
-      const trajNow = store.getState().trajectory;
-      if (nextIndex >= trajNow.length) return;
-      const s = trajNow[nextIndex]!;
-      const isLast = nextIndex === trajNow.length - 1;
-      applyStep(s, nextIndex, isLast);
-      if (!isLast) schedulePlaybackStep(token, nextIndex + 1);
-    }, currentPlaybackStepIntervalMs());
-  }
-
   // orchestrator 의 'effects' phase 핸들러 — pulse-registry 의 'time-axis' 가
   // pausedAt·startTime 봉합을 마친 *후* 에 시드·spawn·loop 가 일어나도록 순서가
   // 강제된다. multiplier 는 RAF 콜백이 매 frame 마다 읽으므로 별도 재시작 불필요.
@@ -265,32 +218,28 @@ export function createModelStore({
     state: { paused: boolean },
     prev: { paused: boolean },
   ): void => {
-    if (state.paused !== prev.paused) {
-      if (state.paused) {
-        stopSimulationLoop();
-        stopPlaybackTimer();
-      } else {
-        // 첫 ▶ 진입 (직전 t=0) 이면 ValueNode 매뉴얼 송출기들의 초기값을 일괄
-        // 시드한다. nodeOrder 순회로 결정성 유지. 이후 ▶/||/▶ 토글에는
-        // 시뮬레이션 시간이 진행된 상태이므로 시드하지 않는다.
-        // (다른 source 시드는 generator ticker / pulse arrival propagate 가 책임.)
-        const seedState = store.getState();
-        if (seedState.executionState.simulationTimeMs === 0) {
-          const seedModel = seedState.model;
-          const seedExec = seedState.executionState;
-          for (const nid of seedModel.nodeOrder) {
-            const node = seedModel.nodes[nid];
-            if (!node || !isValueNode(node)) continue;
-            spawnOutgoingPulses(seedModel, seedExec, nid);
-          }
-        }
-        startSimulationLoopIfNeeded();
-        const playbackStep = store.getState().playbackStep;
-        if (playbackStep !== null) {
-          schedulePlaybackStep(activePlaybackToken, playbackStep + 1);
-        }
+    if (state.paused === prev.paused) return;
+    if (state.paused) {
+      stopSimulationLoop();
+      playbackController.pause();
+      return;
+    }
+    // 첫 ▶ 진입 (직전 t=0) 이면 ValueNode 매뉴얼 송출기들의 초기값을 일괄
+    // 시드한다. nodeOrder 순회로 결정성 유지. 이후 ▶/||/▶ 토글에는 시뮬레이션
+    // 시간이 진행된 상태이므로 시드하지 않는다.
+    // (다른 source 시드는 generator ticker / pulse arrival propagate 가 책임.)
+    const seedState = store.getState();
+    if (seedState.executionState.simulationTimeMs === 0) {
+      const seedModel = seedState.model;
+      const seedExec = seedState.executionState;
+      for (const nid of seedModel.nodeOrder) {
+        const node = seedModel.nodes[nid];
+        if (!node || !isValueNode(node)) continue;
+        spawnOutgoingPulses(seedModel, seedExec, nid);
       }
     }
+    startSimulationLoopIfNeeded();
+    playbackController.resumeIfActive();
   };
   simulationOrchestrator.onPauseTransition('effects', pausedTransitionHandler);
 
@@ -597,21 +546,14 @@ export function createModelStore({
     },
 
     play: () => {
-      const { trajectory } = get();
-      if (trajectory.length <= 1) return;
-      stopPlaybackTimer();
-      const token = ++activePlaybackToken;
-      // step 0은 즉시 적용, 1+는 self-rescheduling으로 진행.
-      applyStep(trajectory[0]!, 0, false);
-      schedulePlaybackStep(token, 1);
+      playbackController.play();
     },
 
     resetSimulation: () => {
       // 재생 중 리셋을 누르면 시간 0 + 정지 상태로 — "처음으로 되감기".
       timeSettingsStore.getState().setPaused(true);
       stopSimulationLoop();
-      stopPlaybackTimer();
-      activePlaybackToken++;
+      playbackController.invalidate();
       pulseRegistry.clearAll();
       const fresh = initializeFromInitialValues(get().model);
       set({
@@ -651,6 +593,11 @@ export function createModelStore({
     spawnOutgoingPulses,
     reconcileSimulationLoop,
   }));
+  playbackController = createPlaybackController({
+    store,
+    timeSettingsStore,
+    nodeFlashRegistry,
+  });
   handlePulseArrival = createPulseArrivalHandler({
     store,
     nodeFlashRegistry,
