@@ -35,11 +35,19 @@ export interface RecomputeNodeOptions {
   generatorRegistry?: GeneratorRegistry;
   topology?: InstantaneousTopology;
   /**
-   * 특정 source 노드의 값을 임시 대체. 펄스 도착 시 그 펄스가 운반한
-   * snapshot 값을 해당 source의 출력으로 간주하기 위함. 다른 입력은
-   * 현재 state 그대로 사용. ExecValue — WrappedValue 메타까지 그대로 전달된다.
+   * 펄스가 운반한 source 출력 snapshot. recompute 동안 해당 source 의 해당
+   * 슬롯 출력만 이 값으로 간주하고 valid 로 켠다. 다른 입력은 현재 state
+   * 그대로 사용. ExecValue — WrappedValue 메타까지 그대로 전달된다.
+   *
+   * 슬롯 정보가 핵심: Condition 같은 다출력 source 는 펄스가 어느 슬롯에서
+   * 왔는지로 valid 슬롯이 결정된다. 슬롯 0 을 가정해 강제로 켜면 반대
+   * 슬롯의 stale valid 가 다운스트림에 누설된다.
    */
-  sourceValueOverrides?: Readonly<Record<NodeId, ExecValue>>;
+  sourceOverride?: {
+    sourceNodeId: NodeId;
+    sourceSlotIndex: number;
+    value: ExecValue;
+  };
   /**
    * ObserveNode 누적 버퍼의 시작 상태. 미지정이면 빈 버퍼로 시작해 hot-path
    * 단발 호출에서 누적을 버릴 수 있다. 펄스 도착 시 누적이 *유지*되어야 하면
@@ -106,8 +114,8 @@ export interface RecomputeNodeResult {
  * 전체 그래프 propagate와 달리 위상 순회 없이 *해당 노드만* 디스크립터를 호출.
  * 펄스 도착 시점의 시각·논리적 단위 갱신용.
  *
- * sourceValueOverrides가 주어지면 그 source 노드들의 출력값은 override 값으로
- * 간주된다. 펄스가 운반한 snapshot을 그 펄스의 source에만 적용하기 위해 쓴다.
+ * sourceOverride 가 주어지면 그 펄스 source 노드의 *지정 슬롯* 출력만 override
+ * 값으로 간주된다. 펄스가 운반한 snapshot 을 그 펄스의 source 슬롯에만 적용.
  */
 export function recomputeNode(
   nodeId: NodeId,
@@ -172,14 +180,13 @@ export function recomputeNode(
     ...state.invalidReasons,
   };
 
-  // 펄스 snapshot override 적용 (source 노드들의 출력을 임시 치환).
-  if (options.sourceValueOverrides) {
-    for (const [srcId, v] of Object.entries(options.sourceValueOverrides)) {
-      workingValues[srcId] = v;
-      // override가 들어왔다는 건 그 source의 슬롯 0이 valid임을 의미. (다중 슬롯
-      // override는 펄스 모델 범위 밖.)
-      workingValid.add(outputKey(srcId, 0));
-    }
+  // 펄스 snapshot override 적용 — 펄스가 운반한 source 의 *지정 슬롯* 만 valid
+  // 로 켜고 값을 박는다. 슬롯 0 을 가정해 켜면 Condition 같은 분기 source 에서
+  // 반대 슬롯이 stale valid 로 commit 돼 다운스트림 케이블이 잘못 solid 로 그려진다.
+  if (options.sourceOverride) {
+    const { sourceNodeId, sourceSlotIndex, value } = options.sourceOverride;
+    workingValues[sourceNodeId] = value;
+    workingValid.add(outputKey(sourceNodeId, sourceSlotIndex));
   }
 
   const ctx: PropagateContext = {

@@ -138,8 +138,18 @@ export interface ModelStore {
   setQuestion: (q: string | null) => void;
   setExecution: (e: Partial<Model['execution']>) => void;
 
-  /** 노드 값 스크럽: 펄스 spawn 트리거 + 즉시 값 반영. */
+  /**
+   * ValueNode 매뉴얼 송출 — 값 박제만. 재생/멈춤/초기 모두 호출 가능.
+   * 다운스트림 펄스 발사는 emitValueOutput 이 별도로 책임 (drag 종료/toggle click).
+   */
   scrubInitialValue: (id: NodeId, nextValue: number | boolean) => void;
+
+  /**
+   * ValueNode 다운스트림 펄스 발사. ValueNodeSlider drag 종료(onPointerUp) 및
+   * BooleanValueNodeView 토글 click 시점에 호출. simulationTimeMs===0 이면 보류
+   * (첫 ▶ 진입 시 unpause 분기가 모든 ValueNode 를 일괄 시드한다).
+   */
+  emitValueOutput: (id: NodeId) => void;
 
   /** trajectory를 step-by-step 애니메이션 재생 (§ 11.7). feedback 모델에서만 의미. */
   play: () => void;
@@ -327,12 +337,6 @@ export function createModelStore({
   const initialExec = computeExecutionState(initial);
   let activePlaybackToken = 0;
   let playbackTimeoutId: number | null = null;
-  // 멈춤 중에 mutate 된 source 노드 — 재생 재개 시 flushPendingOnUnpause 가
-  // target stale 여부와 무관하게 강제로 시드한다. paused 일 때는 spawn 자체가
-  // 막혀 다운스트림이 stale 인데 target slot 0 valid 가 그대로라 기본 시드
-  // 조건 (② target slot 0 invalid) 에 잡히지 않는 케이스를 보완.
-  const pausedSourceMutations = new Set<NodeId>();
-
   /**
    * 모델 편집 가능 여부 — paused일 때만 true. 재생 중에는 console.warn 후 false.
    * 단일 진입점으로 모든 mutation 액션이 통과해 "정지 중에만 편집"을 강제한다.
@@ -581,70 +585,6 @@ export function createModelStore({
     }, currentPlaybackStepIntervalMs());
   }
 
-  /**
-   * 재생 진입 시 "데이터를 들고 있는 source → 비활성 target" 쌍에 첫 시드 펄스를
-   * 흘려준다.
-   *
-   * 재생 시작은 시간 흐름의 인과적 시작점. 어떤 노드(특히 Condition 처럼
-   * initialValidSlots 가 비어 propagate 가 펄스 도착으로만 트리거되는 노드)는
-   * 시드 펄스가 없으면 영원히 invalid 에 머무른다. 정지 중에는 source 변화를
-   * 흡수하지 않기로 했으므로(인과 일관), 진입 순간에 한 번만 시드한다.
-   *
-   * 조건: lag=0 엣지, source 슬롯이 validOutputs, target 의 슬롯 0 출력이
-   * invalid — 셋이 모두 만족하면 source 의 해당 슬롯을 시드 대상에 추가.
-   * 효과는 도착 시점의 handlePulseArrival 에서만 일어나므로 시각이 효과를
-   * 앞서지 않는다.
-   */
-  function flushPendingOnUnpause(): void {
-    const { model, executionState } = store.getState();
-    const sourceToSlots = new Map<NodeId, Set<number>>();
-    for (const eid of model.edgeOrder) {
-      const e = model.edges[eid];
-      if (!e) continue;
-      if ((e.lag ?? 0) !== 0) continue;
-      const slot = e.sourceSlotIndex ?? 0;
-      if (!executionState.validOutputs.has(outputKey(e.from, slot))) continue;
-      // target slot 0 이 valid 면 이미 흐름이 정상. invalid 면 시드 필요.
-      // 다중 출력 노드라도 슬롯 0 이 valid 가 되면 후속 propagate 가 나머지
-      // 슬롯을 자연 cascade 시킨다.
-      if (executionState.validOutputs.has(outputKey(e.to, 0))) continue;
-      let set = sourceToSlots.get(e.from);
-      if (!set) {
-        set = new Set();
-        sourceToSlots.set(e.from, set);
-      }
-      set.add(slot);
-    }
-    // 멈춤 중 mutate 된 source 강제 시드 — target 의 stale valid 여부와 무관하게
-    // 새 값을 다운스트림으로 흘려보낸다. 예: A 가 cond=true → false 로 바뀌도록
-    // 멈춤 중 슬라이드한 경우, 조건:0 valid 가 stale 로 남아 기본 ② 조건에
-    // 잡히지 않는다. 사용 후 clear — 일회성 트리거.
-    for (const sourceId of pausedSourceMutations) {
-      const node = model.nodes[sourceId];
-      if (!node) continue;
-      const desc = defaultNodeKindRegistry.forNode(node);
-      if (!desc) continue;
-      const slots = desc.outputSlots(node, {
-        model,
-        registry: defaultNodeKindRegistry,
-      });
-      let set = sourceToSlots.get(sourceId);
-      if (!set) {
-        set = new Set();
-        sourceToSlots.set(sourceId, set);
-      }
-      for (const s of slots) {
-        if (executionState.validOutputs.has(outputKey(sourceId, s.index))) {
-          set.add(s.index);
-        }
-      }
-    }
-    pausedSourceMutations.clear();
-    for (const [sourceId, slots] of sourceToSlots) {
-      spawnOutgoingPulses(model, executionState, sourceId, slots);
-    }
-  }
-
   // timeSettings 변경 구독 — paused 변화에 시뮬레이션 루프·playback 반영.
   // multiplier는 RAF 콜백이 매 frame마다 읽으므로 별도 재시작 불필요.
   timeSettingsStore.subscribe((state, prev) => {
@@ -653,9 +593,20 @@ export function createModelStore({
         stopSimulationLoop();
         stopPlaybackTimer();
       } else {
-        // pending 흡수는 ticker 시작 전에 한 번 — generator emit 보다 인과적으로
-        // 먼저 시작된 "새 엣지의 첫 신호" 가 시각화되도록.
-        flushPendingOnUnpause();
+        // 첫 ▶ 진입 (직전 t=0) 이면 ValueNode 매뉴얼 송출기들의 초기값을 일괄
+        // 시드한다. nodeOrder 순회로 결정성 유지. 이후 ▶/||/▶ 토글에는
+        // 시뮬레이션 시간이 진행된 상태이므로 시드하지 않는다.
+        // (다른 source 시드는 generator ticker / pulse arrival propagate 가 책임.)
+        const seedState = store.getState();
+        if (seedState.executionState.simulationTimeMs === 0) {
+          const seedModel = seedState.model;
+          const seedExec = seedState.executionState;
+          for (const nid of seedModel.nodeOrder) {
+            const node = seedModel.nodes[nid];
+            if (!node || !isValueNode(node)) continue;
+            spawnOutgoingPulses(seedModel, seedExec, nid);
+          }
+        }
         startSimulationLoopIfNeeded();
         const playbackStep = store.getState().playbackStep;
         if (playbackStep !== null) {
@@ -732,7 +683,7 @@ export function createModelStore({
 
   /**
    * 펄스 도착 처리.
-   * 1. target 재계산 (펄스의 source 값을 sourceValueOverrides로 박제)
+   * 1. target 재계산 (펄스의 source 슬롯 값을 sourceOverride 로 박제)
    * 2. flash 트리거
    * 3. 결과값이 *바뀐 경우에만* outgoing edges로 펄스 전파
    *
@@ -907,7 +858,11 @@ export function createModelStore({
       shapeRegistry,
       combinerRegistry,
       expressionEvaluator: fizzexExpressionEvaluator,
-      sourceValueOverrides: { [pulse.sourceNodeId]: pulse.sourceValue },
+      sourceOverride: {
+        sourceNodeId: pulse.sourceNodeId,
+        sourceSlotIndex: pulse.sourceSlotIndex,
+        value: pulse.sourceValue,
+      },
       observeBuffers: executionState.observeBuffers,
       observeExtractionRuntime: executionState.observeExtractionRuntime,
       sequenceOutputs: executionState.sequenceOutputs,
@@ -1288,8 +1243,10 @@ export function createModelStore({
       set({ model: after, ...exec });
     },
 
+    // ValueNode 는 "사용자 매뉴얼 송출기" — 재생 중에도 슬라이드/토글 가능해야 하므로
+    // assertEditable (재생 중 차단) 가드를 두지 않는 유일한 mutation. UI 의
+    // userAuthoredVisible (초기 OR !paused) 가 호출 시점 자체를 닫는다.
     scrubInitialValue: (id, nextValue) => {
-      if (!assertEditable()) return;
       const before = get().model;
       const node = before.nodes[id];
       if (!node || !isValueNode(node)) return;
@@ -1306,47 +1263,39 @@ export function createModelStore({
       }
       const after = updateNodeOp(before, id, { initialValue: nextValueRecord });
       if (after === before) return;
+      // trajectory 는 play() baseline 이라 모델 변경과 함께 재계산. executionState
+      // 는 본인 노드의 슬롯 0 만 즉시 박제 — 다운스트림 propagation 은 호출자가
+      // emitValueOutput 으로 명시 트리거.
       const recomputed = computeExecutionState(after, get().executionState, true, before);
-      const playbackActive = get().playbackStep !== null;
       set((s) => {
-        const nextValues: Record<NodeId, ExecValue> = playbackActive
-          ? s.executionState.values
-          : { ...s.executionState.values, [id]: nextValueRecord };
-        const nextValid = playbackActive
-          ? s.executionState.validOutputs
-          : new Set(s.executionState.validOutputs);
-        if (!playbackActive) nextValid.add(outputKey(id, 0));
+        const nextValues: Record<NodeId, ExecValue> = {
+          ...s.executionState.values,
+          [id]: nextValueRecord,
+        };
+        const nextValid = new Set(s.executionState.validOutputs);
+        nextValid.add(outputKey(id, 0));
         return {
           model: after,
-          executionState: playbackActive
-            ? s.executionState
-            : {
-                values: nextValues,
-                sequenceOutputs: s.executionState.sequenceOutputs,
-                validOutputs: nextValid,
-                pendingOutputs: s.executionState.pendingOutputs,
-                invalidReasons: s.executionState.invalidReasons,
-                observeBuffers: s.executionState.observeBuffers,
-                observeExtractionRuntime: s.executionState.observeExtractionRuntime,
-                generatorRuntime: s.executionState.generatorRuntime,
-                stockRuntime: s.executionState.stockRuntime,
-                simulationTimeMs: s.executionState.simulationTimeMs,
-              },
+          executionState: {
+            ...s.executionState,
+            values: nextValues,
+            validOutputs: nextValid,
+          },
           trajectory: recomputed.trajectory,
         };
       });
-      if (!playbackActive) {
-        nodeFlashRegistry.trigger(id);
-        if (timeSettingsStore.getState().paused) {
-          // 멈춤 중에는 spawnOutgoingPulses 가 paused 가드에 막혀 다운스트림이
-          // stale 한 채 남는다. 재생 재개 시 flushPendingOnUnpause 가 강제
-          // 시드하도록 source 를 기록.
-          pausedSourceMutations.add(id);
-        } else {
-          const latest = get();
-          spawnOutgoingPulses(latest.model, latest.executionState, id);
-        }
-      }
+      nodeFlashRegistry.trigger(id);
+    },
+
+    emitValueOutput: (id) => {
+      const { model, executionState } = get();
+      const node = model.nodes[id];
+      if (!node || !isValueNode(node)) return;
+      // 초기(t=0)에는 다운스트림 박제만 — 첫 ▶ 진입 시 모든 ValueNode 를 일괄
+      // 시드하는 unpause 분기가 책임. spawnOutgoingPulses 의 paused/playback
+      // 가드는 그 함수 안에서 처리한다.
+      if (executionState.simulationTimeMs === 0) return;
+      spawnOutgoingPulses(model, executionState, id);
     },
 
     play: () => {

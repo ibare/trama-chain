@@ -18,7 +18,15 @@ import { TramaPopover } from '../util/TramaPopover.js';
  * 노드 위치(캔버스 좌표) → viewport 변환 → 화면 좌표 anchor.
  */
 export function UnitInspectorLayer(): JSX.Element | null {
-  const { modelStore, uiStore, viewport: viewportContainer } = useTrama();
+  const {
+    modelStore,
+    uiStore,
+    viewport: viewportContainer,
+    timeSettingsStore,
+  } = useTrama();
+  // 인스펙터는 정지(t===0 초기 OR ||) 상태에서만 노출 — 재생 중에는 사용자가
+  // 슬라이드/토글로 값을 변경할 수 있는 노드 본체 컨트롤만 열어둔다.
+  const paused = timeSettingsStore((s) => s.paused);
   const nodeId = uiStore((s) => s.unitInspector?.nodeId ?? null);
   const closeInspector = uiStore((s) => s.closeUnitInspector);
   const node = modelStore((s) => (nodeId ? s.model.nodes[nodeId] : null));
@@ -58,6 +66,7 @@ export function UnitInspectorLayer(): JSX.Element | null {
     return getInputPortType(node, undefined, model);
   }, [node, model]);
 
+  if (!paused) return null;
   if (!node || !anchor) return null;
   if (!isValueNode(node) && !isObserveNode(node) && !isGeneratorNode(node)) return null;
 

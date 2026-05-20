@@ -39,8 +39,13 @@ const SOCKET_SIZE = parseFloat(tokens.spacing.socketSize);
  * 별 표현을 분기한다.
  */
 function BooleanValueNodeViewImpl({ id, incomingCount }: Props): JSX.Element | null {
-  const { modelStore, uiStore, socketRegistry } = useTrama();
+  const { modelStore, uiStore, socketRegistry, timeSettingsStore } = useTrama();
   const node = modelStore((s) => s.model.nodes[id]);
+  // 사용자 매뉴얼 송출기 UI 가시성 — numeric ValueNodeView 와 동일 정책.
+  // 초기(t=0)이거나 재생 중일 때만 토글 노출. 일시정지엔 미렌더.
+  const paused = timeSettingsStore((s) => s.paused);
+  const isInitial = modelStore((s) => s.executionState.simulationTimeMs === 0);
+  const userAuthoredVisible = isInitial || !paused;
   const currentBoolean = modelStore((s) => {
     const n = s.model.nodes[id];
     const fallback =
@@ -53,6 +58,7 @@ function BooleanValueNodeViewImpl({ id, incomingCount }: Props): JSX.Element | n
   });
   const updateNode = modelStore((s) => s.updateNode);
   const scrubInitialValue = modelStore((s) => s.scrubInitialValue);
+  const emitValueOutput = modelStore((s) => s.emitValueOutput);
   const outputConnected = useOutputConnected(id);
   const selectNode = uiStore((s) => s.selectNode);
   const readOnly = uiStore((s) => s.readOnly);
@@ -128,7 +134,9 @@ function BooleanValueNodeViewImpl({ id, incomingCount }: Props): JSX.Element | n
   const onToggleClick = useCallback(() => {
     if (readOnly) return;
     scrubInitialValue(id, !currentBoolean);
-  }, [id, currentBoolean, readOnly, scrubInitialValue]);
+    // 토글은 단일 click — drag 단계 없이 즉시 다운스트림 emit.
+    emitValueOutput(id);
+  }, [id, currentBoolean, readOnly, scrubInitialValue, emitValueOutput]);
 
   const currentMode = node ? resolveDisplayMode(node) : 'compact';
   const onToggleMode = useCallback(() => {
@@ -195,7 +203,7 @@ function BooleanValueNodeViewImpl({ id, incomingCount }: Props): JSX.Element | n
         />
       )}
 
-      {isInputNode && (
+      {isInputNode && userAuthoredVisible && (
         <BooleanToggleSwitch
           cx={toggleCx}
           cy={toggleCy}

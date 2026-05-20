@@ -39,8 +39,13 @@ interface Props {
 const SOCKET_SIZE = parseFloat(tokens.spacing.socketSize);
 
 function ValueNodeViewImpl({ id, incomingCount }: Props): JSX.Element | null {
-  const { modelStore, uiStore, socketRegistry } = useTrama();
+  const { modelStore, uiStore, socketRegistry, timeSettingsStore } = useTrama();
   const node = modelStore((s) => s.model.nodes[id]);
+  // 사용자 매뉴얼 송출기 UI 가시성 — 초기(t=0)이거나 재생 중일 때만 노출.
+  // 재생 일시정지(paused && t>0)에는 회색 dim 없이 컴포넌트 자체를 그리지 않는다.
+  const paused = timeSettingsStore((s) => s.paused);
+  const isInitial = modelStore((s) => s.executionState.simulationTimeMs === 0);
+  const userAuthoredVisible = isInitial || !paused;
   const currentValue = modelStore((s) => {
     const n = s.model.nodes[id];
     const fallbackVal =
@@ -157,7 +162,7 @@ function ValueNodeViewImpl({ id, incomingCount }: Props): JSX.Element | null {
   const hasSkin = SkinLazy !== null;
   // 스킨 본체가 값 표시 + 슬라이더 핸들을 통합 표현한다. 외부 입력이 있으면
   // 직접 조작이 의미 없으므로 onScrub을 넘기지 않아 핸들이 비활성화된다.
-  const skinScrub = hasSkin && !hasLag0Incoming
+  const skinScrub = hasSkin && !hasLag0Incoming && userAuthoredVisible
     ? (v: number) => scrubInitialValue(id, v)
     : undefined;
 
@@ -264,7 +269,7 @@ function ValueNodeViewImpl({ id, incomingCount }: Props): JSX.Element | null {
           cy={layout.combinerCenterY}
         />
       )}
-      {isInputNode && !isEditing && !hasSkin && !(isCompactNumeric && layout.hasCombiner) && (
+      {isInputNode && !isEditing && !hasSkin && !(isCompactNumeric && layout.hasCombiner) && userAuthoredVisible && (
         <ValueNodeSlider
           node={node}
           halfW={isCompactNumeric ? layout.panelWidth / 2 : halfW}

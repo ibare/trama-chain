@@ -3,6 +3,13 @@ import { isNumericValue, type ValueNode } from '@trama/core';
 import { useTrama } from '../store/index.js';
 import { resolveNodeUnit } from '../util/unit-resolver.js';
 
+interface DragState {
+  startClientX: number;
+  startValue: number;
+  zoom: number;
+  lastValue: number;
+}
+
 interface Props {
   node: ValueNode;
   halfW: number;
@@ -40,9 +47,9 @@ function snap(v: number, step: number): number {
 }
 
 export function ValueNodeSlider({ node, halfW, sliderY }: Props): JSX.Element | null {
-  const { modelStore, timeSettingsStore, viewport } = useTrama();
+  const { modelStore, viewport } = useTrama();
   const scrubInitialValue = modelStore((s) => s.scrubInitialValue);
-  const paused = timeSettingsStore((s) => s.paused);
+  const emitValueOutput = modelStore((s) => s.emitValueOutput);
   const unit = resolveNodeUnit(node);
   const { min, max, step } = boundsForSlider(unit);
   const range = max - min;
@@ -57,61 +64,62 @@ export function ValueNodeSlider({ node, halfW, sliderY }: Props): JSX.Element | 
   const norm = range > 0 ? clamp((value - min) / range, 0, 1) : 0;
   const handleX = trackLeft + norm * trackLen;
 
-  const dragRef = useRef<{
-    startClientX: number;
-    startValue: number;
-    zoom: number;
-  } | null>(null);
+  const dragRef = useRef<DragState | null>(null);
 
   const applyClientX = useCallback(
-    (clientX: number, startClientX: number, startValue: number, zoom: number) => {
+    (clientX: number, d: DragState) => {
       if (trackLen <= 0 || range <= 0) return;
-      const dxCanvas = (clientX - startClientX) / zoom;
+      const dxCanvas = (clientX - d.startClientX) / d.zoom;
       const dNorm = dxCanvas / trackLen;
-      const raw = startValue + dNorm * range;
+      const raw = d.startValue + dNorm * range;
       const snapped = snap(clamp(raw, min, max), step);
-      if (snapped !== numericInitial) scrubInitialValue(node.id, snapped);
+      // drag 중에는 박제만 — 다운스트림 펄스는 pointerup 의 emitValueOutput 한 번.
+      if (snapped !== d.lastValue) {
+        d.lastValue = snapped;
+        scrubInitialValue(node.id, snapped);
+      }
     },
-    [max, min, node.id, numericInitial, range, scrubInitialValue, step, trackLen],
+    [max, min, node.id, range, scrubInitialValue, step, trackLen],
   );
 
   const onPointerDown = useCallback(
     (e: React.PointerEvent<SVGRectElement>) => {
       e.stopPropagation();
-      // hit rect는 그대로 두고(노드 본문 드래그와의 의도 충돌 방지) 핸들러
-      // 내부에서 paused일 때만 drag를 시작한다.
-      if (!paused) return;
       e.currentTarget.setPointerCapture(e.pointerId);
       dragRef.current = {
         startClientX: e.clientX,
         startValue: value,
         zoom: viewport.getCurrentZoom(),
+        lastValue: value,
       };
     },
-    [paused, value, viewport],
+    [value, viewport],
   );
 
   const onPointerMove = useCallback(
     (e: React.PointerEvent<SVGRectElement>) => {
       const d = dragRef.current;
       if (!d) return;
-      applyClientX(e.clientX, d.startClientX, d.startValue, d.zoom);
+      applyClientX(e.clientX, d);
     },
     [applyClientX],
   );
 
-  const onPointerUp = useCallback((e: React.PointerEvent<SVGRectElement>) => {
-    e.currentTarget.releasePointerCapture?.(e.pointerId);
-    dragRef.current = null;
-  }, []);
+  const onPointerUp = useCallback(
+    (e: React.PointerEvent<SVGRectElement>) => {
+      e.currentTarget.releasePointerCapture?.(e.pointerId);
+      const d = dragRef.current;
+      dragRef.current = null;
+      // 마지막 박제값을 다운스트림으로 한 번만 emit — drag 중 중간값은 발사 안 함.
+      if (d && d.lastValue !== d.startValue) emitValueOutput(node.id);
+    },
+    [emitValueOutput, node.id],
+  );
 
   if (numericInitial === null || range <= 0 || trackLen <= 0) return null;
 
   return (
-    <g
-      className={`trama-value-slider${paused ? '' : ' is-paused-dim'}`}
-      pointerEvents="auto"
-    >
+    <g className="trama-value-slider" pointerEvents="auto">
       <line
         className="trama-value-slider-rest"
         x1={trackLeft}
