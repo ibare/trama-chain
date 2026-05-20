@@ -3,7 +3,7 @@ import {
   type ObserveExtractionRuntime,
   type PortTypeContext,
   type PropagateContext,
-} from './kinds/context.js';
+} from './context.js';
 import {
   isIdentityShape,
   isSequencePortSpec,
@@ -11,12 +11,12 @@ import {
   type PortSpec,
   type ScalarPortSpec,
   type SequencePortSpec,
-} from './kinds/port-spec.js';
+} from './port-spec.js';
 import {
   checkEdgeCompatibility,
   type EdgeCompatibility,
-} from './kinds/edge-compatibility.js';
-import type { NodeKindDescriptor } from './kinds/descriptor.js';
+} from './edge-compatibility.js';
+import type { NodeKindDescriptor } from './descriptor.js';
 
 // C1 (kinds-split): 분리된 4 모듈의 심볼을 public surface 보존 위해 re-export.
 // 외부 (projector-web/embed) 가 `@trama/core` 에서 보던 이름은 그대로 유효.
@@ -40,7 +40,7 @@ export type {
 import {
   createNodeKindRegistry,
   type NodeKindRegistry,
-} from './kinds/registry.js';
+} from './registry.js';
 import {
   getNodeOutputUnit,
   isRawOutputNode,
@@ -50,7 +50,7 @@ import {
   getInputAccepts,
   getInputPortType,
   getOutputPortType,
-} from './kinds/queries.js';
+} from './queries.js';
 
 export {
   createNodeKindRegistry,
@@ -67,17 +67,17 @@ export type { NodeKindRegistry };
 
 // C3 (kinds-split): scalar/raw 디스크립터 5종을 descriptors/ 로 분리.
 // 디스크립터 본문은 더 이상 이 파일에 없고, register 호출만 createDefault... 에 남는다.
-import { valueNodeDescriptor } from './kinds/descriptors/value.js';
-import { constantNodeDescriptor } from './kinds/descriptors/constant.js';
-import { conditionNodeDescriptor } from './kinds/descriptors/condition.js';
-import { expressionNodeDescriptor } from './kinds/descriptors/expression.js';
-import { logicGateNodeDescriptor } from './kinds/descriptors/logic-gate.js';
+import { valueNodeDescriptor } from './descriptors/value.js';
+import { constantNodeDescriptor } from './descriptors/constant.js';
+import { conditionNodeDescriptor } from './descriptors/condition.js';
+import { expressionNodeDescriptor } from './descriptors/expression.js';
+import { logicGateNodeDescriptor } from './descriptors/logic-gate.js';
 
 // C4 (kinds-split): sequence/observe/generator/stock 디스크립터 4종도 분리.
-import { observeNodeDescriptor } from './kinds/descriptors/observe.js';
-import { generatorNodeDescriptor } from './kinds/descriptors/generator.js';
-import { averageNodeDescriptor } from './kinds/descriptors/average.js';
-import { stockNodeDescriptor } from './kinds/descriptors/stock.js';
+import { observeNodeDescriptor } from './descriptors/observe.js';
+import { generatorNodeDescriptor } from './descriptors/generator.js';
+import { averageNodeDescriptor } from './descriptors/average.js';
+import { stockNodeDescriptor } from './descriptors/stock.js';
 
 export function createDefaultNodeKindRegistry(): NodeKindRegistry {
   return createNodeKindRegistry()
@@ -97,9 +97,3 @@ export function createDefaultNodeKindRegistry(): NodeKindRegistry {
  * 옵션을 통해 명시 주입하지 않은 경로의 폴백.
  */
 export const defaultNodeKindRegistry = createDefaultNodeKindRegistry();
-
-// getNodeOutputUnit / isRawOutputNode / canBeFeedbackTarget /
-// getOutputSlots / getOutputSlotAt / getInputAccepts /
-// getInputPortType / getOutputPortType 는 ./kinds/queries.js 로 이동 (C2).
-
-// EdgeCompatibility / checkEdgeCompatibility 는 ./kinds/edge-compatibility.js 로 이동 (C1).

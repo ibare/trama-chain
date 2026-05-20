@@ -10,7 +10,7 @@ import type { NodeKindRegistry } from './registry.js';
 // cyclic value import — `defaultNodeKindRegistry` 는 디스크립터 9 개를 register
 // 한 후 kinds.ts 가 평가 끝낼 때 완성. queries 함수의 default 인자 평가는
 // 호출 시점(=모듈 평가 후) 이므로 live binding 으로 안전하게 해소.
-import { defaultNodeKindRegistry } from '../kinds.js';
+import { defaultNodeKindRegistry } from './index.js';
 
 /**
  * 디스크립터를 통해 출력 단위를 얻는다. 등록되지 않은 종류면 FREE_FALLBACK.

@@ -14,7 +14,7 @@ import {
   type NodeKindRegistry,
   type ObserveExtractionRuntime,
   type PropagateContext,
-} from './kinds.js';
+} from './kinds/index.js';
 import {
   noopExpressionEvaluator,
   type ExpressionEvaluator,

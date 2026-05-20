@@ -1,10 +1,10 @@
 import type { Model, Node } from '../../model/index.js';
-import type { NodeKindRegistry } from '../kinds.js';
+import type { NodeKindRegistry } from './index.js';
 import {
   defaultNodeKindRegistry,
   getInputAccepts,
   getOutputSlotAt,
-} from '../kinds.js';
+} from './index.js';
 import {
   isSequencePortSpec,
   type PortSpec,

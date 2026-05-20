@@ -16,7 +16,7 @@ import type {
   ExpressionEvaluator,
 } from '../expression-evaluator.js';
 import type { ObserveBuffer } from '../observe-buffer.js';
-import type { NodeKindRegistry } from '../kinds.js';
+import type { NodeKindRegistry } from './index.js';
 
 /**
  * ObserveNode 의 누적 추출 슬롯 런타임 상태. throttle 정책의 마지막 emit 시각을

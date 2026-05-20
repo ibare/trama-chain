@@ -2,7 +2,7 @@ export * from './errors.js';
 export * from './exec-value.js';
 export * from './observe-buffer.js';
 export * from './expression-evaluator.js';
-export * from './kinds.js';
+export * from './kinds/index.js';
 export * from './state.js';
 export * from './topology.js';
 export * from './propagate.js';

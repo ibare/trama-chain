@@ -13,7 +13,7 @@ import {
   defaultNodeKindRegistry,
   type NodeKindRegistry,
   type ObserveExtractionRuntime,
-} from './kinds.js';
+} from './kinds/index.js';
 
 /**
  * Stock 노드의 rate 윈도우 길이(ms). "초당 유량" 직관에 맞춘 1초 고정.
