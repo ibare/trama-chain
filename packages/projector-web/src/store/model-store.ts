@@ -902,6 +902,29 @@ export function createModelStore({
         executionState: recomputed.executionState,
         trajectory: recomputed.trajectory,
       });
+      // 전체 재계산은 invalid 전파를 한 step 으로 잡지만, 같은 target 의
+      // 다른 슬롯이 동시에 invalid→valid 로 뒤집힌 경우(Condition 판정 전환 등)
+      // 다운스트림으로 흘러야 할 cascade 가 끊긴다. 펄스 체인은 valid source 만
+      // 운반하므로, 새로 valid 가 된 슬롯에 대해서는 명시적으로 spawn 해 줘야
+      // Cond→다운스트림 케이블에 펄스가 정상적으로 흐르고 시각도 잇는다.
+      const prevValid = executionState.validOutputs;
+      const nextValid = recomputed.executionState.validOutputs;
+      const prefix = `${pulse.targetNodeId}:`;
+      const newlyValidSlots = new Set<number>();
+      for (const slotKey of nextValid) {
+        if (!slotKey.startsWith(prefix)) continue;
+        if (prevValid.has(slotKey)) continue;
+        const slot = Number.parseInt(slotKey.slice(prefix.length), 10);
+        if (!Number.isNaN(slot)) newlyValidSlots.add(slot);
+      }
+      if (newlyValidSlots.size > 0) {
+        spawnOutgoingPulses(
+          model,
+          recomputed.executionState,
+          pulse.targetNodeId,
+          newlyValidSlots,
+        );
+      }
       return;
     }
 
