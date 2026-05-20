@@ -43,64 +43,85 @@ export interface BooleanSkinDomain {
 }
 
 /**
- * 스킨 컴포넌트가 받는 props.
- *
- * 스킨은 노드 본문(label/value/combiner chip)을 대체하는 SVG group을 그린다.
- * 소켓·NodeFrame·ValueNodeSlider는 ValueNodeView가 계속 책임진다.
+ * 스킨 컴포넌트가 받는 props 공통 필드. 노드 본문(label/value/combiner chip)을
+ * 대체하는 SVG group을 그린다. 소켓·NodeFrame·공통 원 보더는 view 가 책임진다.
  *
  * 영역: (-halfW, -halfH) ~ (halfW, halfH). NodeFrame 안에서 좌표 (0,0)이
  * 노드 중심에 오도록 transform이 이미 걸려 있다.
  */
-export interface SkinRenderProps {
+interface SkinRenderPropsBase {
   node: ValueNode;
-  /**
-   * 현재 step의 실행값(numeric 스킨이 보는 number). 입력 노드면 initialValue로
-   * fallback돼서 들어온다.
-   *
-   * 1단계는 모든 스킨이 numeric 도메인이라 이 number 시그니처가 충분.
-   * boolean 스킨이 등장하면(5단계 이후) RenderProps를 ValueKind별 props로
-   * 분기하거나 Value 객체를 받도록 확장한다.
-   */
-  value: number;
-  /** numeric 스킨에서 의미. boolean 스킨은 무시. */
-  unit: ResolvedUnit;
   halfW: number;
   halfH: number;
+  /** 외부 입력이 있어 직접 조작이 의미 없는 상태. 시각 hint용. */
+  disabled?: boolean;
+  /**
+   * 라벨/타이틀 영역 클릭 — 인스펙터 진입. 스킨은 상단 라벨 슬롯을 InteractiveArea
+   * 로 감싸 이 callback을 호출한다. (선택 + 인스펙터 열기 합쳐 들어옴)
+   */
+  onLabelClick?: () => void;
+}
+
+/**
+ * numeric 도메인 스킨 props — 슬라이더·다이얼·게이지 등이 사용.
+ */
+export interface NumericSkinRenderProps extends SkinRenderPropsBase {
+  /**
+   * 현재 step의 실행값. 입력 노드면 initialValue로 fallback돼서 들어온다.
+   */
+  value: number;
+  unit: ResolvedUnit;
   /**
    * 사용자 직접 조작 콜백. drag 중 매 move마다 호출. 외부 입력이 있는 노드면
    * undefined로 들어와 스킨이 자체 핸들을 비활성화해야 한다.
    */
   onScrub?: (next: number) => void;
-  /** 외부 입력이 있어 직접 조작이 의미 없는 상태. 시각 hint용. */
-  disabled?: boolean;
-  /**
-   * 라벨/타이틀 영역 클릭 — 단위·스킨 인스펙터 진입. 스킨은 상단 라벨 슬롯을
-   * InteractiveArea로 감싸 이 callback을 호출한다. (선택 + 인스펙터 열기 합쳐 들어옴)
-   */
-  onLabelClick?: () => void;
 }
 
-export type SkinComponent = ComponentType<SkinRenderProps>;
+/**
+ * boolean 도메인 스킨 props — 토글·전구·체크 등이 사용.
+ *
+ * numeric의 scrub(드래그 중 연속 값) 대신 toggle(클릭 1회 ON↔OFF) 시맨틱.
+ * 단위·범위 개념 자체가 없으므로 unit·range는 받지 않는다.
+ */
+export interface BooleanSkinRenderProps extends SkinRenderPropsBase {
+  on: boolean;
+  /** 본체 클릭 등으로 호출. 외부 입력이 있으면 undefined로 들어와 스킨이 비활성화. */
+  onToggle?: () => void;
+}
 
-export interface SkinDefinition {
+export type NumericSkinComponent = ComponentType<NumericSkinRenderProps>;
+export type BooleanSkinComponent = ComponentType<BooleanSkinRenderProps>;
+
+/**
+ * 스킨 정의 — 도메인 ValueKind에 따라 컴포넌트 시그니처가 달라지므로 discriminated
+ * union으로 묶는다. registry는 key로 lookup하지만, 사용처(ValueNodeSkin/
+ * BooleanValueNodeSkin)는 자신이 다룰 도메인의 SkinComponent 타입을 받아야 prop
+ * 전달이 안전하다.
+ */
+export type SkinDefinition = NumericSkinDefinition | BooleanSkinDefinition;
+
+interface SkinDefinitionBase {
   /** 모델에 저장되는 skin.kind. */
   key: string;
   labels: { ko: string };
   /** 인스펙터 카드의 phosphor 아이콘 이름. */
   icon?: import('../icon/phosphor.js').PhosphorGlyphName;
   /**
-   * 도메인 영역 선언. 노드의 ValueKind와 domain.valueKind가 일치해야 후보가
-   * 되고, numeric이면 추가로 unitId가 노드의 단위와 매치돼야 한다.
-   * numeric-any-unit은 단위 무관하게 모든 numeric ValueNode의 후보가 된다.
-   */
-  domain: SkinDomain;
-  /** dynamic import — vite가 자동으로 별도 chunk로 분리한다. */
-  load: () => Promise<{ Skin: SkinComponent }>;
-  /**
    * 새로 적용 시 초기 params. 비어 있으면 빈 객체로 시작.
    * params 형태는 스킨이 자체 검증한다 — core schema는 unknown record로 통과시킨다.
    */
   defaultParams?: () => Record<string, unknown>;
+}
+
+export interface NumericSkinDefinition extends SkinDefinitionBase {
+  domain: NumericSkinDomain | NumericAnyUnitSkinDomain;
+  load: () => Promise<{ Skin: NumericSkinComponent }>;
+}
+
+export interface BooleanSkinDefinition extends SkinDefinitionBase {
+  domain: BooleanSkinDomain;
+  load: () => Promise<{ Skin: BooleanSkinComponent }>;
 }
 
 /** 스킨이 다루는 ValueKind. registry 필터에 자주 쓰여 별도 헬퍼로 둔다. */

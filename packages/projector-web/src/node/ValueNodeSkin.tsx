@@ -1,6 +1,6 @@
 import { memo, Suspense, type LazyExoticComponent } from 'react';
 import type { ValueNode, ResolvedUnit } from '@trama/core';
-import type { SkinComponent } from '../skin/types.js';
+import type { NumericSkinComponent } from '../skin/types.js';
 import type { NodeLayout } from './box.js';
 
 interface Props {
@@ -13,7 +13,7 @@ interface Props {
   disabled: boolean;
   onScrub: ((v: number) => void) | undefined;
   onLabelClick: () => void;
-  SkinLazy: LazyExoticComponent<SkinComponent>;
+  SkinLazy: LazyExoticComponent<NumericSkinComponent>;
 }
 
 /**

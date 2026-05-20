@@ -1,7 +1,7 @@
 import { useCallback, useId, useRef } from 'react';
 import { useTrama } from '../../store/index.js';
 import { InteractiveArea } from '../../node/InteractiveArea.js';
-import type { SkinRenderProps } from '../types.js';
+import type { NumericSkinRenderProps } from '../types.js';
 
 /**
  * 흑체복사 가마 스킨 (500..1500 °C).
@@ -26,7 +26,7 @@ export function ThermometerKiln({
   onScrub,
   disabled,
   onLabelClick,
-}: SkinRenderProps): JSX.Element {
+}: NumericSkinRenderProps): JSX.Element {
   const { viewport } = useTrama();
   const uid = useId().replace(/[:#]/g, '');
 

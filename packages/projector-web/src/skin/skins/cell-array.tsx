@@ -10,7 +10,7 @@ import {
   type ShadeKey,
   type SwatchRef,
 } from '../palette.js';
-import type { SkinRenderProps } from '../types.js';
+import type { NumericSkinRenderProps } from '../types.js';
 
 /**
  * Cell Array 스킨 — Range 도메인의 단위 무관 표현 도구.
@@ -39,7 +39,7 @@ export function CellArray({
   halfW,
   halfH,
   onLabelClick,
-}: SkinRenderProps): JSX.Element {
+}: NumericSkinRenderProps): JSX.Element {
   const params = normalizeParams(node.skin?.params);
 
   const labelSlotH = 24;

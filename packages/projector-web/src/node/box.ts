@@ -97,6 +97,15 @@ const SKIN_LAYOUTS: Record<string, SkinLayoutSpec> = {
     circleCy: 12,
     labelSlotH: 24,
   },
+  // 백열전구 — boolean 도메인 첫 스킨. 전류 ON 시 필라멘트가 달궈진다는
+  // 물리 메타포. 컴팩트한 원형 보더 안에 전구 형상이 들어간다.
+  "incandescent-bulb": {
+    width: 200,
+    height: 220,
+    circleR: 96,
+    circleCy: 12,
+    labelSlotH: 24,
+  },
 };
 const COMBINER_ADD_H = 44;
 export const NAME_FROM_TOP = 20;

@@ -2,7 +2,7 @@ import { useCallback, useId, useRef } from 'react';
 import { useTrama } from '../../store/index.js';
 import { formatNodeValue } from '../../util/format.js';
 import { InteractiveArea } from '../../node/InteractiveArea.js';
-import type { SkinRenderProps } from '../types.js';
+import type { NumericSkinRenderProps } from '../types.js';
 
 /**
  * 극저온 영역 전문 온도계 (−273..−100 °C).
@@ -23,7 +23,7 @@ export function ThermometerCryogenic({
   onScrub,
   disabled,
   onLabelClick,
-}: SkinRenderProps): JSX.Element {
+}: NumericSkinRenderProps): JSX.Element {
   const { viewport } = useTrama();
   const uid = useId().replace(/[:#]/g, '');
 

@@ -28,8 +28,7 @@ import { ValueNodeSkin } from './ValueNodeSkin.js';
 import { useOutputConnected } from './use-socket-connections.js';
 import { slotColor } from './slot-palette.js';
 import { useEdgeDraftSource } from '../canvas/use-edge-draft-source.js';
-import { getLazySkin } from '../skin/registry.js';
-import '../skin/register-default-skins.js';
+import { getLazyNumericSkin } from '../skin/registry.js';
 
 interface Props {
   id: NodeId;
@@ -156,7 +155,7 @@ function ValueNodeViewImpl({ id, incomingCount }: Props): JSX.Element | null {
   const isFocal = node.isFocal;
   const stateClass = isPending ? 'is-pending' : isInputNode ? 'is-focal' : 'is-calm';
 
-  const SkinLazy = node.skin ? getLazySkin(node.skin.kind) : null;
+  const SkinLazy = node.skin ? getLazyNumericSkin(node.skin.kind) : null;
   const hasSkin = SkinLazy !== null;
   // 스킨 본체가 값 표시 + 슬라이더 핸들을 통합 표현한다. 외부 입력이 있으면
   // 직접 조작이 의미 없으므로 onScrub을 넘기지 않아 핸들이 비활성화된다.

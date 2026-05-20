@@ -1,3 +1,7 @@
+// 스킨 등록 사이드이펙트 — NodeView dispatcher 단일 진입점에서 1회 평가.
+// (numeric ValueNodeView 와 boolean BooleanValueNodeView 가 갈라지므로, 어느
+// 한쪽에 두면 다른 쪽 노드만 있는 페이지에서 등록이 누락될 수 있다.)
+import '../skin/register-default-skins.js';
 import { booleanValue, numericValue } from '@trama/core';
 import type { LogicGateOperator } from '@trama/core';
 import { constantRegistry } from '../store/registries.js';

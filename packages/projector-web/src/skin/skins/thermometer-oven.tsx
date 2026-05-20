@@ -1,7 +1,7 @@
 import { useCallback, useRef } from 'react';
 import { useTrama } from '../../store/index.js';
 import { InteractiveArea } from '../../node/InteractiveArea.js';
-import type { SkinRenderProps } from '../types.js';
+import type { NumericSkinRenderProps } from '../types.js';
 
 /**
  * 오븐 온도계 스킨 (50..300 °C, step 5).
@@ -26,7 +26,7 @@ export function ThermometerOven({
   onScrub,
   disabled,
   onLabelClick,
-}: SkinRenderProps): JSX.Element {
+}: NumericSkinRenderProps): JSX.Element {
   const { viewport } = useTrama();
   const labelSlotH = 24;
   const labelCenterY = -halfH + labelSlotH / 2;
