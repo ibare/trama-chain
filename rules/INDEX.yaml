@@ -41,6 +41,7 @@ concerns:
     triggers:
       paths:
         - "packages/core/src/{functions,combiners,constants,generators}/**/*.ts"
+        - "packages/core/src/execution/kinds/**/*.ts"
         - "packages/projector-web/src/node/register-default-kinds.ts"
         - "packages/projector-web/src/node/kind-catalog.ts"
       patterns: ["registerNodeKindUI", "register\\(", "Registry"]
