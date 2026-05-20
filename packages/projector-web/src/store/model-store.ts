@@ -69,11 +69,7 @@ import {
 import { tokens } from '@trama/tokens';
 import { commitExecutionState } from './execution-commit.js';
 import { computeExecutionState } from './execution-merge.js';
-import {
-  selectIsContinuousSource,
-  selectIsSlotActive,
-  selectSourceExecValue,
-} from './edge-selectors.js';
+import { createSpawnPolicy, type SpawnPolicy } from './spawn-policy.js';
 import { combinerRegistry, shapeRegistry } from './registries.js';
 import { fizzexExpressionEvaluator } from '../expression/fizzex-evaluator.js';
 import type { PulseRegistry, Pulse } from '../pulse/pulse-registry.js';
@@ -211,6 +207,12 @@ export function createModelStore({
   const initialExec = computeExecutionState(initial);
   let activePlaybackToken = 0;
   let playbackTimeoutId: number | null = null;
+  // spawn 정책은 spawn-policy 모듈이 캡슐화 (L5-2). store/handlePulseArrival 가
+  // 모두 정의된 후 createSpawnPolicy 로 초기화. 호출 표면은 기존 free function
+  // 그대로 유지하기 위해 let + 늦은 assign — definite assignment assertion 으로
+  // TS 의 "used before assigned" 검사를 우회한다. 호출 시점에는 이미 init 완료.
+  let spawnOutgoingPulses!: SpawnPolicy['spawnOutgoingPulses'];
+  let spawnStockSlotPulse!: SpawnPolicy['spawnStockSlotPulse'];
   /**
    * 모델 편집 가능 여부 — paused일 때만 true. 재생 중에는 console.warn 후 false.
    * 단일 진입점으로 모든 mutation 액션이 통과해 "정지 중에만 편집"을 강제한다.
@@ -318,61 +320,6 @@ export function createModelStore({
       spawnOutgoingPulses(latest.model, latest.executionState, nid);
     }
   }
-  /**
-   * Stock 노드의 단일 슬롯에 대해 lag=0 outgoing 엣지를 순회하며 펄스를 spawn.
-   * Stock 은 continuous source 라 시각 입자 없이 즉시 도착 Pulse 로 동기 propagate.
-   * sourceValue 는 호출자가 명시 — slot 0=level, slot 1=overflow, slot 2=rate 가
-   * 각각 다른 값이므로.
-   */
-  function spawnStockSlotPulse(
-    model: Model,
-    stockId: NodeId,
-    slot: 0 | 1 | 2,
-    sourceValue: ExecValue,
-  ): void {
-    if (timeSettingsStore.getState().paused) return;
-    if (store.getState().playbackStep !== null) return;
-    // source slot 을 valid 로 켜고 pending 해제 — 펄스 발사 직전에 commit 해
-    // EdgeView 의 isBranchingInactive selector 가 케이블을 solid 로 인식.
-    // slot 0 (level) 은 handlePulseArrival stock 분기 setState 에서 이미 처리
-    // 되지만, slot 1 (overflow)/ slot 2 (rate) 는 본 캡슐화가 단일 진입점.
-    store.setState((s) => {
-      const slotKey = outputKey(stockId, slot);
-      if (
-        s.executionState.validOutputs.has(slotKey) &&
-        !s.executionState.pendingOutputs.has(slotKey)
-      ) {
-        return {};
-      }
-      const newValid = new Set(s.executionState.validOutputs);
-      newValid.add(slotKey);
-      const newPending = new Set(s.executionState.pendingOutputs);
-      newPending.delete(slotKey);
-      return {
-        executionState: commitExecutionState(s.executionState, {
-          validOutputs: newValid,
-          pendingOutputs: newPending,
-        }),
-      };
-    });
-    for (const eid of model.edgeOrder) {
-      const e = model.edges[eid];
-      if (!e || e.from !== stockId) continue;
-      if ((e.lag ?? 0) !== 0) continue;
-      if ((e.sourceSlotIndex ?? 0) !== slot) continue;
-      handlePulseArrival({
-        id: `direct-${nextDirectPulseSerial++}`,
-        edgeId: eid,
-        sourceNodeId: stockId,
-        sourceSlotIndex: slot,
-        targetNodeId: e.to,
-        sourceValue,
-        startTime: performance.now(),
-        travelDurationMs: 0,
-      });
-    }
-  }
-
   /**
    * playback step 간 wall-time 지연. multiplier로 나눠 "한 step을 보는 시간"을
    * 환산한다. 시뮬레이션 ticker와 무관 — trajectory 재생용 setTimeout 경로 전용.
@@ -521,67 +468,6 @@ export function createModelStore({
   } else {
     timeSettingsStore.subscribe(pausedTransitionHandler);
   }
-
-  /**
-   * 주어진 source 노드의 lag=0 outgoing edges에 대해 펄스를 spawn.
-   * lag=1 feedback 엣지는 제외 (방식 가). 출력 슬롯이 invalid면 skip.
-   * playback 중이면 spawn 자체를 막는다.
-   *
-   * allowedSlots 가 주어지면 해당 슬롯 인덱스에 속한 outgoing edge 만 spawn —
-   * 호출자가 "이번 step 에 실제로 갱신/emit 된 슬롯" 만 추려 넘기는 경로용.
-   * ObserveNode 누적 추출처럼 throttle 미충족 step 에서 valid 가 *유지* 되는
-   * 슬롯이 있어 valid 만 기준으로 하면 시각(펄스)이 실제 인과(emit)와 어긋난다.
-   * 미지정이면 기존 동작 — 모든 valid outgoing 슬롯에 spawn.
-   */
-  function spawnOutgoingPulses(
-    model: Model,
-    executionState: ExecutionState,
-    sourceNodeId: NodeId,
-    allowedSlots?: ReadonlySet<number>,
-  ): void {
-    // 정지(paused)면 어떤 경로로도 펄스가 흐르지 않는다 — 사용자의 명시적 ▶
-    // 행위 전까지는 시간·값 전파 모두 침묵. 정지 중 mutation으로 인한 즉시
-    // 박제와는 별개 — 시각·인과 전파만 차단한다.
-    if (timeSettingsStore.getState().paused) return;
-    if (store.getState().playbackStep !== null) return;
-    // continuous source(현재 sine paradigm) 는 매 tick 신호값이 변하는 흐름이라
-    // 시각적 "입자(펄스)" 시맨틱과 어울리지 않는다. EdgeView 가 stroke 변조로
-    // 흐름을 표현하므로 시각 펄스는 띄우지 않고, 그래도 다운스트림 상태(예:
-    // ObserveNode 누적 버퍼) 는 갱신되어야 하므로 즉시 도착한 합성 Pulse 로
-    // 동기 propagate 만 수행한다.
-    const isContinuousSource = selectIsContinuousSource(model, sourceNodeId);
-    for (const eid of model.edgeOrder) {
-      const e = model.edges[eid];
-      if (!e || e.from !== sourceNodeId) continue;
-      if ((e.lag ?? 0) !== 0) continue;
-      const slot = e.sourceSlotIndex ?? 0;
-      if (allowedSlots && !allowedSlots.has(slot)) continue;
-      if (!selectIsSlotActive(executionState, sourceNodeId, slot)) continue;
-      const sourceValue = selectSourceExecValue(executionState, sourceNodeId);
-      if (!sourceValue) continue;
-      if (isContinuousSource) {
-        handlePulseArrival({
-          id: `direct-${nextDirectPulseSerial++}`,
-          edgeId: eid,
-          sourceNodeId,
-          sourceSlotIndex: slot,
-          targetNodeId: e.to,
-          sourceValue,
-          startTime: performance.now(),
-          travelDurationMs: 0,
-        });
-        continue;
-      }
-      pulseRegistry.spawn({
-        edgeId: eid,
-        sourceNodeId,
-        sourceSlotIndex: slot,
-        targetNodeId: e.to,
-        sourceValue,
-      });
-    }
-  }
-  let nextDirectPulseSerial = 0;
 
   /**
    * 펄스 도착 처리.
@@ -1246,6 +1132,16 @@ export function createModelStore({
         playbackStep: null,
       });
     },
+  }));
+
+  // spawn-policy 의 늦은 init — store/handlePulseArrival 가 모두 정의된 *지금* 시점에
+  // 한 번만 assign. handlePulseArrival 은 hoisted function declaration 이라 factory
+  // 의 getHandlePulseArrival lazy ref 가 안전하게 참조 가능.
+  ({ spawnOutgoingPulses, spawnStockSlotPulse } = createSpawnPolicy({
+    store,
+    timeSettingsStore,
+    pulseRegistry,
+    getHandlePulseArrival: () => handlePulseArrival,
   }));
 
   pulseRegistry.setArrivalHandler(handlePulseArrival);
