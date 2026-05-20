@@ -74,7 +74,7 @@ export interface RecomputeNodeResult {
    * 그대로 운반해 메타 인식 노드(GeneratorNode 등)가 게이트를 읽을 수 있게 한다.
    */
   newValue: ExecValue | undefined;
-  /** 단출력 노드 기준 슬롯 0의 valid 여부. */
+  /** 노드 단위 valid — 어느 출력 슬롯이라도 valid 면 true. 다출력 노드 일반화. */
   isValid: boolean;
   /** 갱신된 validOutputs 집합 (조건 노드 등 다출력 케이스 포함). */
   validOutputs: Set<string>;
@@ -214,12 +214,17 @@ export function recomputeNode(
 
   desc.propagate(node, ctx);
 
-  // 모든 노드가 출력 슬롯 0 하나만 사용 — 조건 노드도 게이트 시맨틱이라 단일 출력.
-  const outputSlotKeys = [outputKey(nodeId, 0)];
+  // 디스크립터가 정의한 출력 슬롯을 그대로 사용 — Condition(2 슬롯)·Observe(추출
+  // 슬롯 포함) 같은 다출력 노드도 일반화 경로로 다룬다. 단출력 노드는 길이 1.
+  const slots = desc.outputSlots(node, { model, registry: nodeKindRegistry });
+  const outputSlotKeys = slots.map((s) => outputKey(nodeId, s.index));
+  // 노드 단위 valid — "어느 슬롯이라도 valid" 면 노드가 valid. caller 의
+  // becameInvalid 판정(노드 valid→invalid 전이만 전체 재계산) 의 기준이 된다.
+  const isValid = outputSlotKeys.some((k) => workingValid.has(k));
 
   return {
     newValue: workingValues[nodeId],
-    isValid: workingValid.has(outputKey(nodeId, 0)),
+    isValid,
     validOutputs: workingValid,
     pendingOutputs: workingPending,
     outputSlotKeys,

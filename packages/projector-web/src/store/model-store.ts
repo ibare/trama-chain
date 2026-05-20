@@ -577,34 +577,32 @@ export function createModelStore({
   }
 
   /**
-   * 재생 진입 시 pending ValueNode 들에 첫 펄스를 흘려준다.
+   * 재생 진입 시 "데이터를 들고 있는 source → 비활성 target" 쌍에 첫 시드 펄스를
+   * 흘려준다.
    *
-   * 멈춤 중 새로 추가된 lag=0 엣지의 target 은 pending 상태로 남아 있다 — 멈춤
-   * 중에는 source 변화를 흡수하지 않기로 했으므로(인과 일관). 재생 진입 순간에야
-   * "시간이 흐르기 시작" 했으니 source 의 첫 펄스를 spawn 해 target 이 시각·인과
-   * 정상 경로로 값을 받게 한다. 효과는 펄스 도착 시점의 handlePulseArrival 에서만
-   * 일어나므로 시각이 효과를 앞서지 않는다.
+   * 재생 시작은 시간 흐름의 인과적 시작점. 어떤 노드(특히 Condition 처럼
+   * initialValidSlots 가 비어 propagate 가 펄스 도착으로만 트리거되는 노드)는
+   * 시드 펄스가 없으면 영원히 invalid 에 머무른다. 정지 중에는 source 변화를
+   * 흡수하지 않기로 했으므로(인과 일관), 진입 순간에 한 번만 시드한다.
+   *
+   * 조건: lag=0 엣지, source 슬롯이 validOutputs, target 의 슬롯 0 출력이
+   * invalid — 셋이 모두 만족하면 source 의 해당 슬롯을 시드 대상에 추가.
+   * 효과는 도착 시점의 handlePulseArrival 에서만 일어나므로 시각이 효과를
+   * 앞서지 않는다.
    */
   function flushPendingOnUnpause(): void {
     const { model, executionState } = store.getState();
-    if (executionState.pendingOutputs.size === 0) return;
-    const pendingTargets = new Set<NodeId>();
-    for (const slot of executionState.pendingOutputs) {
-      const colon = slot.lastIndexOf(':');
-      const nid = colon >= 0 ? slot.slice(0, colon) : slot;
-      const node = model.nodes[nid];
-      if (!node || !isValueNode(node)) continue;
-      pendingTargets.add(nid);
-    }
-    if (pendingTargets.size === 0) return;
     const sourceToSlots = new Map<NodeId, Set<number>>();
     for (const eid of model.edgeOrder) {
       const e = model.edges[eid];
       if (!e) continue;
       if ((e.lag ?? 0) !== 0) continue;
-      if (!pendingTargets.has(e.to)) continue;
       const slot = e.sourceSlotIndex ?? 0;
       if (!executionState.validOutputs.has(outputKey(e.from, slot))) continue;
+      // target slot 0 이 valid 면 이미 흐름이 정상. invalid 면 시드 필요.
+      // 다중 출력 노드라도 슬롯 0 이 valid 가 되면 후속 propagate 가 나머지
+      // 슬롯을 자연 cascade 시킨다.
+      if (executionState.validOutputs.has(outputKey(e.to, 0))) continue;
       let set = sourceToSlots.get(e.from);
       if (!set) {
         set = new Set();
@@ -887,7 +885,12 @@ export function createModelStore({
     });
 
     const prevValue = executionState.values[pulse.targetNodeId];
-    const wasValid = executionState.validOutputs.has(outputKey(pulse.targetNodeId, 0));
+    // 노드 단위 valid — 어느 슬롯이라도 valid 면 노드가 valid.
+    // Condition(true/false 2 슬롯) 처럼 다출력 노드는 슬롯 0 만 보던 기존
+    // 판정으로는 slot 1(false 분기) 이 켜진 상태를 invalid 로 오판한다.
+    const wasValid = result.outputSlotKeys.some((k) =>
+      executionState.validOutputs.has(k),
+    );
     const isValid = result.isValid;
     const valueChanged =
       result.newValue !== undefined && result.newValue !== prevValue;
@@ -933,19 +936,33 @@ export function createModelStore({
       };
     });
 
-    // 이번 step 에 실제로 갱신/emit 된 슬롯만 펄스 spawn — slot 0 은 스칼라
-    // 본체 값이 바뀐 경우, slot 1+ 는 sequenceOutputs reference 가 바뀐(=새 emit)
-    // 경우. throttle 미충족 step 에서도 valid 는 유지되는 sequence 슬롯이 있어
-    // valid 만 기준으로 하면 시각과 인과가 어긋난다.
+    // 이번 step 에 실제로 갱신/emit 된 슬롯만 펄스 spawn. 슬롯별 정책:
+    //   1) invalid → valid 전환: 무조건 spawn (펄스 체인 cascade 시작)
+    //   2) 계속 valid + 스칼라 본체 값 바뀜: spawn
+    //   3) 계속 valid + sequence emit reference 바뀜: spawn
+    //   4) 그 외: skip — throttle 미충족 step 의 sequence 슬롯이 valid 유지된
+    //      채로 펄스가 비지 않게.
+    // Condition(2 슬롯) 처럼 다출력 노드는 slot 1 전환도 같은 규칙으로 spawn된다.
     const allowedSlots = new Set<number>();
-    if (valueChanged) allowedSlots.add(0);
     const prevSeq = executionState.sequenceOutputs;
     const prefix = `${pulse.targetNodeId}:`;
-    for (const [key, seq] of Object.entries(result.newSequenceOutputs)) {
-      if (!key.startsWith(prefix)) continue;
-      if (prevSeq[key] === seq) continue;
-      const slot = Number.parseInt(key.slice(prefix.length), 10);
-      if (!Number.isNaN(slot)) allowedSlots.add(slot);
+    for (const slotKey of result.outputSlotKeys) {
+      if (!result.validOutputs.has(slotKey)) continue;
+      const slot = Number.parseInt(slotKey.slice(prefix.length), 10);
+      if (Number.isNaN(slot)) continue;
+      const wasSlotValid = executionState.validOutputs.has(slotKey);
+      if (!wasSlotValid) {
+        allowedSlots.add(slot);
+        continue;
+      }
+      if (valueChanged) {
+        allowedSlots.add(slot);
+        continue;
+      }
+      const newSeq = result.newSequenceOutputs[slotKey];
+      if (newSeq !== undefined && prevSeq[slotKey] !== newSeq) {
+        allowedSlots.add(slot);
+      }
     }
     if (allowedSlots.size > 0) {
       const latest = store.getState();

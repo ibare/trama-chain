@@ -568,6 +568,11 @@ const conditionNodeDescriptor: NodeKindDescriptor<
       return;
     }
 
+    // 멈춤 상태에서는 source 값을 즉시 흡수하지 않는다 — 펄스 도착으로만 갱신.
+    // 입력이 사라진 경우(value === undefined)는 위에서 이미 invalid 마킹하여 모델
+    // 변화는 즉시 반영. 여기서는 valid 입력의 평가만 보류해 prior 상태를 유지.
+    if (ctx.paused) return;
+
     let cond: boolean;
     switch (node.operator) {
       case '>':
@@ -710,6 +715,10 @@ const expressionNodeDescriptor: NodeKindDescriptor<
       return;
     }
 
+    // 멈춤 상태: 모든 변수가 채워진 경우의 평가만 보류 — invalid 사유(unbound·
+    // boolean·missing)는 위에서 이미 즉시 반영. 펄스 도착으로만 valid 전환.
+    if (ctx.paused) return;
+
     const diag = ctx.expressionEvaluator.diagnose(node.latex, bindings);
     if (!diag.ok || !Number.isFinite(diag.value)) {
       ctx.validOutputs.delete(outputKey(node.id, 0));
@@ -763,6 +772,9 @@ const logicGateNodeDescriptor: NodeKindDescriptor<
         ctx.validOutputs.delete(outputKey(node.id, 0));
         return;
       }
+      // 멈춤 상태: invalid 케이스(0개·2개+)는 위에서 즉시 반영하고, 단항 입력의
+      // 평가만 보류 — 펄스 도착으로만 valid 전환.
+      if (ctx.paused) return;
       ctx.next[node.id] = booleanValue(!contributions[0]);
       ctx.validOutputs.add(outputKey(node.id, 0));
       return;
@@ -775,6 +787,7 @@ const logicGateNodeDescriptor: NodeKindDescriptor<
       ctx.validOutputs.delete(outputKey(node.id, 0));
       return;
     }
+    if (ctx.paused) return;
     ctx.next[node.id] = booleanValue(combiner.combine(contributions));
     ctx.validOutputs.add(outputKey(node.id, 0));
   },
@@ -898,6 +911,9 @@ const observeNodeDescriptor: NodeKindDescriptor<Extract<Node, { kind: 'observe' 
       ctx.validOutputs.delete(outputKey(node.id, 0));
       return;
     }
+    // 멈춤 상태: invalid 분기(엣지 없음·source invalid·sequence)는 위에서 즉시
+    // 반영하고, passthrough 갱신과 observeBuffer 누적만 보류 — 펄스 도착으로만 진행.
+    if (ctx.paused) return;
     const inner: Value = unwrap(resolveScalar(sourceEv, ctx.simulationTimeMs));
     const innerOut: Value =
       edge.inverted && inner.kind === 'boolean'
