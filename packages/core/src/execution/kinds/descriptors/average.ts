@@ -29,18 +29,18 @@ export const averageNodeDescriptor: NodeKindDescriptor<Extract<Node, { kind: 'av
     const slotKey = outputKey(node.id, 0);
     const edge = ctx.incoming[0];
     if (!edge) {
-      ctx.validOutputs.delete(slotKey);
+      ctx.setSlotInvalid(slotKey);
       return;
     }
     if (!isEdgeSourceValid(ctx, edge)) {
-      ctx.validOutputs.delete(slotKey);
+      ctx.setSlotInvalid(slotKey);
       return;
     }
     const srcSlot = edge.sourceSlotIndex ?? 0;
     const seqKey = outputKey(edge.from, srcSlot);
     const seq = ctx.sequenceNext[seqKey];
     if (!seq) {
-      ctx.validOutputs.delete(slotKey);
+      ctx.setSlotInvalid(slotKey);
       return;
     }
     let sum = 0;
@@ -53,11 +53,11 @@ export const averageNodeDescriptor: NodeKindDescriptor<Extract<Node, { kind: 'av
       count += 1;
     }
     if (count === 0) {
-      ctx.validOutputs.delete(slotKey);
+      ctx.setSlotInvalid(slotKey);
       return;
     }
     const mean = sum / count;
     ctx.next[node.id] = numericValue(mean, 'free');
-    ctx.validOutputs.add(slotKey);
+    ctx.setSlotValid(slotKey);
   },
 };

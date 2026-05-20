@@ -17,6 +17,6 @@ export const constantNodeDescriptor: NodeKindDescriptor<Extract<Node, { kind: 'c
   // 슬롯/엣지를 통한 입력이 있더라도 무시하고 자기 value를 유지한다.
   propagate: (node, ctx) => {
     ctx.next[node.id] = node.value;
-    ctx.validOutputs.add(outputKey(node.id, 0));
+    ctx.setSlotValid(outputKey(node.id, 0));
   },
 };

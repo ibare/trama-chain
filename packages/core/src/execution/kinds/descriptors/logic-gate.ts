@@ -42,14 +42,14 @@ export const logicGateNodeDescriptor: NodeKindDescriptor<
 
     if (node.operator === 'not') {
       if (contributions.length !== 1) {
-        ctx.validOutputs.delete(outputKey(node.id, 0));
+        ctx.setSlotInvalid(outputKey(node.id, 0));
         return;
       }
       // 멈춤 상태: invalid 케이스(0개·2개+)는 위에서 즉시 반영하고, 단항 입력의
       // 평가만 보류 — 펄스 도착으로만 valid 전환.
       if (ctx.paused) return;
       ctx.next[node.id] = booleanValue(!contributions[0]);
-      ctx.validOutputs.add(outputKey(node.id, 0));
+      ctx.setSlotValid(outputKey(node.id, 0));
       return;
     }
 
@@ -57,11 +57,11 @@ export const logicGateNodeDescriptor: NodeKindDescriptor<
     if (!combiner) throw new MissingCombinerError(node.operator);
 
     if (contributions.length === 0) {
-      ctx.validOutputs.delete(outputKey(node.id, 0));
+      ctx.setSlotInvalid(outputKey(node.id, 0));
       return;
     }
     if (ctx.paused) return;
     ctx.next[node.id] = booleanValue(combiner.combine(contributions));
-    ctx.validOutputs.add(outputKey(node.id, 0));
+    ctx.setSlotValid(outputKey(node.id, 0));
   },
 };

@@ -48,8 +48,8 @@ export const stockNodeDescriptor: NodeKindDescriptor<Extract<Node, { kind: 'stoc
     // overflow / rate 는 펄스 도착 사건 전용 — propagate 경로에서는 invalid.
     // rate 의 노드 본문 표시값은 UI selector 가 stockRuntime 으로 직접 계산해
     // RAF 따라 자연 감쇠시킨다. 다운스트림 전파는 handlePulseArrival 의 spawn 만.
-    ctx.validOutputs.delete(overflowKey);
-    ctx.validOutputs.delete(rateKey);
+    ctx.setSlotInvalid(overflowKey);
+    ctx.setSlotInvalid(rateKey);
 
     // prev level: ctx.next 우선, 없으면 initialLevel 폴백.
     const prevExec = ctx.next[node.id];
@@ -62,7 +62,6 @@ export const stockNodeDescriptor: NodeKindDescriptor<Extract<Node, { kind: 'stoc
     // 누적은 호스트의 handlePulseArrival 에서 일어난다. 이 propagate 경로는
     // RAF/scrub/initial 등 누적과 무관한 경로 — prev level 을 그대로 유지.
     ctx.next[node.id] = numericValue(prevLevel, node.unitId);
-    ctx.validOutputs.add(levelKey);
-    ctx.pendingOutputs.delete(levelKey);
+    ctx.setSlotValid(levelKey);
   },
 };

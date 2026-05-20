@@ -13,16 +13,11 @@ import {
   type SequenceSample,
   type SequenceValue,
 } from '../../exec-value.js';
-import {
-  createObserveBuffer,
-  observeBufferToArray,
-  pushSample,
-} from '../../observe-buffer.js';
+import { observeBufferToArray } from '../../observe-buffer.js';
 import { outputKey } from '../../state.js';
 import { FREE_FALLBACK } from '../context.js';
 import type { NodeKindDescriptor } from '../descriptor.js';
 import {
-  capacityMatches,
   firstIncomingEdgeForNode,
   isEdgeSourceValid,
   passthroughSourceSpec,
@@ -72,13 +67,13 @@ export const observeNodeDescriptor: NodeKindDescriptor<Extract<Node, { kind: 'ob
     const extractionSlotKey = outputKey(node.id, 1);
     const edge = ctx.incoming[0];
     if (!edge) {
-      ctx.validOutputs.delete(outputKey(node.id, 0));
+      ctx.setSlotInvalid(outputKey(node.id, 0));
       // 누적 추출은 본체가 stall 해도 이전 누적 스냅샷을 유지한다 — 다운스트림
       // 통계 노드가 마지막으로 보았던 분포를 잃지 않게. valid 도 그대로.
       return;
     }
     if (!isEdgeSourceValid(ctx, edge)) {
-      ctx.validOutputs.delete(outputKey(node.id, 0));
+      ctx.setSlotInvalid(outputKey(node.id, 0));
       return;
     }
     // 메타 보존 passthrough — source 가 WrappedValue 면 알맹이만 inverted 변환 후
@@ -88,14 +83,14 @@ export const observeNodeDescriptor: NodeKindDescriptor<Extract<Node, { kind: 'ob
       sourceNode && isValueNode(sourceNode) ? sourceNode.initialValue : undefined;
     const sourceEv: ExecValue | undefined = ctx.next[edge.from] ?? fallback;
     if (!sourceEv) {
-      ctx.validOutputs.delete(outputKey(node.id, 0));
+      ctx.setSlotInvalid(outputKey(node.id, 0));
       return;
     }
     // ObserveNode 는 스칼라만 passthrough — sequence source 는 port-compat 단계의
     // 별도 처리(차후 Phase) 대상. 안전망으로 무효 처리. FunctionHandle 은 ctx
     // 시각의 peek로 환원해 메타 없는 스칼라처럼 처리한다.
     if (isSequence(sourceEv)) {
-      ctx.validOutputs.delete(outputKey(node.id, 0));
+      ctx.setSlotInvalid(outputKey(node.id, 0));
       return;
     }
     // 멈춤 상태: invalid 분기(엣지 없음·source invalid·sequence)는 위에서 즉시
@@ -111,20 +106,13 @@ export const observeNodeDescriptor: NodeKindDescriptor<Extract<Node, { kind: 'ob
     const passed: ExecValue =
       sourceEv.kind === 'wrapped' ? wrap(innerOut, sourceEv.meta) : innerOut;
     ctx.next[node.id] = passed;
-    ctx.validOutputs.add(outputKey(node.id, 0));
+    ctx.setSlotValid(outputKey(node.id, 0));
 
     // observeBuffer 에는 (value, t) sample 로 누적 — t 는 현 step 의 simulation time.
     // 메타는 시각화/통계 모두 알맹이만 보면 충분하므로 메타 분리 후 알맹이만 박제.
     // bounded는 ring buffer로 O(1) push + 자동 evict, unbounded는 growable array.
-    let buf = ctx.observeBuffers[node.id];
-    if (!buf || !capacityMatches(buf, node.capacity)) {
-      // 미초기화 또는 capacity 정책이 모델에서 바뀐 경우 — 새로 만든다. capacity
-      // 변경은 흔치 않으니 누적 손실은 수용 가능한 트레이드오프.
-      buf = createObserveBuffer(node.capacity);
-    }
     const sample: SequenceSample = { value: innerOut, t: ctx.simulationTimeMs };
-    pushSample(buf, sample);
-    ctx.observeBuffers[node.id] = buf;
+    ctx.pushObserveSample(node, sample);
 
     // 누적 추출 슬롯의 발사 정책 평가. realtime 은 매번, throttle 은 지난 emit
     // 이후 intervalMs 가 simulation time 으로 지났을 때만 새 스냅샷을 흘려보낸다.
@@ -136,11 +124,10 @@ export const observeNodeDescriptor: NodeKindDescriptor<Extract<Node, { kind: 'ob
     if (shouldEmit) {
       const snapshot: SequenceValue = {
         kind: 'sequence',
-        samples: observeBufferToArray(buf),
+        samples: observeBufferToArray(ctx.observeBuffers[node.id]!),
       };
-      ctx.sequenceNext[extractionSlotKey] = snapshot;
-      ctx.validOutputs.add(extractionSlotKey);
-      ctx.observeExtractionRuntime[node.id] = { lastEmitTimeMs: ctx.simulationTimeMs };
+      ctx.emitSequence(extractionSlotKey, snapshot);
+      ctx.markExtractionEmitted(node.id, ctx.simulationTimeMs);
     }
     // emit 하지 않으면 직전 스냅샷을 그대로 둔다 — 다운스트림이 stale 값을 계속
     // 본다는 의미가 아니라 "아직 다음 발사 시각이 안 됐다" 의 결정론적 표현.

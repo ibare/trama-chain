@@ -34,13 +34,16 @@ export const expressionNodeDescriptor: NodeKindDescriptor<
       const diag = ctx.expressionEvaluator.diagnose(node.latex, {});
       if (diag.ok && Number.isFinite(diag.value)) {
         ctx.next[node.id] = numericValue(diag.value, 'free');
-        ctx.validOutputs.add(outputKey(node.id, 0));
-        delete ctx.invalidReasons[node.id];
+        ctx.setSlotValid(outputKey(node.id, 0));
+        ctx.clearInvalidReason(node.id);
       } else {
-        ctx.validOutputs.delete(outputKey(node.id, 0));
-        ctx.invalidReasons[node.id] = diag.ok
-          ? { ok: false, status: 'divergent', reason: 'non-finite-result' }
-          : diag;
+        ctx.setSlotInvalid(outputKey(node.id, 0));
+        ctx.setInvalidReason(
+          node.id,
+          diag.ok
+            ? { ok: false, status: 'divergent', reason: 'non-finite-result' }
+            : diag,
+        );
       }
       return;
     }
@@ -81,13 +84,13 @@ export const expressionNodeDescriptor: NodeKindDescriptor<
     }
 
     if (booleanBindingVar !== undefined) {
-      ctx.validOutputs.delete(outputKey(node.id, 0));
-      ctx.invalidReasons[node.id] = {
+      ctx.setSlotInvalid(outputKey(node.id, 0));
+      ctx.setInvalidReason(node.id, {
         ok: false,
         status: 'unsupported',
         variable: booleanBindingVar,
         reason: `boolean 입력은 식에 사용 불가: ${booleanBindingVar}`,
-      };
+      });
       return;
     }
 
@@ -98,13 +101,13 @@ export const expressionNodeDescriptor: NodeKindDescriptor<
           if (typeof v === 'string') missing.push(v);
         }
       }
-      ctx.validOutputs.delete(outputKey(node.id, 0));
-      ctx.invalidReasons[node.id] = {
+      ctx.setSlotInvalid(outputKey(node.id, 0));
+      ctx.setInvalidReason(node.id, {
         ok: false,
         status: 'unbound',
         variable: missing[0],
         reason: missing.length > 1 ? `unbound: ${missing.join(', ')}` : undefined,
-      };
+      });
       return;
     }
 
@@ -114,14 +117,17 @@ export const expressionNodeDescriptor: NodeKindDescriptor<
 
     const diag = ctx.expressionEvaluator.diagnose(node.latex, bindings);
     if (!diag.ok || !Number.isFinite(diag.value)) {
-      ctx.validOutputs.delete(outputKey(node.id, 0));
-      ctx.invalidReasons[node.id] = diag.ok
-        ? { ok: false, status: 'divergent', reason: 'non-finite-result' }
-        : diag;
+      ctx.setSlotInvalid(outputKey(node.id, 0));
+      ctx.setInvalidReason(
+        node.id,
+        diag.ok
+          ? { ok: false, status: 'divergent', reason: 'non-finite-result' }
+          : diag,
+      );
       return;
     }
     ctx.next[node.id] = numericValue(diag.value, 'free');
-    ctx.validOutputs.add(outputKey(node.id, 0));
-    delete ctx.invalidReasons[node.id];
+    ctx.setSlotValid(outputKey(node.id, 0));
+    ctx.clearInvalidReason(node.id);
   },
 };

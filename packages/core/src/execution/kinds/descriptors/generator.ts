@@ -79,7 +79,7 @@ export const generatorNodeDescriptor: NodeKindDescriptor<
 
     if (!effectivelyEnabled) {
       // 비활성(freeze)이어도 gateOpen은 최신 source 상태로 갱신해 둔다.
-      ctx.generatorRuntime[node.id] = { cursor: runtime.cursor, gateOpen };
+      ctx.advanceGeneratorCursor(node.id, { cursor: runtime.cursor, gateOpen });
       return;
     }
     const { value, nextCursor } = ctx.generatorRegistry.emit(
@@ -92,8 +92,8 @@ export const generatorNodeDescriptor: NodeKindDescriptor<
     // 값(또는 invalid)이 유지되고, cursor만 진행한다.
     if (value !== undefined) {
       ctx.next[node.id] = value;
-      ctx.validOutputs.add(outputKey(node.id, 0));
+      ctx.setSlotValid(outputKey(node.id, 0));
     }
-    ctx.generatorRuntime[node.id] = { cursor: nextCursor, gateOpen };
+    ctx.advanceGeneratorCursor(node.id, { cursor: nextCursor, gateOpen });
   },
 };

@@ -75,8 +75,8 @@ export const conditionNodeDescriptor: NodeKindDescriptor<
     }
 
     if (value === undefined) {
-      ctx.validOutputs.delete(trueSlot);
-      ctx.validOutputs.delete(falseSlot);
+      ctx.setSlotInvalid(trueSlot);
+      ctx.setSlotInvalid(falseSlot);
       return;
     }
 
@@ -116,11 +116,11 @@ export const conditionNodeDescriptor: NodeKindDescriptor<
     ctx.next[node.id] = wrap(rawValue, booleanValue(cond));
 
     if (cond) {
-      ctx.validOutputs.add(trueSlot);
-      ctx.validOutputs.delete(falseSlot);
+      ctx.setSlotValid(trueSlot);
+      ctx.setSlotInvalid(falseSlot);
     } else {
-      ctx.validOutputs.delete(trueSlot);
-      ctx.validOutputs.add(falseSlot);
+      ctx.setSlotInvalid(trueSlot);
+      ctx.setSlotValid(falseSlot);
     }
   },
 };
