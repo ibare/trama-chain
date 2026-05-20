@@ -62,6 +62,7 @@ import { computeExecutionState } from './execution-merge.js';
 import { createSpawnPolicy, type SpawnPolicy } from './spawn-policy.js';
 import { createPulseArrivalHandler } from './pulse-arrival.js';
 import { createSimulationLoop } from './simulation-loop.js';
+import { createExecutionStore, type ExecutionStore } from './execution-store.js';
 import { combinerRegistry, shapeRegistry } from './registries.js';
 import { fizzexExpressionEvaluator } from '../expression/fizzex-evaluator.js';
 import type { PulseRegistry, Pulse } from '../pulse/pulse-registry.js';
@@ -197,6 +198,9 @@ export function createModelStore({
   let startSimulationLoopIfNeeded!: () => void;
   let stopSimulationLoop!: () => void;
   let reconcileSimulationLoop!: () => void;
+  // L5-6: model+executionState commit 경로의 단일 헬퍼. 위 lazy-let 들과 동일
+  // 패턴 — store 생성 이후 createExecutionStore 가 합쳐 init.
+  let commitModelMutation!: ExecutionStore['commitModelMutation'];
   /**
    * 모델 편집 가능 여부 — paused일 때만 true. 재생 중에는 console.warn 후 false.
    * 단일 진입점으로 모든 mutation 액션이 통과해 "정지 중에만 편집"을 강제한다.
@@ -298,16 +302,15 @@ export function createModelStore({
 
     setModel: (next) => {
       if (!assertEditable()) return;
-      const s = get();
-      const exec = computeExecutionState(next, s.executionState, true, s.model);
-      set({ model: next, ...exec });
-      reconcileSimulationLoop();
+      commitModelMutation({ after: next, before: get().model, reconcileLoop: true });
     },
 
     recompute: () => {
-      const s = get();
-      const exec = computeExecutionState(s.model, s.executionState, true, s.model);
-      set(exec);
+      const m = get().model;
+      // recompute 는 model 변경 없이 executionState 만 재계산. commit 헬퍼는
+      // `after === before` 를 그대로 받아 computeExecutionState 의 머지 경로를
+      // 통과시킨다(누적 상태 보존).
+      commitModelMutation({ after: m, before: m });
     },
 
     loadFromJson: (json) => {
@@ -324,103 +327,79 @@ export function createModelStore({
       return serializeTrama(modelToDocument(get().model));
     },
 
+    // addXxxNode 9 액션의 공통 패턴 — assertEditable, op 호출, commit, 마지막 newId
+    // 추출하여 반환. commit 헬퍼가 model+executionState 재계산을 흡수해 본문은
+    // op 호출 + return 으로 좁아진다.
     addNode: (input) => {
       if (!assertEditable()) return null;
-      const s = get();
-      const after = addValueNodeOp(s.model, input);
-      const newId = after.nodeOrder[after.nodeOrder.length - 1]!;
-      const node = after.nodes[newId]!;
-      const exec = computeExecutionState(after, s.executionState, true, s.model);
-      set({ model: after, ...exec });
-      return node;
+      const before = get().model;
+      const after = addValueNodeOp(before, input);
+      commitModelMutation({ after, before });
+      return after.nodes[after.nodeOrder[after.nodeOrder.length - 1]!]!;
     },
 
     addConstantNode: (input) => {
       if (!assertEditable()) return null;
-      const s = get();
-      const after = addConstantNodeOp(s.model, input);
-      const newId = after.nodeOrder[after.nodeOrder.length - 1]!;
-      const node = after.nodes[newId]!;
-      const exec = computeExecutionState(after, s.executionState, true, s.model);
-      set({ model: after, ...exec });
-      return node;
+      const before = get().model;
+      const after = addConstantNodeOp(before, input);
+      commitModelMutation({ after, before });
+      return after.nodes[after.nodeOrder[after.nodeOrder.length - 1]!]!;
     },
 
     addConditionNode: (input) => {
       if (!assertEditable()) return null;
-      const s = get();
-      const after = addConditionNodeOp(s.model, input);
-      const newId = after.nodeOrder[after.nodeOrder.length - 1]!;
-      const node = after.nodes[newId]!;
-      const exec = computeExecutionState(after, s.executionState, true, s.model);
-      set({ model: after, ...exec });
-      return node;
+      const before = get().model;
+      const after = addConditionNodeOp(before, input);
+      commitModelMutation({ after, before });
+      return after.nodes[after.nodeOrder[after.nodeOrder.length - 1]!]!;
     },
 
     addLogicGateNode: (input) => {
       if (!assertEditable()) return null;
-      const s = get();
-      const after = addLogicGateNodeOp(s.model, input);
-      const newId = after.nodeOrder[after.nodeOrder.length - 1]!;
-      const node = after.nodes[newId]!;
-      const exec = computeExecutionState(after, s.executionState, true, s.model);
-      set({ model: after, ...exec });
-      return node;
+      const before = get().model;
+      const after = addLogicGateNodeOp(before, input);
+      commitModelMutation({ after, before });
+      return after.nodes[after.nodeOrder[after.nodeOrder.length - 1]!]!;
     },
 
     addObserveNode: (input) => {
       if (!assertEditable()) return null;
-      const s = get();
-      const after = addObserveNodeOp(s.model, input);
-      const newId = after.nodeOrder[after.nodeOrder.length - 1]!;
-      const node = after.nodes[newId]!;
-      const exec = computeExecutionState(after, s.executionState, true, s.model);
-      set({ model: after, ...exec });
-      return node;
+      const before = get().model;
+      const after = addObserveNodeOp(before, input);
+      commitModelMutation({ after, before });
+      return after.nodes[after.nodeOrder[after.nodeOrder.length - 1]!]!;
     },
 
     addExpressionNode: (input) => {
       if (!assertEditable()) return null;
-      const s = get();
-      const after = addExpressionNodeOp(s.model, input);
-      const newId = after.nodeOrder[after.nodeOrder.length - 1]!;
-      const node = after.nodes[newId]!;
-      const exec = computeExecutionState(after, s.executionState, true, s.model);
-      set({ model: after, ...exec });
-      return node;
+      const before = get().model;
+      const after = addExpressionNodeOp(before, input);
+      commitModelMutation({ after, before });
+      return after.nodes[after.nodeOrder[after.nodeOrder.length - 1]!]!;
     },
 
     addGeneratorNode: (input) => {
       if (!assertEditable()) return null;
-      const s = get();
-      const after = addGeneratorNodeOp(s.model, input);
-      const newId = after.nodeOrder[after.nodeOrder.length - 1]!;
-      const node = after.nodes[newId]!;
-      const exec = computeExecutionState(after, s.executionState, true, s.model);
-      set({ model: after, ...exec });
-      return node;
+      const before = get().model;
+      const after = addGeneratorNodeOp(before, input);
+      commitModelMutation({ after, before });
+      return after.nodes[after.nodeOrder[after.nodeOrder.length - 1]!]!;
     },
 
     addAverageNode: (input) => {
       if (!assertEditable()) return null;
-      const s = get();
-      const after = addAverageNodeOp(s.model, input);
-      const newId = after.nodeOrder[after.nodeOrder.length - 1]!;
-      const node = after.nodes[newId]!;
-      const exec = computeExecutionState(after, s.executionState, true, s.model);
-      set({ model: after, ...exec });
-      return node;
+      const before = get().model;
+      const after = addAverageNodeOp(before, input);
+      commitModelMutation({ after, before });
+      return after.nodes[after.nodeOrder[after.nodeOrder.length - 1]!]!;
     },
 
     addStockNode: (input) => {
       if (!assertEditable()) return null;
-      const s = get();
-      const after = addStockNodeOp(s.model, input);
-      const newId = after.nodeOrder[after.nodeOrder.length - 1]!;
-      const node = after.nodes[newId]!;
-      const exec = computeExecutionState(after, s.executionState, true, s.model);
-      set({ model: after, ...exec });
-      return node;
+      const before = get().model;
+      const after = addStockNodeOp(before, input);
+      commitModelMutation({ after, before });
+      return after.nodes[after.nodeOrder[after.nodeOrder.length - 1]!]!;
     },
 
     updateNode: (id, rawPatch) => {
@@ -447,25 +426,21 @@ export function createModelStore({
       const after = updateNodeOp(before, id, patch);
       if (after === before) return;
 
-      const exec = affectsValues
-        ? computeExecutionState(after, get().executionState, true, before)
-        : null;
-      set({ model: after, ...(exec ?? {}) });
-      if (affectsValues) {
-        nodeFlashRegistry.trigger(id);
-        const latest = get();
-        spawnOutgoingPulses(latest.model, latest.executionState, id);
-      }
-      reconcileSimulationLoop();
+      commitModelMutation({
+        after,
+        before,
+        recomputeExec: affectsValues,
+        flashAndSpawnFrom: affectsValues ? id : undefined,
+        reconcileLoop: true,
+      });
     },
 
     removeNode: (id) => {
       if (!assertEditable()) return;
-      const s = get();
-      const after = removeNodeOp(s.model, id);
-      if (after === s.model) return;
-      const exec = computeExecutionState(after, s.executionState, true, s.model);
-      set({ model: after, ...exec });
+      const before = get().model;
+      const after = removeNodeOp(before, id);
+      if (after === before) return;
+      commitModelMutation({ after, before });
     },
 
     addEdge: (input) => {
@@ -517,18 +492,15 @@ export function createModelStore({
       }
       const after = candidate;
       const newId = after.edgeOrder[after.edgeOrder.length - 1]!;
-      const edge = after.edges[newId]!;
-      const exec = computeExecutionState(after, get().executionState, true, before);
-      set({ model: after, ...exec });
-      reconcileSimulationLoop();
-      return edge;
+      commitModelMutation({ after, before, reconcileLoop: true });
+      return after.edges[newId]!;
     },
 
     updateEdge: (id, patch) => {
       if (!assertEditable()) return;
-      const s = get();
-      const candidate = updateEdgeOp(s.model, id, patch);
-      if (candidate === s.model) return;
+      const before = get().model;
+      const candidate = updateEdgeOp(before, id, patch);
+      if (candidate === before) return;
       if ('lag' in patch || 'from' in patch || 'to' in patch) {
         try {
           buildTopology(candidate);
@@ -536,20 +508,15 @@ export function createModelStore({
           return;
         }
       }
-      const after = candidate;
-      const exec = computeExecutionState(after, s.executionState, true, s.model);
-      set({ model: after, ...exec });
-      reconcileSimulationLoop();
+      commitModelMutation({ after: candidate, before, reconcileLoop: true });
     },
 
     removeEdge: (id) => {
       if (!assertEditable()) return;
-      const s = get();
-      const after = removeEdgeOp(s.model, id);
-      if (after === s.model) return;
-      const exec = computeExecutionState(after, s.executionState, true, s.model);
-      set({ model: after, ...exec });
-      reconcileSimulationLoop();
+      const before = get().model;
+      const after = removeEdgeOp(before, id);
+      if (after === before) return;
+      commitModelMutation({ after, before, reconcileLoop: true });
     },
 
     setQuestion: (q) => {
@@ -560,11 +527,10 @@ export function createModelStore({
 
     setExecution: (e) => {
       if (!assertEditable()) return;
-      const s = get();
-      const after = setExecutionOp(s.model, e);
-      if (after === s.model) return;
-      const exec = computeExecutionState(after, s.executionState, true, s.model);
-      set({ model: after, ...exec });
+      const before = get().model;
+      const after = setExecutionOp(before, e);
+      if (after === before) return;
+      commitModelMutation({ after, before });
     },
 
     // ValueNode 는 "사용자 매뉴얼 송출기" — paused/실행 중 모두 슬라이더로 값
@@ -679,6 +645,12 @@ export function createModelStore({
       nodeFlashRegistry,
       spawnOutgoingPulses,
     }));
+  ({ commitModelMutation } = createExecutionStore({
+    store,
+    nodeFlashRegistry,
+    spawnOutgoingPulses,
+    reconcileSimulationLoop,
+  }));
   handlePulseArrival = createPulseArrivalHandler({
     store,
     nodeFlashRegistry,
