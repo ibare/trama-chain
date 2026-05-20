@@ -197,6 +197,23 @@ export interface PropagateContext {
    * 결합·갱신이 일어난다.
    */
   paused: boolean;
+  /**
+   * 슬롯을 valid 로 켜고 pending 에서 제거 — `validOutputs.add(k) +
+   * pendingOutputs.delete(k)` 의 캡슐화. 디스크립터는 set 을 직접 mutate 하는
+   * 대신 이 헬퍼를 통해 valid ↔ pending 상호 배타 invariant 를 자동 보장한다.
+   * 직접 set 노출도 호환 유지 — 점진 교체.
+   */
+  setSlotValid(slotKey: string): void;
+  /**
+   * 슬롯의 valid 를 끈다. pending 은 호출자 정책 — invalidate 가 의도하는
+   * 의미가 "토폴로지 유효, 첫 신호 미도착(pending)" 인지 "토폴로지 유효하지만
+   * 평가 실패(invalid)" 인지가 다르므로 자동 pending 복귀는 하지 않는다.
+   */
+  setSlotInvalid(slotKey: string): void;
+  /** 노드의 invalid 사유를 갱신. UI invalid 배지/툴팁이 이 맵을 읽는다. */
+  setInvalidReason(nodeId: NodeId, reason: EvalDiagnosis & { ok: false }): void;
+  /** 노드의 invalid 사유 제거. 평가 성공으로 사유가 더 이상 유효하지 않을 때. */
+  clearInvalidReason(nodeId: NodeId): void;
 }
 
 /**

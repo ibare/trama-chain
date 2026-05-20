@@ -136,6 +136,19 @@ export function propagateOneStep(
       simulationTimeMs,
       stepIntervalMs: stepDelta,
       paused: options.paused ?? false,
+      setSlotValid(slotKey) {
+        validOutputs.add(slotKey);
+        pendingOutputs.delete(slotKey);
+      },
+      setSlotInvalid(slotKey) {
+        validOutputs.delete(slotKey);
+      },
+      setInvalidReason(nodeId, reason) {
+        invalidReasons[nodeId] = reason;
+      },
+      clearInvalidReason(nodeId) {
+        delete invalidReasons[nodeId];
+      },
     };
     desc.propagate(node, ctx);
   }
