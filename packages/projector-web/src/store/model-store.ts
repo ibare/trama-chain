@@ -327,6 +327,11 @@ export function createModelStore({
   const initialExec = computeExecutionState(initial);
   let activePlaybackToken = 0;
   let playbackTimeoutId: number | null = null;
+  // 멈춤 중에 mutate 된 source 노드 — 재생 재개 시 flushPendingOnUnpause 가
+  // target stale 여부와 무관하게 강제로 시드한다. paused 일 때는 spawn 자체가
+  // 막혀 다운스트림이 stale 인데 target slot 0 valid 가 그대로라 기본 시드
+  // 조건 (② target slot 0 invalid) 에 잡히지 않는 케이스를 보완.
+  const pausedSourceMutations = new Set<NodeId>();
 
   /**
    * 모델 편집 가능 여부 — paused일 때만 true. 재생 중에는 console.warn 후 false.
@@ -610,6 +615,31 @@ export function createModelStore({
       }
       set.add(slot);
     }
+    // 멈춤 중 mutate 된 source 강제 시드 — target 의 stale valid 여부와 무관하게
+    // 새 값을 다운스트림으로 흘려보낸다. 예: A 가 cond=true → false 로 바뀌도록
+    // 멈춤 중 슬라이드한 경우, 조건:0 valid 가 stale 로 남아 기본 ② 조건에
+    // 잡히지 않는다. 사용 후 clear — 일회성 트리거.
+    for (const sourceId of pausedSourceMutations) {
+      const node = model.nodes[sourceId];
+      if (!node) continue;
+      const desc = defaultNodeKindRegistry.forNode(node);
+      if (!desc) continue;
+      const slots = desc.outputSlots(node, {
+        model,
+        registry: defaultNodeKindRegistry,
+      });
+      let set = sourceToSlots.get(sourceId);
+      if (!set) {
+        set = new Set();
+        sourceToSlots.set(sourceId, set);
+      }
+      for (const s of slots) {
+        if (executionState.validOutputs.has(outputKey(sourceId, s.index))) {
+          set.add(s.index);
+        }
+      }
+    }
+    pausedSourceMutations.clear();
     for (const [sourceId, slots] of sourceToSlots) {
       spawnOutgoingPulses(model, executionState, sourceId, slots);
     }
@@ -894,7 +924,13 @@ export function createModelStore({
     const isValid = result.isValid;
     const valueChanged =
       result.newValue !== undefined && result.newValue !== prevValue;
-    const becameInvalid = wasValid && !isValid;
+    // 슬롯 단위 valid→invalid 전환도 cascade 트리거 — Condition 처럼 다출력 노드는
+    // 노드 단위로는 여전히 valid(반대 슬롯이 켜지므로) 지만, 끄려는 슬롯 하나의
+    // valid 가 stale 로 남으면 다운스트림이 invalidation 을 받지 못한다.
+    const slotBecameInvalid = result.outputSlotKeys.some(
+      (k) => executionState.validOutputs.has(k) && !result.validOutputs.has(k),
+    );
+    const becameInvalid = (wasValid && !isValid) || slotBecameInvalid;
 
     nodeFlashRegistry.trigger(pulse.targetNodeId);
 
@@ -1301,8 +1337,15 @@ export function createModelStore({
       });
       if (!playbackActive) {
         nodeFlashRegistry.trigger(id);
-        const latest = get();
-        spawnOutgoingPulses(latest.model, latest.executionState, id);
+        if (timeSettingsStore.getState().paused) {
+          // 멈춤 중에는 spawnOutgoingPulses 가 paused 가드에 막혀 다운스트림이
+          // stale 한 채 남는다. 재생 재개 시 flushPendingOnUnpause 가 강제
+          // 시드하도록 source 를 기록.
+          pausedSourceMutations.add(id);
+        } else {
+          const latest = get();
+          spawnOutgoingPulses(latest.model, latest.executionState, id);
+        }
       }
     },
 
