@@ -459,6 +459,30 @@ export function createModelStore({
   ): void {
     if (timeSettingsStore.getState().paused) return;
     if (store.getState().playbackStep !== null) return;
+    // source slot 을 valid 로 켜고 pending 해제 — 펄스 발사 직전에 commit 해
+    // EdgeView 의 isBranchingInactive selector 가 케이블을 solid 로 인식.
+    // slot 0 (level) 은 handlePulseArrival stock 분기 setState 에서 이미 처리
+    // 되지만, slot 1 (overflow)/ slot 2 (rate) 는 본 캡슐화가 단일 진입점.
+    store.setState((s) => {
+      const slotKey = outputKey(stockId, slot);
+      if (
+        s.executionState.validOutputs.has(slotKey) &&
+        !s.executionState.pendingOutputs.has(slotKey)
+      ) {
+        return {};
+      }
+      const newValid = new Set(s.executionState.validOutputs);
+      newValid.add(slotKey);
+      const newPending = new Set(s.executionState.pendingOutputs);
+      newPending.delete(slotKey);
+      return {
+        executionState: {
+          ...s.executionState,
+          validOutputs: newValid,
+          pendingOutputs: newPending,
+        },
+      };
+    });
     for (const eid of model.edgeOrder) {
       const e = model.edges[eid];
       if (!e || e.from !== stockId) continue;
