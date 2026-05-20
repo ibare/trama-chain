@@ -39,6 +39,9 @@ export const generatorNodeDescriptor: NodeKindDescriptor<
   outputInterpolation: (node): OutputInterpolation =>
     defaultGeneratorRegistry.get(node.params.kind)?.outputInterpolation ?? 'continuous',
   initialValue: () => undefined,
+  // 빈 배열 — initializeFromInitialValues (state.ts) 가 generator 한정 분기에서
+  // t=0 peek 가 정의된 paradigm 만 슬롯 0 을 add 한다. 디스크립터 약속 외 별도
+  // 호스트 처리 — 시간 기반 paradigm 의 "아직 정의되지 않은 시각" 도 표현하기 위함.
   initialValidSlots: () => [],
   // 메타 인지: plain boolean 또는 numeric+meta:boolean (Condition 슬롯) 둘 다 받는다.
   // port-compat 검사가 둘 중 하나와 매칭되면 호환으로 판정.
@@ -54,9 +57,11 @@ export const generatorNodeDescriptor: NodeKindDescriptor<
       cursor: ctx.generatorRegistry.initCursor(node.params, ctx.simulationTimeMs),
     };
 
-    // 입력 boolean gate 캐시 동기화 — propagate는 모델 변경/전체 재계산 시점이라
-    // 이 자리에서 source state로부터 gateOpen을 새로 채운다. ticker는 이후 이
-    // 캐시만 본다(state.values 직접 조회 금지).
+    // 입력 boolean gate 캐시 동기화 — propagate 는 모델 변경/전체 재계산 시점이라
+    // 이 자리에서 source state 로부터 gateOpen 을 새로 채운다. propagate 사이에
+    // 도착한 펄스는 호스트 (pulse-arrival 의 generator 분기) 가 같은 GeneratorRuntime
+    // 캐시를 직접 갱신 — 갱신 출처가 두 곳이지만 형식이 같아 ticker 는 둘 모두
+    // 동일하게 본다. ticker 는 이 캐시만 본다 (state.values 직접 조회 금지).
     //
     // asBooleanGate 가 알맹이/메타 우선순위를 통일 — Condition 슬롯에서 흘러온
     // wrapped numeric 의 meta:boolean 도 게이트로 인식.
