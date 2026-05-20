@@ -18,12 +18,19 @@ import '../node/register-default-kinds.js';
  *
  * UI 구성:
  *   - 상단 필터칩 ToggleGroup — All + descriptor의 menuSectionLabel 동적 추출
- *   - 본문 타일 그리드 — 큰 아이콘 + 라벨, 멀티 선택 (우상단 순번 배지)
+ *   - 본문 타일 그리드 — 큰 아이콘 + 라벨, 카드별 카운트 (우상단 뱃지)
  *   - 호버 시 HoverCard로 설명 팝오버 (200ms 지연)
  *   - 하단 "N개 추가" 액션
  *
+ * 선택 모델 — Map<key, count>:
+ *   - 카드 클릭: count===0 이면 1 (활성), count>=1 이면 -1 (0이 되면 해제)
+ *   - 뱃지 클릭: +1 (stopPropagation 으로 카드 클릭 차단)
+ *   - 카드 더블클릭: 즉시 confirm + close. 첫 click 의 +1 효과만 남기고 두 번째
+ *     click(e.detail===2) 의 -1 은 무시. 이미 잡힌 다른 카드들도 함께 추가.
+ *
  * 멀티 생성 정책:
- *   - 자유 추가: 선택 순번대로 가로 일렬, NODE_HSTEP 간격, 한 행 NODE_MAX_PER_ROW개
+ *   - 자유 추가: Map 의 insertion order 대로 카운트만큼 풀어 가로 일렬, NODE_HSTEP
+ *     간격, 한 행 NODE_MAX_PER_ROW개
  *   - 엣지 분할: 직렬 체인 — 원본 from → 새 노드들 → 원본 to. 첫 엣지만 원본 shape 보존
  *     좌표는 두 끝점 사이를 균등 분할 (i=1..n / (n+1))
  *
@@ -69,7 +76,7 @@ interface BodyProps {
 const ALL = '__all__';
 
 function NodePickerBody({ intent, instance, modelStore, close }: BodyProps): JSX.Element {
-  const [selectedKeys, setSelectedKeys] = useState<string[]>([]);
+  const [selections, setSelections] = useState<Map<string, number>>(() => new Map());
   const [category, setCategory] = useState<string>(ALL);
 
   const sections = useMemo(() => {
@@ -118,38 +125,78 @@ function NodePickerBody({ intent, instance, modelStore, close }: BodyProps): JSX
   }, [intent.screenPos.x, intent.screenPos.y]);
 
   useEffect(() => {
-    setSelectedKeys([]);
+    setSelections(new Map());
     setCategory(ALL);
   }, [intent]);
 
-  /**
-   * 타일 클릭 — 데스크톱 멀티 셀렉트 관습 적용.
-   *   - 일반 클릭: 단일 선택. 이미 그 항목만 선택돼 있으면 해제(빈 선택).
-   *   - Shift/Meta/Ctrl + 클릭: 선택 토글(추가/제거).
-   */
-  function handleTileClick(key: string, additive: boolean): void {
-    setSelectedKeys((prev) => {
-      if (additive) {
-        const i = prev.indexOf(key);
-        if (i >= 0) return prev.filter((k) => k !== key);
-        return [...prev, key];
+  // 카드 클릭: 0 → 1 (활성), >=1 → count-1 (0 이면 해제).
+  function handleTileClick(key: string): void {
+    setSelections((prev) => {
+      const next = new Map(prev);
+      const cur = next.get(key) ?? 0;
+      if (cur === 0) {
+        next.set(key, 1);
+      } else if (cur <= 1) {
+        next.delete(key);
+      } else {
+        next.set(key, cur - 1);
       }
-      if (prev.length === 1 && prev[0] === key) return [];
-      return [key];
+      return next;
     });
   }
 
+  // 뱃지 클릭: +1. 카드 onClick 으로 전파되지 않도록 호출처에서 stopPropagation.
+  function handleBadgeIncrement(key: string): void {
+    setSelections((prev) => {
+      const next = new Map(prev);
+      next.set(key, (next.get(key) ?? 0) + 1);
+      return next;
+    });
+  }
+
+  // 선택된 Map 을 createNode 호출 순서대로 풀어쓴 keys 배열로 변환.
+  // Map insertion order = 사용자가 처음 활성화한 순서 → 자유 추가의 가로 배치 순서.
+  function expandSelections(): string[] {
+    const out: string[] = [];
+    for (const [k, c] of selections) {
+      for (let i = 0; i < c; i++) out.push(k);
+    }
+    return out;
+  }
+
   function handleConfirm(): void {
-    if (selectedKeys.length === 0) return;
+    const keys = expandSelections();
+    if (keys.length === 0) return;
     if (intent.origin === 'edge-split') {
-      addAsEdgeChain(selectedKeys, intent.edgeId, intent.canvasPos, modelStore, itemByKey);
+      addAsEdgeChain(keys, intent.edgeId, intent.canvasPos, modelStore, itemByKey);
     } else {
-      addAsFreeRow(selectedKeys, intent.canvasPos, itemByKey);
+      addAsFreeRow(keys, intent.canvasPos, itemByKey);
     }
     close();
   }
 
-  const count = selectedKeys.length;
+  // 더블클릭 — 첫 click 의 +1 효과는 적용된 상태 (두 번째 click 은 e.detail===2 로
+  // 카드 onClick 에서 무시됨). 그 상태에서 confirm 으로 즉시 추가 + close.
+  function handleTileDoubleClick(key: string): void {
+    // 더블클릭한 카드가 아직 selections 에 없다면 (첫 click 이 활성화 안 된
+    // 엣지 케이스 방어) 1로 강제.
+    if (!selections.has(key)) {
+      const keys: string[] = [];
+      for (const [k, c] of selections) for (let i = 0; i < c; i++) keys.push(k);
+      keys.push(key);
+      if (intent.origin === 'edge-split') {
+        addAsEdgeChain(keys, intent.edgeId, intent.canvasPos, modelStore, itemByKey);
+      } else {
+        addAsFreeRow(keys, intent.canvasPos, itemByKey);
+      }
+      close();
+      return;
+    }
+    handleConfirm();
+  }
+
+  let totalCount = 0;
+  for (const c of selections.values()) totalCount += c;
 
   return (
     <Dialog.Content
@@ -199,8 +246,8 @@ function NodePickerBody({ intent, instance, modelStore, close }: BodyProps): JSX
             aria-label="노드 종류"
           >
             {filteredItems.map((it) => {
-              const idx = selectedKeys.indexOf(it.key);
-              const selected = idx >= 0;
+              const count = selections.get(it.key) ?? 0;
+              const selected = count > 0;
               return (
                 <HoverCard.Root key={it.key} openDelay={200} closeDelay={80}>
                   <HoverCard.Trigger asChild>
@@ -210,17 +257,29 @@ function NodePickerBody({ intent, instance, modelStore, close }: BodyProps): JSX
                       aria-selected={selected}
                       className={`trama-node-picker-tile${selected ? ' is-selected' : ''}`}
                       onClick={(e) => {
-                        const additive = e.shiftKey || e.metaKey || e.ctrlKey;
-                        handleTileClick(it.key, additive);
+                        // 두 번째 click (e.detail===2) 은 onDoubleClick 의 짝이므로
+                        // -1 효과를 흘리지 않도록 무시. 첫 click 의 +1 만 남는다.
+                        if (e.detail >= 2) return;
+                        handleTileClick(it.key);
                       }}
+                      onDoubleClick={() => handleTileDoubleClick(it.key)}
                     >
                       <span className="trama-node-picker-tile-icon" aria-hidden>
                         {it.symbol ?? '◯'}
                       </span>
                       <span className="trama-node-picker-tile-label">{it.label}</span>
                       {selected && (
-                        <span className="trama-node-picker-tile-badge" aria-hidden>
-                          {idx + 1}
+                        <span
+                          className="trama-node-picker-tile-badge"
+                          role="button"
+                          aria-label={`${it.label} 추가 개수 ${count}, 클릭하여 1 증가`}
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            handleBadgeIncrement(it.key);
+                          }}
+                          onDoubleClick={(e) => e.stopPropagation()}
+                        >
+                          {count}
                         </span>
                       )}
                     </button>
@@ -252,10 +311,10 @@ function NodePickerBody({ intent, instance, modelStore, close }: BodyProps): JSX
         <button
           type="button"
           className="trama-node-picker-btn trama-node-picker-btn--primary"
-          disabled={count === 0}
+          disabled={totalCount === 0}
           onClick={handleConfirm}
         >
-          {count === 0 ? '추가' : `${count}개 추가`}
+          {totalCount === 0 ? '추가' : `${totalCount}개 추가`}
         </button>
       </div>
     </Dialog.Content>

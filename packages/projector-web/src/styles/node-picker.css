@@ -145,6 +145,12 @@
     align-items: center;
     justify-content: center;
     line-height: 1;
+    cursor: pointer;
+    transition: transform 80ms var(--motion-easing-fade-natural);
+}
+
+[data-trama-root] .trama-node-picker-tile-badge:hover {
+    transform: scale(1.1);
 }
 
 [data-trama-root] .trama-node-picker-empty {
