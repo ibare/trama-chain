@@ -1,10 +1,6 @@
-import type { CombinerRegistry } from '../combiners/index.js';
-import type { ShapeRegistry } from '../functions/index.js';
-import type { Rng } from '../functions/types.js';
 import type { Edge, Model, Node, NodeId, Value, ValueKind } from '../model/index.js';
 import { booleanValue, isValueNode, isNumericValue, numericValue } from '../model/index.js';
 import type {
-  GeneratorRegistry,
   GeneratorRuntime,
   OutputInterpolation,
 } from '../generators/index.js';
@@ -19,7 +15,6 @@ import {
   type UnitCatalog,
 } from '../units/index.js';
 import { MissingCombinerError, MissingShapeError } from './errors.js';
-import type { EvalDiagnosis, ExpressionEvaluator } from './expression-evaluator.js';
 import {
   asBooleanGate,
   isSequence,
@@ -37,18 +32,41 @@ import {
   type ObserveBuffer,
 } from './observe-buffer.js';
 
-/**
- * ObserveNode 의 누적 추출 슬롯 런타임 상태. throttle 정책의 마지막 emit 시각을
- * 박제해 다음 propagate 가 발사 여부를 결정한다. realtime 모드에서는 사실상
- * 사용되지 않지만 일관된 형태로 유지.
- *
- * `state.ts` 의 ExecutionState 가 이 타입을 참조하지만, kinds.ts → state.ts 의
- * 단방향 import 를 유지하기 위해 이 자리에 정의.
- */
-export interface ObserveExtractionRuntime {
-  lastEmitTimeMs: number;
-}
 import { outputKey } from './state.js';
+import {
+  FREE_FALLBACK,
+  type ObserveExtractionRuntime,
+  type PortTypeContext,
+  type PropagateContext,
+} from './kinds/context.js';
+import {
+  isIdentityShape,
+  isSequencePortSpec,
+  type OutputSlotSpec,
+  type PortSpec,
+  type ScalarPortSpec,
+  type SequencePortSpec,
+} from './kinds/port-spec.js';
+import {
+  checkEdgeCompatibility,
+  type EdgeCompatibility,
+} from './kinds/edge-compatibility.js';
+import type { NodeKindDescriptor } from './kinds/descriptor.js';
+
+// C1 (kinds-split): 분리된 4 모듈의 심볼을 public surface 보존 위해 re-export.
+// 외부 (projector-web/embed) 가 `@trama/core` 에서 보던 이름은 그대로 유효.
+export { FREE_FALLBACK, isIdentityShape, isSequencePortSpec, checkEdgeCompatibility };
+export type {
+  EdgeCompatibility,
+  NodeKindDescriptor,
+  ObserveExtractionRuntime,
+  OutputSlotSpec,
+  PortSpec,
+  PortTypeContext,
+  PropagateContext,
+  ScalarPortSpec,
+  SequencePortSpec,
+};
 
 /**
  * propagate 컨텍스트에서 source 노드의 현재 numeric value를 꺼낸다.
@@ -93,260 +111,10 @@ function getBooleanNext(ctx: PropagateContext, id: NodeId): boolean | undefined 
   return undefined;
 }
 
-/**
- * 단위가 명시되지 않은 raw 출력 노드(상수·조건 게이트·식)의 폴백.
- * 값은 raw로 흐르고, 시각화 단계에서 자동 단위 추론이 동작한다.
- */
-export const FREE_FALLBACK: ResolvedUnit = {
-  id: 'free',
-  kind: 'free',
-  suffix: '',
-  labels: [],
-  min: 0,
-  max: 1,
-  step: 0.01,
-};
+// FREE_FALLBACK / isIdentityShape / PropagateContext 는 ./kinds/context.js & port-spec.js 로 이동 (C1).
 
-/**
- * 엣지의 shape이 사실상 항등 변환인지 판정. 두 경우:
- *  - kind='none'                : 사용자가 변환을 선택하지 않은 상태
- *  - kind='linear', slope=1, offset=0 : explicit identity linear
- *
- * identity 엣지는 raw passthrough로 다루고 정규화·역정규화·클램프를 건너뛴다.
- * "shape을 적용하지 않으면 raw"라는 의미 모델의 단일 진입점.
- */
-export function isIdentityShape(edge: Edge): boolean {
-  if (edge.shape.kind === 'none') return true;
-  if (edge.shape.kind !== 'linear') return false;
-  const p = edge.shape.params as { slope?: unknown; offset?: unknown };
-  return p.slope === 1 && p.offset === 0;
-}
-
-/**
- * 한 노드의 lag=0 전파 단계에서 디스크립터가 사용하는 컨텍스트.
- * next/validOutputs는 의도적으로 가변(mutate) — 한 step 내에서 디스크립터가
- * 직접 갱신해 다음 노드로 흘러간다.
- */
-export interface PropagateContext {
-  model: Model;
-  incoming: ReadonlyArray<Edge>;
-  /**
-   * 노드별 출력값(작업 버퍼). 타입은 [[ExecValue]] — Value 또는 WrappedValue.
-   * 디스크립터가 알맹이만 보고 싶다면 `unwrap(ctx.next[id])` 또는 헬퍼
-   * `getNumericNext`/`getBooleanNext`/`getAnyNext` 를 통해 자동 unwrap 된 값을 사용.
-   * 메타까지 보고 분기하는 디스크립터(예: Generator gate)는 raw 그대로 읽는다.
-   */
-  next: Record<NodeId, ExecValue>;
-  validOutputs: Set<string>;
-  /**
-   * "토폴로지 정상, 첫 신호 미도착" 슬롯 집합. ValueNode 처럼 incoming 엣지가
-   * 있어 stored state(initialValue) 권위를 잃은 노드가 아직 어떤 펄스도
-   * 받지 못한 상태를 표시한다. 디스크립터가 성공적으로 갱신하면 키를
-   * 삭제한다. valid 와 상호 배타.
-   */
-  pendingOutputs: Set<string>;
-  /**
-   * 노드별 마지막 실패 사유 (UI invalid 배지/툴팁 노출용).
-   * 디스크립터가 평가에 실패하면 여기에 기록하고, 성공하면 키를 삭제한다.
-   */
-  invalidReasons: Record<NodeId, EvalDiagnosis & { ok: false }>;
-  catalog: UnitCatalog;
-  shapeRegistry: ShapeRegistry;
-  combinerRegistry: CombinerRegistry;
-  nodeKindRegistry: NodeKindRegistry;
-  expressionEvaluator: ExpressionEvaluator;
-  rng: Rng;
-  /**
-   * ObserveNode 가 통과한 값을 시간순으로 누적해 두는 sample 버퍼.
-   * 각 sample 은 (value, t) — t 는 누적 당시 simulation time(ms).
-   * 디스크립터가 mutate하며, propagateOneStep 이 결과를 ExecutionState 로 회수한다.
-   * runtime-only — 직렬화되지 않는다.
-   */
-  observeBuffers: Record<NodeId, ObserveBuffer>;
-  /**
-   * ObserveNode 추출 슬롯 throttle 런타임. 마지막 emit 시각(simulation time)을
-   * 박제해 다음 propagate 가 발사 여부를 결정. runtime-only.
-   */
-  observeExtractionRuntime: Record<NodeId, ObserveExtractionRuntime>;
-  /**
-   * GeneratorNode의 cursor·gate 캐시. propagate가 emit할 때 mutate한다.
-   * runtime-only — 직렬화되지 않는다.
-   */
-  generatorRuntime: Record<NodeId, GeneratorRuntime>;
-  /** 등록된 패러다임 모음. emit 라우팅에 사용. */
-  generatorRegistry: GeneratorRegistry;
-  /**
-   * Sequence 채널 출력 작업 버퍼. 키: outputKey(nodeId, slot). 누적 추출 등
-   * sequence PortSpec slot 의 SequenceValue 스냅샷을 디스크립터가 여기 기록한다.
-   * 스칼라 [[next]] 와 분리된 채널.
-   */
-  sequenceNext: Record<string, SequenceValue>;
-  /** 현재 simulation time(ms). 이 step 내 누적·emit 시각의 기준. */
-  simulationTimeMs: number;
-  /**
-   * 이번 step 의 시뮬레이션 시간 증분(ms). 시간 적분이 필요한 노드(Stock 등)가
-   * `dt = stepIntervalMs / 1000` 로 환산해 사용. 0 이면 시간이 흐르지 않은 step
-   * (수동 recompute·노드 편집 후 재계산 등) — 시간 적분 노드는 이번 step 에서
-   * 적분하지 않고 직전 상태를 보존한다.
-   */
-  stepIntervalMs: number;
-  /**
-   * 멈춤 상태. true 면 ValueNode 처럼 펄스 도착으로만 갱신되는 노드는 이번
-   * 단계에서 source 변화를 흡수하지 않는다 — pending 이면 pending 유지, valid
-   * 였다면 마지막 수신값 유지. 시간이 흐르는 step(!paused)에서만 contribute
-   * 결합·갱신이 일어난다.
-   */
-  paused: boolean;
-  /**
-   * 슬롯을 valid 로 켜고 pending 에서 제거 — `validOutputs.add(k) +
-   * pendingOutputs.delete(k)` 의 캡슐화. 디스크립터는 set 을 직접 mutate 하는
-   * 대신 이 헬퍼를 통해 valid ↔ pending 상호 배타 invariant 를 자동 보장한다.
-   * 직접 set 노출도 호환 유지 — 점진 교체.
-   */
-  setSlotValid(slotKey: string): void;
-  /**
-   * 슬롯의 valid 를 끈다. pending 은 호출자 정책 — invalidate 가 의도하는
-   * 의미가 "토폴로지 유효, 첫 신호 미도착(pending)" 인지 "토폴로지 유효하지만
-   * 평가 실패(invalid)" 인지가 다르므로 자동 pending 복귀는 하지 않는다.
-   */
-  setSlotInvalid(slotKey: string): void;
-  /** 노드의 invalid 사유를 갱신. UI invalid 배지/툴팁이 이 맵을 읽는다. */
-  setInvalidReason(nodeId: NodeId, reason: EvalDiagnosis & { ok: false }): void;
-  /** 노드의 invalid 사유 제거. 평가 성공으로 사유가 더 이상 유효하지 않을 때. */
-  clearInvalidReason(nodeId: NodeId): void;
-}
-
-/**
- * PortType 해석에 필요한 컨텍스트. ObserveNode처럼 입력 엣지의 source PortType을
- * 따라가는 passthrough 노드만 사용한다. 다른 노드는 인자를 무시.
- *
- * 정적 시점(메뉴 후보 계산 등)에서는 ctx 없이 호출될 수 있어 optional —
- * ctx가 없으면 디스크립터는 정적 폴백을 반환한다.
- */
-export interface PortTypeContext {
-  model: Model;
-  registry: NodeKindRegistry;
-}
-
-/**
- * scalar 채널 포트 spec — 한 스텝당 단일 값(+optional 메타) 이 흐른다.
- * `value` 는 알맹이 Value 의 kind, `meta` 는 WrappedValue 의 메타 kind
- * (미정의면 메타 없음). 기본 종류이므로 `kind` 는 생략 가능.
- */
-export interface ScalarPortSpec {
-  kind?: 'scalar';
-  value: ValueKind;
-  meta?: ValueKind;
-  /** UI/디버깅용 라벨. 없으면 인덱스·value 로 자동 표기. */
-  label?: string;
-}
-
-/**
- * sequence 채널 포트 spec — 누적된 (value, t) sample 시퀀스가 흐른다.
- * 누적 추출 슬롯(ObserveNode 상단 우측 등) 의 출력 / 통계 노드(AverageNode 등)
- * 의 입력에 쓰인다. scalar 와는 호환되지 않는다(자동 변환 없음 — 명시적 변환 노드 필요).
- */
-export interface SequencePortSpec {
-  kind: 'sequence';
-  /** sample element 의 value kind. 누적원 본체 PortSpec.value 를 따른다. */
-  element: ValueKind;
-  label?: string;
-}
-
-/**
- * 한 포트(입력/출력 슬롯)의 타입 명세. scalar 채널과 sequence 채널의 합집합.
- *
- * 입력 포트는 acceptsList 로 여러 PortSpec 을 OR 매칭.
- * 출력 포트(`OutputSlotSpec`) 는 슬롯당 항상 단일 spec.
- */
-export type PortSpec = ScalarPortSpec | SequencePortSpec;
-
-/** scalar/sequence 분기 가드. C4 Sum Type Routing 의 단일 진입점. */
-export function isSequencePortSpec(spec: PortSpec): spec is SequencePortSpec {
-  return spec.kind === 'sequence';
-}
-
-/** 한 출력 슬롯의 명세. 디스크립터는 0..n-1 순서로 반환. */
-export type OutputSlotSpec = PortSpec & {
-  index: number;
-  /**
-   * 라우팅이 런타임에만 확정되는 분기 슬롯. true 면 EdgeView 가 이 슬롯에서
-   * 나가는 케이블을 항상 dashed 로 그려 "어디로 흐를지 모름" 을 시각화한다.
-   * Condition 의 true/false 슬롯, LogicGate 의 출력 슬롯이 해당. 일반 연산
-   * 노드의 출력은 입력이 valid 면 항상 발사라 분기가 아니다.
-   */
-  branching?: boolean;
-};
-
-/**
- * 노드 종류별 동작을 한 곳에 모은 디스크립터.
- * 새 노드 종류 추가 시 디스크립터를 작성·등록하면 전파·초기화·피드백·단위
- * 해석이 모두 라우팅된다.
- */
-export interface NodeKindDescriptor<N extends Node = Node> {
-  kind: N['kind'];
-  /** 초기 state.values에 기록할 Value. undefined면 미기록(propagate 단계에서 채움). */
-  initialValue(node: N): Value | undefined;
-  /**
-   * 초기 validOutputs 에 포함시킬 슬롯 인덱스들. 단출력 노드의 즉시 valid 케이스는
-   * `[0]`, 모든 슬롯 invalid 출발이면 `[]`. ConditionNode 처럼 슬롯별로 결정되는
-   * 케이스를 일급화하기 위한 자리.
-   */
-  initialValidSlots(node: N): readonly number[];
-  /** 이 노드의 출력 단위. raw 통과(outputsRaw=true)여도 시각화·클램프 폴백용으로 의미가 있다. */
-  outputUnit(node: N, catalog: UnitCatalog): ResolvedUnit;
-  /**
-   * 이 노드가 받을 수 있는 입력 포트 명세 리스트. null 이면 입력을 받지 않는다
-   * (예: Constant). 빈 배열은 의도된 "입력 슬롯은 있으나 어떤 spec 도 매칭 못함" —
-   * 정상적으론 발생하지 않게 한다.
-   *
-   * 리스트의 모든 spec 은 OR 매칭 — source 의 출력 PortSpec 이 그 중 하나와
-   * value(+meta) 가 일치하면 호환. Generator 같은 메타 인식 입력이 "boolean OR
-   * numeric(meta:boolean)" 두 spec 을 동시에 advertise 하는 자리.
-   *
-   * passthrough 노드(ObserveNode)는 입력 엣지의 source spec 을 따라가야 하므로
-   * optional ctx 로 모델·레지스트리를 받는다.
-   */
-  inputAccepts(node: N, ctx?: PortTypeContext): readonly PortSpec[] | null;
-  /**
-   * 이 노드의 출력 슬롯 명세. 인덱스 0..n-1 순서. 단출력 노드는 길이 1.
-   * Condition 처럼 다출력은 [true 슬롯, false 슬롯] 형태로 P4 에서 정의된다.
-   *
-   * passthrough 노드는 입력 엣지의 source spec 을 따라가므로 ctx 가 필요하다.
-   */
-  outputSlots(node: N, ctx?: PortTypeContext): readonly OutputSlotSpec[];
-  /**
-   * 입력 PortType이 비결정적(passthrough 노드 + 입력 미연결 등)일 때 어떤 source든
-   * 받아주겠다는 신호. ObserveNode가 입력 엣지가 없을 때 true를 반환해
-   * 첫 연결을 자유롭게 허용한다. 일단 연결되면 false로 떨어져 inputAccepts 가
-   * 잠긴 PortType을 반환한다. 미정의면 false 취급.
-   */
-  acceptsAnyInput?(node: N, ctx?: PortTypeContext): boolean;
-  /**
-   * 이 노드를 source로 두는 엣지가 raw passthrough인지.
-   * true면 ValueNode 타깃의 normalize/shape/denormalize 파이프라인이 우회되고
-   * 타깃의 단위 클램프도 건너뛴다 (예: 함수 결과 1760이 cm[0..250]에 짓이겨지지 않게).
-   */
-  outputsRaw: boolean;
-  /** lag=1 feedback 엣지의 target이 될 수 있는지. */
-  canBeFeedbackTarget: boolean;
-  /**
-   * 이 노드 출력의 시간 분포 본질 — 시각화 측에서 두 emit 사이를 lerp할지
-   * 결정한다. 미정의면 'continuous' 취급(기존 노드의 안전한 기본).
-   *
-   * - 'continuous': 매끄러운 변화 — 시각화가 wallTime 비율로 lerp 가능.
-   * - 'discrete': 이산 이벤트(step·pulse·schedule 등). 보간하면 sharp 전환이
-   *   부드러워져 의도가 왜곡되므로 즉시 전환이어야 한다.
-   *
-   * 모델·실행 계층은 이 플래그를 read-only로 노출만 한다. 보간 정책은 시각 계층 책임.
-   */
-  outputInterpolation?(node: N): OutputInterpolation;
-  /**
-   * lag=0 전파. incoming을 보고 next[node.id]·validOutputs를 갱신.
-   * incoming이 비어 있고 디스크립터가 외부 입력이 없는 종류면 기존 값을 유지하는 것이 일반적.
-   */
-  propagate(node: N, ctx: PropagateContext): void;
-}
+// PropagateContext / PortTypeContext / PortSpec 류 / NodeKindDescriptor 는
+// ./kinds/{context,port-spec,descriptor}.js 로 이동 (C1).
 
 class NodeKindRegistryImpl {
   private readonly map = new Map<string, NodeKindDescriptor<Node>>();
@@ -1316,92 +1084,4 @@ export function getOutputPortType(
   return first.value;
 }
 
-export type EdgeCompatibility =
-  | { compatible: true }
-  | { compatible: false; reason: string };
-
-/**
- * 두 PortSpec 이 호환되는지.
- *
- * - `value` 는 항상 일치해야 한다 (자동 변환 없음).
- * - target 이 `meta` 를 명시했으면 source 도 동일한 `meta` 를 가져야 한다.
- *   target 이 meta 를 명시 안 했으면 source meta 유무 무관 — caller 가 unwrap 으로
- *   알맹이만 본다.
- *
- * 이 모델은 "connected but doesn't work" 를 정적으로 차단한다 — Generator 의
- * boolean 게이트가 plain numeric 을 받아 freeze 만 되는 사례를 메뉴에서 제외시킨다.
- */
-function specMatches(source: PortSpec, target: PortSpec): boolean {
-  // scalar ↔ sequence 는 호환 안 됨 — 자동 변환 없음 (명시적 변환 노드 필요).
-  if (isSequencePortSpec(source) !== isSequencePortSpec(target)) return false;
-  if (isSequencePortSpec(source) && isSequencePortSpec(target)) {
-    return source.element === target.element;
-  }
-  // 둘 다 scalar — 기존 의미 동일.
-  const ss = source as ScalarPortSpec;
-  const ts = target as ScalarPortSpec;
-  if (ss.value !== ts.value) return false;
-  if (ts.meta !== undefined && ss.meta !== ts.meta) return false;
-  return true;
-}
-
-/**
- * source → target 엣지의 PortType 호환성을 본다.
- *
- * 검사 항목:
- *  1. target 이 입력을 받지 않는 종류면 거부 (Constant 등)
- *  2. source 출력 슬롯의 PortSpec 이 target inputAccepts 의 어떤 spec 과도
- *     매칭되지 않으면 거부
- *
- * 자동 변환은 없다 — numeric을 boolean으로(또는 그 반대) 흘리려면
- * 명시적 변환 노드를 끼워야 한다.
- *
- * `sourceSlotIndex` 미지정 시 슬롯 0 으로 간주. ConditionNode 의 true/false
- * 슬롯이 동일 spec 이면 어느 쪽으로 연결하든 통과.
- */
-export function checkEdgeCompatibility(
-  source: Node,
-  target: Node,
-  registry: NodeKindRegistry = defaultNodeKindRegistry,
-  model?: Model,
-  sourceSlotIndex: number = 0,
-): EdgeCompatibility {
-  // target 입력 PortType 이 비결정적인 passthrough(ObserveNode 미연결 상태 등)면
-  // 어떤 source 든 받아준다 — acceptsAnyInput=true 케이스. 첫 연결을 자유롭게 허용해
-  // 이후 PortType 이 그 source 로 잠긴다.
-  const targetDesc = registry.forNode(target);
-  if (
-    targetDesc?.acceptsAnyInput &&
-    targetDesc.acceptsAnyInput(target, model ? { model, registry } : undefined)
-  ) {
-    return { compatible: true };
-  }
-  const targetAccepts = getInputAccepts(target, registry, model);
-  if (targetAccepts === null) {
-    return {
-      compatible: false,
-      reason: `target node "${target.kind}" does not accept inputs`,
-    };
-  }
-  const sourceSlot = getOutputSlotAt(source, sourceSlotIndex, registry, model);
-  if (!sourceSlot) {
-    return {
-      compatible: false,
-      reason: `source node "${source.kind}" has no output slot ${sourceSlotIndex}`,
-    };
-  }
-  for (const accept of targetAccepts) {
-    if (specMatches(sourceSlot, accept)) return { compatible: true };
-  }
-  const wanted = targetAccepts.map(describePortSpec).join('|');
-  return {
-    compatible: false,
-    reason: `port type mismatch: source outputs "${describePortSpec(sourceSlot)}", target expects "${wanted}"`,
-  };
-}
-
-/** PortSpec → 사람이 읽을 수 있는 라우팅 라벨. scalar/sequence 양쪽을 한 형식으로. */
-function describePortSpec(spec: PortSpec): string {
-  if (isSequencePortSpec(spec)) return `sequence<${spec.element}>`;
-  return spec.value;
-}
+// EdgeCompatibility / checkEdgeCompatibility 는 ./kinds/edge-compatibility.js 로 이동 (C1).
