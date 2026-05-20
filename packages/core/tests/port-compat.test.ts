@@ -82,12 +82,14 @@ describe('ConditionNode 두 슬롯 명세', () => {
       value: 'numeric',
       meta: 'boolean',
       label: 'true',
+      branching: true,
     });
     expect(getOutputSlotAt(cond, 1)).toEqual({
       index: 1,
       value: 'numeric',
       meta: 'boolean',
       label: 'false',
+      branching: true,
     });
   });
 

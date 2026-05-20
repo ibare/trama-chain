@@ -118,17 +118,18 @@
     opacity: 0.25;
 }
 
-/* condition 게이트가 닫혀 source 출력이 invalid가 된 엣지 — 점선·반투명으로
-   "데이터가 흐를 수 없음"을 표시. 코어가 invalid를 다운스트림 자동 전파하므로
-   체인 전체가 동일하게 흐려진다. */
-[data-trama-root] .trama-edge-group.is-gated .trama-edge {
+/* 분기 source(Condition true/false 슬롯, LogicGate 출력)에서 나가는 케이블 —
+   점선·반투명으로 "라우팅이 런타임에만 확정됨" 을 표시. 활성 슬롯이든 비활성
+   슬롯이든 동일하게 dashed — 어디로 흐르는지는 펄스 운반 자체가 보여준다.
+   데이터 미도착/평가 보류 같은 상태성은 노드 본체의 "…" + 점선 보더로 표현. */
+[data-trama-root] .trama-edge-group.is-branching .trama-edge {
     opacity: var(--physical-opacity-edge-gated);
     stroke-dasharray: var(--physical-dasharray-edge-gated);
     transition:
         opacity 200ms ease,
         stroke-dasharray 200ms ease;
 }
-[data-trama-root] .trama-edge-group.is-gated .trama-arrow {
+[data-trama-root] .trama-edge-group.is-branching .trama-arrow {
     opacity: var(--physical-opacity-edge-gated);
     transition: opacity 200ms ease;
 }

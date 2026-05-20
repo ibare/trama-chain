@@ -250,7 +250,16 @@ export function isSequencePortSpec(spec: PortSpec): spec is SequencePortSpec {
 }
 
 /** 한 출력 슬롯의 명세. 디스크립터는 0..n-1 순서로 반환. */
-export type OutputSlotSpec = PortSpec & { index: number };
+export type OutputSlotSpec = PortSpec & {
+  index: number;
+  /**
+   * 라우팅이 런타임에만 확정되는 분기 슬롯. true 면 EdgeView 가 이 슬롯에서
+   * 나가는 케이블을 항상 dashed 로 그려 "어디로 흐를지 모름" 을 시각화한다.
+   * Condition 의 true/false 슬롯, LogicGate 의 출력 슬롯이 해당. 일반 연산
+   * 노드의 출력은 입력이 valid 면 항상 발사라 분기가 아니다.
+   */
+  branching?: boolean;
+};
 
 /**
  * 노드 종류별 동작을 한 곳에 모은 디스크립터.
@@ -529,8 +538,8 @@ const conditionNodeDescriptor: NodeKindDescriptor<
   initialValidSlots: () => [],
   inputAccepts: () => [{ value: 'numeric' }],
   outputSlots: () => [
-    { index: 0, value: 'numeric', meta: 'boolean', label: 'true' },
-    { index: 1, value: 'numeric', meta: 'boolean', label: 'false' },
+    { index: 0, value: 'numeric', meta: 'boolean', label: 'true', branching: true },
+    { index: 1, value: 'numeric', meta: 'boolean', label: 'false', branching: true },
   ],
   outputUnit: () => FREE_FALLBACK,
   propagate: (node, ctx) => {
@@ -754,7 +763,7 @@ const logicGateNodeDescriptor: NodeKindDescriptor<
   initialValue: () => undefined,
   initialValidSlots: () => [],
   inputAccepts: () => [{ value: 'boolean' }],
-  outputSlots: () => [{ index: 0, value: 'boolean' }],
+  outputSlots: () => [{ index: 0, value: 'boolean', branching: true }],
   outputUnit: () => FREE_FALLBACK,
   propagate: (node, ctx) => {
     const contributions: boolean[] = [];

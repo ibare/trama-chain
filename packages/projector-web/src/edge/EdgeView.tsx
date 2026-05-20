@@ -5,8 +5,6 @@ import {
   isConditionNode,
   isExpressionNode,
   isNumericValue,
-  isOutputPending,
-  isOutputValid,
   isSequence,
   isValueNode,
   normalize,
@@ -100,15 +98,22 @@ function EdgeViewImpl({
     }
     return fallback;
   });
-  // source 가 케이블에 *부착* 되어 있는지. condition 게이트가 닫히는 등으로
-  // 출력이 invalid 가 되면 target 끝을 소켓에서 풀어 대롱대롱 늘어진 시각을 만든다.
-  // pending(첫 신호 미도착) 은 토폴로지가 정상이라 부착 상태로 간주 — 노드 본체의
-  // 점선 보더 + "…" 가 이미 그 의미를 표현한다.
+  // 케이블 dashed 시맨틱은 "분기 — 라우팅이 런타임에만 확정됨" 단일 의미.
+  // source 슬롯이 디스크립터에서 branching: true 로 표시되어 있으면 항상 dashed.
+  // 그 외 케이블은 source valid 여부와 무관하게 항상 solid — 데이터 미도착/평가
+  // 보류 같은 상태성은 노드 본체의 "…" + 점선 보더로 이미 표현된다.
   const edgeSourceSlot = edge?.sourceSlotIndex ?? 0;
-  const sourceValid = modelStore((s) => {
-    if (!fromId) return true;
-    if (isOutputValid(s.executionState, fromId, edgeSourceSlot)) return true;
-    return isOutputPending(s.executionState, fromId, edgeSourceSlot);
+  const isBranchingSource = modelStore((s) => {
+    if (!fromId) return false;
+    const n = s.model.nodes[fromId];
+    if (!n) return false;
+    const desc = defaultNodeKindRegistry.forNode(n);
+    if (!desc) return false;
+    const slots = desc.outputSlots(n, {
+      model: s.model,
+      registry: defaultNodeKindRegistry,
+    });
+    return slots[edgeSourceSlot]?.branching === true;
   });
 
   const openFunctionPicker = uiStore((s) => s.openFunctionPicker);
@@ -301,7 +306,7 @@ function EdgeViewImpl({
   if (isContinuousSource) baseClasses.push('is-continuous');
 
   const arrowClass = `trama-arrow${isFeedback ? ' is-feedback' : ''}${isStrained ? ' is-strained' : ''}`;
-  const groupCls = `trama-edge-group${morphing ? ' is-morphing' : ''}${isDetaching ? ' is-detaching' : ''}${sourceValid ? '' : ' is-gated'}`;
+  const groupCls = `trama-edge-group${morphing ? ' is-morphing' : ''}${isDetaching ? ' is-detaching' : ''}${isBranchingSource ? ' is-branching' : ''}`;
 
   // 멀티슬롯 노드에 연결된 엣지에 슬롯 식별색을 CSS 변수로 부여.
   // feedback·strained는 styles.css 우선순위로 이 색을 덮어 시맨틱 상태가 우선됨.
