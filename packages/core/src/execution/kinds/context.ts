@@ -1,7 +1,7 @@
 import type { CombinerRegistry } from '../../combiners/index.js';
 import type { ShapeRegistry } from '../../functions/index.js';
 import type { Rng } from '../../functions/types.js';
-import type { Edge, Model, NodeId } from '../../model/index.js';
+import type { Edge, Model, Node, NodeId } from '../../model/index.js';
 import type {
   GeneratorRegistry,
   GeneratorRuntime,
@@ -9,6 +9,7 @@ import type {
 import type { ResolvedUnit, UnitCatalog } from '../../units/index.js';
 import type {
   ExecValue,
+  SequenceSample,
   SequenceValue,
 } from '../exec-value.js';
 import type {
@@ -136,6 +137,32 @@ export interface PropagateContext {
   setInvalidReason(nodeId: NodeId, reason: EvalDiagnosis & { ok: false }): void;
   /** 노드의 invalid 사유 제거. 평가 성공으로 사유가 더 이상 유효하지 않을 때. */
   clearInvalidReason(nodeId: NodeId): void;
+  /**
+   * ObserveNode 의 누적 sample 버퍼에 한 개 sample 을 push 한다. 버퍼가 없거나
+   * capacity 정책이 바뀌었으면 새로 만든다 — 디스크립터가 `observeBuffers[id]`
+   * 를 직접 mutate 하지 않도록 캡슐화. capacity 변경 시 누적 손실은 수용 가능한
+   * 트레이드오프.
+   */
+  pushObserveSample(
+    node: Extract<Node, { kind: 'observe' }>,
+    sample: SequenceSample,
+  ): void;
+  /**
+   * Sequence 채널 슬롯에 스냅샷을 발사하고 valid 로 켠다. `sequenceNext[slot]`
+   * 저장 + `validOutputs.add(slot)` 의 캡슐화. ObserveNode 누적 추출 슬롯처럼
+   * sequence 채널을 쓰는 디스크립터가 사용.
+   */
+  emitSequence(slotKey: string, seq: SequenceValue): void;
+  /**
+   * ObserveNode 추출 슬롯의 throttle 마지막 emit 시각을 박제한다. 다음 step 의
+   * propagate 가 이 시각을 기준으로 다음 발사 여부를 결정.
+   */
+  markExtractionEmitted(nodeId: NodeId, simulationTimeMs: number): void;
+  /**
+   * GeneratorNode 의 cursor·gate 캐시를 갱신한다. emit 후 다음 step 으로 cursor 를
+   * 진행시킬 때 사용 — 디스크립터가 `generatorRuntime[id]` 를 직접 mutate 하지 않도록.
+   */
+  advanceGeneratorCursor(nodeId: NodeId, runtime: GeneratorRuntime): void;
 }
 
 /**

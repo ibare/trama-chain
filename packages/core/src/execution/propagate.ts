@@ -2,7 +2,12 @@ import type { CombinerRegistry } from '../combiners/index.js';
 import type { Model, NodeId, Value } from '../model/index.js';
 import { booleanValue, isNumericValue, isValueNode, numericValue } from '../model/index.js';
 import { isSequence, resolveScalar, unwrap, type ExecValue, type SequenceValue } from './exec-value.js';
-import { cloneObserveBuffer, type ObserveBuffer } from './observe-buffer.js';
+import {
+  cloneObserveBuffer,
+  createObserveBuffer,
+  pushSample,
+  type ObserveBuffer,
+} from './observe-buffer.js';
 import type { ShapeRegistry } from '../functions/index.js';
 import type { Rng } from '../functions/types.js';
 import {
@@ -25,6 +30,7 @@ import {
   type ObserveExtractionRuntime,
   type PropagateContext,
 } from './kinds/index.js';
+import { capacityMatches } from './kinds/internals.js';
 import {
   noopExpressionEvaluator,
   type ExpressionEvaluator,
@@ -148,6 +154,24 @@ export function propagateOneStep(
       },
       clearInvalidReason(nodeId) {
         delete invalidReasons[nodeId];
+      },
+      pushObserveSample(observeNode, sample) {
+        let buf = observeBuffers[observeNode.id];
+        if (!buf || !capacityMatches(buf, observeNode.capacity)) {
+          buf = createObserveBuffer(observeNode.capacity);
+        }
+        pushSample(buf, sample);
+        observeBuffers[observeNode.id] = buf;
+      },
+      emitSequence(slotKey, seq) {
+        sequenceNext[slotKey] = seq;
+        validOutputs.add(slotKey);
+      },
+      markExtractionEmitted(nodeId, timeMs) {
+        observeExtractionRuntime[nodeId] = { lastEmitTimeMs: timeMs };
+      },
+      advanceGeneratorCursor(nodeId, runtime) {
+        generatorRuntime[nodeId] = runtime;
       },
     };
     desc.propagate(node, ctx);

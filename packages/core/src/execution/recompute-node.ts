@@ -8,13 +8,19 @@ import {
 import type { Model, NodeId } from '../model/index.js';
 import { defaultUnitCatalog, type UnitCatalog } from '../units/index.js';
 import type { ExecValue, SequenceValue } from './exec-value.js';
-import { cloneObserveBuffer, type ObserveBuffer } from './observe-buffer.js';
+import {
+  cloneObserveBuffer,
+  createObserveBuffer,
+  pushSample,
+  type ObserveBuffer,
+} from './observe-buffer.js';
 import {
   defaultNodeKindRegistry,
   type NodeKindRegistry,
   type ObserveExtractionRuntime,
   type PropagateContext,
 } from './kinds/index.js';
+import { capacityMatches } from './kinds/internals.js';
 import {
   noopExpressionEvaluator,
   type ExpressionEvaluator,
@@ -260,6 +266,24 @@ export function recomputeNode(
     },
     clearInvalidReason(nodeId) {
       delete workingInvalidReasons[nodeId];
+    },
+    pushObserveSample(observeNode, sample) {
+      let buf = seedBuffers[observeNode.id];
+      if (!buf || !capacityMatches(buf, observeNode.capacity)) {
+        buf = createObserveBuffer(observeNode.capacity);
+      }
+      pushSample(buf, sample);
+      seedBuffers[observeNode.id] = buf;
+    },
+    emitSequence(slotKey, seq) {
+      seedSequenceOutputs[slotKey] = seq;
+      workingValid.add(slotKey);
+    },
+    markExtractionEmitted(nodeId, timeMs) {
+      seedExtractionRuntime[nodeId] = { lastEmitTimeMs: timeMs };
+    },
+    advanceGeneratorCursor(nodeId, runtime) {
+      ctx.generatorRuntime[nodeId] = runtime;
     },
   };
 
