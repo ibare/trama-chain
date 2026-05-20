@@ -183,9 +183,31 @@ export function recomputeNode(
   // 펄스 snapshot override 적용 — 펄스가 운반한 source 의 *지정 슬롯* 만 valid
   // 로 켜고 값을 박는다. 슬롯 0 을 가정해 켜면 Condition 같은 분기 source 에서
   // 반대 슬롯이 stale valid 로 commit 돼 다운스트림 케이블이 잘못 solid 로 그려진다.
+  //
+  // override 가 *branching 슬롯* 인 경우, 같은 source 의 다른 branching 슬롯들의
+  // stale valid 를 제거 — 분기 source 는 라우팅이 런타임에 확정되므로 한 시점에
+  // 한 branching 슬롯만 valid 가 시각·인과 일관성. ConditionNode 의 슬롯 0/1
+  // 처럼 모두 branching 인 노드만 영향. LogicGate (슬롯 0 만 branching) 는 다른
+  // branching 슬롯이 없어 동작 무변경.
   if (options.sourceOverride) {
     const { sourceNodeId, sourceSlotIndex, value } = options.sourceOverride;
     workingValues[sourceNodeId] = value;
+    const sourceNode = model.nodes[sourceNodeId];
+    const sourceDesc = sourceNode ? nodeKindRegistry.forNode(sourceNode) : undefined;
+    if (sourceNode && sourceDesc) {
+      const slots = sourceDesc.outputSlots(sourceNode, {
+        model,
+        registry: nodeKindRegistry,
+      });
+      const overrideSlot = slots.find((s) => s.index === sourceSlotIndex);
+      if (overrideSlot?.branching) {
+        for (const slot of slots) {
+          if (slot.index !== sourceSlotIndex && slot.branching) {
+            workingValid.delete(outputKey(sourceNodeId, slot.index));
+          }
+        }
+      }
+    }
     workingValid.add(outputKey(sourceNodeId, sourceSlotIndex));
   }
 
