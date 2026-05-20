@@ -1,4 +1,4 @@
-import type { Edge, Model, Node, NodeId, Value, ValueKind } from '../model/index.js';
+import type { Node, Value, ValueKind } from '../model/index.js';
 import { booleanValue, isValueNode, isNumericValue, numericValue } from '../model/index.js';
 import type {
   GeneratorRuntime,
@@ -11,8 +11,6 @@ import {
   denormalize,
   normalize,
   resolveUnit,
-  type ResolvedUnit,
-  type UnitCatalog,
 } from '../units/index.js';
 import { MissingCombinerError, MissingShapeError } from './errors.js';
 import {
@@ -29,7 +27,6 @@ import {
   createObserveBuffer,
   observeBufferToArray,
   pushSample,
-  type ObserveBuffer,
 } from './observe-buffer.js';
 
 import { outputKey } from './state.js';
@@ -68,86 +65,45 @@ export type {
   SequencePortSpec,
 };
 
-/**
- * propagate 컨텍스트에서 source 노드의 현재 numeric value를 꺼낸다.
- * - ctx.next에 기록돼 있으면 그것 (Value sum type 중 numeric만 인정).
- * - WrappedValue 면 알맹이 Value 로 unwrap 후 검사.
- * - 없으면 ValueNode의 initialValue에서 폴백.
- * - boolean Value거나 미기록이면 undefined — caller가 skip해야 한다.
- */
-function getNumericNext(ctx: PropagateContext, id: NodeId): number | undefined {
-  const ev = ctx.next[id];
-  if (ev) {
-    if (isSequence(ev)) return undefined;
-    const v = unwrap(resolveScalar(ev, ctx.simulationTimeMs));
-    if (v.kind === 'numeric') return v.n;
-    return undefined;
-  }
-  const source = ctx.model.nodes[id];
-  if (source && isValueNode(source) && isNumericValue(source.initialValue)) {
-    return source.initialValue.n;
-  }
-  return undefined;
-}
+// C2 (kinds-split): 분리된 3 모듈에서 필요한 심볼을 import.
+// public surface 보존: getNodeOutputUnit/isRawOutputNode/canBeFeedbackTarget/
+// getOutputSlots/getOutputSlotAt/getInputAccepts/getInputPortType/getOutputPortType
+// 그리고 NodeKindRegistry/createNodeKindRegistry 를 그대로 re-export.
+import {
+  getNumericNext,
+  getBooleanNext,
+  isEdgeSourceValid,
+  firstIncomingEdgeForNode,
+  capacityMatches,
+  passthroughSourceSpec,
+} from './kinds/internals.js';
+import {
+  createNodeKindRegistry,
+  type NodeKindRegistry,
+} from './kinds/registry.js';
+import {
+  getNodeOutputUnit,
+  isRawOutputNode,
+  canBeFeedbackTarget,
+  getOutputSlots,
+  getOutputSlotAt,
+  getInputAccepts,
+  getInputPortType,
+  getOutputPortType,
+} from './kinds/queries.js';
 
-/**
- * boolean Value 버전. boolean ValueNode propagate가 사용.
- * WrappedValue 면 알맹이 Value 로 unwrap 후 분기. FunctionHandle은 ctx 시각의
- * peek로 환원 후 동일 분기.
- * source가 numeric이면 undefined — PortType 검사가 막아야 하지만 안전망.
- */
-function getBooleanNext(ctx: PropagateContext, id: NodeId): boolean | undefined {
-  const ev = ctx.next[id];
-  if (ev) {
-    if (isSequence(ev)) return undefined;
-    const v = unwrap(resolveScalar(ev, ctx.simulationTimeMs));
-    if (v.kind === 'boolean') return v.b;
-    return undefined;
-  }
-  const source = ctx.model.nodes[id];
-  if (source && isValueNode(source) && source.initialValue.kind === 'boolean') {
-    return source.initialValue.b;
-  }
-  return undefined;
-}
-
-// FREE_FALLBACK / isIdentityShape / PropagateContext 는 ./kinds/context.js & port-spec.js 로 이동 (C1).
-
-// PropagateContext / PortTypeContext / PortSpec 류 / NodeKindDescriptor 는
-// ./kinds/{context,port-spec,descriptor}.js 로 이동 (C1).
-
-class NodeKindRegistryImpl {
-  private readonly map = new Map<string, NodeKindDescriptor<Node>>();
-
-  register<N extends Node>(desc: NodeKindDescriptor<N>): this {
-    this.map.set(desc.kind, desc as unknown as NodeKindDescriptor<Node>);
-    return this;
-  }
-
-  get(kind: Node['kind']): NodeKindDescriptor<Node> | undefined {
-    return this.map.get(kind);
-  }
-
-  forNode(node: Node): NodeKindDescriptor<Node> | undefined {
-    return this.map.get(node.kind);
-  }
-
-  kinds(): string[] {
-    return Array.from(this.map.keys());
-  }
-}
-
-export type NodeKindRegistry = NodeKindRegistryImpl;
-
-export function createNodeKindRegistry(): NodeKindRegistry {
-  return new NodeKindRegistryImpl();
-}
-
-/** edge의 source가 가리키는 출력 슬롯이 현재 valid한지. */
-function isEdgeSourceValid(ctx: PropagateContext, edge: Edge): boolean {
-  const slot = edge.sourceSlotIndex ?? 0;
-  return ctx.validOutputs.has(outputKey(edge.from, slot));
-}
+export {
+  createNodeKindRegistry,
+  getNodeOutputUnit,
+  isRawOutputNode,
+  canBeFeedbackTarget,
+  getOutputSlots,
+  getOutputSlotAt,
+  getInputAccepts,
+  getInputPortType,
+  getOutputPortType,
+};
+export type { NodeKindRegistry };
 
 // ---------------------------------------------------------------------------
 // Built-in descriptors
@@ -601,54 +557,8 @@ const logicGateNodeDescriptor: NodeKindDescriptor<
  * "데이터 흐름 도메인 전문가" — ValueNode + Skin이 단위 도메인 전문가인 것과
  * 평행한 구조. 본체는 단순하고 paradigm이 표현을 책임진다.
  */
-function firstIncomingEdgeForNode(model: Model, id: NodeId): Edge | undefined {
-  for (const eid of model.edgeOrder) {
-    const e = model.edges[eid];
-    if (e && e.to === id && e.lag === 0) return e;
-  }
-  return undefined;
-}
-
-/** 기존 버퍼의 capacity 정책이 현재 모델 설정과 일치하는지. */
-function capacityMatches(
-  buf: ObserveBuffer,
-  capacity: Extract<Node, { kind: 'observe' }>['capacity'],
-): boolean {
-  switch (buf.kind) {
-    case 'windowed':
-      return capacity.kind === 'windowed' && buf.windowMs === capacity.windowMs;
-    case 'unbounded':
-      return capacity.kind === 'unbounded';
-  }
-}
-
-/**
- * ObserveNode passthrough 의 source spec 미러링 헬퍼.
- * 입력 엣지가 없거나 source 가 사라졌으면 보수적인 numeric 폴백.
- *
- * source 의 출력 슬롯 spec(value + meta) 을 그대로 가져와 ObserveNode 의
- * 입출력 모두에 동일하게 반영 — passthrough 의 핵심 의미.
- */
-function passthroughSourceSpec(
-  node: Extract<Node, { kind: 'observe' }>,
-  ctx: PortTypeContext | undefined,
-): PortSpec {
-  if (!ctx) return { value: 'numeric' };
-  const edge = firstIncomingEdgeForNode(ctx.model, node.id);
-  if (!edge) return { value: 'numeric' };
-  const source = ctx.model.nodes[edge.from];
-  if (!source) return { value: 'numeric' };
-  const srcSlot = edge.sourceSlotIndex ?? 0;
-  const sourceSlots = getOutputSlots(source, ctx.registry, ctx.model);
-  const slot = sourceSlots[srcSlot] ?? sourceSlots[0];
-  if (!slot) return { value: 'numeric' };
-  // ObserveNode 본체는 스칼라 passthrough — sequence source 는 port-compat 가
-  // 차단해야 정상이지만, 그 결과까지 미러링하지 않는다. 보수적 폴백.
-  if (isSequencePortSpec(slot)) return { value: 'numeric' };
-  return slot.meta !== undefined
-    ? { value: slot.value, meta: slot.meta }
-    : { value: slot.value };
-}
+// firstIncomingEdgeForNode / capacityMatches / passthroughSourceSpec 는
+// ./kinds/internals.js 로 이동 (C2).
 
 const observeNodeDescriptor: NodeKindDescriptor<Extract<Node, { kind: 'observe' }>> = {
   kind: 'observe',
@@ -979,109 +889,8 @@ export function createDefaultNodeKindRegistry(): NodeKindRegistry {
  */
 export const defaultNodeKindRegistry = createDefaultNodeKindRegistry();
 
-/**
- * 디스크립터를 통해 출력 단위를 얻는다. 등록되지 않은 종류면 FREE_FALLBACK.
- * propagate.ts와 외부(UI)에서 안전하게 쓰기 위한 헬퍼.
- */
-export function getNodeOutputUnit(
-  node: Node,
-  catalog: UnitCatalog,
-  registry: NodeKindRegistry = defaultNodeKindRegistry,
-): ResolvedUnit {
-  const desc = registry.forNode(node);
-  if (!desc) return FREE_FALLBACK;
-  return desc.outputUnit(node, catalog);
-}
-
-/** 노드의 raw passthrough 여부. 미등록 종류는 false. */
-export function isRawOutputNode(
-  node: Node,
-  registry: NodeKindRegistry = defaultNodeKindRegistry,
-): boolean {
-  return registry.forNode(node)?.outputsRaw ?? false;
-}
-
-/** 노드가 피드백 target이 될 수 있는지. 미등록 종류는 false. */
-export function canBeFeedbackTarget(
-  node: Node,
-  registry: NodeKindRegistry = defaultNodeKindRegistry,
-): boolean {
-  return registry.forNode(node)?.canBeFeedbackTarget ?? false;
-}
-
-/**
- * 노드의 출력 슬롯 명세 전체. 미등록 종류는 보수적인 단일 numeric 슬롯으로 폴백.
- *
- * `model` 을 주면 passthrough 노드가 source spec 을 미러링한다.
- */
-export function getOutputSlots(
-  node: Node,
-  registry: NodeKindRegistry = defaultNodeKindRegistry,
-  model?: Model,
-): readonly OutputSlotSpec[] {
-  const desc = registry.forNode(node);
-  if (!desc) return [{ index: 0, value: 'numeric' }];
-  return desc.outputSlots(node, model ? { model, registry } : undefined);
-}
-
-/**
- * 특정 슬롯 인덱스의 출력 PortSpec. 슬롯이 없으면 undefined.
- */
-export function getOutputSlotAt(
-  node: Node,
-  slot: number,
-  registry: NodeKindRegistry = defaultNodeKindRegistry,
-  model?: Model,
-): OutputSlotSpec | undefined {
-  return getOutputSlots(node, registry, model)[slot];
-}
-
-/**
- * 노드의 입력 acceptsList. null 이면 입력을 받지 않는다.
- */
-export function getInputAccepts(
-  node: Node,
-  registry: NodeKindRegistry = defaultNodeKindRegistry,
-  model?: Model,
-): readonly PortSpec[] | null {
-  const desc = registry.forNode(node);
-  if (!desc) return null;
-  return desc.inputAccepts(node, model ? { model, registry } : undefined);
-}
-
-/**
- * 노드의 scalar 입력 PortType (slot 0, value 만). null 이면 입력 없음 또는 sequence-only.
- * 미등록 종류는 null 로 안전 폴백.
- *
- * 슬롯·메타·sequence 인지 호출자는 [[getInputAccepts]] 를 직접 사용.
- */
-export function getInputPortType(
-  node: Node,
-  registry: NodeKindRegistry = defaultNodeKindRegistry,
-  model?: Model,
-): ValueKind | null {
-  const accepts = getInputAccepts(node, registry, model);
-  if (accepts === null) return null;
-  const first = accepts[0];
-  if (!first) return null;
-  if (isSequencePortSpec(first)) return null;
-  return first.value;
-}
-
-/**
- * 노드의 scalar 출력 PortType (slot 0, value 만). 미등록·sequence 슬롯은 'numeric' 폴백.
- *
- * 슬롯별 / sequence 인지 PortType 이 필요하면 [[getOutputSlotAt]] 사용.
- */
-export function getOutputPortType(
-  node: Node,
-  registry: NodeKindRegistry = defaultNodeKindRegistry,
-  model?: Model,
-): ValueKind {
-  const first = getOutputSlots(node, registry, model)[0];
-  if (!first) return 'numeric';
-  if (isSequencePortSpec(first)) return 'numeric';
-  return first.value;
-}
+// getNodeOutputUnit / isRawOutputNode / canBeFeedbackTarget /
+// getOutputSlots / getOutputSlotAt / getInputAccepts /
+// getInputPortType / getOutputPortType 는 ./kinds/queries.js 로 이동 (C2).
 
 // EdgeCompatibility / checkEdgeCompatibility 는 ./kinds/edge-compatibility.js 로 이동 (C1).
