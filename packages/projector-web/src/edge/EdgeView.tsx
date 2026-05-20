@@ -266,6 +266,10 @@ function EdgeViewImpl({
       if (!isContinuousRef.current) return;
       const path = pathRef.current;
       if (!path) return;
+      // paused 일 때는 시뮬레이션 시간이 정지 — 시각만 흐르면 "멈춤이지만 흐른다"
+      // 라는 모순. 마지막 intensity 를 그대로 둬 박제한다 (performance.now() 는
+      // wall-clock 이라 paused 와 무관하게 흘러 잘못된 진동을 만들 위험).
+      if (timeSettingsStore.getState().paused) return;
       const intensity = (Math.sin((performance.now() / 1000) * Math.PI * 2) + 1) / 2;
       path.style.setProperty('--continuous-intensity', String(intensity));
     };
@@ -275,7 +279,7 @@ function EdgeViewImpl({
       unregisterTicker();
       unregisterCable();
     };
-  }, [edgeId, animationLoop, cableRegistry]);
+  }, [edgeId, animationLoop, cableRegistry, timeSettingsStore]);
 
   // 노드 드래그 중 imperative 갱신을 위한 drag-registry 핸들. 여기선 endpoint ref만
   // 갱신하면 ticker가 다음 프레임에 알아서 케이블을 끌어간다.
