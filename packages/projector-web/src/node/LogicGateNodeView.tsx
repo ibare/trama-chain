@@ -83,7 +83,7 @@ function LogicGateNodeViewImpl({ id, incomingCount }: Props): JSX.Element | null
   }, [layout, posX, posY]);
   const { onPointerDown: onSocketPointerDown, onPointerUp: onSocketPointerUp } =
     useEdgeDraftSource(id, {
-      enabled: !!layout && outputValid,
+      enabled: !!layout,
       getStartPoint: getOutputStartPoint,
     });
 

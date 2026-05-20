@@ -6,7 +6,8 @@ import { completeEdgeDraft } from './edge-draft-actions.js';
 interface Options {
   /**
    * 활성 여부. false면 onPointerDown이 무시된다.
-   * (예: 식 노드 출력이 invalid일 때 — edge draft 시작 자체를 차단.)
+   * 레이아웃 미준비 등 좌표 계산이 불가능할 때만 false로 — 노드 상태(invalid 등)와는
+   * 무관하게 케이블은 항상 뽑을 수 있어야 한다(설계 단계 스케치 허용).
    */
   enabled?: boolean;
   /**

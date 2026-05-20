@@ -81,7 +81,8 @@ function EdgeViewImpl({
   introducing,
 }: Props): JSX.Element | null {
   const instance = useTrama();
-  const { modelStore, uiStore, animationLoop, cableRegistry, dragRegistry } = instance;
+  const { modelStore, uiStore, animationLoop, cableRegistry, dragRegistry, timeSettingsStore } =
+    instance;
   const edge = modelStore((s) => s.model.edges[edgeId]);
   const fromId = edge?.from ?? '';
   const toId = edge?.to ?? '';
@@ -324,6 +325,8 @@ function EdgeViewImpl({
   const markerClass = `trama-shape-marker${shapeApplied ? ' is-applied' : ''}`;
 
   const onTipPointerDown = (e: React.PointerEvent<SVGCircleElement>): void => {
+    // 재생 중에는 케이블 편집(detach 포함) 일괄 금지 — 출력 소켓 측 use-edge-draft-source와 일관.
+    if (!timeSettingsStore.getState().paused) return;
     e.stopPropagation();
     e.currentTarget.setPointerCapture(e.pointerId);
     const cable = cableRef.current!;

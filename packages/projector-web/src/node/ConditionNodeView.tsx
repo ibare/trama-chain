@@ -106,13 +106,13 @@ function ConditionNodeViewImpl({ id }: Props): JSX.Element | null {
   }, [layout, posX, posY]);
   const { onPointerDown: onSocketPointerDown0, onPointerUp: onSocketPointerUp0 } =
     useEdgeDraftSource(id, {
-      enabled: !!layout && outputValid0,
+      enabled: !!layout,
       getStartPoint: getOutputStartPoint0,
       sourceSlotIndex: 0,
     });
   const { onPointerDown: onSocketPointerDown1, onPointerUp: onSocketPointerUp1 } =
     useEdgeDraftSource(id, {
-      enabled: !!layout && outputValid1,
+      enabled: !!layout,
       getStartPoint: getOutputStartPoint1,
       sourceSlotIndex: 1,
     });

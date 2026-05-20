@@ -314,6 +314,8 @@ export function Canvas({ initialFit = 'none' }: CanvasProps = {}): JSX.Element {
     const onKey = (e: KeyboardEvent) => {
       // readOnly에서는 모델 변경 단축키 전부 비활성. 셀렉션·pan/zoom은 유지된다.
       if (uiStore.getState().readOnly) return;
+      // 재생 중에는 모델 편집(노드·엣지 삭제 포함) 일괄 금지.
+      if (!timeSettingsStore.getState().paused) return;
       // undo/redo는 호스트(ProseMirror history 등)가 controlled value 흐름으로 처리.
       if (e.key === 'Delete' || e.key === 'Backspace') {
         const active = document.activeElement;
@@ -329,7 +331,7 @@ export function Canvas({ initialFit = 'none' }: CanvasProps = {}): JSX.Element {
     };
     window.addEventListener('keydown', onKey);
     return () => window.removeEventListener('keydown', onKey);
-  }, [removeEdge, removeNode, selection, uiStore]);
+  }, [removeEdge, removeNode, selection, timeSettingsStore, uiStore]);
 
   return (
     <>

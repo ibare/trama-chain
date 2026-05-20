@@ -203,7 +203,7 @@ function ExpressionNodeViewImpl({ id }: Props): JSX.Element | null {
   }, [layout, posX, posY]);
   const { onPointerDown: onSocketPointerDown, onPointerUp: onSocketPointerUp } =
     useEdgeDraftSource(id, {
-      enabled: isValid && !!layout,
+      enabled: !!layout,
       getStartPoint: getOutputStartPoint,
     });
 
