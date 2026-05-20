@@ -73,6 +73,7 @@ import { combinerRegistry, shapeRegistry } from './registries.js';
 import { fizzexExpressionEvaluator } from '../expression/fizzex-evaluator.js';
 import type { PulseRegistry, Pulse } from '../pulse/pulse-registry.js';
 import type { NodeFlashRegistry } from '../pulse/node-flash-registry.js';
+import type { SimulationOrchestrator } from './simulation-orchestrator.js';
 import type { TimeSettingsStore } from './time-settings.js';
 import type { AnimationLoop } from '../canvas/animation-loop.js';
 
@@ -169,6 +170,12 @@ export interface ModelStoreDeps {
   nodeFlashRegistry: NodeFlashRegistry;
   timeSettingsStore: TimeSettingsStore;
   animationLoop: AnimationLoop;
+  /**
+   * paused 전이 진입점. 미지정이면 timeSettingsStore.subscribe 직접 사용 (호환).
+   * 지정하면 'effects' phase 에 등록 — pulse-registry 의 'time-axis' 가 시간 축을
+   * 봉합한 후에 시드·loop 변경이 일어나도록 순서가 강제된다.
+   */
+  simulationOrchestrator?: SimulationOrchestrator;
 }
 
 /** Node patch가 propagation 결과에 영향을 줄 수 있는 필드를 포함하는지. */
@@ -337,6 +344,7 @@ export function createModelStore({
   nodeFlashRegistry,
   timeSettingsStore,
   animationLoop,
+  simulationOrchestrator,
 }: ModelStoreDeps): ModelStoreInstance {
   const initial = createEmptyModel();
   const initialExec = computeExecutionState(initial);
@@ -616,7 +624,12 @@ export function createModelStore({
 
   // timeSettings 변경 구독 — paused 변화에 시뮬레이션 루프·playback 반영.
   // multiplier는 RAF 콜백이 매 frame마다 읽으므로 별도 재시작 불필요.
-  timeSettingsStore.subscribe((state, prev) => {
+  // orchestrator 가 있으면 'effects' phase 로 — pulse-registry 의 'time-axis' 가
+  // pausedAt·startTime 봉합을 마친 후에 시드·spawn 이 일어나도록 보장된다.
+  const pausedTransitionHandler = (
+    state: { paused: boolean },
+    prev: { paused: boolean },
+  ): void => {
     if (state.paused !== prev.paused) {
       if (state.paused) {
         stopSimulationLoop();
@@ -643,7 +656,12 @@ export function createModelStore({
         }
       }
     }
-  });
+  };
+  if (simulationOrchestrator) {
+    simulationOrchestrator.onPauseTransition('effects', pausedTransitionHandler);
+  } else {
+    timeSettingsStore.subscribe(pausedTransitionHandler);
+  }
 
   /**
    * 주어진 source 노드의 lag=0 outgoing edges에 대해 펄스를 spawn.

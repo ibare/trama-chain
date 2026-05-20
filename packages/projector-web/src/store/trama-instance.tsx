@@ -7,6 +7,10 @@ import { createCableRegistry, type CableRegistry } from '../edge/cable-points-re
 import { createNodeFlashRegistry, type NodeFlashRegistry } from '../pulse/node-flash-registry.js';
 import { createPulseRegistry, type PulseRegistry } from '../pulse/pulse-registry.js';
 import { createPulseSettingsStore, type PulseSettingsStore } from './pulse-settings.js';
+import {
+  createSimulationOrchestrator,
+  type SimulationOrchestrator,
+} from './simulation-orchestrator.js';
 import { createTimeSettingsStore, type TimeSettingsStore } from './time-settings.js';
 import { createModelStore, type ModelStoreInstance } from './model-store.js';
 import { createUIStore, type UIStoreInstance } from './ui-store.js';
@@ -26,6 +30,7 @@ export interface TramaInstance {
   pulseRegistry: PulseRegistry;
   pulseSettingsStore: PulseSettingsStore;
   timeSettingsStore: TimeSettingsStore;
+  simulationOrchestrator: SimulationOrchestrator;
   modelStore: ModelStoreInstance;
   uiStore: UIStoreInstance;
   dispose(): void;
@@ -40,16 +45,19 @@ export function createTramaInstance(): TramaInstance {
   const nodeFlashRegistry = createNodeFlashRegistry();
   const pulseSettingsStore = createPulseSettingsStore();
   const timeSettingsStore = createTimeSettingsStore();
+  const simulationOrchestrator = createSimulationOrchestrator({ timeSettingsStore });
   const pulseRegistry = createPulseRegistry({
     animationLoop,
     pulseSettingsStore,
     timeSettingsStore,
+    simulationOrchestrator,
   });
   const modelStore = createModelStore({
     pulseRegistry,
     nodeFlashRegistry,
     timeSettingsStore,
     animationLoop,
+    simulationOrchestrator,
   });
   const uiStore = createUIStore();
 
@@ -63,10 +71,12 @@ export function createTramaInstance(): TramaInstance {
     pulseRegistry,
     pulseSettingsStore,
     timeSettingsStore,
+    simulationOrchestrator,
     modelStore,
     uiStore,
     dispose(): void {
       pulseRegistry.dispose();
+      simulationOrchestrator.dispose();
       animationLoop.dispose();
     },
   };

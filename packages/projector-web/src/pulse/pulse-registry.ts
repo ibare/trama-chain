@@ -2,6 +2,7 @@ import type { EdgeId, ExecValue, NodeId } from '@trama/core';
 import { tokens } from '@trama/tokens';
 import type { AnimationLoop } from '../canvas/animation-loop.js';
 import type { PulseSettingsStore } from '../store/pulse-settings.js';
+import type { SimulationOrchestrator } from '../store/simulation-orchestrator.js';
 import type { TimeSettingsStore } from '../store/time-settings.js';
 
 /**
@@ -56,6 +57,12 @@ export interface PulseRegistryDeps {
   animationLoop: AnimationLoop;
   pulseSettingsStore: PulseSettingsStore;
   timeSettingsStore: TimeSettingsStore;
+  /**
+   * paused 전이 진입점. 미지정이면 timeSettingsStore.subscribe 직접 사용 (호환).
+   * 지정하면 'time-axis' phase 에 등록 — model-store 의 'effects' 핸들러보다 항상
+   * 먼저 호출돼 spawn 시점에 pausedAt·startTime 이 일관 상태가 되도록 보장.
+   */
+  simulationOrchestrator?: SimulationOrchestrator;
 }
 
 const EMPTY_SNAPSHOT: readonly Pulse[] = Object.freeze([]);
@@ -64,6 +71,7 @@ export function createPulseRegistry({
   animationLoop,
   pulseSettingsStore,
   timeSettingsStore,
+  simulationOrchestrator,
 }: PulseRegistryDeps): PulseRegistry {
   const pulses = new Map<string, Pulse>();
   const listSubscribers = new Set<Listener>();
@@ -77,8 +85,7 @@ export function createPulseRegistry({
   let pausedAt: number | null = timeSettingsStore.getState().paused
     ? performance.now()
     : null;
-  const unsubscribeTimeSettings = timeSettingsStore.subscribe((state, prev) => {
-    if (state.paused === prev.paused) return;
+  const pauseTransition = (state: { paused: boolean }): void => {
     const now = performance.now();
     if (state.paused) {
       pausedAt = now;
@@ -89,7 +96,19 @@ export function createPulseRegistry({
         (p as { startTime: number }).startTime += delta;
       }
     }
-  });
+  };
+  // orchestrator 가 있으면 'time-axis' phase 로 등록 — model-store 의 effects
+  // (시드·loop start) 보다 먼저 호출돼 pausedAt 가 봉합된 후에 spawn 이 일어남.
+  // 미지정이면 기존 동작 호환 (구독 등록 순서 의존) — 점진 이행 경로.
+  const unsubscribeTimeSettings = simulationOrchestrator
+    ? simulationOrchestrator.onPauseTransition('time-axis', (state, prev) => {
+        if (state.paused === prev.paused) return;
+        pauseTransition(state);
+      })
+    : timeSettingsStore.subscribe((state, prev) => {
+        if (state.paused === prev.paused) return;
+        pauseTransition(state);
+      });
 
   function invalidateSnapshot(): void {
     cachedSnapshot =
