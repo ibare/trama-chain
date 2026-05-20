@@ -1,11 +1,9 @@
 import { memo, useEffect, useMemo, useRef, useState } from 'react';
 import { tokens } from '@trama/tokens';
 import {
-  defaultNodeKindRegistry,
   isConditionNode,
   isExpressionNode,
   isNumericValue,
-  isOutputValid,
   isSequence,
   isValueNode,
   normalize,
@@ -15,6 +13,12 @@ import {
   type Node,
 } from '@trama/core';
 import { useTrama } from '../store/index.js';
+import {
+  selectIsBranchingSlot,
+  selectIsContinuousSource,
+  selectIsSlotActive,
+  selectSourceExecValue,
+} from '../store/edge-selectors.js';
 import { shapeRegistry } from '../store/registries.js';
 import { getNodeLayout } from '../node/box.js';
 import { resolveDisplayMode } from '../node/display-mode.js';
@@ -92,7 +96,7 @@ function EdgeViewImpl({
     const n = s.model.nodes[fromId];
     const fallback =
       n && isValueNode(n) && isNumericValue(n.initialValue) ? n.initialValue.n : 0;
-    const ev = s.executionState.values[fromId];
+    const ev = selectSourceExecValue(s.executionState, fromId);
     if (ev && !isSequence(ev)) {
       const v = unwrap(resolveScalar(ev, s.executionState.simulationTimeMs));
       if (isNumericValue(v)) return v.n;
@@ -108,16 +112,8 @@ function EdgeViewImpl({
   const edgeSourceSlot = edge?.sourceSlotIndex ?? 0;
   const isBranchingInactive = modelStore((s) => {
     if (!fromId) return false;
-    const n = s.model.nodes[fromId];
-    if (!n) return false;
-    const desc = defaultNodeKindRegistry.forNode(n);
-    if (!desc) return false;
-    const slots = desc.outputSlots(n, {
-      model: s.model,
-      registry: defaultNodeKindRegistry,
-    });
-    if (slots[edgeSourceSlot]?.branching !== true) return false;
-    return !isOutputValid(s.executionState, fromId, edgeSourceSlot);
+    if (!selectIsBranchingSlot(s.model, fromId, edgeSourceSlot)) return false;
+    return !selectIsSlotActive(s.executionState, fromId, edgeSourceSlot);
   });
 
   const openFunctionPicker = uiStore((s) => s.openFunctionPicker);
@@ -195,13 +191,9 @@ function EdgeViewImpl({
   // source 노드의 outputInterpolation을 디스크립터 경유로 조회 — 'continuous' 인
   // source(현재 sine paradigm) 만 매 프레임 stroke 시각을 변조한다. 디스크립터를 직접
   // 경유해 paradigm 종류 하드코딩 분기를 피한다(principles §3).
-  const isContinuousSource = modelStore((s) => {
-    if (!fromId) return false;
-    const n = s.model.nodes[fromId];
-    if (!n) return false;
-    const desc = defaultNodeKindRegistry.forNode(n);
-    return desc?.outputInterpolation?.(n) === 'continuous';
-  });
+  const isContinuousSource = modelStore((s) =>
+    fromId ? selectIsContinuousSource(s.model, fromId) : false,
+  );
   // ticker 재등록 회피용 ref.
   const isContinuousRef = useRef(isContinuousSource);
   useEffect(() => {

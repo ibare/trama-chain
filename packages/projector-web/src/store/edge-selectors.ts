@@ -1,6 +1,7 @@
 import {
   defaultNodeKindRegistry,
-  outputKey,
+  getExecValue,
+  isOutputValid,
   type ExecutionState,
   type ExecValue,
   type Model,
@@ -18,16 +19,17 @@ import {
  */
 
 /**
- * "output slot 이 valid 인가" 의 단일 표현. `validOutputs.has(outputKey(nodeId, slot))`
- * 의 캡슐화. EdgeView 는 branching 슬롯의 dashed 판정에, spawn 은 펄스 발사 가드에
- * 사용. 다른 호출자도 같은 식을 직접 쓰지 않고 이 함수만 부른다.
+ * "output slot 이 valid 인가" 의 단일 표현 — core 의 [[isOutputValid]] wrapper.
+ * projector layer 의 EdgeView 와 spawnOutgoingPulses 가 *같은 모듈을 거쳐* 같은
+ * 식을 부르도록 강제하는 게 이 selector 의 역할. core helper 를 직접 호출해도
+ * 의미는 동일하지만, 한 자리에서 호출 표면을 통제하기 위해 wrapper 를 둔다.
  */
 export function selectIsSlotActive(
   executionState: ExecutionState,
   nodeId: NodeId,
   slot: number,
 ): boolean {
-  return executionState.validOutputs.has(outputKey(nodeId, slot));
+  return isOutputValid(executionState, nodeId, slot);
 }
 
 /**
@@ -77,5 +79,5 @@ export function selectSourceExecValue(
   executionState: ExecutionState,
   nodeId: NodeId,
 ): ExecValue | undefined {
-  return executionState.values[nodeId];
+  return getExecValue(executionState, nodeId);
 }
