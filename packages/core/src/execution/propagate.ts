@@ -192,8 +192,10 @@ export function propagateOneStep(
 }
 
 /**
- * lag=1 엣지를 따라 source의 *현재* 값을 target의 다음 timestep 시작값으로 전달.
- * 단일 target에 여러 feedback이 모이면 노드의 combiner로 결합.
+ * lag=1 엣지를 따라 source의 *현재* 값을 target에 합성. combiner 는 target 의
+ * *기존 값* 을 첫 입력, source 기여들을 뒤이어 받아 결합한 결과로 target 의
+ * 다음 timestep 시작값을 *덮어쓴다* (`combine([baseValue, ...contribs])`).
+ * 단일 target 에 여러 feedback 이 모이면 모두 같은 combiner 의 입력에 누적된다.
  * 디스크립터의 `canBeFeedbackTarget`이 false인 종류는 target이 될 수 없다.
  * 디스크립터의 `outputsRaw`가 true인 source가 한 컨트리뷰션이라도 섞이면
  * 타깃 단위 클램프를 건너뛴다 (raw 의미 보존).

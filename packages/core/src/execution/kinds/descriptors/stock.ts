@@ -13,11 +13,14 @@ import type { NodeKindDescriptor } from '../descriptor.js';
  *   - slot 0: inflow (가산, numeric).
  *   - slot 1: outflow (감산, numeric).
  *
- * 출력 슬롯 2개:
+ * 출력 슬롯 3개:
  *   - slot 0: level (현재 누적량, unitId 보존). 항상 valid (초기 level 부터).
  *   - slot 1: overflow (capacity 경계를 넘쳐 사라지는 양, raw). propagate 경로에서는
  *     항상 invalid — overflow 는 펄스 도착 시점 사건이라 RAF/scrub/initial 경로에서는
  *     의미를 갖지 않는다. handlePulseArrival 에서 누적 발생 시 spawn.
+ *   - slot 2: rate (단위 시간당 변화량). propagate 경로에서는 항상 invalid —
+ *     UI selector 가 stockRuntime 으로 RAF 따라 자연 감쇠 계산. 다운스트림
+ *     전파는 handlePulseArrival 의 spawnStockSlotPulse 로만 발생.
  *
  * 누적 시맨틱은 propagate 가 아니라 호스트(model-store) 의 handlePulseArrival 에서
  * 직접 수행한다. propagate 는 prev level 을 유지하는 노옵 — RAF/scrub/initial 등

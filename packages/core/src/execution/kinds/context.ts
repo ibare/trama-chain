@@ -24,8 +24,10 @@ import type { NodeKindRegistry } from './index.js';
  * 박제해 다음 propagate 가 발사 여부를 결정한다. realtime 모드에서는 사실상
  * 사용되지 않지만 일관된 형태로 유지.
  *
- * `state.ts` 의 ExecutionState 가 이 타입을 참조하지만, kinds → state 의
- * 단방향 import 를 유지하기 위해 이 자리에 정의.
+ * `state.ts` 의 ExecutionState 가 이 타입을 참조한다. kinds 와 state 는 양방향
+ * 참조(state → kinds 는 디스크립터 인터페이스, kinds → state 는 outputKey 등)
+ * 이므로 단방향 가정 없이, 이 런타임이 *kinds 계층의 개념* 이라는 의미적
+ * 책임 지점인 여기에 정의.
  */
 export interface ObserveExtractionRuntime {
   lastEmitTimeMs: number;

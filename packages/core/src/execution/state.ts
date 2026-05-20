@@ -44,7 +44,7 @@ export interface StockRuntime {
  * 값의 부가 메타는 WrappedValue 로 분리해 표현한다.
  *
  * `validOutputs`는 "출력 슬롯 단위"로 유효성을 표현한다. 키 형식 `${nodeId}:${slot}`.
- * 단출력 노드(value·function·constant)는 슬롯 0만 사용. 다출력 노드(조건 노드는
+ * 단출력 노드(value·constant 등)는 슬롯 0만 사용. 다출력 노드(조건 노드는
  * 0=참, 1=거짓)는 한 시점에 정확히 한 슬롯만 valid로 표시한다.
  *
  * `invalidReasons`는 노드별 마지막 실패 사유. 평가가 성공한 step에서는 키가
