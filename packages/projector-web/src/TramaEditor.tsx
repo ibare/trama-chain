@@ -11,6 +11,7 @@ import './styles.css';
 import { Canvas } from './canvas/Canvas.js';
 import { FunctionPicker } from './function-picker/FunctionPicker.js';
 import { UnitInspectorLayer } from './node/UnitInspectorLayer.js';
+import { BooleanInspectorLayer } from './node/BooleanInspectorLayer.js';
 import { ExecutionControl } from './execution-control/ExecutionControl.js';
 import { MiniPlayer } from './mini-player/MiniPlayer.js';
 import {
@@ -175,6 +176,7 @@ function TramaEditorInner({
       <Canvas initialFit={initialFit} />
       {!isReadOnly && <FunctionPicker />}
       {!isReadOnly && <UnitInspectorLayer />}
+      {!isReadOnly && <BooleanInspectorLayer />}
       {!isReadOnly && <ExecutionControl />}
       {!isReadOnly && <MiniPlayer />}
     </div>

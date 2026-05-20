@@ -43,6 +43,10 @@ export interface UnitInspectorState {
   nodeId: NodeId;
 }
 
+export interface BooleanInspectorState {
+  nodeId: NodeId;
+}
+
 /**
  * NodePicker — 빈 캔버스 dblclick·우클릭·엣지 중간 클릭 3가지 진입을 통합한다.
  * 사용자가 칩을 고르고 "추가"를 누르기 전엔 노드도 엣지 분할도 실제로 일어나지 않는다.
@@ -95,6 +99,8 @@ export interface UIStore {
   functionPicker: FunctionPickerState | null;
   /** 단위 인스펙터 열림 상태 (선택된 노드의 단위·범위 편집) */
   unitInspector: UnitInspectorState | null;
+  /** boolean 인스펙터 열림 상태. boolean ValueNode 의 스킨 선택 전용 — 단위 개념이 없어 UnitInspector 와 분리. */
+  booleanInspector: BooleanInspectorState | null;
   /**
    * 인라인 편집 중인 노드와 그 안의 어떤 영역을 편집 중인지.
    *
@@ -148,6 +154,9 @@ export interface UIStore {
   openUnitInspector: (nodeId: NodeId) => void;
   closeUnitInspector: () => void;
 
+  openBooleanInspector: (nodeId: NodeId) => void;
+  closeBooleanInspector: () => void;
+
   setEditingNode: (id: NodeId | null, target?: string) => void;
   setRunFlash: (s: RunFlashState | null) => void;
 }
@@ -163,6 +172,7 @@ export function createUIStore(): UIStoreInstance {
     nodePickerIntent: null,
     functionPicker: null,
     unitInspector: null,
+    booleanInspector: null,
     editingNode: null,
     runFlash: null,
 
@@ -175,6 +185,7 @@ export function createUIStore(): UIStoreInstance {
           nodePickerIntent: null,
           functionPicker: null,
           unitInspector: null,
+          booleanInspector: null,
           editingNode: null,
         });
       } else {
@@ -246,6 +257,12 @@ export function createUIStore(): UIStoreInstance {
       set({ unitInspector: { nodeId } });
     },
     closeUnitInspector: () => set({ unitInspector: null }),
+
+    openBooleanInspector: (nodeId) => {
+      if (get().readOnly) return;
+      set({ booleanInspector: { nodeId } });
+    },
+    closeBooleanInspector: () => set({ booleanInspector: null }),
 
     setEditingNode: (id, target = 'body') => {
       if (id !== null && get().readOnly) return;

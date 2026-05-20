@@ -11,10 +11,12 @@ import { NodeLabel } from './NodeLabel.js';
 import { ModeToggle } from './ModeToggle.js';
 import { InteractiveArea } from './InteractiveArea.js';
 import { BooleanStateIcon } from './BooleanStateIcon.js';
+import { BooleanValueNodeSkin } from './BooleanValueNodeSkin.js';
 import { Socket } from './Socket.js';
 import { useOutputConnected } from './use-socket-connections.js';
 import { slotColor } from './slot-palette.js';
 import { useEdgeDraftSource } from '../canvas/use-edge-draft-source.js';
+import { getLazyBooleanSkin } from '../skin/registry.js';
 
 interface Props {
   id: NodeId;
@@ -61,6 +63,7 @@ function BooleanValueNodeViewImpl({ id, incomingCount }: Props): JSX.Element | n
   const readOnly = uiStore((s) => s.readOnly);
   const isEditing = uiStore((s) => s.editingNode?.id === id);
   const setEditingNode = uiStore((s) => s.setEditingNode);
+  const openBooleanInspector = uiStore((s) => s.openBooleanInspector);
   const isSelected = uiStore(
     (s) => s.selection.kind === 'node' && s.selection.id === id,
   );
@@ -137,6 +140,11 @@ function BooleanValueNodeViewImpl({ id, incomingCount }: Props): JSX.Element | n
     emitValueOutput(id);
   }, [id, currentBoolean, readOnly, scrubInitialValue, emitValueOutput]);
 
+  const onInspectorOpen = useCallback(() => {
+    selectNode(id);
+    openBooleanInspector(id);
+  }, [id, openBooleanInspector, selectNode]);
+
   const currentMode = node ? resolveDisplayMode(node) : 'compact';
   const onToggleMode = useCallback(() => {
     if (readOnly) return;
@@ -153,6 +161,11 @@ function BooleanValueNodeViewImpl({ id, incomingCount }: Props): JSX.Element | n
   const combiner = combinerRegistry.getOfKind(node.combiner, 'boolean');
   const combinerLabel = combiner?.labels.ko ?? node.combiner;
   const isInputNode = !hasLag0Incoming;
+
+  const SkinLazy = node.skin ? getLazyBooleanSkin(node.skin.kind) : null;
+  const hasSkin = SkinLazy !== null;
+  // 외부 입력이 있으면 직접 토글이 의미 없으므로 skin onToggle 비활성.
+  const skinToggle = hasSkin && !hasLag0Incoming ? onToggleClick : undefined;
 
   // compact일 때 토글은 패널 *밖* 외곽 컨트롤 슬롯으로. standard일 때는 패널 안쪽
   // 오른편(기존 동작 유지).
@@ -172,51 +185,83 @@ function BooleanValueNodeViewImpl({ id, incomingCount }: Props): JSX.Element | n
       panelHeight={layout.panelHeight}
       onBodyDoubleClick={onBodyDoubleClick}
     >
-      <NodeBody
-        width={layout.panelWidth}
-        height={layout.panelHeight}
-        cx={panelCx}
-        cy={panelCy}
-        stateClass={stateClass}
-        isSelected={isSelected}
-      />
-      <NodeLabel
-        text={node.label}
-        x={layout.labelAnchor === 'middle' ? 0 : layout.textX}
-        y={layout.labelY}
-        width={width - (layout.textX - -halfW) * 2}
-        textAnchor={layout.labelAnchor}
-        isEditing={isEditing}
-        onCommit={commitLabel}
-        onCancel={cancelLabel}
-      />
-
-      <BooleanStateIcon cx={iconCx} cy={outerControlSlot ? panelCy : valueY} on={currentBoolean} />
-
-      {!readOnly && !isEditing && (
-        <ModeToggle
-          panelRight={panelCx + layout.panelWidth / 2}
-          panelTop={panelCy - layout.panelHeight / 2}
-          mode={currentMode}
-          onToggle={onToggleMode}
-        />
-      )}
-
-      {isInputNode && (
-        <BooleanToggleSwitch
-          cx={toggleCx}
-          cy={toggleCy}
+      {hasSkin && SkinLazy ? (
+        <BooleanValueNodeSkin
+          node={node}
+          layout={layout}
+          isSelected={isSelected}
           on={currentBoolean}
-          onClick={onToggleClick}
+          disabled={hasLag0Incoming}
+          onToggle={skinToggle}
+          onLabelClick={onInspectorOpen}
+          SkinLazy={SkinLazy}
         />
-      )}
+      ) : (
+        <>
+          <NodeBody
+            width={layout.panelWidth}
+            height={layout.panelHeight}
+            cx={panelCx}
+            cy={panelCy}
+            stateClass={stateClass}
+            isSelected={isSelected}
+          />
+          <NodeLabel
+            text={node.label}
+            x={layout.labelAnchor === 'middle' ? 0 : layout.textX}
+            y={layout.labelY}
+            width={width - (layout.textX - -halfW) * 2}
+            textAnchor={layout.labelAnchor}
+            isEditing={isEditing}
+            onCommit={commitLabel}
+            onCancel={cancelLabel}
+          />
 
-      {layout.hasCombiner && layout.combinerCenterY !== null && (
-        <BooleanCombinerChip
-          label={combinerLabel}
-          cy={layout.combinerCenterY}
-          onClick={onCombinerClick}
-        />
+          <BooleanStateIcon cx={iconCx} cy={outerControlSlot ? panelCy : valueY} on={currentBoolean} />
+
+          {!readOnly && !isEditing && (
+            <ModeToggle
+              panelRight={panelCx + layout.panelWidth / 2}
+              panelTop={panelCy - layout.panelHeight / 2}
+              mode={currentMode}
+              onToggle={onToggleMode}
+            />
+          )}
+
+          {isInputNode && (
+            <BooleanToggleSwitch
+              cx={toggleCx}
+              cy={toggleCy}
+              on={currentBoolean}
+              onClick={onToggleClick}
+            />
+          )}
+
+          {layout.hasCombiner && layout.combinerCenterY !== null && (
+            <BooleanCombinerChip
+              label={combinerLabel}
+              cy={layout.combinerCenterY}
+              onClick={onCombinerClick}
+            />
+          )}
+
+          {/* 라벨 슬롯 InteractiveArea — single click 으로 인스펙터 진입.
+              패널 외부 라벨 영역이라 dblclick 으로 라벨 편집 진입 (NodeFrame body)
+              과 겹치지 않는다. 토글·콤바이너 칩은 자체 InteractiveArea/stopPropagation
+              으로 우선권을 가진다. */}
+          <InteractiveArea
+            x={layout.labelAnchor === 'middle' ? -halfW : layout.textX}
+            y={layout.labelY - 14}
+            width={
+              layout.labelAnchor === 'middle'
+                ? width
+                : width - (layout.textX - -halfW) * 2
+            }
+            height={20}
+            hitClassName="trama-boolean-label-hit"
+            onClick={onInspectorOpen}
+          />
+        </>
       )}
 
       {layout.leftPin.sockets.map((s, i) => (
