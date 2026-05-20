@@ -894,22 +894,15 @@ export function createModelStore({
     });
 
     const prevValue = executionState.values[pulse.targetNodeId];
-    // 노드 단위 valid — 어느 슬롯이라도 valid 면 노드가 valid.
-    // Condition(true/false 2 슬롯) 처럼 다출력 노드는 슬롯 0 만 보던 기존
-    // 판정으로는 slot 1(false 분기) 이 켜진 상태를 invalid 로 오판한다.
-    const wasValid = result.outputSlotKeys.some((k) =>
-      executionState.validOutputs.has(k),
-    );
-    const isValid = result.isValid;
     const valueChanged =
       result.newValue !== undefined && result.newValue !== prevValue;
-    // 슬롯 단위 valid→invalid 전환도 cascade 트리거 — Condition 처럼 다출력 노드는
-    // 노드 단위로는 여전히 valid(반대 슬롯이 켜지므로) 지만, 끄려는 슬롯 하나의
-    // valid 가 stale 로 남으면 다운스트림이 invalidation 을 받지 못한다.
-    const slotBecameInvalid = result.outputSlotKeys.some(
+    // 슬롯 단위 valid→invalid 전환만으로 cascade 를 트리거 — Condition 같은 다출력
+    // 노드도 슬롯 하나만 꺼져도 다운스트림에 invalidation 이 전파돼야 한다.
+    // 노드 단위 OR(`wasValid && !isValid`) 는 slotBecameInvalid 의 부분집합이므로
+    // (한 슬롯도 valid 가 없으면 노드도 valid 가 아님) 별도 항이 필요 없다.
+    const becameInvalid = result.outputSlotKeys.some(
       (k) => executionState.validOutputs.has(k) && !result.validOutputs.has(k),
     );
-    const becameInvalid = (wasValid && !isValid) || slotBecameInvalid;
 
     nodeFlashRegistry.trigger(pulse.targetNodeId);
 
