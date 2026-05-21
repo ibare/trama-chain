@@ -16,6 +16,7 @@
   },
   "dependencies": {
     "@trama/core": "workspace:*",
+    "@trama/layout": "workspace:*",
     "@trama/tokens": "workspace:*",
     "zod": "3.23.8"
   },

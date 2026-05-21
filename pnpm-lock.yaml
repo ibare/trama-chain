@@ -156,6 +156,9 @@ importers:
       '@trama/core':
         specifier: workspace:*
         version: link:../core
+      '@trama/layout':
+        specifier: workspace:*
+        version: link:../layout
       '@trama/tokens':
         specifier: workspace:*
         version: link:../tokens
