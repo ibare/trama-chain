@@ -1,4 +1,12 @@
 import { z } from 'zod';
+import {
+  BooleanValueSchema,
+  NumericValueSchema,
+  ValueSchema,
+} from './primitives.js';
+import { NodeSnapshotSchema } from './node-snapshot.js';
+
+export { BooleanValueSchema, NumericValueSchema, ValueSchema };
 
 export const UnitOverrideSchema = z
   .object({
@@ -21,24 +29,6 @@ export const NodeSkinSchema = z
 export const NodeDisplayModeSchema = z.enum(['standard', 'compact']);
 
 /** numeric ValueKind — 수치 + 카탈로그 단위 키. */
-export const NumericValueSchema = z.object({
-  kind: z.literal('numeric'),
-  n: z.number(),
-  unitId: z.string(),
-});
-
-/** boolean ValueKind — 2값 신호. 단위 없음. */
-export const BooleanValueSchema = z.object({
-  kind: z.literal('boolean'),
-  b: z.boolean(),
-});
-
-/** Value sum type — 신호가 흐르는 모든 자리의 시멘틱 타입. */
-export const ValueSchema = z.discriminatedUnion('kind', [
-  NumericValueSchema,
-  BooleanValueSchema,
-]);
-
 export const ValueNodeSchema = z.object({
   kind: z.literal('value'),
   id: z.string(),
@@ -251,6 +241,13 @@ export const TramaDocumentSchema = z.object({
   execution: ExecutionSchema,
   nodes: z.array(NodeSchema),
   edges: z.array(EdgeSchema),
+  /**
+   * 정적 렌더링용 미리 계산된 스냅샷. 저장 시점에 capture 되어 동봉되면
+   * projector-embed 같은 zero-compute 렌더러가 시뮬레이션 없이 이 자리에서
+   * 바로 시각을 만든다. 없으면 동적 환경(편집기·라이브 미리보기)이 직접
+   * 시뮬레이션을 돌려 채운다.
+   */
+  snapshot: NodeSnapshotSchema.optional(),
 });
 
 export type TramaDocument = z.infer<typeof TramaDocumentSchema>;
