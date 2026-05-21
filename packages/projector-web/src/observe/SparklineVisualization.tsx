@@ -125,14 +125,19 @@ function SparklineImpl({
   }
 
   // x 도메인 — capacity 정책에 따라 분기.
-  //  - windowed: [latestT - windowMs, latestT] 고정. 시간 진행에 따라 그래프가
-  //    우→좌 미끄러진다. push 가 한동안 스킵돼도 새 sample 은 정확한 t 위치에 찍힘.
+  //  - windowed: [max(latestT - windowMs, firstT), latestT]. 시뮬레이션 시작 직후
+  //    windowMs 미충분 영역까지 미래·과거로 도메인이 확장되지 않게 firstT 으로
+  //    클램프. 누적이 windowMs 보다 길어진 이후엔 firstT 이 자동으로 evict 따라
+  //    움직여 정상 sliding 으로 수렴.
   //  - unbounded: [firstT, latestT] 전체 fit. 길수록 x 가 압축되지만 시간 비례 보존.
+  //
+  // 이 클램프는 FunctionHandle dense peek 의 시각 의미와도 직결된다 — 시뮬레이션
+  // 이 도달한 적 없는 음수 t 영역까지 sin 모양으로 채워지지 않도록.
   const tLatest = combined[combined.length - 1]?.t ?? currentT;
   const tFirst = combined[0]?.t ?? tLatest;
   const tMin =
     node.capacity.kind === 'windowed'
-      ? tLatest - node.capacity.windowMs
+      ? Math.max(tLatest - node.capacity.windowMs, tFirst)
       : tFirst;
   const tMax = tLatest;
   const tSpan = Math.max(tMax - tMin, 1e-9);

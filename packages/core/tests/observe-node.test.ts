@@ -2,6 +2,7 @@ import { describe, expect, it } from 'vitest';
 import {
   addConstantNode,
   addEdge,
+  addGeneratorNode,
   addObserveNode,
   addValueNode,
   booleanValue,
@@ -11,6 +12,7 @@ import {
   getInputPortType,
   getOutputPortType,
   initializeFromInitialValues,
+  isFunctionHandle,
   isObserveNode,
   modelToDocument,
   numericValue,
@@ -315,5 +317,33 @@ describe('ObserveNode', () => {
     });
     expect(state.validOutputs.has('mon:0')).toBe(true);
     expect(state.values['mon']).toEqual(numericValue(5, 'free'));
+  });
+
+  it('Sine source → Observe: FunctionHandle 이 ctx.next 에 echo 되어 보존된다 (passthrough echo 시맨틱)', () => {
+    // 회귀 — Observe propagate 가 환원 평탄 Value 만 저장하면 다운스트림 시각이
+    // source 의 시간 의존 closure 를 잃어 sparkline dense peek 가 dead path 가 된다.
+    // sin paradigm 의 FunctionHandle 이 Observe 통과 후에도 isFunctionHandle 로 식별
+    // 되는지 검증.
+    let m = createEmptyModel(0);
+    m = addGeneratorNode(
+      m,
+      {
+        id: 'g-sine',
+        label: 'sine',
+        params: { kind: 'sine', amplitude: 1, period: 1000, phase: 0, offset: 0 },
+      },
+      0,
+    );
+    m = addObserveNode(m, { id: 'mon', label: 'monitor' }, 0);
+    m = addEdge(m, { from: 'g-sine', to: 'mon', shape: { kind: 'none', params: {} } }, 0);
+
+    let state = initializeFromInitialValues(m);
+    state = propagateOneStep(state, m, {
+      shapeRegistry: shapes,
+      combinerRegistry: combiners,
+    });
+    const monEv = state.values['mon'];
+    expect(monEv).toBeDefined();
+    expect(isFunctionHandle(monEv!)).toBe(true);
   });
 });

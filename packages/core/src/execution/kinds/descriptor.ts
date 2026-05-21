@@ -78,6 +78,20 @@ export interface NodeKindDescriptor<N extends Node = Node> {
   /**
    * lag=0 전파. incoming을 보고 next[node.id]·validOutputs를 갱신.
    * incoming이 비어 있고 디스크립터가 외부 입력이 없는 종류면 기존 값을 유지하는 것이 일반적.
+   *
+   * **Passthrough echo 시맨틱 (Observe·Condition 등)**:
+   *   본체가 입력을 그대로 통과시키는 디스크립터는 `ctx.next[node.id]` 에 *source
+   *   ExecValue 의 본질을 그대로 흘려보낸다* — FunctionHandle / WrappedValue (alue
+   *   자리에 핸들 포함 가능) / Value 모두 동일 인스턴스를 echo 하거나, 자기 책임의
+   *   부가 작업(예: Condition 의 cond 메타 부착) 만 envelope 으로 덧대고 alue·핸들은
+   *   보존. *환원은 값을 봐야 하는 자리에서만* — observeBuffer 누적, 조건 비교, 시각
+   *   normalize 등. 이렇게 두면 sin 같은 continuous source 의 시간 의존 closure 가
+   *   passthrough 체인 끝까지 살아 다운스트림 시각(sparkline dense peek, cable medium)
+   *   이 source 본질에 일관된다.
+   *
+   *   환원 표준 패턴: `unwrap(resolveScalar(ev, ctx.simulationTimeMs))`. resolveScalar
+   *   가 wrapped 내부 핸들까지 단일 자리에서 환원한다. 디스크립터가 직접 핸들 케이스를
+   *   분기 처리하지 않아도 된다.
    */
   propagate(node: N, ctx: PropagateContext): void;
 }

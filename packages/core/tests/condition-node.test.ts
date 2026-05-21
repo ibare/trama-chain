@@ -2,6 +2,7 @@ import { describe, expect, it } from 'vitest';
 import {
   addConditionNode,
   addEdge,
+  addGeneratorNode,
   addValueNode,
   createEmptyModel,
   documentToModel,
@@ -16,6 +17,7 @@ import {
   getExecValue,
   getNumericValue,
   initializeFromInitialValues,
+  isFunctionHandle,
   isOutputValid,
   isWrapped,
   outputKey,
@@ -331,6 +333,37 @@ describe('ConditionNode 게이트 시맨틱', () => {
     expect(result.newValue && isWrapped(result.newValue)).toBe(true);
     if (result.newValue && isWrapped(result.newValue)) {
       expect(result.newValue.meta).toEqual({ kind: 'boolean', b: true });
+    }
+  });
+
+  it('Sine source → Condition: wrap.value 자리에 FunctionHandle 이 보존된다 (passthrough echo)', () => {
+    // 회귀 — Condition 이 wrap(rawValue, cond) 로 평탄 Value 만 envelope 의 alue 자리에
+    // 담으면 다운스트림 시각이 sin paradigm 의 시간 의존 closure 를 잃는다.
+    // sourceEv 본질을 보존하면서 cond 메타만 갱신하는 echo 시맨틱 검증.
+    let m = createEmptyModel();
+    m = addGeneratorNode(m, {
+      id: 'g-sine',
+      label: 'sine',
+      params: { kind: 'sine', amplitude: 1, period: 1000, phase: 0, offset: 0 },
+    });
+    m = addConditionNode(m, { id: 'c', label: '>0', operator: '>', threshold: 0 });
+    m = addEdge(m, {
+      from: 'g-sine',
+      to: 'c',
+      shape: { kind: 'none', params: {} },
+      slotIndex: 0,
+    });
+
+    const state = propagateOneStep(initializeFromInitialValues(m), m, {
+      shapeRegistry: shapes,
+      combinerRegistry: combiners,
+    });
+    const ev = getExecValue(state, 'c');
+    expect(ev).toBeDefined();
+    expect(ev && isWrapped(ev)).toBe(true);
+    if (ev && isWrapped(ev)) {
+      expect(isFunctionHandle(ev.value)).toBe(true);
+      expect(ev.meta.kind).toBe('boolean');
     }
   });
 

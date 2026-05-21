@@ -127,8 +127,15 @@ export const observeNodeDescriptor: NodeKindDescriptor<Extract<Node, { kind: 'ob
       }
       return;
     }
-    // 메타 보존 passthrough — source 가 WrappedValue 면 알맹이만 inverted 변환 후
-    // 메타를 재부착해 흘려보낸다. 평탄한 Value 면 기존 동작 그대로.
+    // passthrough echo — source ExecValue 의 본질(FunctionHandle / WrappedValue /
+    // Value) 을 그대로 ctx.next 에 흘려보낸다. 환원은 다운스트림이 *값을 봐야 하는*
+    // 시점에만 수행 — 표준 패턴 `unwrap(resolveScalar(ev, t))`. 이렇게 두면 sin
+    // 같은 continuous source 의 시간 의존 closure 가 Observe 를 통과한 뒤에도
+    // 유지되어, 시각화(sparkline dense peek) 와 cable medium 판정이 source 본질에
+    // 일관된다.
+    //
+    // inverted 가 걸린 엣지는 예외 — 변환된 값은 본질적으로 평탄 Value 라 새 envelope
+    // 으로 복원. wrap envelope 은 메타만 보존하면 충분.
     const fallback: Value | undefined =
       sourceNode && isValueNode(sourceNode) ? sourceNode.initialValue : undefined;
     const sourceEv: ExecValue | undefined = ctx.next[edge.from] ?? fallback;
@@ -145,21 +152,29 @@ export const observeNodeDescriptor: NodeKindDescriptor<Extract<Node, { kind: 'ob
     // 멈춤 상태: invalid 분기(엣지 없음·source invalid)는 위에서 즉시 반영하고,
     // passthrough 갱신과 observeBuffer 누적만 보류 — 펄스 도착으로만 진행.
     if (ctx.paused) return;
-    const inner: Value = unwrap(resolveScalar(sourceEv, ctx.simulationTimeMs));
+
+    // 환원은 한 번 — observeBuffer 누적과 inverted 변환에 공통으로 쓴다.
+    const scalar = resolveScalar(sourceEv, ctx.simulationTimeMs);
+    const inner: Value = unwrap(scalar);
     const innerOut: Value =
       edge.inverted && inner.kind === 'boolean'
         ? booleanValue(!inner.b)
         : edge.inverted && inner.kind === 'numeric'
           ? numericValue(-inner.n, inner.unitId)
           : inner;
-    const passed: ExecValue =
-      sourceEv.kind === 'wrapped' ? wrap(innerOut, sourceEv.meta) : innerOut;
+
+    const passed: ExecValue = edge.inverted
+      ? sourceEv.kind === 'wrapped'
+        ? wrap(innerOut, sourceEv.meta)
+        : innerOut
+      : sourceEv;
     ctx.next[node.id] = passed;
     ctx.setSlotValid(bodySlotKey);
 
     // observeBuffer 에는 (value, t) sample 로 누적 — t 는 현 step 의 simulation time.
-    // 메타는 시각화/통계 모두 알맹이만 보면 충분하므로 메타 분리 후 알맹이만 박제.
-    // bounded는 ring buffer로 O(1) push + 자동 evict, unbounded는 growable array.
+    // 시각화는 시점별 한 Value 만 보면 충분 — 핸들/메타는 ctx.next 의 echo 쪽이
+    // 따로 보존한다. bounded 는 ring buffer 로 O(1) push + 자동 evict, unbounded 는
+    // growable array.
     const sample: SequenceSample = { value: innerOut, t: ctx.simulationTimeMs };
     ctx.pushObserveSample(node, sample);
 

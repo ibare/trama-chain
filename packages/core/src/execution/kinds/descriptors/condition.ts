@@ -9,6 +9,9 @@ import {
   resolveScalar,
   unwrap,
   wrap,
+  type FunctionHandle,
+  type ScalarExec,
+  type WrappedValue,
 } from '../../exec-value.js';
 import type { OutputInterpolation } from '../../../generators/index.js';
 import { outputKey } from '../../state.js';
@@ -69,6 +72,7 @@ export const conditionNodeDescriptor: NodeKindDescriptor<
 
     let value: number | undefined;
     let valueObj: Value | undefined;
+    let sourceEvForEcho: ScalarExec | FunctionHandle | undefined;
     for (const edge of ctx.incoming) {
       // 단일 슬롯 게이트 — slotIndex가 명시되지 않은 엣지(undefined)는 슬롯 0으로
       // 간주한다. 명시된 경우엔 0만 허용.
@@ -83,12 +87,15 @@ export const conditionNodeDescriptor: NodeKindDescriptor<
       // valueObj 는 raw 알맹이 Value — wrapped 면 unwrap 후 단위만 보존.
       // sequence source 는 Condition 게이트가 다루지 않는다 (port-compat 차단).
       // FunctionHandle 은 ctx 시각의 peek로 환원 후 일반 unwrap.
+      // sourceEvForEcho 는 ctx.next echo 용 — 본질(핸들·wrap envelope) 을 그대로
+      // 들고 나가 다운스트림이 source 의 시간 의존 closure 를 잃지 않게 한다.
       const sourceEv = ctx.next[edge.from];
-      const sourceVal =
-        sourceEv && !isSequence(sourceEv)
-          ? unwrap(resolveScalar(sourceEv, ctx.simulationTimeMs))
-          : undefined;
-      valueObj = sourceVal ?? (isValueNode(source) ? source.initialValue : undefined);
+      if (sourceEv && !isSequence(sourceEv)) {
+        sourceEvForEcho = sourceEv;
+        valueObj = unwrap(resolveScalar(sourceEv, ctx.simulationTimeMs));
+      } else {
+        valueObj = isValueNode(source) ? source.initialValue : undefined;
+      }
       break;
     }
 
@@ -129,9 +136,21 @@ export const conditionNodeDescriptor: NodeKindDescriptor<
 
     const rawValue: Value =
       valueObj && valueObj.kind === 'numeric' ? valueObj : numericValue(value, 'free');
-    // 알맹이 + meta(boolean cond) 를 한 WrappedValue 로 묶어 저장 — 두 슬롯이
-    // 같은 노드 값 컨테이너를 공유하지만, valid 슬롯 키로 라우팅이 갈린다.
-    ctx.next[node.id] = wrap(rawValue, booleanValue(cond));
+    const condMeta = booleanValue(cond);
+    // echo — source ExecValue 의 본질을 보존하면서 cond 메타를 부착해 다운스트림에
+    // 운반. 두 슬롯(true/false) 이 같은 컨테이너를 공유하지만, valid 슬롯 키로 라우팅
+    // 이 갈린다.
+    //  - wrapped source: alue 그대로(핸들 포함) + meta 만 cond 로 갱신.
+    //    ConditionNode 자체가 새 평가 결과를 부착하므로 이전 메타는 자연스럽게 덮어쓴다.
+    //  - function-handle source: wrap.value 자리에 핸들 그대로 (P-A 에서 wrap 시그니처
+    //    확장). Sine → Condition 통과 후에도 시간 의존 closure 가 끊기지 않는다.
+    //  - 평탄 Value source: 기존 동작과 동일.
+    //  - sourceEv 없음 / sequence: rawValue 로 fallback.
+    const echoed: WrappedValue =
+      sourceEvForEcho?.kind === 'wrapped'
+        ? { kind: 'wrapped', value: sourceEvForEcho.value, meta: condMeta }
+        : wrap(sourceEvForEcho ?? rawValue, condMeta);
+    ctx.next[node.id] = echoed;
 
     if (cond) {
       ctx.setSlotValid(trueSlot);

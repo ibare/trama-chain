@@ -13,10 +13,16 @@ import type { Value } from '../model/index.js';
  * **Lifecycle**: WrappedValue 는 입력값을 그대로 통과시키는 노드(passthrough)에서만
  * 유지된다. 계산 노드는 입력 → 새 값 변환 과정에서 자연스럽게 unwrap 한 뒤
  * 새 값을 출력하므로 meta 가 사라진다 — "값이 바뀌면 짝이 풀린다"는 자연스러운 결과.
+ *
+ * **alue 일반화**: `value` 는 Value 와 [[FunctionHandle]] 모두 담을 수 있다.
+ * passthrough 가 source 의 시간 의존 closure 를 wrap envelope 으로 감싸 echo 할 때
+ * 핸들이 alue 자리에 그대로 들어간다. 환원은 [[resolveScalar]] 가 단일 자리에서 일괄
+ * 수행 — 다운스트림 노드·시각화는 항상 `unwrap(resolveScalar(ev, t))` 패턴으로 읽어
+ * Value 를 얻는다.
  */
 export interface WrappedValue {
   kind: 'wrapped';
-  value: Value;
+  value: Value | FunctionHandle;
   meta: Value;
 }
 
@@ -67,9 +73,10 @@ export interface FunctionHandle {
 }
 
 /**
- * 스칼라 실행값 — 단일 값(또는 메타 부착 값). combiner·shape·port-compat 등
- * 대부분의 라우팅은 스칼라만 다룬다. sequence 와 FunctionHandle 은 별도 케이스로
- * 분리되어 컴파일 시점에 잘못된 호출(예: unwrap(SequenceValue))을 차단.
+ * 스칼라 실행값 (raw) — 단일 값 또는 메타 부착 값. 메타 부착 값 안에는 시간 의존
+ * 핸들이 들어 있을 수 있다 (passthrough echo). 직접 unwrap 하면 핸들이 노출돼
+ * 다운스트림이 Value 로 가정하는 곳이 깨진다 — 그래서 [[resolveScalar]] 로 먼저
+ * [[ResolvedScalar]] 형태로 좁히고 [[unwrap]] 한다.
  */
 export type ScalarExec = Value | WrappedValue;
 
@@ -77,14 +84,26 @@ export type ScalarExec = Value | WrappedValue;
  * 실행 시 전파되는 값의 단위. 엣지·펄스·executionState.values 가 운반하는 모든
  * 값은 이 한 타입이다.
  *
- * - ScalarExec: 즉시 Value로 환원되는 일반 출력.
+ * - ScalarExec: 즉시 Value로 환원되는 일반 출력 (단, wrapped 내부 핸들은 resolveScalar 선행 필요).
  * - SequenceValue: 누적 sample 시퀀스(평균·trail 등의 입력).
  * - FunctionHandle: 시간 의존 closure — peek로 환원해야 Value가 된다.
  *
  * 다운스트림 노드는 보통 `isSequence` 분기 후 [[resolveScalar]] 로 FunctionHandle을
- * 풀어 ScalarExec로 환원한 뒤 [[unwrap]]을 부른다.
+ * 풀어 [[ResolvedScalar]] 로 환원한 뒤 [[unwrap]]을 부른다.
  */
 export type ExecValue = ScalarExec | SequenceValue | FunctionHandle;
+
+/**
+ * resolveScalar 통과 후의 ScalarExec — wrapped 내부 핸들이 모두 환원되어
+ * `value: Value` 가 보장된다. [[unwrap]] / [[metaOf]] 의 안전한 입력 타입.
+ */
+export interface WrappedScalar {
+  kind: 'wrapped';
+  value: Value;
+  meta: Value;
+}
+
+export type ResolvedScalar = Value | WrappedScalar;
 
 export function isWrapped(ev: ExecValue): ev is WrappedValue {
   return ev.kind === 'wrapped';
@@ -106,37 +125,60 @@ export function functionHandle(
 }
 
 /**
- * 시간 의존 핸들을 주어진 시각의 ScalarExec로 환원한다. sequence는 입력 불가
- * (호출자가 미리 [[isSequence]] 분기). 기존 ScalarExec는 그대로 통과.
+ * 시간 의존 핸들을 주어진 시각의 [[ResolvedScalar]]로 환원한다. sequence는 입력 불가
+ * (호출자가 미리 [[isSequence]] 분기).
+ *
+ * 두 환원 자리:
+ *   1. 인자 자체가 FunctionHandle → `peek(t)` 의 Value.
+ *   2. 인자가 WrappedValue 인데 `value` 가 FunctionHandle → 그 alue 만 peek 로 환원,
+ *      meta 는 그대로 두어 새 WrappedScalar 생성. (passthrough echo 가 핸들을 wrap
+ *      안에 담아 흘려보낸 케이스를 다운스트림이 안전하게 풀 수 있게 단일 자리에서 처리.)
  *
  * 다운스트림 노드의 입력 읽기 표준 패턴:
  * ```
  * const ev = ctx.next[edge.from];
  * if (!ev || isSequence(ev)) freeze;
- * const scalar = resolveScalar(ev, ctx.simulationTimeMs);
- * const v = unwrap(scalar);
+ * const scalar = resolveScalar(ev, ctx.simulationTimeMs); // ResolvedScalar
+ * const v = unwrap(scalar);                                // Value
  * ```
  */
 export function resolveScalar(
   ev: ScalarExec | FunctionHandle,
   simulationTimeMs: number,
-): ScalarExec {
-  return ev.kind === 'function-handle' ? ev.peek(simulationTimeMs) : ev;
+): ResolvedScalar {
+  if (ev.kind === 'function-handle') return ev.peek(simulationTimeMs);
+  if (ev.kind === 'wrapped') {
+    if (ev.value.kind === 'function-handle') {
+      return {
+        kind: 'wrapped',
+        value: ev.value.peek(simulationTimeMs),
+        meta: ev.meta,
+      };
+    }
+    // wrapped.value 가 이미 Value — narrow 후 WrappedScalar 로 통과.
+    return ev as WrappedScalar;
+  }
+  return ev;
 }
 
-/** envelope 생성. 동일 value 라도 meta 다르면 다른 인스턴스. */
-export function wrap(value: Value, meta: Value): WrappedValue {
+/** envelope 생성. 동일 value 라도 meta 다르면 다른 인스턴스. value 자리에 시간 의존
+ * 핸들을 그대로 담을 수 있다 — passthrough 가 source 의 핸들을 보존해 echo 할 때 사용. */
+export function wrap(value: Value | FunctionHandle, meta: Value): WrappedValue {
   return { kind: 'wrapped', value, meta };
 }
 
 /**
  * envelope 의 알맹이 값을 꺼낸다. raw Value 이면 그대로 반환.
- * 일반 노드(메타 무관)는 ScalarExec 를 받으면 이 헬퍼로 정규화한다.
+ * 일반 노드(메타 무관)는 [[ResolvedScalar]] 를 받으면 이 헬퍼로 정규화한다.
+ *
+ * **반드시 [[resolveScalar]] 를 거친 ResolvedScalar 만 입력 가능** — wrapped.value 가
+ * 핸들인 raw WrappedValue 를 직접 unwrap 하면 Value 가 아닌 핸들이 노출돼 다운스트림이
+ * 깨진다. 타입 시스템이 컴파일 시점에 강제.
  *
  * **sequence 는 인자로 받지 않는다** — Sequence 는 스칼라가 아니므로 호출자가
- * 미리 [[isSequence]] 로 분기해야 한다. 타입 시스템이 컴파일 시점에 강제.
+ * 미리 [[isSequence]] 로 분기해야 한다.
  */
-export function unwrap(ev: ScalarExec): Value {
+export function unwrap(ev: ResolvedScalar): Value {
   return ev.kind === 'wrapped' ? ev.value : ev;
 }
 
@@ -145,8 +187,10 @@ export function unwrap(ev: ScalarExec): Value {
  * 메타 인식 노드(Generator boolean gate 등)는 이 값을 분기 입력으로 사용한다.
  *
  * sequence 는 받지 않는다 (스칼라 전용). 호출자가 미리 [[isSequence]] 로 분기.
+ * 입력은 [[ResolvedScalar]] — meta 자체는 Value 만 담는다는 계약이라 resolveScalar
+ * 통과 후엔 meta 가 항상 Value.
  */
-export function metaOf(ev: ScalarExec): Value | null {
+export function metaOf(ev: ResolvedScalar): Value | null {
   return ev.kind === 'wrapped' ? ev.meta : null;
 }
 
@@ -157,6 +201,7 @@ export function metaOf(ev: ScalarExec): Value | null {
  * - plain boolean Value: 알맹이 그대로 사용
  * - WrappedValue + value:boolean : 알맹이 사용 (메타가 다른 의미를 가져도 알맹이 우선)
  * - WrappedValue + value:numeric + meta:boolean : meta 사용 (Condition 슬롯 출력)
+ * - WrappedValue + value:function-handle : 게이트 아님 (시간 의존 신호는 boolean 게이트로 평가 X) — meta 가 boolean 이면 그 쪽을 본다
  * - SequenceValue: 시퀀스는 boolean 게이트가 아님 — undefined
  * - 그 외: 게이트로 쓸 수 없음 → undefined (caller 가 freeze 처리)
  *
