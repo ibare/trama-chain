@@ -4,6 +4,7 @@ import {
   isValueNode,
   numericValue,
 } from '../../../model/index.js';
+import type { OutputInterpolation } from '../../../generators/index.js';
 import {
   isSequence,
   resolveScalar,
@@ -65,6 +66,21 @@ export const observeNodeDescriptor: NodeKindDescriptor<Extract<Node, { kind: 'ob
     return firstIncomingEdgeForNode(ctx.model, node.id) === undefined;
   },
   outputUnit: () => FREE_FALLBACK,
+  // passthrough — source paradigm 의 시간 분포 본질을 mirror 한다. ObserveNode
+  // 자체는 lag=0 입력을 그대로 흘려보내므로 자기 시간성이 없다. 케이블 시각
+  // (continuous→undulation, discrete→particle) 이 Sine→Observe→… 체인에서
+  // 일관되려면 본질을 자기 한 단계로 위임해야 한다.
+  // ctx 가 없거나 입력이 비어 있거나 source 디스크립터가 outputInterpolation 을
+  // 정의하지 않은 케이스 모두 'discrete' 폴백 — 기본 케이블 시각.
+  outputInterpolation: (node, ctx): OutputInterpolation => {
+    if (!ctx) return 'discrete';
+    const edge = firstIncomingEdgeForNode(ctx.model, node.id);
+    if (!edge) return 'discrete';
+    const source = ctx.model.nodes[edge.from];
+    if (!source) return 'discrete';
+    const desc = ctx.registry.forNode(source);
+    return desc?.outputInterpolation?.(source, ctx) ?? 'discrete';
+  },
   propagate: (node, ctx) => {
     const bodySlotKey = outputKey(node.id, 0);
     const extractionSlotKey = outputKey(node.id, 1);

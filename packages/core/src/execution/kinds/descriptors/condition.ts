@@ -10,10 +10,15 @@ import {
   unwrap,
   wrap,
 } from '../../exec-value.js';
+import type { OutputInterpolation } from '../../../generators/index.js';
 import { outputKey } from '../../state.js';
 import { FREE_FALLBACK } from '../context.js';
 import type { NodeKindDescriptor } from '../descriptor.js';
-import { getNumericNext, isEdgeSourceValid } from '../internals.js';
+import {
+  firstIncomingEdgeForNode,
+  getNumericNext,
+  isEdgeSourceValid,
+} from '../internals.js';
 
 /**
  * 조건 노드 디스크립터 — 단일 입력 / 두 출력 게이트 (true·false 슬롯).
@@ -44,6 +49,19 @@ export const conditionNodeDescriptor: NodeKindDescriptor<
     { index: 0, value: 'numeric', meta: 'boolean', label: 'true', branching: true },
     { index: 1, value: 'numeric', meta: 'boolean', label: 'false', branching: true },
   ],
+  // 본체는 입력 알맹이를 raw 그대로 흘려보내는 passthrough — 자기 시간성이 없다.
+  // 다운스트림 케이블 시각이 source paradigm 본질을 잃지 않도록 source 의
+  // outputInterpolation 을 그대로 mirror. ctx 없거나 입력 미연결 / 미정의 →
+  // 'discrete' 폴백. ObserveNode 와 동일 패턴.
+  outputInterpolation: (node, ctx): OutputInterpolation => {
+    if (!ctx) return 'discrete';
+    const edge = firstIncomingEdgeForNode(ctx.model, node.id);
+    if (!edge) return 'discrete';
+    const source = ctx.model.nodes[edge.from];
+    if (!source) return 'discrete';
+    const desc = ctx.registry.forNode(source);
+    return desc?.outputInterpolation?.(source, ctx) ?? 'discrete';
+  },
   outputUnit: () => FREE_FALLBACK,
   propagate: (node, ctx) => {
     const trueSlot = outputKey(node.id, 0);
