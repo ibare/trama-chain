@@ -72,7 +72,13 @@ export function createPulseArrivalHandler(
 
     // Generator는 boolean gate 입력을 받지만 자기 값은 ticker가 만든다.
     // 펄스 도착 시 (a) gateOpen 캐시를 펄스 source 값으로 갱신, (b) ticker
-    // reconcile만 수행. 즉시 emit은 ticker가 다음 틱에 처리 → 인과 시점 일치.
+    // reconcile. opening (close→open) 의 emit 은 다음 RAF tick 의 tickGenerators
+    // 가 자연스럽게 spawn 해 인과 시점 일치.
+    // (c) closing (open→close) transition 만 예외 — sin 같은 시간 의존
+    // FunctionHandle 이 state.values 에 잔존하면 다운스트림 UI 가 매 프레임 새
+    // simulationTimeMs 로 재평가해 시각 흐름 착시가 생긴다 (본체 표시·undulation
+    // 케이블 모두). 그 시점의 값을 한 번 평탄화해 t 의존성을 끊고, cascade pulse
+    // 한 번을 spawn 해 다운스트림이 frozen scalar 를 흡수하게 한다.
     if (isGeneratorNode(targetNode)) {
       const edge = model.edgeOrder
         .map((eid) => model.edges[eid])
@@ -83,35 +89,68 @@ export function createPulseArrivalHandler(
             e.from === pulse.sourceNodeId &&
             e.lag === 0,
         );
+      const prevRuntime = executionState.generatorRuntime[pulse.targetNodeId];
+      if (!prevRuntime) return;
       // 펄스의 sourceValue 는 ExecValue — asBooleanGate 가 알맹이 boolean / wrapped
       // value:boolean / wrapped meta:boolean 우선순위로 게이트를 추출해 준다. Condition
       // 슬롯에서 흘러온 wrapped numeric 의 meta:boolean 도 동일하게 게이트로 인식.
       // 추출 실패 시 prev.gateOpen 을 유지 — 잘못된 펄스 하나로 ticker 가 영구
       // freeze 되는 일이 없게.
-      store.setState((s) => {
-        const prev = s.executionState.generatorRuntime[pulse.targetNodeId];
-        if (!prev) return s;
-        let nextGateOpen = prev.gateOpen;
-        if (edge) {
-          const raw = asBooleanGate(pulse.sourceValue);
-          if (raw !== undefined) {
-            nextGateOpen = edge.inverted ? !raw : raw;
-          }
+      let nextGateOpen = prevRuntime.gateOpen;
+      if (edge) {
+        const raw = asBooleanGate(pulse.sourceValue);
+        if (raw !== undefined) {
+          nextGateOpen = edge.inverted ? !raw : raw;
         }
+      }
+      // closing transition 시 현재 ExecValue 를 simulationTimeMs 로 평탄화 —
+      // FunctionHandle 이면 peek 호출로 Value, ScalarExec 이면 그대로. sequence 는
+      // 안전망으로 스킵 (generator 가 sequence 를 emit 하는 경우 없음).
+      const closing =
+        prevRuntime.gateOpen === true && nextGateOpen === false;
+      let frozenValue: ExecValue | undefined;
+      if (closing) {
+        const ev = executionState.values[pulse.targetNodeId];
+        if (ev !== undefined && !isSequence(ev)) {
+          frozenValue = resolveScalar(ev, executionState.simulationTimeMs);
+        }
+      }
+      store.setState((s) => {
+        const cur = s.executionState.generatorRuntime[pulse.targetNodeId];
+        if (!cur) return s;
         const newRuntime = {
           ...s.executionState.generatorRuntime,
           [pulse.targetNodeId]: {
-            cursor: prev.cursor,
+            cursor: cur.cursor,
             gateOpen: nextGateOpen,
           },
         };
+        const partial: Partial<typeof s.executionState> = {
+          generatorRuntime: newRuntime,
+        };
+        if (frozenValue !== undefined) {
+          partial.values = {
+            ...s.executionState.values,
+            [pulse.targetNodeId]: frozenValue,
+          };
+        }
         return {
-          executionState: commitExecutionState(s.executionState, {
-            generatorRuntime: newRuntime,
-          }),
+          executionState: commitExecutionState(s.executionState, partial),
         };
       });
       nodeFlashRegistry.trigger(pulse.targetNodeId);
+      // closing 만 cascade pulse 한 번 spawn — 다운스트림이 frozen scalar 를 흡수해
+      // 본체·undulation 이 평탄해진다. opening 은 tickGenerators 가 다음 tick 에 emit
+      // 하면서 spawn 하므로 여기서는 별도 spawn 불필요.
+      if (closing) {
+        const latest = store.getState();
+        spawnOutgoingPulses(
+          latest.model,
+          latest.executionState,
+          pulse.targetNodeId,
+          new Set([0]),
+        );
+      }
       reconcileSimulationLoop();
       return;
     }

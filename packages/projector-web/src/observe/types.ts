@@ -38,6 +38,13 @@ export interface ObserveVisualizationRenderProps {
    * source 는 null.
    */
   functionSource: FunctionHandle | null;
+  /**
+   * 신호 동결 상태 — 상류 continuous 패러다임의 gate 가 닫혀 closure 가 scalar 로
+   * 환원된 직후를 표시. 시간은 흐르고 있지만 새 sample 이 더 들어오지 않는
+   * 시점을 시각화가 인지해 sliding 정지·halo 표식 같은 표현을 분기할 수 있다.
+   * discrete source(counter 등) 는 항상 false.
+   */
+  frozen: boolean;
   halfW: number;
   halfH: number;
   /** compact 모드 여부. 시각화는 자체 폰트/패딩을 이 값에 맞게 줄여야 한다. */

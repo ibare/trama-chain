@@ -1,7 +1,8 @@
-import { memo, useCallback, useEffect, useMemo } from 'react';
+import { memo, useCallback, useEffect, useMemo, useRef } from 'react';
 import { tokens } from '@trama/tokens';
 import {
   booleanValue,
+  functionHandle,
   isFunctionHandle,
   isObserveNode,
   isSequence,
@@ -17,6 +18,7 @@ import {
 } from '@trama/core';
 import type { SequenceSample } from '@trama/core';
 import { useTrama } from '../store/index.js';
+import { selectCableMedium } from '../store/edge-selectors.js';
 import { useNodeLayout } from './use-node-layout.js';
 import { resolveDisplayMode } from './display-mode.js';
 import { NodeBody } from './NodeBody.js';
@@ -87,9 +89,6 @@ function ObserveNodeViewImpl({ id, incomingCount }: Props): JSX.Element | null {
       return booleanValue(currentBoolean);
     return null;
   }, [currentKind, currentNumber, currentBoolean]);
-  // 시간축이 필요한 시각화가 current 를 sample 처럼 다룰 때의 t. primitive 라
-  // selector 가 안정적.
-  const currentT = modelStore((s) => s.executionState.simulationTimeMs);
   // FunctionHandle source — peek(t) 로 임의 시각의 Value 를 계산할 수 있는 closure.
   // 시각이 windowed 시간 도메인을 dense peek 해 sub-frame 매끄러운 곡선을 그릴 때
   // 사용. propagate 가 매 step 새 핸들 객체를 만들므로 ref 가 step 마다 갱신된다.
@@ -97,6 +96,50 @@ function ObserveNodeViewImpl({ id, incomingCount }: Props): JSX.Element | null {
     const ev = s.executionState.values[id];
     return ev && isFunctionHandle(ev) ? (ev as FunctionHandle) : null;
   });
+  // 상류 source 가 continuous paradigm 인지(sin·stock 처럼 매 tick 변하는 신호).
+  // 판정: body slot 0 으로 들어오는 첫 edge 의 cable medium.
+  const upstreamIsContinuous = modelStore((s) => {
+    const model = s.model;
+    for (const eid of model.edgeOrder) {
+      const e = model.edges[eid];
+      if (!e || e.to !== id || e.lag !== 0) continue;
+      if ((e.slotIndex ?? 0) !== 0) continue;
+      return selectCableMedium(model, e.from, e.sourceSlotIndex ?? 0) === 'undulation';
+    }
+    return false;
+  });
+  // 시간축이 필요한 시각화가 current 를 sample 처럼 다룰 때의 t.
+  // 동결 조건: 상류가 continuous 패러다임인데 현재 source 가 closure 가 아니다
+  // (=generator gate OFF 직후 closing transition 으로 scalar 로 환원된 상태).
+  // currentT 를 마지막 sample 의 t 로 고정해 sparkline windowed 도메인이 우→좌
+  // sliding 을 멈추고, 신호 단절 시점의 그래프가 그대로 유지되게 한다 — 시간은
+  // 흐르지만 신호 관측이 끊긴 상태의 시각적 표현. discrete source(counter 등)
+  // 는 medium='particle' 이라 이 분기를 안 타고 sliding 유지.
+  const lastSampleT = modelStore((s) => {
+    const buf = s.executionState.observeBuffers[id];
+    if (!buf) return null;
+    const arr = observeBufferToArray(buf);
+    return arr.length > 0 ? (arr[arr.length - 1]?.t ?? null) : null;
+  });
+  const simulationTimeMs = modelStore((s) => s.executionState.simulationTimeMs);
+  const frozen = upstreamIsContinuous && functionSource === null && lastSampleT !== null;
+  // currentT 는 항상 sim time 으로 둔다 — frozen 동안에도 window 가 자연스럽게 sliding
+  // 해 ON 재개 시 window 가 갑자기 windowMs 전체로 펼쳐지는 jump 가 없게.
+  const currentT = simulationTimeMs;
+  // ON 동안 본 마지막 FunctionHandle 을 캐시. frozen 일 때 t > lastSampleT 영역은
+  // 마지막 값에서 hold 하도록 clamp wrapper 로 감싼다 — "신호가 멎고 마지막 값이
+  // 유지된다" 의 시각. sin paradigm 은 결정적 순수 함수라 cache 의 lifetime 동안
+  // params 변경 없으면 같은 결과를 반환.
+  const cachedFnRef = useRef<FunctionHandle | null>(null);
+  if (functionSource) cachedFnRef.current = functionSource;
+  const effectiveFunctionSource = useMemo<FunctionHandle | null>(() => {
+    if (functionSource) return functionSource;
+    if (!frozen) return null;
+    const cached = cachedFnRef.current;
+    if (!cached || lastSampleT === null) return null;
+    const cap = lastSampleT;
+    return functionHandle((t: number) => cached.peek(t < cap ? t : cap));
+  }, [functionSource, frozen, lastSampleT]);
   const updateNode = modelStore((s) => s.updateNode);
   const outputConnected = useOutputConnected(id, 0);
   const extractionConnected = useOutputConnected(id, 1);
@@ -212,7 +255,8 @@ function ObserveNodeViewImpl({ id, incomingCount }: Props): JSX.Element | null {
             samples={samples}
             current={current}
             currentT={currentT}
-            functionSource={functionSource}
+            functionSource={effectiveFunctionSource}
+            frozen={frozen}
             halfW={observeBody.w / 2}
             halfH={observeBody.h / 2}
             compact={currentMode === 'compact'}

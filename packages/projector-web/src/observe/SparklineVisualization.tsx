@@ -82,6 +82,7 @@ function SparklineImpl({
   current,
   currentT,
   functionSource,
+  frozen,
   halfW,
   halfH,
   compact,
@@ -169,7 +170,7 @@ function SparklineImpl({
       const path = sparkLineGen(points) ?? '';
       const last = points[points.length - 1]!;
       return (
-        <g className="trama-observe-vis-sparkline is-numeric is-function">
+        <g className={`trama-observe-vis-sparkline is-numeric is-function${frozen ? ' is-frozen' : ''}`}>
           <path d={path} fill="none" className="trama-observe-sparkline-line" />
           <circle
             cx={last.x}
@@ -177,6 +178,14 @@ function SparklineImpl({
             r={markerR}
             className="trama-observe-sparkline-marker"
           />
+          {frozen ? (
+            <circle
+              cx={last.x}
+              cy={last.y}
+              r={markerR}
+              className="trama-observe-sparkline-ring"
+            />
+          ) : null}
         </g>
       );
     }
@@ -197,7 +206,7 @@ function SparklineImpl({
     const path = sparkLineGen(points) ?? '';
     const last = points[points.length - 1]!;
     return (
-      <g className="trama-observe-vis-sparkline is-numeric">
+      <g className={`trama-observe-vis-sparkline is-numeric${frozen ? ' is-frozen' : ''}`}>
         <path d={path} fill="none" className="trama-observe-sparkline-line" />
         <circle
           cx={last.x}
@@ -205,6 +214,14 @@ function SparklineImpl({
           r={markerR}
           className="trama-observe-sparkline-marker"
         />
+        {frozen ? (
+          <circle
+            cx={last.x}
+            cy={last.y}
+            r={markerR}
+            className="trama-observe-sparkline-ring"
+          />
+        ) : null}
       </g>
     );
   }

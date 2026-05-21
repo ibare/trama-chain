@@ -35,6 +35,29 @@
     fill: var(--color-node-text-primary);
     pointer-events: none;
 }
+/* 신호 동결 표식 — 상류 continuous generator 의 gate 가 닫혀 신호가 멎은 시점.
+ * 정적 marker dot 위에 ring 이 r 확장 + opacity 페이드 무한 반복으로 "관측 중,
+ * 마지막 값 유지" 시각을 만든다. transform-box: fill-box 가 있어야 SVG circle
+ * 의 scale 이 자기 중심 기준으로 적용된다. */
+[data-trama-root] .trama-observe-sparkline-ring {
+    fill: none;
+    stroke: var(--color-node-text-primary);
+    stroke-width: 1;
+    pointer-events: none;
+    transform-box: fill-box;
+    transform-origin: center;
+    animation: trama-observe-halo-ring 1.2s ease-out infinite;
+}
+@keyframes trama-observe-halo-ring {
+    0% {
+        transform: scale(0.6);
+        opacity: 0.9;
+    }
+    100% {
+        transform: scale(2.6);
+        opacity: 0;
+    }
+}
 [data-trama-root] .trama-observe-empty-label {
     font-size: 0.85rem;
     fill: var(--color-node-text-low);
