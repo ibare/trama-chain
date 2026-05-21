@@ -1,7 +1,9 @@
 import {
   defaultNodeKindRegistry,
   getExecValue,
+  getOutputSlots,
   isOutputValid,
+  isSequencePortSpec,
   type ExecutionState,
   type ExecValue,
   type Model,
@@ -57,16 +59,53 @@ export function selectIsBranchingSlot(
 }
 
 /**
- * source 노드의 `outputInterpolation` 이 `'continuous'` 인가. 디스크립터가 선언하는
- * paradigm 속성 — sine 같은 연속 신호 source 에서 시각·인과 양쪽 모두 분기.
- * EdgeView 는 stroke 변조 토글에, spawn 은 시각 펄스 대신 합성 즉시 펄스를 쓰는
- * 분기에 사용.
+ * 케이블의 시각 medium — 한 자리에서 결정되는 2-enum.
+ *
+ * - `'particle'`: 시각 입자가 케이블 위를 흐른다. 이산 이벤트(펄스·throttle 발사·
+ *   누적 추출 스냅샷) 의 자연스러운 표현.
+ * - `'undulation'`: 케이블 자체가 진동한다. 매 tick 신호값이 변하는 connecting
+ *   continuous 흐름 — sine paradigm 처럼 시간 의존 closure 가 통과하는 자리.
+ *
+ * 시각 분기는 두 갈래밖에 없지만, 의사결정 입력은 두 종류 — 슬롯의 PortSpec
+ * (sequence 여부) 과 source 디스크립터의 outputInterpolation (continuous 여부) —
+ * 가 같이 본다.
  */
-export function selectIsContinuousSource(model: Model, nodeId: NodeId): boolean {
-  const node = model.nodes[nodeId];
-  if (!node) return false;
+export type CableMedium = 'particle' | 'undulation';
+
+/**
+ * source slot 의 cable medium 을 결정.
+ *
+ * 우선순위:
+ *  1. source 출력 slot 이 SequencePortSpec → `'particle'`.
+ *     누적 추출처럼 throttle / step 단위 sample 발사를 시각 입자로 표현해야
+ *     사용자가 "스냅샷이 흘렀다" 는 인과를 본다. source 가 continuous paradigm
+ *     이어도 sequence 채널은 이산 이벤트라는 시맨틱이 우선.
+ *  2. source 디스크립터 `outputInterpolation === 'continuous'` → `'undulation'`.
+ *     sine 처럼 매 tick 변하는 신호. Observe·Condition 같은 passthrough 노드는
+ *     디스크립터에서 source 의 outputInterpolation 을 mirror 하므로 체인 전체가
+ *     일관된 undulation 을 유지한다.
+ *  3. 그 외 → `'particle'`. 안전한 기본 — 펄스 시각이 가장 보편.
+ *
+ * EdgeView 는 medium 으로 stroke 변조 토글을, spawn 은 시각 펄스 대신 합성 즉시
+ * 펄스를 쓰는 분기에 사용. 같은 medium 판정이 두 호출자 사이 drift 없이 흐른다.
+ */
+export function selectCableMedium(
+  model: Model,
+  sourceNodeId: NodeId,
+  sourceSlotIndex: number,
+): CableMedium {
+  const node = model.nodes[sourceNodeId];
+  if (!node) return 'particle';
   const desc = defaultNodeKindRegistry.forNode(node);
-  return desc?.outputInterpolation?.(node) === 'continuous';
+  if (!desc) return 'particle';
+  const slots = getOutputSlots(node, defaultNodeKindRegistry, model);
+  const slot = slots[sourceSlotIndex] ?? slots[0];
+  if (slot && isSequencePortSpec(slot)) return 'particle';
+  const interp = desc.outputInterpolation?.(node, {
+    model,
+    registry: defaultNodeKindRegistry,
+  });
+  return interp === 'continuous' ? 'undulation' : 'particle';
 }
 
 /**

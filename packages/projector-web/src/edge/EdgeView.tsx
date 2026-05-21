@@ -7,8 +7,8 @@ import {
 } from '@trama/core';
 import { useTrama } from '../store/index.js';
 import {
+  selectCableMedium,
   selectIsBranchingSlot,
-  selectIsContinuousSource,
   selectIsSlotActive,
 } from '../store/edge-selectors.js';
 import { shapeRegistry } from '../store/registries.js';
@@ -165,17 +165,20 @@ function EdgeViewImpl({
     liveEndpointsRef.current.end = { x: baseEnd.x, y: baseEnd.y };
   }, [baseStart.x, baseStart.y, baseEnd.x, baseEnd.y]);
 
-  // source 노드의 outputInterpolation을 디스크립터 경유로 조회 — 'continuous' 인
-  // source(현재 sine paradigm) 만 매 프레임 stroke 시각을 변조한다. 디스크립터를 직접
-  // 경유해 paradigm 종류 하드코딩 분기를 피한다(principles §3).
-  const isContinuousSource = modelStore((s) =>
-    fromId ? selectIsContinuousSource(s.model, fromId) : false,
+  // source slot 의 cable medium — 'undulation' 이면 매 프레임 stroke 시각을
+  // 변조해 케이블 진동으로 흐름을 표현. 'particle' 이면 이 변조를 건드리지 않고
+  // 시각 펄스가 입자로 흐른다. 의사결정 자리는 selectCableMedium 한 곳 — EdgeView
+  // 와 spawn 이 같은 식을 거쳐 paradigm 하드코딩 분기를 피한다(principles §3).
+  const isUndulation = modelStore((s) =>
+    fromId
+      ? selectCableMedium(s.model, fromId, edgeSourceSlot) === 'undulation'
+      : false,
   );
   // ticker 재등록 회피용 ref.
-  const isContinuousRef = useRef(isContinuousSource);
+  const isUndulationRef = useRef(isUndulation);
   useEffect(() => {
-    isContinuousRef.current = isContinuousSource;
-  }, [isContinuousSource]);
+    isUndulationRef.current = isUndulation;
+  }, [isUndulation]);
 
   const lag = edge?.lag ?? 0;
 
@@ -229,10 +232,10 @@ function EdgeViewImpl({
         shapeMarkerRef.current.setAttribute('transform', `translate(${m.x},${m.y})`);
       }
 
-      // continuous source: 데이터 주기와 독립인 1s 자체 진동으로 stroke 시각을 변조.
+      // undulation medium: 데이터 주기와 독립인 1s 자체 진동으로 stroke 시각을 변조.
       // "유체가 흐른다" 는 추상적 시그널만 전달 — 실제 데이터 값은 ObserveNode 가 담당.
       // source 의 주기(예: sine 20s)에 시각이 결속되면 너무 느려 흐름이 느껴지지 않음.
-      if (!isContinuousRef.current) return;
+      if (!isUndulationRef.current) return;
       const path = pathRef.current;
       if (!path) return;
       // paused 일 때는 시뮬레이션 시간이 정지 — 시각만 흐르면 "멈춤이지만 흐른다"
@@ -240,7 +243,7 @@ function EdgeViewImpl({
       // wall-clock 이라 paused 와 무관하게 흘러 잘못된 진동을 만들 위험).
       if (timeSettingsStore.getState().paused) return;
       const intensity = (Math.sin((performance.now() / 1000) * Math.PI * 2) + 1) / 2;
-      path.style.setProperty('--continuous-intensity', String(intensity));
+      path.style.setProperty('--undulation-intensity', String(intensity));
     };
     const unregisterTicker = animationLoop.register(tick);
     const unregisterCable = cableRegistry.register(edgeId, cable);
@@ -277,7 +280,7 @@ function EdgeViewImpl({
   const baseClasses = ['trama-edge'];
   if (isFeedback) baseClasses.push('is-feedback');
   if (introducing) baseClasses.push('is-introducing');
-  if (isContinuousSource) baseClasses.push('is-continuous');
+  if (isUndulation) baseClasses.push('is-undulation');
 
   const arrowClass = `trama-arrow${isFeedback ? ' is-feedback' : ''}`;
   const groupCls = `trama-edge-group${morphing ? ' is-morphing' : ''}${isDetaching ? ' is-detaching' : ''}${isBranchingInactive ? ' is-branching' : ''}`;

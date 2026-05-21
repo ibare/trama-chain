@@ -26,17 +26,18 @@
     stroke-dasharray: var(--physical-dasharray-edge-feedback);
 }
 
-/* continuous source(현재 sine paradigm) 의 sub-frame modulation 시각.
-   --continuous-intensity 는 EdgeView ticker 가 peek 결과를 적응적으로 [0,1] 로
-   환산해 매 프레임 갱신한다. discrete source 엣지는 이 클래스가 붙지 않아 무영향. */
-[data-trama-root] .trama-edge.is-continuous {
+/* undulation medium 케이블 (현재 sine paradigm 등 continuous source) 의 sub-frame
+   modulation 시각. --undulation-intensity 는 EdgeView ticker 가 자체 1s 진동을
+   [0,1] 로 환산해 매 프레임 갱신한다. particle medium 엣지는 이 클래스가 붙지
+   않아 무영향. */
+[data-trama-root] .trama-edge.is-undulation {
     filter: drop-shadow(
-        0 0 calc(var(--continuous-intensity, 0.5) * 6px)
+        0 0 calc(var(--undulation-intensity, 0.5) * 6px)
             var(--slot-color, var(--color-edge-default))
     );
     stroke-width: calc(
         var(--spacing-stroke-edge-default) *
-            (0.8 + var(--continuous-intensity, 0.5) * 0.6)
+            (0.8 + var(--undulation-intensity, 0.5) * 0.6)
     );
 }
 

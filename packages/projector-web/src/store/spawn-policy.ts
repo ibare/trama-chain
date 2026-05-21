@@ -8,7 +8,7 @@ import {
 } from '@trama/core';
 import { commitExecutionState } from './execution-commit.js';
 import {
-  selectIsContinuousSource,
+  selectCableMedium,
   selectIsSlotActive,
   selectSourceExecValue,
 } from './edge-selectors.js';
@@ -62,7 +62,7 @@ export interface SpawnPolicy {
 
   /**
    * Stock 노드의 단일 슬롯에 대해 lag=0 outgoing 엣지를 순회하며 펄스를 spawn.
-   * Stock 은 continuous source 라 시각 입자 없이 즉시 도착 Pulse 로 동기 propagate.
+   * Stock 은 undulation medium source 라 시각 입자 없이 즉시 도착 Pulse 로 동기 propagate.
    * sourceValue 는 호출자가 명시 — slot 0=level, slot 1=overflow, slot 2=rate 가
    * 각각 다른 값이므로.
    */
@@ -92,12 +92,14 @@ export function createSpawnPolicy(deps: SpawnPolicyDeps): SpawnPolicy {
     // 박제와는 별개 — 시각·인과 전파만 차단한다.
     if (timeSettingsStore.getState().paused) return;
     if (store.getState().playbackStep !== null) return;
-    // continuous source(현재 sine paradigm) 는 매 tick 신호값이 변하는 흐름이라
-    // 시각적 "입자(펄스)" 시맨틱과 어울리지 않는다. EdgeView 가 stroke 변조로
-    // 흐름을 표현하므로 시각 펄스는 띄우지 않고, 그래도 다운스트림 상태(예:
-    // ObserveNode 누적 버퍼) 는 갱신되어야 하므로 즉시 도착한 합성 Pulse 로
-    // 동기 propagate 만 수행한다.
-    const isContinuousSource = selectIsContinuousSource(model, sourceNodeId);
+    // medium 결정은 selector 한 자리. 'undulation' (현재 sine paradigm 같은
+    // continuous source 의 본체 슬롯) 은 매 tick 신호값이 변하는 흐름이라 시각적
+    // "입자(펄스)" 시맨틱과 어울리지 않는다. EdgeView 가 stroke 변조로 흐름을
+    // 표현하므로 시각 펄스는 띄우지 않고, 그래도 다운스트림 상태(예: ObserveNode
+    // 누적 버퍼) 는 갱신되어야 하므로 즉시 도착한 합성 Pulse 로 동기 propagate 만
+    // 수행. 'particle' 은 기존 시각 펄스 스폰.
+    // slot 마다 평가 — SequencePortSpec 슬롯(예: 누적 추출) 은 같은 source 라도
+    // particle 로 떨어지는 케이스가 있다.
     for (const eid of model.edgeOrder) {
       const e = model.edges[eid];
       if (!e || e.from !== sourceNodeId) continue;
@@ -107,7 +109,8 @@ export function createSpawnPolicy(deps: SpawnPolicyDeps): SpawnPolicy {
       if (!selectIsSlotActive(executionState, sourceNodeId, slot)) continue;
       const sourceValue = selectSourceExecValue(executionState, sourceNodeId);
       if (!sourceValue) continue;
-      if (isContinuousSource) {
+      const cableMedium = selectCableMedium(model, sourceNodeId, slot);
+      if (cableMedium === 'undulation') {
         getHandlePulseArrival()({
           id: `direct-${nextDirectPulseSerial++}`,
           edgeId: eid,
