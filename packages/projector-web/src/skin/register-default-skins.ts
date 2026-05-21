@@ -89,6 +89,18 @@ registerSkin({
 });
 
 registerSkin({
+  key: 'audio-jack',
+  labels: { ko: '오디오 잭' },
+  icon: 'plug',
+  domain: {
+    valueKind: 'boolean',
+    intent: '잭을 꽂으면 회로가 연결된다 — connected/disconnected 를 plug 의 물리적 위치로',
+  },
+  load: (): Promise<{ Skin: BooleanSkinComponent }> =>
+    import('./skins/audio-jack.js').then((m) => ({ Skin: m.AudioJack })),
+});
+
+registerSkin({
   key: 'thermometer-cryogenic',
   labels: { ko: '극저온 온도계' },
   icon: 'snowflake',

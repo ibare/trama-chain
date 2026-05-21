@@ -106,6 +106,17 @@ const SKIN_LAYOUTS: Record<string, SkinLayoutSpec> = {
     circleCy: 12,
     labelSlotH: 24,
   },
+  // 오디오 잭 — boolean 도메인. plug 가 본체에 꽂히면 ON(중앙 진공관 발광),
+  // 빠지면 OFF(본체 아래로 떨어진 plug + socket hole). bbox 상반에 본체,
+  // 하반에 dropped plug 영역. circleCy 음수: 엣지 앵커가 본체 중심 변에
+  // 정렬되도록 한다.
+  "audio-jack": {
+    width: 240,
+    height: 240,
+    circleR: 100,
+    circleCy: -30,
+    labelSlotH: 24,
+  },
 };
 const COMBINER_ADD_H = 44;
 export const NAME_FROM_TOP = 20;
