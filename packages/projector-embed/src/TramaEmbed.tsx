@@ -7,7 +7,6 @@ import {
   isNumericValue,
   isSequence,
   isValueNode,
-  normalize,
   parseTrama,
   propagateOneStep,
   resolveScalar,
@@ -55,8 +54,6 @@ const CARD_CORNER = parseFloat(tokens.spacing.cardCornerRadius);
 const PIN_RADIUS = parseFloat(tokens.spacing.pinRadius);
 const SOCKET_SIZE = parseFloat(tokens.spacing.socketSize);
 const SOCKET_DOT_SIZE = parseFloat(tokens.spacing.socketDotSize);
-const STRAINED_LOW = tokens.physical.thresholdEdgeStrainedLow;
-const STRAINED_HIGH = tokens.physical.thresholdEdgeStrainedHigh;
 
 interface Props {
   json: string;
@@ -165,17 +162,10 @@ export function TramaEmbed({ json, height = 360, showQuestion = true }: Props): 
 
           const { d, tip, tangent, mid } = staticEdgePath(start, end, { lag: edge.lag });
 
-          const srcRaw =
-            values[edge.from] ??
-            (isValueNode(fromNode) ? fromNode.initialValue : undefined);
-          const srcValue = valueAsNumber(srcRaw, simulationTimeMs);
-          const srcNorm = normalize(srcValue, resolveNodeUnit(fromNode));
           const isFeedback = edge.lag === 1;
-          const isStrained = srcNorm < STRAINED_LOW || srcNorm > STRAINED_HIGH;
           const cls = [
             'trama-embed-edge',
             isFeedback ? 'is-feedback' : '',
-            isStrained ? 'is-strained' : '',
           ]
             .filter(Boolean)
             .join(' ');

@@ -126,12 +126,6 @@
   stroke-linecap: round;
 }
 
-[data-trama-root] .trama-embed-edge.is-strained {
-  stroke: var(--color-edge-strained);
-  stroke-dasharray: var(--physical-dasharray-edge-strained);
-  stroke-width: var(--spacing-stroke-edge-strained);
-}
-
 [data-trama-root] .trama-embed-edge.is-feedback {
   stroke: var(--color-edge-feedback);
   stroke-dasharray: var(--physical-dasharray-edge-feedback);

@@ -40,12 +40,6 @@
     );
 }
 
-[data-trama-root] .trama-edge.is-strained {
-    stroke: var(--color-edge-strained);
-    stroke-dasharray: var(--physical-dasharray-edge-strained);
-    stroke-width: var(--spacing-stroke-edge-strained);
-}
-
 [data-trama-root] .trama-edge.is-introducing {
     stroke-dasharray: 1000;
     stroke-dashoffset: 1000;
@@ -98,9 +92,6 @@
 }
 [data-trama-root] .trama-arrow.is-feedback {
     fill: var(--color-edge-feedback);
-}
-[data-trama-root] .trama-arrow.is-strained {
-    fill: var(--color-edge-strained);
 }
 
 /* 화살촉 끝 detach 핸들 — 화살표 위에 덮여 hover/grab 시작점 역할만. */

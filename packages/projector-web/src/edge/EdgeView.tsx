@@ -1,14 +1,7 @@
 import { memo, useEffect, useMemo, useRef, useState } from 'react';
-import { tokens } from '@trama/tokens';
 import {
   isConditionNode,
   isExpressionNode,
-  isNumericValue,
-  isSequence,
-  isValueNode,
-  normalize,
-  resolveScalar,
-  unwrap,
   type EdgeId,
   type Node,
 } from '@trama/core';
@@ -17,7 +10,6 @@ import {
   selectIsBranchingSlot,
   selectIsContinuousSource,
   selectIsSlotActive,
-  selectSourceExecValue,
 } from '../store/edge-selectors.js';
 import { shapeRegistry } from '../store/registries.js';
 import { getNodeLayout } from '../node/box.js';
@@ -25,7 +17,6 @@ import { resolveDisplayMode } from '../node/display-mode.js';
 import { conditionSourceSlotColor, slotColor } from '../node/slot-palette.js';
 import { useExpressionMeasureStore } from '../expression/expression-measure-store.js';
 import type { FizzexMeasure } from '../expression/use-fizzex-renderer.js';
-import { resolveNodeUnit } from '../util/unit-resolver.js';
 import { type Point } from './geometry.js';
 import { type EdgeHandle } from '../canvas/drag-registry.js';
 import { completeEdgeDraft } from '../canvas/edge-draft-actions.js';
@@ -65,8 +56,6 @@ interface Props {
   introducing?: boolean;
 }
 
-const STRAINED_LOW = tokens.physical.thresholdEdgeStrainedLow;
-const STRAINED_HIGH = tokens.physical.thresholdEdgeStrainedHigh;
 const ARROW_SIZE = 7;
 
 function computeArrowPoints(tip: Point, tangent: Point): string {
@@ -91,18 +80,6 @@ function EdgeViewImpl({
   const toId = edge?.to ?? '';
   const fromNode = modelStore((s) => (fromId ? s.model.nodes[fromId] : undefined));
   const toNode = modelStore((s) => (toId ? s.model.nodes[toId] : undefined));
-  const srcValue = modelStore((s) => {
-    if (!fromId) return 0;
-    const n = s.model.nodes[fromId];
-    const fallback =
-      n && isValueNode(n) && isNumericValue(n.initialValue) ? n.initialValue.n : 0;
-    const ev = selectSourceExecValue(s.executionState, fromId);
-    if (ev && !isSequence(ev)) {
-      const v = unwrap(resolveScalar(ev, s.executionState.simulationTimeMs));
-      if (isNumericValue(v)) return v.n;
-    }
-    return fallback;
-  });
   // 케이블 dashed 시맨틱은 "분기 슬롯의 비활성 케이블" 단일 의미.
   // source 슬롯이 디스크립터에서 branching: true 로 표시되어 있고 (Condition true/
   // false, LogicGate 출력 등) 현재 그 슬롯이 valid 가 아닐 때만 dashed. 평가 결과
@@ -296,20 +273,17 @@ function EdgeViewImpl({
 
   if (!edge || !fromNode || !toNode) return null;
 
-  const norm = isValueNode(fromNode) ? normalize(srcValue, resolveNodeUnit(fromNode)) : 0.5;
   const isFeedback = edge.lag === 1;
-  const isStrained = norm < STRAINED_LOW || norm > STRAINED_HIGH;
   const baseClasses = ['trama-edge'];
   if (isFeedback) baseClasses.push('is-feedback');
-  if (isStrained) baseClasses.push('is-strained');
   if (introducing) baseClasses.push('is-introducing');
   if (isContinuousSource) baseClasses.push('is-continuous');
 
-  const arrowClass = `trama-arrow${isFeedback ? ' is-feedback' : ''}${isStrained ? ' is-strained' : ''}`;
+  const arrowClass = `trama-arrow${isFeedback ? ' is-feedback' : ''}`;
   const groupCls = `trama-edge-group${morphing ? ' is-morphing' : ''}${isDetaching ? ' is-detaching' : ''}${isBranchingInactive ? ' is-branching' : ''}`;
 
   // 멀티슬롯 노드에 연결된 엣지에 슬롯 식별색을 CSS 변수로 부여.
-  // feedback·strained는 styles.css 우선순위로 이 색을 덮어 시맨틱 상태가 우선됨.
+  // feedback은 styles.css 우선순위로 이 색을 덮어 시맨틱 상태가 우선됨.
   //
   // 우선순위: source 가 ConditionNode 면 true/false 의미가 target slot 식별색보다
   // 강하므로 conditionSourceSlotColor 가 먼저. 그 외엔 target 슬롯 식별색.

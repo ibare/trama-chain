@@ -7,7 +7,7 @@ import { tokens } from '@trama/tokens';
  * slot 1..k 에 palette[0..k-1]을 매핑한다. slot ring · 연결 엣지 stroke · 화살촉
  * fill · 식 노드 변수 라벨 텍스트가 같은 색을 공유해 시각 동일성을 만든다.
  *
- * feedback·strained 같은 시맨틱 상태 색은 식별색보다 우선한다 (CSS specificity).
+ * feedback 같은 시맨틱 상태 색은 식별색보다 우선한다 (CSS specificity).
  */
 const PALETTE: readonly string[] = [
   tokens.color.slot1,
