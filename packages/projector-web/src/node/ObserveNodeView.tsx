@@ -76,6 +76,9 @@ function ObserveNodeViewImpl({ id, incomingCount }: Props): JSX.Element | null {
       return booleanValue(currentBoolean);
     return null;
   }, [currentKind, currentNumber, currentBoolean]);
+  // 시간축이 필요한 시각화가 current 를 sample 처럼 다룰 때의 t. primitive 라
+  // selector 가 안정적.
+  const currentT = modelStore((s) => s.executionState.simulationTimeMs);
   const updateNode = modelStore((s) => s.updateNode);
   const outputConnected = useOutputConnected(id, 0);
   const extractionConnected = useOutputConnected(id, 1);
@@ -190,6 +193,7 @@ function ObserveNodeViewImpl({ id, incomingCount }: Props): JSX.Element | null {
             node={node}
             samples={samples}
             current={current}
+            currentT={currentT}
             halfW={observeBody.w / 2}
             halfH={observeBody.h / 2}
             compact={currentMode === 'compact'}

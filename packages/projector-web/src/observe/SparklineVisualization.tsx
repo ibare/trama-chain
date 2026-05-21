@@ -1,6 +1,6 @@
 import { memo, useMemo } from 'react';
 import { curveMonotoneX, line as d3Line } from 'd3-shape';
-import type { Value } from '@trama/core';
+import type { SequenceSample, Value } from '@trama/core';
 import type { ObserveVisualizationRenderProps } from './types.js';
 
 /**
@@ -8,6 +8,11 @@ import type { ObserveVisualizationRenderProps } from './types.js';
  *
  * - numeric: min/max 정규화 후 선 그래프. 마지막 점은 작은 dot으로 강조.
  * - boolean: 디지털 신호기 — 참=상단, 거짓=하단. 값이 바뀌는 순간 수직 전이.
+ *
+ * x 축은 sample.t (simulation time) 기반. windowed capacity 면 도메인을
+ * `[latestT - windowMs, latestT]` 로 고정해 시간 진행에 따라 우→좌 sliding,
+ * unbounded 면 `[firstT, latestT]` 로 전체 fit. 인덱스 등간격 매핑이 아니라
+ * 실제 시간 비례라 push 가 일부 step 에서 스킵돼도 정확한 시점에 점이 찍힌다.
  *
  * 두 ValueKind를 섞은 누적은 시각이 깨지지만 ObserveNode는 단일 source에서만
  * 값을 받는 1:1 구조라 한 버퍼 안에서는 ValueKind가 한 종류로 고정된다 — 첫
@@ -19,10 +24,11 @@ const PAD_Y = 12;
 const PAD_X_COMPACT = 4;
 const PAD_Y_COMPACT = 3;
 
-function pickValueKind(values: Value[], current: Value | null): 'numeric' | 'boolean' | null {
-  for (const v of values) {
-    return v.kind;
-  }
+function pickValueKind(
+  samples: SequenceSample[],
+  current: Value | null,
+): 'numeric' | 'boolean' | null {
+  for (const s of samples) return s.value.kind;
   if (current) return current.kind;
   return null;
 }
@@ -56,15 +62,23 @@ function numericRange(values: number[]): NumericRange {
   return { min, max };
 }
 
+function sameValue(a: Value, b: Value): boolean {
+  if (a.kind !== b.kind) return false;
+  if (a.kind === 'numeric' && b.kind === 'numeric') return a.n === b.n;
+  if (a.kind === 'boolean' && b.kind === 'boolean') return a.b === b.b;
+  return false;
+}
+
 function SparklineImpl({
+  node,
   samples,
   current,
+  currentT,
   halfW,
   halfH,
   compact,
 }: ObserveVisualizationRenderProps): JSX.Element {
-  const sampleValues = useMemo(() => samples.map((s) => s.value), [samples]);
-  const kind = pickValueKind(sampleValues, current);
+  const kind = pickValueKind(samples, current);
 
   const padX = compact ? PAD_X_COMPACT : PAD_X;
   const padY = compact ? PAD_Y_COMPACT : PAD_Y;
@@ -74,21 +88,17 @@ function SparklineImpl({
   const x0 = -halfW + padX;
   const y0 = -halfH + padY;
 
-  // 현재 값을 같이 보여주기 위해 marker 점만 별도 처리 — 버퍼에는 아직 안 들어간
-  // 가장 최근 출력값을 표시 (descriptor가 push하기 전 hot-path에서도 보이도록).
-  const combined: Value[] = useMemo(() => {
-    if (!current) return sampleValues;
-    const tail = sampleValues[sampleValues.length - 1];
-    if (tail && tail.kind === current.kind) {
-      if (tail.kind === 'numeric' && current.kind === 'numeric' && tail.n === current.n) {
-        return sampleValues;
-      }
-      if (tail.kind === 'boolean' && current.kind === 'boolean' && tail.b === current.b) {
-        return sampleValues;
-      }
-    }
-    return [...sampleValues, current];
-  }, [sampleValues, current]);
+  // 현재값을 같이 보여주기 위해 sample 처럼 t 와 함께 붙인다. 버퍼에는 아직
+  // 안 들어간 가장 최근 출력값을 표시 (descriptor 가 push 하기 전 hot-path 에서도
+  // 보이도록). 마지막 sample 과 t 가 같거나 값이 같으면 중복 추가 안 함 —
+  // monotoneX 가 단조 x 를 가정하므로.
+  const combined: SequenceSample[] = useMemo(() => {
+    if (!current) return samples;
+    const tail = samples[samples.length - 1];
+    if (tail && tail.t >= currentT) return samples;
+    if (tail && sameValue(tail.value, current)) return samples;
+    return [...samples, { value: current, t: currentT }];
+  }, [samples, current, currentT]);
 
   if (!kind || combined.length === 0) {
     return (
@@ -106,23 +116,35 @@ function SparklineImpl({
     );
   }
 
+  // x 도메인 — capacity 정책에 따라 분기.
+  //  - windowed: [latestT - windowMs, latestT] 고정. 시간 진행에 따라 그래프가
+  //    우→좌 미끄러진다. push 가 한동안 스킵돼도 새 sample 은 정확한 t 위치에 찍힘.
+  //  - unbounded: [firstT, latestT] 전체 fit. 길수록 x 가 압축되지만 시간 비례 보존.
+  const tLatest = combined[combined.length - 1]?.t ?? currentT;
+  const tFirst = combined[0]?.t ?? tLatest;
+  const tMin =
+    node.capacity.kind === 'windowed'
+      ? tLatest - node.capacity.windowMs
+      : tFirst;
+  const tMax = tLatest;
+  const tSpan = Math.max(tMax - tMin, 1e-9);
+  const scaleX = (t: number): number => x0 + ((t - tMin) / tSpan) * innerW;
+
   if (kind === 'numeric') {
-    const nums: number[] = [];
-    for (const v of combined) {
-      if (v.kind === 'numeric' && Number.isFinite(v.n)) nums.push(v.n);
-    }
-    if (nums.length === 0) {
+    const finiteSamples = combined.filter(
+      (s): s is SequenceSample & { value: Extract<Value, { kind: 'numeric' }> } =>
+        s.value.kind === 'numeric' && Number.isFinite(s.value.n),
+    );
+    if (finiteSamples.length === 0) {
       return <g className="trama-observe-vis-sparkline is-empty" />;
     }
-    const { min, max } = numericRange(nums);
+    const { min, max } = numericRange(finiteSamples.map((s) => s.value.n));
     const span = max - min;
-    const stepX = nums.length > 1 ? innerW / (nums.length - 1) : 0;
-    const points = nums.map((n, i) => {
-      const x = x0 + i * stepX;
-      // y는 위가 -, 아래가 + — 큰 값이 위로 가도록 반전.
-      const y = y0 + innerH - ((n - min) / span) * innerH;
-      return { x, y };
-    });
+    const points = finiteSamples.map((s) => ({
+      x: scaleX(s.t),
+      // y 는 위가 -, 아래가 + — 큰 값이 위로 가도록 반전.
+      y: y0 + innerH - ((s.value.n - min) / span) * innerH,
+    }));
     const path = sparkLineGen(points) ?? '';
     const last = points[points.length - 1]!;
     return (
@@ -139,27 +161,26 @@ function SparklineImpl({
   }
 
   // boolean: 디지털 신호기. 참=상단 line, 거짓=하단 line. 값 변경 시 수직 전이.
-  const bools: boolean[] = [];
-  for (const v of combined) {
-    if (v.kind === 'boolean') bools.push(v.b);
-  }
-  if (bools.length === 0) {
+  const boolSamples = combined.filter(
+    (s): s is SequenceSample & { value: Extract<Value, { kind: 'boolean' }> } =>
+      s.value.kind === 'boolean',
+  );
+  if (boolSamples.length === 0) {
     return <g className="trama-observe-vis-sparkline is-empty" />;
   }
   const yHigh = y0 + innerH * 0.2;
   const yLow = y0 + innerH * 0.8;
-  const stepX = bools.length > 1 ? innerW / (bools.length - 1) : 0;
   const segs: string[] = [];
-  bools.forEach((b, i) => {
-    const x = x0 + i * stepX;
-    const y = b ? yHigh : yLow;
+  boolSamples.forEach((s, i) => {
+    const x = scaleX(s.t);
+    const y = s.value.b ? yHigh : yLow;
     if (i === 0) {
       segs.push(`M ${x.toFixed(2)} ${y.toFixed(2)}`);
       return;
     }
-    const prevB = bools[i - 1]!;
-    if (prevB !== b) {
-      const prevY = prevB ? yHigh : yLow;
+    const prev = boolSamples[i - 1]!;
+    if (prev.value.b !== s.value.b) {
+      const prevY = prev.value.b ? yHigh : yLow;
       segs.push(`L ${x.toFixed(2)} ${prevY.toFixed(2)}`);
       segs.push(`L ${x.toFixed(2)} ${y.toFixed(2)}`);
     } else {

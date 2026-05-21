@@ -22,6 +22,9 @@ export interface ObserveVisualizationRenderProps {
   samples: SequenceSample[];
   /** 현재 step 출력 값. 누적 버퍼가 비어 있어도 invalid가 아니면 들어온다. */
   current: Value | null;
+  /** 현재 step 의 simulation time (ms). 시간축이 필요한 시각이 current 를 sample
+   *  처럼 다룰 때의 t. paused 상태라면 직전 step 의 t 가 그대로 유지된다. */
+  currentT: number;
   halfW: number;
   halfH: number;
   /** compact 모드 여부. 시각화는 자체 폰트/패딩을 이 값에 맞게 줄여야 한다. */
