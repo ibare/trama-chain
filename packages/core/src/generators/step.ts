@@ -31,4 +31,7 @@ export const stepParadigm: GeneratorParadigm<
   }),
   peek: (params, _cursor, simulationTimeMs) =>
     simulationTimeMs < params.startMs ? undefined : numericValue(params.value, 'free'),
+  // 시간의 순수 함수 — cursor 상태 없음. freeze 동안 sim 시간이 흘러도 emit 이
+  // simulationTimeMs vs params.startMs 만으로 결정한다.
+  resyncCursor: (cursor) => cursor,
 };

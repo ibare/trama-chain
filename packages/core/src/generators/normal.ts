@@ -50,6 +50,10 @@ export const normalParadigm: GeneratorParadigm<
     const { z } = boxMullerZ0(cursor.prngState);
     return numericValue(params.mean + params.stdev * z, 'free');
   },
+  resyncCursor: (cursor, simulationTimeMs) => ({
+    ...cursor,
+    nextFireMs: Math.max(cursor.nextFireMs, simulationTimeMs),
+  }),
 };
 
 /**

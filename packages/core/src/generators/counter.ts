@@ -47,4 +47,8 @@ export const counterParadigm: GeneratorParadigm<
     simulationTimeMs < cursor.nextFireMs
       ? undefined
       : numericValue(cursor.nextValue, 'free'),
+  resyncCursor: (cursor, simulationTimeMs) => ({
+    ...cursor,
+    nextFireMs: Math.max(cursor.nextFireMs, simulationTimeMs),
+  }),
 };

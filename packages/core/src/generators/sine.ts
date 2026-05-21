@@ -47,6 +47,9 @@ export const sineParadigm: GeneratorParadigm<
   }),
   peek: (params) =>
     functionHandle((t) => numericValue(sampleAt(params, t), 'free')),
+  // 시간의 순수 함수 — cursor 에 시간 상태 없음. freeze 동안 sim 시간이 흘렀어도
+  // emit 이 t 를 직접 받아 결정하므로 cursor 동기화 불필요.
+  resyncCursor: (cursor) => cursor,
 };
 
 /** y(t) — t는 simulationTimeMs(ms). omega는 rad/s이므로 t/1000으로 환산. */

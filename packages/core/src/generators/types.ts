@@ -113,4 +113,22 @@ export interface GeneratorParadigm<
     cursor: C,
     simulationTimeMs: number,
   ): Value | FunctionHandle | undefined;
+  /**
+   * gate=false 로 freeze 된 동안 simulationTimeMs 가 흐른 뒤, gate 가 다시 열리기
+   * 전에 cursor 의 시간 필드를 sim 시간에 동기화한다. drift-free 스케줄(nextFireMs
+   * += interval) paradigm 은 이 hook 없이 freeze 시 nextFireMs 가 그대로 멈추므로,
+   * gate 해제 시 cursor.nextFireMs 가 simulationTimeMs 보다 한참 뒤처져 매 tick
+   * 마다 emit 이 폭주한다 (catch-up burst).
+   *
+   * - drift-free 스케줄 paradigm (counter/uniform/normal/pulse): `Math.max(
+   *   cursor.nextFireMs, simulationTimeMs)` 으로 끌어올린다. gate 해제 시점부터
+   *   새 스케줄이 시작되며, freeze 중 누락된 발화는 폐기.
+   * - 시간의 순수 함수 paradigm (sine/step/schedule): cursor 에 시간 상태가 없어
+   *   identity `(c) => c` 가 정답. freeze 동안에도 sim 시간이 흐른다는 사실은
+   *   t 가 직접 결정한다.
+   *
+   * **required** — 신규 paradigm 작성 시 이 결정을 반드시 마주치게 하기 위함.
+   * "내 cursor 는 sim 시간 흐름에 영향받는가?" 의 답을 코드 위에 명시.
+   */
+  resyncCursor(cursor: C, simulationTimeMs: number): C;
 }

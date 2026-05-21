@@ -48,6 +48,10 @@ export const uniformParadigm: GeneratorParadigm<
     const { r } = nextMulberry(cursor.prngState);
     return numericValue(mapR(r, params), 'free');
   },
+  resyncCursor: (cursor, simulationTimeMs) => ({
+    ...cursor,
+    nextFireMs: Math.max(cursor.nextFireMs, simulationTimeMs),
+  }),
 };
 
 /** [0,1) r을 params 범위로 매핑. emit·peek 공통 경로. */

@@ -39,6 +39,9 @@ export const scheduleParadigm: GeneratorParadigm<
     const v = sampleAt(params, simulationTimeMs);
     return v === undefined ? undefined : numericValue(v, 'free');
   },
+  // 시간의 순수 함수 — cursor 상태 없음. freeze 동안 sim 시간이 흘러도 sampleAt(t)
+  // 가 직접 결정.
+  resyncCursor: (cursor) => cursor,
 };
 
 /**

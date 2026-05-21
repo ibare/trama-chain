@@ -109,9 +109,20 @@ export function createSimulationLoop(deps: SimulationLoopDeps): SimulationLoop {
     for (const nid in executionState.generatorRuntime) {
       const rt = executionState.generatorRuntime[nid];
       if (!rt) continue;
-      if (!isGeneratorEffectivelyEnabled(model, executionState, nid)) continue;
       const node = model.nodes[nid];
       if (!node || !isGeneratorNode(node)) continue;
+      if (!isGeneratorEffectivelyEnabled(model, executionState, nid)) {
+        // freeze 동안에도 cursor 의 시간 필드는 sim 시간에 동기화 — gate 해제 시
+        // drift-free 스케줄 paradigm 이 catch-up 폭주하지 않도록 paradigm 에 위임.
+        // gateOpen 캐시는 펄스 도착 시점에만 갱신되므로 여기서는 건드리지 않는다.
+        const resynced = defaultGeneratorRegistry.resyncCursor(
+          node.params,
+          rt.cursor,
+          nextSimulationTimeMs,
+        );
+        newRuntime[nid] = { cursor: resynced, gateOpen: rt.gateOpen };
+        continue;
+      }
       const { value, nextCursor } = defaultGeneratorRegistry.emit(
         node.params,
         rt.cursor,

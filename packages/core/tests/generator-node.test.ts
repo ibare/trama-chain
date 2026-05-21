@@ -863,3 +863,102 @@ describe('GeneratorRegistry', () => {
     expect(out.value).toEqual(numericValue(100, 'free'));
   });
 });
+
+describe('GeneratorParadigm — resyncCursor (freeze 후 catch-up 폭주 방지)', () => {
+  // 시나리오: gate=false 로 1초 freeze 한 사이 sim 시간만 3초 진행. resync 없으면
+  // 다음 emit 호출들에서 cursor.nextFireMs ≪ sim 시간 → 매 tick 발화로 catch-up.
+  // resync 후 cursor.nextFireMs 는 sim 시간으로 끌어올려져 한 tick 한 번만 발화.
+  it('counter: resync 후 nextFireMs 가 sim 시간으로 점프', () => {
+    const c0 = counterParadigm.initCursor({ kind: 'counter', start: 0, step: 1 }, 0);
+    // 1초까지 정상 발화로 cursor 진행.
+    let c = c0;
+    for (let t = 0; t < 1000; t += FIRE_INTERVAL_MS) {
+      c = counterParadigm.emit({ kind: 'counter', start: 0, step: 1 }, c, t).nextCursor;
+    }
+    expect(c.nextFireMs).toBeGreaterThan(900);
+    // freeze 동안 sim 시간이 4000ms 까지 진행. resync 호출.
+    const resynced = counterParadigm.resyncCursor(c, 4000);
+    expect(resynced.nextFireMs).toBe(4000);
+    expect(resynced.nextValue).toBe(c.nextValue); // 값 진행은 보존
+  });
+
+  it('uniform: resync 가 prngState 는 보존하고 nextFireMs 만 끌어올림', () => {
+    const c = { kind: 'uniform' as const, prngState: 7777, nextFireMs: 500 };
+    const r = uniformParadigm.resyncCursor(c, 3000);
+    expect(r.prngState).toBe(7777);
+    expect(r.nextFireMs).toBe(3000);
+  });
+
+  it('normal: resync 가 prngState 는 보존하고 nextFireMs 만 끌어올림', () => {
+    const c = { kind: 'normal' as const, prngState: 4242, nextFireMs: 800 };
+    const r = normalParadigm.resyncCursor(c, 5000);
+    expect(r.prngState).toBe(4242);
+    expect(r.nextFireMs).toBe(5000);
+  });
+
+  it('pulse: resync 가 nextFireMs 만 끌어올림', () => {
+    const c = { kind: 'pulse' as const, nextFireMs: 100 };
+    const r = pulseParadigm.resyncCursor(c, 2500);
+    expect(r.nextFireMs).toBe(2500);
+  });
+
+  it('sim 시간이 cursor 보다 뒤이면 resync 는 no-op (Math.max 시맨틱)', () => {
+    const c = { kind: 'uniform' as const, prngState: 7777, nextFireMs: 5000 };
+    const r = uniformParadigm.resyncCursor(c, 1000);
+    expect(r.nextFireMs).toBe(5000);
+  });
+
+  it('sine/step/schedule: identity — cursor 그대로 반환', () => {
+    expect(sineParadigm.resyncCursor({ kind: 'sine' }, 9999)).toEqual({ kind: 'sine' });
+    expect(stepParadigm.resyncCursor({ kind: 'step' }, 9999)).toEqual({ kind: 'step' });
+    expect(scheduleParadigm.resyncCursor({ kind: 'schedule' }, 9999)).toEqual({
+      kind: 'schedule',
+    });
+  });
+
+  it('catch-up 폭주 회귀: freeze 후 sim 시간 4초 점프, 다음 한 tick에 한 번만 emit', () => {
+    const params = { kind: 'counter' as const, start: 0, step: 1 };
+    let c = counterParadigm.initCursor(params, 0);
+    // t=0 한 번 발화.
+    const first = counterParadigm.emit(params, c, 0);
+    c = first.nextCursor;
+    expect(first.value).toEqual(numericValue(0, 'free'));
+    // freeze (gate=false) 동안 sim 시간 4000ms 까지 진행 — 호스트가 emit 호출 안 함.
+    // 대신 resync 만 호출.
+    c = counterParadigm.resyncCursor(c, 4000);
+    // gate 해제 시점 (sim=4000) 에 다음 발화.
+    const second = counterParadigm.emit(params, c, 4000);
+    expect(second.value).toEqual(numericValue(1, 'free'));
+    // 같은 tick 안에서 또 emit 시도하면 freeze (다음 nextFireMs 가 4000+FIRE_INTERVAL_MS
+    // 로 갱신됐기 때문) — catch-up 폭주 없음.
+    const sameTick = counterParadigm.emit(params, second.nextCursor, 4000);
+    expect(sameTick.value).toBeUndefined();
+  });
+});
+
+describe('GeneratorRegistry — resyncCursor', () => {
+  it('routes to paradigm resyncCursor by params.kind', () => {
+    const reg = createDefaultGeneratorRegistry();
+    const cursor = { kind: 'uniform' as const, prngState: 1, nextFireMs: 100 };
+    const r = reg.resyncCursor(
+      { kind: 'uniform', min: 0, max: 1, integer: false, seed: 1 },
+      cursor,
+      3000,
+    );
+    expect(r.kind).toBe('uniform');
+    if (r.kind === 'uniform') expect(r.nextFireMs).toBe(3000);
+  });
+
+  it('kind mismatch 시 emit/peek 와 동일하게 cursor 재초기화 후 위임', () => {
+    const reg = createDefaultGeneratorRegistry();
+    // pulse params + counter cursor → pulse paradigm 의 initCursor(t) 결과를 resync 한 값.
+    const r = reg.resyncCursor(
+      { kind: 'pulse', periodMs: 100, value: 1 },
+      { kind: 'counter', nextValue: 0, nextFireMs: 50 },
+      2000,
+    );
+    expect(r.kind).toBe('pulse');
+    // initCursor(2000) → nextFireMs=2000, resync(2000) → 그대로 2000.
+    if (r.kind === 'pulse') expect(r.nextFireMs).toBe(2000);
+  });
+});

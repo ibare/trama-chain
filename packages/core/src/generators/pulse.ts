@@ -44,4 +44,8 @@ export const pulseParadigm: GeneratorParadigm<
   },
   peek: (params, cursor, simulationTimeMs) =>
     simulationTimeMs < cursor.nextFireMs ? undefined : numericValue(params.value, 'free'),
+  resyncCursor: (cursor, simulationTimeMs) => ({
+    ...cursor,
+    nextFireMs: Math.max(cursor.nextFireMs, simulationTimeMs),
+  }),
 };

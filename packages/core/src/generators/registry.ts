@@ -64,6 +64,28 @@ export class GeneratorRegistry {
         : p.initCursor(params as never, simulationTimeMs);
     return p.peek(params as never, c as never, simulationTimeMs);
   }
+
+  /**
+   * gate=false freeze 동안 sim 시간이 흐른 뒤, gate 가 다시 열리기 전에 cursor 의
+   * 시간 필드를 sim 시간에 동기화. drift-free 스케줄 paradigm 의 catch-up burst
+   * 를 막는 단일 위임 지점 — ticker (simulation-loop) 와 descriptor (propagate)
+   * 가 모두 이 메서드를 호출한다.
+   */
+  resyncCursor(
+    params: GeneratorParams,
+    cursor: GeneratorCursor,
+    simulationTimeMs: number,
+  ): GeneratorCursor {
+    const p = this.map.get(params.kind);
+    if (!p) throw new Error(`GeneratorRegistry: unknown paradigm "${params.kind}"`);
+    // emit·peek 와 동일한 정합 규칙 — params.kind 와 cursor.kind 가 어긋나면
+    // 재초기화. resync 자체가 의미 없으므로 freshly init 된 cursor 를 그대로 돌려준다.
+    const c =
+      cursor.kind === params.kind
+        ? cursor
+        : p.initCursor(params as never, simulationTimeMs);
+    return p.resyncCursor(c as never, simulationTimeMs);
+  }
 }
 
 export function createDefaultGeneratorRegistry(): GeneratorRegistry {

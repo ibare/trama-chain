@@ -83,8 +83,15 @@ export const generatorNodeDescriptor: NodeKindDescriptor<
       ctx.incoming.length === 0 ? true : gateOpen === true;
 
     if (!effectivelyEnabled) {
-      // 비활성(freeze)이어도 gateOpen은 최신 source 상태로 갱신해 둔다.
-      ctx.advanceGeneratorCursor(node.id, { cursor: runtime.cursor, gateOpen });
+      // 비활성(freeze)이어도 gateOpen은 최신 source 상태로 갱신해 둔다. 그리고
+      // cursor 의 시간 필드는 sim 시간에 동기화 — drift-free 스케줄 paradigm 이
+      // gate 해제 시점에 catch-up 폭주하지 않도록 paradigm 에 위임.
+      const resynced = ctx.generatorRegistry.resyncCursor(
+        node.params,
+        runtime.cursor,
+        ctx.simulationTimeMs,
+      );
+      ctx.advanceGeneratorCursor(node.id, { cursor: resynced, gateOpen });
       return;
     }
     const { value, nextCursor } = ctx.generatorRegistry.emit(
