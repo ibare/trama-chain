@@ -1,5 +1,6 @@
 import { useTrama } from '../store/trama-instance.js';
 import { PhosphorIcon } from '../icon/phosphor.js';
+import { FpsChip } from './FpsChip.js';
 
 /**
  * 전역 미니 플레이어 — 우상단 부동 패널.
@@ -100,6 +101,7 @@ export function MiniPlayer(): JSX.Element {
           <PhosphorIcon name="plus" size={18} />
         </button>
       )}
+      <FpsChip />
     </div>
   );
 }

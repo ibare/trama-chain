@@ -138,6 +138,25 @@
     background: var(--color-node-fill-calm);
 }
 
+[data-trama-root] .trama-mini-player-fps-chip {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    box-sizing: border-box;
+    height: 28px;
+    border: 1px solid var(--color-node-stroke-calm);
+    border-radius: var(--spacing-radius-pill);
+    padding: 0 10px;
+    font-family: inherit;
+    font-size: var(--typography-text-picker-label);
+    line-height: 1;
+    font-variant-numeric: tabular-nums;
+    color: var(--color-node-text-low);
+    min-width: 6ch;
+    text-align: center;
+    user-select: none;
+}
+
 /* Question header */
 [data-trama-root] .trama-question {
     position: absolute;
