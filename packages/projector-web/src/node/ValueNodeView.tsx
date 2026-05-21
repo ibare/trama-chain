@@ -14,7 +14,7 @@ import { combinerRegistry } from '../store/registries.js';
 import { formatNodeValue } from '../util/format.js';
 import { resolveNodeUnit } from '../util/unit-resolver.js';
 import { useNodeLayout } from './use-node-layout.js';
-import type { NodeLayout } from './box.js';
+import type { NodeLayout } from '@trama/layout';
 import { resolveDisplayMode, supportsDisplayModeToggle } from './display-mode.js';
 import { ValueNodeSlider } from './ValueNodeSlider.js';
 import { NodeFrame } from './NodeFrame.js';

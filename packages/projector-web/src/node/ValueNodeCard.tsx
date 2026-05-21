@@ -6,7 +6,7 @@ import { formatNodeValue } from '../util/format.js';
 import { NodeBody } from './NodeBody.js';
 import { NodeLabel } from './NodeLabel.js';
 import { InteractiveArea } from './InteractiveArea.js';
-import type { NodeLayout } from './box.js';
+import type { NodeLayout } from '@trama/layout';
 
 interface Props {
   node: ValueNode;

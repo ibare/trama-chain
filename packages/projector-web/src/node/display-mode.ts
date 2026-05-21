@@ -9,7 +9,7 @@ import {
   isValueNode,
   type Node,
 } from '@trama/core';
-import type { NodeDisplayMode } from './box.js';
+import type { NodeDisplayMode } from '@trama/layout';
 
 /**
  * 노드 종류별 기본 디스플레이 모드 매핑.

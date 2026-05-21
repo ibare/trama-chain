@@ -12,7 +12,7 @@ import {
   selectIsSlotActive,
 } from '../store/edge-selectors.js';
 import { shapeRegistry } from '../store/registries.js';
-import { getNodeLayout } from '../node/box.js';
+import { getNodeLayout } from '@trama/layout';
 import { resolveDisplayMode } from '../node/display-mode.js';
 import { conditionSourceSlotColor, slotColor } from '../node/slot-palette.js';
 import { useExpressionMeasureStore } from '../expression/expression-measure-store.js';

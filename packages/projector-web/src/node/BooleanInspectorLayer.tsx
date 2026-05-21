@@ -1,7 +1,7 @@
 import { useMemo, useSyncExternalStore } from 'react';
 import { isValueNode } from '@trama/core';
 import { useTrama } from '../store/index.js';
-import { getNodeLayout } from './box.js';
+import { getNodeLayout } from '@trama/layout';
 import { resolveDisplayMode } from './display-mode.js';
 import { BooleanInspector } from './BooleanInspector.js';
 import { TramaPopover } from '../util/TramaPopover.js';

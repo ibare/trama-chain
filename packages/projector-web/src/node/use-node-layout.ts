@@ -1,6 +1,6 @@
 import { useMemo } from 'react';
 import type { Node } from '@trama/core';
-import { getNodeLayout, type NodeDisplayMode, type NodeLayout } from './box.js';
+import { getNodeLayout, type NodeDisplayMode, type NodeLayout } from '@trama/layout';
 
 interface Options {
   incomingCount: number;

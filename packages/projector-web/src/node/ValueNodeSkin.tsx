@@ -1,7 +1,7 @@
 import { memo, Suspense, type LazyExoticComponent } from 'react';
 import type { ValueNode, ResolvedUnit } from '@trama/core';
 import type { NumericSkinComponent } from '../skin/types.js';
-import type { NodeLayout } from './box.js';
+import type { NodeLayout } from '@trama/layout';
 
 interface Props {
   node: ValueNode;

@@ -6,7 +6,7 @@ import {
   isValueNode,
 } from '@trama/core';
 import { useTrama } from '../store/index.js';
-import { getNodeLayout } from './box.js';
+import { getNodeLayout } from '@trama/layout';
 import { resolveDisplayMode } from './display-mode.js';
 import { UnitInspector } from './UnitInspector.js';
 import { ObserveInspector } from './ObserveInspector.js';
