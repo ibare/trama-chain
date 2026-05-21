@@ -246,6 +246,59 @@ describe('ObserveNode', () => {
     }
   });
 
+  it('sequence source: echoes upstream extraction to slot 0 + slot 1 without re-accumulation', () => {
+    // mon1 이 src 의 스칼라를 누적해 slot 1 로 sequence 발사 → mon2 가 그 sequence
+    // 를 입력으로 받는다. mon2 는 sequence echo 모드 — observeBuffer 누적 없이
+    // 본체 slot 0 에 source sequence 그대로 통과.
+    let m = createEmptyModel(0);
+    m = addConstantNode(
+      m,
+      { id: 'k', label: 'k', value: numericValue(1, 'free') },
+      0,
+    );
+    m = addObserveNode(
+      m,
+      { id: 'mon1', label: 'mon1', capacity: { kind: 'unbounded' } },
+      0,
+    );
+    m = addObserveNode(
+      m,
+      { id: 'mon2', label: 'mon2', capacity: { kind: 'unbounded' } },
+      0,
+    );
+    m = addEdge(m, { from: 'k', to: 'mon1', shape: { kind: 'none', params: {} } }, 0);
+    m = addEdge(
+      m,
+      { from: 'mon1', to: 'mon2', sourceSlotIndex: 1, shape: { kind: 'none', params: {} } },
+      0,
+    );
+
+    let state = initializeFromInitialValues(m);
+    for (let i = 1; i <= 3; i++) {
+      const k = m.nodes['k']!;
+      if (k.kind === 'constant') {
+        m = {
+          ...m,
+          nodes: { ...m.nodes, k: { ...k, value: numericValue(i, 'free') } },
+        };
+      }
+      state = propagateOneStep(state, m, {
+        shapeRegistry: shapes,
+        combinerRegistry: combiners,
+      });
+    }
+
+    // mon2 의 본체(slot 0) 는 source sequence 그대로 통과 — mon1 의 누적이 그대로.
+    const mon2Ev = state.values['mon2'];
+    expect(mon2Ev?.kind).toBe('sequence');
+    if (mon2Ev?.kind === 'sequence') {
+      expect(mon2Ev.samples.map((s) => (s.value.kind === 'numeric' ? s.value.n : null))).toEqual([1, 2, 3]);
+    }
+    // mon2 의 observeBuffer 는 누적되지 않는다 — sequence source 는 source 자체가 누적.
+    expect(state.observeBuffers['mon2']).toBeUndefined();
+    expect(state.validOutputs.has('mon2:0')).toBe(true);
+  });
+
   it('invalid output when source becomes invalid', () => {
     let m = createEmptyModel(0);
     m = addConstantNode(

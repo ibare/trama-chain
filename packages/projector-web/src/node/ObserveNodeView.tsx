@@ -43,9 +43,18 @@ function ObserveNodeViewImpl({ id, incomingCount }: Props): JSX.Element | null {
   const buffer: ObserveBuffer | undefined = modelStore(
     (s) => s.executionState.observeBuffers[id],
   );
+  // sequence source 면 본체 자체가 sample 시퀀스이므로 누적 버퍼 대신 source
+  // SequenceValue 의 samples 를 그대로 노출한다. ref 안정성은 propagate 가 매 step
+  // 새 SequenceValue 객체를 만드므로 step 단위 갱신만 발생.
+  const sourceSequenceSamples = modelStore((s) => {
+    const ev = s.executionState.values[id];
+    return ev && isSequence(ev) ? ev.samples : null;
+  });
   const samples = useMemo(
-    () => (buffer ? observeBufferToArray(buffer) : EMPTY_SAMPLES),
-    [buffer],
+    () =>
+      sourceSequenceSamples ??
+      (buffer ? observeBufferToArray(buffer) : EMPTY_SAMPLES),
+    [buffer, sourceSequenceSamples],
   );
   // 누적 버퍼는 Value[] 그대로지만 current 는 ExecValue 가 들어올 수 있다 —
   // 시각화는 alue 만 보면 충분하므로 unwrap 후 노출. FunctionHandle.peek 은 매 호출

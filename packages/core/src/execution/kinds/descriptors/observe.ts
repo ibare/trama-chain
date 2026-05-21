@@ -23,6 +23,7 @@ import {
   passthroughSourceSpec,
 } from '../internals.js';
 import { isSequencePortSpec } from '../port-spec.js';
+import { getOutputSlots } from '../queries.js';
 
 /**
  * ObserveNode 디스크립터 — 입력값을 그대로 출력으로 통과시키는 모니터.
@@ -45,13 +46,14 @@ export const observeNodeDescriptor: NodeKindDescriptor<Extract<Node, { kind: 'ob
   initialValue: () => undefined,
   initialValidSlots: () => [],
   inputAccepts: (node, ctx) => [passthroughSourceSpec(node, ctx)],
-  // 슬롯 0: 스칼라 passthrough(본체). 슬롯 1: 누적 추출 sequence.
-  //   element kind 는 본체 passthrough spec.value 와 같다 — 본체가 numeric 이면
-  //   추출 sample 도 numeric.
+  // 슬롯 0: source passthrough(본체) — scalar 든 sequence 든 source spec 그대로.
+  // 슬롯 1: 누적 추출 sequence. scalar source 면 본체가 한 step 한 sample 씩 쌓는
+  //   누적 본체이고, sequence source 면 본체 자체가 누적이므로 source sequence 를
+  //   그대로 echo 한다 — 두 경우 모두 element kind 는 source 의 element/value.
   outputSlots: (node, ctx) => {
     const bodySpec = passthroughSourceSpec(node, ctx);
     const elementKind: ValueKind = isSequencePortSpec(bodySpec)
-      ? 'numeric'
+      ? bodySpec.element
       : bodySpec.value;
     return [
       { index: 0, ...bodySpec },
@@ -64,37 +66,68 @@ export const observeNodeDescriptor: NodeKindDescriptor<Extract<Node, { kind: 'ob
   },
   outputUnit: () => FREE_FALLBACK,
   propagate: (node, ctx) => {
+    const bodySlotKey = outputKey(node.id, 0);
     const extractionSlotKey = outputKey(node.id, 1);
     const edge = ctx.incoming[0];
     if (!edge) {
-      ctx.setSlotInvalid(outputKey(node.id, 0));
+      ctx.setSlotInvalid(bodySlotKey);
       // 누적 추출은 본체가 stall 해도 이전 누적 스냅샷을 유지한다 — 다운스트림
       // 통계 노드가 마지막으로 보았던 분포를 잃지 않게. valid 도 그대로.
       return;
     }
     if (!isEdgeSourceValid(ctx, edge)) {
-      ctx.setSlotInvalid(outputKey(node.id, 0));
+      ctx.setSlotInvalid(bodySlotKey);
+      return;
+    }
+    const sourceNode = ctx.model.nodes[edge.from];
+    const srcSlot = edge.sourceSlotIndex ?? 0;
+    // source slot 이 sequence 채널이면 sequenceNext 에서 SequenceValue 를 꺼내
+    // 본체에 echo 한다. 본체 자체가 이미 (value, t) sample 의 누적 — observeBuffer
+    // 에 별도 누적은 하지 않고 (source 가 단일 원천), slot 0 / slot 1 양쪽에
+    // 그대로 흘려보낸다. ctx.next 와 sequenceNext 둘 다 채워야 다운스트림이
+    // 두 채널 어느쪽으로 읽어도 일관되게 본다.
+    const sourceSpec = sourceNode
+      ? getOutputSlots(sourceNode, ctx.nodeKindRegistry, ctx.model)[srcSlot]
+      : undefined;
+    if (sourceSpec && isSequencePortSpec(sourceSpec)) {
+      const seqKey = outputKey(edge.from, srcSlot);
+      const seq = ctx.sequenceNext[seqKey];
+      if (!seq) {
+        ctx.setSlotInvalid(bodySlotKey);
+        return;
+      }
+      if (ctx.paused) return;
+      ctx.next[node.id] = seq;
+      ctx.emitSequence(bodySlotKey, seq);
+      const extraction = node.extraction;
+      const lastEmit =
+        ctx.observeExtractionRuntime[node.id]?.lastEmitTimeMs ?? -Infinity;
+      const shouldEmit =
+        extraction.kind === 'realtime' ||
+        ctx.simulationTimeMs - lastEmit >= extraction.intervalMs;
+      if (shouldEmit) {
+        ctx.emitSequence(extractionSlotKey, seq);
+        ctx.markExtractionEmitted(node.id, ctx.simulationTimeMs);
+      }
       return;
     }
     // 메타 보존 passthrough — source 가 WrappedValue 면 알맹이만 inverted 변환 후
     // 메타를 재부착해 흘려보낸다. 평탄한 Value 면 기존 동작 그대로.
-    const sourceNode = ctx.model.nodes[edge.from];
     const fallback: Value | undefined =
       sourceNode && isValueNode(sourceNode) ? sourceNode.initialValue : undefined;
     const sourceEv: ExecValue | undefined = ctx.next[edge.from] ?? fallback;
     if (!sourceEv) {
-      ctx.setSlotInvalid(outputKey(node.id, 0));
+      ctx.setSlotInvalid(bodySlotKey);
       return;
     }
-    // ObserveNode 는 스칼라만 passthrough — sequence source 는 port-compat 단계의
-    // 별도 처리(차후 Phase) 대상. 안전망으로 무효 처리. FunctionHandle 은 ctx
-    // 시각의 peek로 환원해 메타 없는 스칼라처럼 처리한다.
+    // 안전망: scalar PortSpec advertise 인데 sourceEv 가 sequence (예: source 가
+    // sequence 와 scalar slot 을 함께 가진 노드의 spec 미정합). 본체 invalid.
     if (isSequence(sourceEv)) {
-      ctx.setSlotInvalid(outputKey(node.id, 0));
+      ctx.setSlotInvalid(bodySlotKey);
       return;
     }
-    // 멈춤 상태: invalid 분기(엣지 없음·source invalid·sequence)는 위에서 즉시
-    // 반영하고, passthrough 갱신과 observeBuffer 누적만 보류 — 펄스 도착으로만 진행.
+    // 멈춤 상태: invalid 분기(엣지 없음·source invalid)는 위에서 즉시 반영하고,
+    // passthrough 갱신과 observeBuffer 누적만 보류 — 펄스 도착으로만 진행.
     if (ctx.paused) return;
     const inner: Value = unwrap(resolveScalar(sourceEv, ctx.simulationTimeMs));
     const innerOut: Value =
@@ -106,7 +139,7 @@ export const observeNodeDescriptor: NodeKindDescriptor<Extract<Node, { kind: 'ob
     const passed: ExecValue =
       sourceEv.kind === 'wrapped' ? wrap(innerOut, sourceEv.meta) : innerOut;
     ctx.next[node.id] = passed;
-    ctx.setSlotValid(outputKey(node.id, 0));
+    ctx.setSlotValid(bodySlotKey);
 
     // observeBuffer 에는 (value, t) sample 로 누적 — t 는 현 step 의 simulation time.
     // 메타는 시각화/통계 모두 알맹이만 보면 충분하므로 메타 분리 후 알맹이만 박제.

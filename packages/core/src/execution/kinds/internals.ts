@@ -84,8 +84,9 @@ export function capacityMatches(
  * ObserveNode passthrough 의 source spec 미러링 헬퍼.
  * 입력 엣지가 없거나 source 가 사라졌으면 보수적인 numeric 폴백.
  *
- * source 의 출력 슬롯 spec(value + meta) 을 그대로 가져와 ObserveNode 의
- * 입출력 모두에 동일하게 반영 — passthrough 의 핵심 의미.
+ * source 의 출력 슬롯 spec(value + meta + sequence) 을 그대로 가져와
+ * ObserveNode 의 입출력 모두에 동일하게 반영. scalar 든 sequence 든 대칭.
+ * ObserveNode 가 "트라마가 만드는 모든 데이터" 의 관찰자라는 보편성의 진입점.
  */
 export function passthroughSourceSpec(
   node: Extract<Node, { kind: 'observe' }>,
@@ -100,9 +101,9 @@ export function passthroughSourceSpec(
   const sourceSlots = getOutputSlots(source, ctx.registry, ctx.model);
   const slot = sourceSlots[srcSlot] ?? sourceSlots[0];
   if (!slot) return { value: 'numeric' };
-  // ObserveNode 본체는 스칼라 passthrough — sequence source 는 port-compat 가
-  // 차단해야 정상이지만, 그 결과까지 미러링하지 않는다. 보수적 폴백.
-  if (isSequencePortSpec(slot)) return { value: 'numeric' };
+  if (isSequencePortSpec(slot)) {
+    return { kind: 'sequence', element: slot.element };
+  }
   return slot.meta !== undefined
     ? { value: slot.value, meta: slot.meta }
     : { value: slot.value };

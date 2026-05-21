@@ -19,7 +19,7 @@ export interface ObserveVisualizationRenderProps {
    * 시간축이 필요 없는 시각은 `s.value` 만 보고, sparkline 같이 시간 분포가
    * 필요한 시각은 t 까지 사용.
    */
-  samples: SequenceSample[];
+  samples: readonly SequenceSample[];
   /** 현재 step 출력 값. 누적 버퍼가 비어 있어도 invalid가 아니면 들어온다. */
   current: Value | null;
   /** 현재 step 의 simulation time (ms). 시간축이 필요한 시각이 current 를 sample

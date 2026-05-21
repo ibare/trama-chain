@@ -25,7 +25,7 @@ const PAD_X_COMPACT = 4;
 const PAD_Y_COMPACT = 3;
 
 function pickValueKind(
-  samples: SequenceSample[],
+  samples: readonly SequenceSample[],
   current: Value | null,
 ): 'numeric' | 'boolean' | null {
   for (const s of samples) return s.value.kind;
@@ -92,7 +92,7 @@ function SparklineImpl({
   // 안 들어간 가장 최근 출력값을 표시 (descriptor 가 push 하기 전 hot-path 에서도
   // 보이도록). 마지막 sample 과 t 가 같거나 값이 같으면 중복 추가 안 함 —
   // monotoneX 가 단조 x 를 가정하므로.
-  const combined: SequenceSample[] = useMemo(() => {
+  const combined: readonly SequenceSample[] = useMemo(() => {
     if (!current) return samples;
     const tail = samples[samples.length - 1];
     if (tail && tail.t >= currentT) return samples;
