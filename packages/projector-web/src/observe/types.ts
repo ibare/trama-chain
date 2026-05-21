@@ -1,5 +1,11 @@
 import type { ComponentType } from 'react';
-import type { ObserveNode, SequenceSample, Value, ValueKind } from '@trama/core';
+import type {
+  FunctionHandle,
+  ObserveNode,
+  SequenceSample,
+  Value,
+  ValueKind,
+} from '@trama/core';
 
 /**
  * Observe 시각화 패러다임.
@@ -25,6 +31,13 @@ export interface ObserveVisualizationRenderProps {
   /** 현재 step 의 simulation time (ms). 시간축이 필요한 시각이 current 를 sample
    *  처럼 다룰 때의 t. paused 상태라면 직전 step 의 t 가 그대로 유지된다. */
   currentT: number;
+  /**
+   * source 가 시간 의존 closure(FunctionHandle) 면 그 핸들. 시각은 임의 시각의
+   * Value 를 peek 해 sub-frame 매끄러운 곡선을 그릴 수 있다. propagate 가 매
+   * step 새 핸들 객체를 만들므로 ref 가 step 마다 갱신된다. scalar/sequence
+   * source 는 null.
+   */
+  functionSource: FunctionHandle | null;
   halfW: number;
   halfH: number;
   /** compact 모드 여부. 시각화는 자체 폰트/패딩을 이 값에 맞게 줄여야 한다. */

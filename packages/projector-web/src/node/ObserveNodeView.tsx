@@ -2,6 +2,7 @@ import { memo, useCallback, useEffect, useMemo } from 'react';
 import { tokens } from '@trama/tokens';
 import {
   booleanValue,
+  isFunctionHandle,
   isObserveNode,
   isSequence,
   numericValue,
@@ -9,6 +10,7 @@ import {
   outputKey,
   resolveScalar,
   unwrap,
+  type FunctionHandle,
   type NodeId,
   type ObserveBuffer,
   type Value,
@@ -88,6 +90,13 @@ function ObserveNodeViewImpl({ id, incomingCount }: Props): JSX.Element | null {
   // 시간축이 필요한 시각화가 current 를 sample 처럼 다룰 때의 t. primitive 라
   // selector 가 안정적.
   const currentT = modelStore((s) => s.executionState.simulationTimeMs);
+  // FunctionHandle source — peek(t) 로 임의 시각의 Value 를 계산할 수 있는 closure.
+  // 시각이 windowed 시간 도메인을 dense peek 해 sub-frame 매끄러운 곡선을 그릴 때
+  // 사용. propagate 가 매 step 새 핸들 객체를 만들므로 ref 가 step 마다 갱신된다.
+  const functionSource = modelStore((s) => {
+    const ev = s.executionState.values[id];
+    return ev && isFunctionHandle(ev) ? (ev as FunctionHandle) : null;
+  });
   const updateNode = modelStore((s) => s.updateNode);
   const outputConnected = useOutputConnected(id, 0);
   const extractionConnected = useOutputConnected(id, 1);
@@ -203,6 +212,7 @@ function ObserveNodeViewImpl({ id, incomingCount }: Props): JSX.Element | null {
             samples={samples}
             current={current}
             currentT={currentT}
+            functionSource={functionSource}
             halfW={observeBody.w / 2}
             halfH={observeBody.h / 2}
             compact={currentMode === 'compact'}

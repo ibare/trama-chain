@@ -69,11 +69,19 @@ function sameValue(a: Value, b: Value): boolean {
   return false;
 }
 
+/**
+ * 시간 도메인 폭당 dense peek 개수. width 비례라기보단 sin 한 주기에 32 점 이상
+ * 떨어지는 정도면 monotoneX 보간으로 충분히 매끄럽다. 너무 크면 매 step rerender
+ * 비용만 늘고 시각 차이는 미미하다.
+ */
+const FUNCTION_DENSE_SAMPLES = 96;
+
 function SparklineImpl({
   node,
   samples,
   current,
   currentT,
+  functionSource,
   halfW,
   halfH,
   compact,
@@ -131,6 +139,42 @@ function SparklineImpl({
   const scaleX = (t: number): number => x0 + ((t - tMin) / tSpan) * innerW;
 
   if (kind === 'numeric') {
+    // FunctionHandle source 면 windowed 도메인을 dense peek 으로 매끄럽게 그린다.
+    // 누적 sample 의 띄엄띄엄함을 함수의 실제 모양으로 보강 — sin 처럼 step 보다
+    // 빠른 신호도 깨지지 않는다. range 계산은 누적 sample 과 dense sample 을 합쳐
+    // y 축이 함수 진폭 전체를 담도록.
+    if (functionSource) {
+      const denseSamples: { t: number; n: number }[] = [];
+      for (let i = 0; i < FUNCTION_DENSE_SAMPLES; i++) {
+        const t = tMin + (tSpan * i) / (FUNCTION_DENSE_SAMPLES - 1);
+        const v = functionSource.peek(t);
+        if (v.kind === 'numeric' && Number.isFinite(v.n)) {
+          denseSamples.push({ t, n: v.n });
+        }
+      }
+      if (denseSamples.length === 0) {
+        return <g className="trama-observe-vis-sparkline is-empty" />;
+      }
+      const { min, max } = numericRange(denseSamples.map((s) => s.n));
+      const span = max - min;
+      const points = denseSamples.map((s) => ({
+        x: scaleX(s.t),
+        y: y0 + innerH - ((s.n - min) / span) * innerH,
+      }));
+      const path = sparkLineGen(points) ?? '';
+      const last = points[points.length - 1]!;
+      return (
+        <g className="trama-observe-vis-sparkline is-numeric is-function">
+          <path d={path} fill="none" className="trama-observe-sparkline-line" />
+          <circle
+            cx={last.x}
+            cy={last.y}
+            r={markerR}
+            className="trama-observe-sparkline-marker"
+          />
+        </g>
+      );
+    }
     const finiteSamples = combined.filter(
       (s): s is SequenceSample & { value: Extract<Value, { kind: 'numeric' }> } =>
         s.value.kind === 'numeric' && Number.isFinite(s.value.n),
