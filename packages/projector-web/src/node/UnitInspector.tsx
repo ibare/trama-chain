@@ -123,7 +123,10 @@ export function UnitInspector({ node }: Props): JSX.Element {
     (key: string) => {
       const def = skinCandidates.find((d) => d.key === key);
       if (!def) return;
-      const initialParams = def.defaultParams ? def.defaultParams() : {};
+      const initialParams = {
+        ...(def.defaultParams ? def.defaultParams() : {}),
+        scale: def.defaultScale,
+      };
       const domain = def.domain;
       switch (domain.valueKind) {
         case 'numeric': {

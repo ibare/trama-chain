@@ -112,6 +112,13 @@ interface SkinDefinitionBase {
    * params 형태는 스킨이 자체 검증한다 — core schema는 unknown record로 통과시킨다.
    */
   defaultParams?: () => Record<string, unknown>;
+  /**
+   * 스킨이 노드에 처음 적용될 때 부여되는 기본 비율 (1 = 100%).
+   * SKIN_LAYOUTS 의 spec(width/height/circleR/circleCy)에 곱해진다. 작게(0.5) 두면
+   * 동일 spec 의 미니어처로 생성되고, 사용자가 resize 핸들로 조정하면
+   * `node.skin.params.scale` 이 갱신되어 이 기본값을 덮어쓴다.
+   */
+  defaultScale: number;
 }
 
 export interface NumericSkinDefinition extends SkinDefinitionBase {

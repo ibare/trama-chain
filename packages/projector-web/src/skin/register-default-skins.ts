@@ -18,6 +18,7 @@ registerSkin({
   load: (): Promise<{ Skin: NumericSkinComponent }> =>
     import('./skins/cell-array.js').then((m) => ({ Skin: m.CellArray })),
   defaultParams: () => defaultCellArrayParams() as unknown as Record<string, unknown>,
+  defaultScale: 1,
 });
 
 registerSkin({
@@ -32,6 +33,7 @@ registerSkin({
   },
   load: (): Promise<{ Skin: NumericSkinComponent }> =>
     import('./skins/thermometer-mercury.js').then((m) => ({ Skin: m.ThermometerMercury })),
+  defaultScale: 1,
 });
 
 registerSkin({
@@ -46,6 +48,7 @@ registerSkin({
   },
   load: (): Promise<{ Skin: NumericSkinComponent }> =>
     import('./skins/thermometer-body.js').then((m) => ({ Skin: m.ThermometerBody })),
+  defaultScale: 1,
 });
 
 registerSkin({
@@ -60,6 +63,7 @@ registerSkin({
   },
   load: (): Promise<{ Skin: NumericSkinComponent }> =>
     import('./skins/thermometer-oven.js').then((m) => ({ Skin: m.ThermometerOven })),
+  defaultScale: 1,
 });
 
 registerSkin({
@@ -74,6 +78,7 @@ registerSkin({
   },
   load: (): Promise<{ Skin: NumericSkinComponent }> =>
     import('./skins/thermometer-kiln.js').then((m) => ({ Skin: m.ThermometerKiln })),
+  defaultScale: 1,
 });
 
 registerSkin({
@@ -86,6 +91,7 @@ registerSkin({
   },
   load: (): Promise<{ Skin: BooleanSkinComponent }> =>
     import('./skins/incandescent-bulb.js').then((m) => ({ Skin: m.IncandescentBulb })),
+  defaultScale: 1,
 });
 
 registerSkin({
@@ -98,6 +104,7 @@ registerSkin({
   },
   load: (): Promise<{ Skin: BooleanSkinComponent }> =>
     import('./skins/audio-jack.js').then((m) => ({ Skin: m.AudioJack })),
+  defaultScale: 1,
 });
 
 registerSkin({
@@ -112,4 +119,5 @@ registerSkin({
   },
   load: (): Promise<{ Skin: NumericSkinComponent }> =>
     import('./skins/thermometer-cryogenic.js').then((m) => ({ Skin: m.ThermometerCryogenic })),
+  defaultScale: 1,
 });

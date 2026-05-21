@@ -28,6 +28,18 @@ export const STANDARD_PANEL = { w: 240, h: 124 };
 export const COMPACT_PANEL = { w: 180, h: 56 };
 
 /**
+ * 스킨 노드의 사용자 조정 비율 한계. `node.skin.params.scale` 이 이 범위를 벗어나면
+ * clamp 되어 layout 에 반영된다. resize 핸들 인터랙션도 같은 한계를 따른다.
+ */
+export const SKIN_SCALE_MIN = 0.4;
+export const SKIN_SCALE_MAX = 2.5;
+
+function clampSkinScale(raw: unknown): number {
+  if (typeof raw !== 'number' || !Number.isFinite(raw)) return 1;
+  return Math.max(SKIN_SCALE_MIN, Math.min(SKIN_SCALE_MAX, raw));
+}
+
+/**
  * 스킨별 레이아웃 스펙.
  *
  * 모든 스킨 노드는 **공통 원형 보더**를 silhouette으로 갖는다. 평소 invisible, 선택
@@ -516,17 +528,25 @@ export function getNodeLayout(
   if (isValueNode(node) && node.skin) {
     const spec = SKIN_LAYOUTS[node.skin.kind];
     if (spec) {
-      const halfW = spec.width / 2;
-      const halfH = spec.height / 2;
+      // 사용자 조정 비율. 미설정이면 1(=100%). 카탈로그의 defaultScale 은
+      // 스킨 부여 시점에 params.scale 로 commit 되므로 layout 은 카탈로그를
+      // 읽을 필요 없이 params 만 본다.
+      const scale = clampSkinScale(node.skin.params.scale);
+      const width = spec.width * scale;
+      const height = spec.height * scale;
+      const circleR = spec.circleR * scale;
+      const circleCy = spec.circleCy * scale;
+      const halfW = width / 2;
+      const halfH = height / 2;
       // 스킨 모드는 단일 입력만 허용 (combiner 없음). incomingCount > 1이면
       // 시각이 깨지지만 PoC 범위로 단순화.
-      const leftPin = buildPin(-spec.circleR, spec.circleCy, 1);
-      const rightPin = buildPin(spec.circleR, spec.circleCy, 1);
+      const leftPin = buildPin(-circleR, circleCy, 1);
+      const rightPin = buildPin(circleR, circleCy, 1);
       return {
-        width: spec.width,
-        height: spec.height,
-        panelWidth: spec.width,
-        panelHeight: spec.height,
+        width,
+        height,
+        panelWidth: width,
+        panelHeight: height,
         panelCx: 0,
         panelCy: 0,
         halfW,
@@ -540,7 +560,7 @@ export function getNodeLayout(
         hasCombiner: false,
         leftPin,
         rightPin,
-        skinBorder: { cx: 0, cy: spec.circleCy, r: spec.circleR },
+        skinBorder: { cx: 0, cy: circleCy, r: circleR },
         expressionBody: null,
         observeBody: null,
         generatorBody: null,

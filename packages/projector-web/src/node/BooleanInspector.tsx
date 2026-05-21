@@ -35,7 +35,10 @@ export function BooleanInspector({ node }: Props): JSX.Element {
     (key: string) => {
       const def = skinCandidates.find((d) => d.key === key);
       if (!def) return;
-      const initialParams = def.defaultParams ? def.defaultParams() : {};
+      const initialParams = {
+        ...(def.defaultParams ? def.defaultParams() : {}),
+        scale: def.defaultScale,
+      };
       updateNode(node.id, {
         skin: { kind: def.key, params: initialParams },
       });
