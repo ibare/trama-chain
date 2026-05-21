@@ -2,6 +2,7 @@ import { memo, Suspense, type LazyExoticComponent } from 'react';
 import type { ValueNode } from '@trama/core';
 import type { BooleanSkinComponent } from '../skin/types.js';
 import type { NodeLayout } from '@trama/layout';
+import { SkinResizeHandle } from './SkinResizeHandle.js';
 
 interface Props {
   node: ValueNode;
@@ -55,6 +56,7 @@ function BooleanValueNodeSkinImpl({
           pointerEvents="none"
         />
       )}
+      <SkinResizeHandle node={node} layout={layout} isSelected={isSelected} />
     </>
   );
 }

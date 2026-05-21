@@ -16,6 +16,14 @@
     stroke: var(--color-node-selected-outline, #6aa9ff);
 }
 
+/* 비율 유지 리사이즈 핸들. 노드 bbox 우하단에 노출되며 선택 시에만 그려진다.
+   visual rect 는 작은 사각형, hit-rect 는 그 바깥에 transparent 로 깔린다. */
+[data-trama-root] .trama-skin-resize-handle-visual {
+    fill: var(--color-node-selected-outline, #6aa9ff);
+    stroke: #ffffff;
+    stroke-width: 1.2;
+}
+
 [data-trama-root] .trama-skin-thermometer-name {
     font-size: calc(var(--typography-text-node-label) * 16px);
     fill: var(--color-node-text-primary);
