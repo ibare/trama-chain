@@ -10,3 +10,4 @@ export * from './execute.js';
 export * from './recompute-node.js';
 export * from './incremental-invalidation.js';
 export * from './rng.js';
+export * from './capture-snapshot.js';
