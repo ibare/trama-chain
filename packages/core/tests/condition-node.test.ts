@@ -344,7 +344,7 @@ describe('ConditionNode 게이트 시맨틱', () => {
     m = addGeneratorNode(m, {
       id: 'g-sine',
       label: 'sine',
-      params: { kind: 'sine', amplitude: 1, period: 1000, phase: 0, offset: 0 },
+      params: { kind: 'sine', amplitude: 1, omega: 2 * Math.PI },
     });
     m = addConditionNode(m, { id: 'c', label: '>0', operator: '>', threshold: 0 });
     m = addEdge(m, {

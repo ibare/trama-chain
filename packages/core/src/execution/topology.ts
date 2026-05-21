@@ -1,3 +1,4 @@
+import { outputKey } from './state.js';
 import type { Edge, Model, NodeId } from '../model/index.js';
 import { InstantaneousCycleError } from './errors.js';
 
@@ -6,6 +7,23 @@ export interface InstantaneousTopology {
   order: NodeId[];
   /** target → incoming lag=0 edges */
   incomingByTarget: Map<NodeId, Edge[]>;
+  /**
+   * source → outgoing lag=0 edges. cascade 전파 시 source 슬롯이 바뀐 노드의
+   * 다운스트림을 빠르게 찾기 위한 색인. Kahn 정렬 중에 이미 빌드되므로 그대로 노출.
+   */
+  outgoingByTarget: Map<NodeId, Edge[]>;
+  /**
+   * 슬롯 단위 다운스트림 색인. key 는 `outputKey(nodeId, slotIndex)`. 분기 노드
+   * (Condition 등) 의 한 슬롯만 변경된 cascade 가 *해당 슬롯에 연결된 엣지의
+   * target* 만 큐에 넣게 한다 — 다른 슬롯에 연결된 다운스트림은 영향 받지 않음.
+   */
+  outgoingBySourceSlot: Map<string, Edge[]>;
+  /**
+   * 위상순서에서의 노드 인덱스. cascade BFS 의 priority queue 가 다운스트림을
+   * "topology 가 앞선 노드 먼저" 처리하도록 비교 키로 사용한다. 다이아몬드
+   * 토폴로지에서 같은 자손이 두 경로로 큐에 들어와도 한 번만 recompute 되게.
+   */
+  orderIndex: Map<NodeId, number>;
   /** lag=1 (feedback) 엣지들 */
   feedbackEdges: Edge[];
 }
@@ -18,7 +36,8 @@ export interface InstantaneousTopology {
 export function buildTopology(model: Model): InstantaneousTopology {
   const nodes = model.nodeOrder;
   const incomingByTarget = new Map<NodeId, Edge[]>();
-  const outgoingByTarget = new Map<NodeId, NodeId[]>(); // for kahn
+  const outgoingByTarget = new Map<NodeId, Edge[]>();
+  const outgoingBySourceSlot = new Map<string, Edge[]>();
   const inDegree = new Map<NodeId, number>();
   const feedbackEdges: Edge[] = [];
 
@@ -38,7 +57,11 @@ export function buildTopology(model: Model): InstantaneousTopology {
     // lag=0 only
     if (!incomingByTarget.has(e.to) || !inDegree.has(e.to)) continue;
     incomingByTarget.get(e.to)!.push(e);
-    outgoingByTarget.get(e.from)!.push(e.to);
+    outgoingByTarget.get(e.from)!.push(e);
+    const slotKey = outputKey(e.from, e.sourceSlotIndex ?? 0);
+    const slotList = outgoingBySourceSlot.get(slotKey) ?? [];
+    slotList.push(e);
+    outgoingBySourceSlot.set(slotKey, slotList);
     inDegree.set(e.to, (inDegree.get(e.to) ?? 0) + 1);
   }
 
@@ -52,10 +75,10 @@ export function buildTopology(model: Model): InstantaneousTopology {
   while (queue.length > 0) {
     const cur = queue.shift()!;
     order.push(cur);
-    for (const next of outgoingByTarget.get(cur) ?? []) {
-      const d = (inDegree.get(next) ?? 0) - 1;
-      inDegree.set(next, d);
-      if (d === 0) queue.push(next);
+    for (const edge of outgoingByTarget.get(cur) ?? []) {
+      const d = (inDegree.get(edge.to) ?? 0) - 1;
+      inDegree.set(edge.to, d);
+      if (d === 0) queue.push(edge.to);
     }
   }
 
@@ -66,7 +89,19 @@ export function buildTopology(model: Model): InstantaneousTopology {
     throw new InstantaneousCycleError(path);
   }
 
-  return { order, incomingByTarget, feedbackEdges };
+  const orderIndex = new Map<NodeId, number>();
+  for (let i = 0; i < order.length; i++) {
+    orderIndex.set(order[i]!, i);
+  }
+
+  return {
+    order,
+    incomingByTarget,
+    outgoingByTarget,
+    outgoingBySourceSlot,
+    orderIndex,
+    feedbackEdges,
+  };
 }
 
 function traceCycle(remaining: NodeId[], model: Model): NodeId[] {

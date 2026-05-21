@@ -330,7 +330,7 @@ describe('ObserveNode', () => {
       {
         id: 'g-sine',
         label: 'sine',
-        params: { kind: 'sine', amplitude: 1, period: 1000, phase: 0, offset: 0 },
+        params: { kind: 'sine', amplitude: 1, omega: 2 * Math.PI },
       },
       0,
     );

@@ -1,6 +1,7 @@
 import type { StoreApi } from 'zustand';
 import {
   asBooleanGate,
+  cascadeInvalidation,
   computeStockRate,
   isGeneratorNode,
   isSequence,
@@ -16,7 +17,6 @@ import {
   type NodeId,
 } from '@trama/core';
 import { commitExecutionState } from './execution-commit.js';
-import { computeExecutionState } from './execution-merge.js';
 import { combinerRegistry, shapeRegistry } from './registries.js';
 import { fizzexExpressionEvaluator } from '../expression/fizzex-evaluator.js';
 import type { ModelStore } from './model-store.js';
@@ -254,42 +254,56 @@ export function createPulseArrivalHandler(
 
     nodeFlashRegistry.trigger(pulse.targetNodeId);
 
-    // valid → invalid 전이만 전체 재계산. 펄스 체인은 valid source 만 흘리는
-    // 시각·증분 경로라 invalid 전파를 표현하지 못하므로 한 번에 그래프 상태를
-    // 잡는다. 반대 방향(invalid/pending → valid) 은 증분 경로로 가야 다운스트림이
-    // 펄스 체인을 따라 자연스럽게 cascade — 한 step 에 모두 흡수되면 시각 펄스가
-    // 사라진다.
+    // valid → invalid 전이만 incremental cascade 로 다운스트림 전파. 펄스 체인은
+    // valid source 만 흘리는 시각·증분 경로라 invalid 전파를 표현하지 못하므로
+    // 본 자리에서 caller state 시드 BFS 로 그래프 상태를 잡는다. 반대 방향
+    // (invalid/pending → valid) 은 증분 경로로 가야 다운스트림이 펄스 체인을
+    // 따라 자연스럽게 cascade — 한 step 에 모두 흡수되면 시각 펄스가 사라진다.
+    //
+    // computeExecutionState 가 아닌 cascadeInvalidation 을 쓰는 이유 — 전자는
+    // "모델 편집 직후 정적 재구성" 함수라 simulationTimeMs=0 으로 fresh 출발한 뒤
+    // 누적만 머지한다. 펄스 도착은 *시간이 흐른 후 발생한 인과 갱신* 이므로 시간축이
+    // 0 으로 리셋되면 sin 같은 시간 의존 source 의 다음 step 이 0 부근으로 튀어
+    // false→true→false 가 매 RAF 마다 반복되는 무한 핀퐁이 생긴다.
     if (becameInvalid) {
-      // 펄스 도착은 시간이 흐르는 step — paused=false 로 재계산해 ValueNode 가
-      // source 변화를 흡수하도록 한다. prior+priorModel 을 함께 전달해 Stock
-      // level, observe buffer, generator cursor 의 누적이 fresh 빈 값으로
-      // 덮이지 않게 한다 (펄스 도착 사이에 모델은 변하지 않으므로 priorModel===model).
-      const recomputed = computeExecutionState(model, executionState, false, model);
-      store.setState({
-        executionState: recomputed.executionState,
-        trajectory: recomputed.trajectory,
-      });
-      // 전체 재계산은 invalid 전파를 한 step 으로 잡지만, 같은 target 의
-      // 다른 슬롯이 동시에 invalid→valid 로 뒤집힌 경우(Condition 판정 전환 등)
-      // 다운스트림으로 흘러야 할 cascade 가 끊긴다. 펄스 체인은 valid source 만
-      // 운반하므로, 새로 valid 가 된 슬롯에 대해서는 명시적으로 spawn 해 줘야
-      // Cond→다운스트림 케이블에 펄스가 정상적으로 흐르고 시각도 잇는다.
-      const prevValid = executionState.validOutputs;
-      const nextValid = recomputed.executionState.validOutputs;
-      const prefix = `${pulse.targetNodeId}:`;
-      const newlyValidSlots = new Set<number>();
-      for (const slotKey of nextValid) {
-        if (!slotKey.startsWith(prefix)) continue;
-        if (prevValid.has(slotKey)) continue;
-        const slot = Number.parseInt(slotKey.slice(prefix.length), 10);
-        if (!Number.isNaN(slot)) newlyValidSlots.add(slot);
-      }
-      if (newlyValidSlots.size > 0) {
+      const cascaded = cascadeInvalidation(
+        pulse.targetNodeId,
+        result,
+        executionState,
+        model,
+        {
+          shapeRegistry,
+          combinerRegistry,
+          expressionEvaluator: fizzexExpressionEvaluator,
+          observeBuffers: executionState.observeBuffers,
+          observeExtractionRuntime: executionState.observeExtractionRuntime,
+          sequenceOutputs: executionState.sequenceOutputs,
+          simulationTimeMs: executionState.simulationTimeMs,
+        },
+      );
+      store.setState((s) => ({
+        executionState: commitExecutionState(s.executionState, {
+          values: cascaded.executionState.values,
+          sequenceOutputs: cascaded.executionState.sequenceOutputs,
+          validOutputs: cascaded.executionState.validOutputs,
+          pendingOutputs: cascaded.executionState.pendingOutputs,
+          invalidReasons: cascaded.executionState.invalidReasons,
+          observeBuffers: cascaded.executionState.observeBuffers,
+          observeExtractionRuntime: cascaded.executionState.observeExtractionRuntime,
+          // generatorRuntime / stockRuntime / simulationTimeMs 는 cascade 가
+          // 건드리지 않음 — prior 그대로 보존 (commitExecutionState 가 prev 채택).
+        }),
+      }));
+      // 같은 target 의 다른 슬롯이 동시에 invalid→valid 로 뒤집힌 경우 (Condition
+      // 판정 전환 등) 다운스트림으로 흘러야 할 cascade 가 끊긴다. 펄스 체인은
+      // valid source 만 운반하므로, 새로 valid 가 된 슬롯에 대해서는 명시적으로
+      // spawn 해 줘야 Cond→다운스트림 케이블에 펄스가 정상적으로 흐르고 시각도 잇는다.
+      if (cascaded.rootNewlyValidSlots.size > 0) {
         spawnOutgoingPulses(
           model,
-          recomputed.executionState,
+          store.getState().executionState,
           pulse.targetNodeId,
-          newlyValidSlots,
+          cascaded.rootNewlyValidSlots,
         );
       }
       return;
