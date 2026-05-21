@@ -68,8 +68,13 @@ export interface NodeKindDescriptor<N extends Node = Node> {
    *   부드러워져 의도가 왜곡되므로 즉시 전환이어야 한다.
    *
    * 모델·실행 계층은 이 플래그를 read-only로 노출만 한다. 보간 정책은 시각 계층 책임.
+   *
+   * **ctx 옵션**: passthrough 노드(Observe·Condition 등) 가 자기 입력 source 의
+   * outputInterpolation 을 mirror 하기 위해 model·registry 가 필요하다. 정적 호출
+   * (paradigm 단독 판정) 은 ctx 없이도 답할 수 있도록 optional. inputAccepts·
+   * outputSlots·acceptsAnyInput 와 같은 시그니처 패턴.
    */
-  outputInterpolation?(node: N): OutputInterpolation;
+  outputInterpolation?(node: N, ctx?: PortTypeContext): OutputInterpolation;
   /**
    * lag=0 전파. incoming을 보고 next[node.id]·validOutputs를 갱신.
    * incoming이 비어 있고 디스크립터가 외부 입력이 없는 종류면 기존 값을 유지하는 것이 일반적.
