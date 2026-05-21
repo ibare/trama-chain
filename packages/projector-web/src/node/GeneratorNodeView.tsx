@@ -17,6 +17,14 @@ import { Socket } from './Socket.js';
 import { useOutputConnected } from './use-socket-connections.js';
 import { useEdgeDraftSource } from '../canvas/use-edge-draft-source.js';
 import { Knob, SelectorKnob } from './knob/index.js';
+import { CrtScope, Waveform } from '../scope/index.js';
+
+/** Sin 프리뷰가 그리는 시간 윈도우(초). 5s 면 주기 1s 에서 5 사이클이 보이고,
+ *  주기 5s 면 1 사이클, 주기 10s 이상은 사이클 일부만 보인다 — "주기를 줄이면
+ *  파형이 좁아진다" 시각을 직접 전달. */
+const SINE_PREVIEW_WINDOW_S = 5;
+const SINE_PREVIEW_W = 70;
+const SINE_PREVIEW_H = 40;
 
 /**
  * sine paradigm 주기(초) stops. 사용자 옵션 B — 주기는 의미 있는 프리셋만 노드
@@ -229,10 +237,14 @@ function GeneratorNodeViewImpl({ id, incomingCount }: Props): JSX.Element | null
     const periodS = (2 * Math.PI) / params.omega;
     const periodSnap = nearestStop(periodS, SINE_PERIOD_STOPS_S);
     const cy = body.y + body.h / 2;
-    const leftCx = body.x + body.w * 0.28;
-    const rightCx = body.x + body.w * 0.72;
-    const knobSize = currentMode === 'compact' ? 'compact' : 'standard';
-    const showLabel = currentMode !== 'compact';
+    // Standard 는 두 노브를 외곽으로 벌려 사이에 CRT 프리뷰 슬롯 확보 (~77px),
+    // compact 는 패널이 좁아 프리뷰 없이 기존 0.28/0.72 배치 유지.
+    const isCompact = currentMode === 'compact';
+    const leftCx = body.x + body.w * (isCompact ? 0.28 : 0.18);
+    const rightCx = body.x + body.w * (isCompact ? 0.72 : 0.82);
+    const knobSize = isCompact ? 'compact' : 'standard';
+    const showLabel = !isCompact;
+    const previewCx = body.x + body.w * 0.5;
     const setPeriod = (T: number) => {
       const omega = (2 * Math.PI) / T;
       updateNode(id, { params: { ...params, omega } });
@@ -254,6 +266,23 @@ function GeneratorNodeViewImpl({ id, incomingCount }: Props): JSX.Element | null
           label={showLabel ? '주기' : undefined}
           centerLabel={`${periodSnap}s`}
         />
+        {!isCompact && (
+          <CrtScope
+            cx={previewCx}
+            cy={cy}
+            w={SINE_PREVIEW_W}
+            h={SINE_PREVIEW_H}
+          >
+            <Waveform
+              w={SINE_PREVIEW_W}
+              h={SINE_PREVIEW_H}
+              amplitude={params.amplitude}
+              omega={params.omega}
+              tWindowS={SINE_PREVIEW_WINDOW_S}
+              ampMax={SINE_AMP_MAX}
+            />
+          </CrtScope>
+        )}
         <Knob
           cx={rightCx}
           cy={cy}
