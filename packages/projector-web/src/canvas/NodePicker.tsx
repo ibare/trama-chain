@@ -4,10 +4,12 @@ import * as ToggleGroup from '@radix-ui/react-toggle-group';
 import * as HoverCard from '@radix-ui/react-hover-card';
 import type { NodeId } from '@trama/core';
 import { useTrama } from '../store/index.js';
-import { listNodeKindUIs, type NodeMenuItem } from '../node/kind-catalog.js';
+import { listNodeKindUIs, type NodeMenuItem, type NodeMenuIcon } from '../node/kind-catalog.js';
 import type { ModelStoreInstance } from '../store/model-store.js';
 import type { TramaInstance } from '../store/trama-instance.js';
 import type { NodePickerIntent } from '../store/ui-store.js';
+import { PhosphorIcon } from '../icon/phosphor.js';
+import { LatexGlyph } from '../expression/LatexGlyph.js';
 import '../node/register-default-kinds.js';
 
 /**
@@ -265,7 +267,7 @@ function NodePickerBody({ intent, instance, modelStore, close }: BodyProps): JSX
                       onDoubleClick={() => handleTileDoubleClick(it.key)}
                     >
                       <span className="trama-node-picker-tile-icon" aria-hidden>
-                        {it.symbol ?? '◯'}
+                        <TileIcon icon={it.icon} />
                       </span>
                       <span className="trama-node-picker-tile-label">{it.label}</span>
                       {selected && (
@@ -319,6 +321,14 @@ function NodePickerBody({ intent, instance, modelStore, close }: BodyProps): JSX
       </div>
     </Dialog.Content>
   );
+}
+
+/** tile-icon 의 두 결(phosphor SVG / latex fizzex) 분기 렌더. */
+function TileIcon({ icon }: { icon: NodeMenuIcon }): JSX.Element {
+  if (icon.kind === 'phosphor') {
+    return <PhosphorIcon name={icon.name} size={32} />;
+  }
+  return <LatexGlyph latex={icon.latex} fontSize={28} />;
 }
 
 /**

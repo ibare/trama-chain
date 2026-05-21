@@ -40,6 +40,7 @@ registerNodeKindUI({
     {
       key: 'value',
       label: '값 노드',
+      icon: { kind: 'phosphor', name: 'seal' },
       createNode: (canvasPos) => {
         const addNode = instance.modelStore.getState().addNode;
         const setEditingNode = instance.uiStore.getState().setEditingNode;
@@ -57,7 +58,7 @@ registerNodeKindUI({
     {
       key: 'value-boolean',
       label: '참/거짓 값 노드',
-      symbol: '⊤',
+      icon: { kind: 'phosphor', name: 'toggle-right' },
       createNode: (canvasPos) => {
         const addNode = instance.modelStore.getState().addNode;
         const setEditingNode = instance.uiStore.getState().setEditingNode;
@@ -85,7 +86,7 @@ registerNodeKindUI({
     {
       key: 'condition',
       label: '조건 노드',
-      symbol: 'If',
+      icon: { kind: 'phosphor', name: 'git-diff' },
       createNode: (canvasPos) => {
         const addConditionNode = instance.modelStore.getState().addConditionNode;
         const node = addConditionNode({
@@ -107,12 +108,12 @@ registerNodeKindUI({
 const LOGIC_GATE_PRESETS: Array<{
   operator: LogicGateOperator;
   label: string;
-  symbol: string;
+  latex: string;
 }> = [
-  { operator: 'and', label: 'AND 노드', symbol: '⋀' },
-  { operator: 'or', label: 'OR 노드', symbol: '⋁' },
-  { operator: 'xor', label: 'XOR 노드', symbol: '⊕' },
-  { operator: 'not', label: 'NOT 노드', symbol: '¬' },
+  { operator: 'and', label: 'AND 노드', latex: '\\wedge' },
+  { operator: 'or', label: 'OR 노드', latex: '\\vee' },
+  { operator: 'xor', label: 'XOR 노드', latex: '\\oplus' },
+  { operator: 'not', label: 'NOT 노드', latex: '\\neg' },
 ];
 
 registerNodeKindUI({
@@ -124,7 +125,7 @@ registerNodeKindUI({
     LOGIC_GATE_PRESETS.map((preset) => ({
       key: `logic-${preset.operator}`,
       label: preset.label,
-      symbol: preset.symbol,
+      icon: { kind: 'latex', latex: preset.latex },
       createNode: (canvasPos) => {
         const addLogicGateNode = instance.modelStore.getState().addLogicGateNode;
         const node = addLogicGateNode({
@@ -157,7 +158,7 @@ registerNodeKindUI({
     {
       key: 'gen-counter',
       label: '카운터 생성기',
-      symbol: '1,2,3',
+      icon: { kind: 'phosphor', name: 'list-numbers' },
       createNode: (canvasPos) => {
         const addGeneratorNode = instance.modelStore.getState().addGeneratorNode;
         const node = addGeneratorNode({
@@ -172,7 +173,7 @@ registerNodeKindUI({
     {
       key: 'gen-uniform',
       label: '균등 랜덤 생성기',
-      symbol: 'unif',
+      icon: { kind: 'phosphor', name: 'rows' },
       createNode: (canvasPos) => {
         const addGeneratorNode = instance.modelStore.getState().addGeneratorNode;
         const node = addGeneratorNode({
@@ -193,7 +194,7 @@ registerNodeKindUI({
     {
       key: 'gen-normal',
       label: '정규 랜덤 생성기',
-      symbol: 'norm',
+      icon: { kind: 'phosphor', name: 'chart-line' },
       createNode: (canvasPos) => {
         const addGeneratorNode = instance.modelStore.getState().addGeneratorNode;
         const node = addGeneratorNode({
@@ -213,7 +214,7 @@ registerNodeKindUI({
     {
       key: 'gen-sine',
       label: '사인파 생성기',
-      symbol: 'Sin',
+      icon: { kind: 'phosphor', name: 'wave-sine' },
       createNode: (canvasPos) => {
         const addGeneratorNode = instance.modelStore.getState().addGeneratorNode;
         const node = addGeneratorNode({
@@ -232,7 +233,7 @@ registerNodeKindUI({
     {
       key: 'gen-step',
       label: '스텝 생성기',
-      symbol: 't↑',
+      icon: { kind: 'phosphor', name: 'stairs' },
       createNode: (canvasPos) => {
         const addGeneratorNode = instance.modelStore.getState().addGeneratorNode;
         const node = addGeneratorNode({
@@ -247,7 +248,7 @@ registerNodeKindUI({
     {
       key: 'gen-pulse',
       label: '펄스 생성기',
-      symbol: '▮',
+      icon: { kind: 'phosphor', name: 'pulse' },
       createNode: (canvasPos) => {
         const addGeneratorNode = instance.modelStore.getState().addGeneratorNode;
         const node = addGeneratorNode({
@@ -262,7 +263,7 @@ registerNodeKindUI({
     {
       key: 'gen-schedule',
       label: '스케줄 생성기',
-      symbol: '≣',
+      icon: { kind: 'phosphor', name: 'calendar' },
       createNode: (canvasPos) => {
         const addGeneratorNode = instance.modelStore.getState().addGeneratorNode;
         const node = addGeneratorNode({
@@ -293,7 +294,7 @@ registerNodeKindUI({
     {
       key: 'observe',
       label: '관찰 노드',
-      symbol: '👁',
+      icon: { kind: 'phosphor', name: 'eye' },
       createNode: (canvasPos) => {
         const addObserveNode = instance.modelStore.getState().addObserveNode;
         const node = addObserveNode({
@@ -316,7 +317,7 @@ registerNodeKindUI({
     {
       key: 'average',
       label: '평균 노드',
-      symbol: 'x̄',
+      icon: { kind: 'latex', latex: '\\bar{x}' },
       createNode: (canvasPos) => {
         const addAverageNode = instance.modelStore.getState().addAverageNode;
         const node = addAverageNode({
@@ -339,7 +340,7 @@ registerNodeKindUI({
     {
       key: 'stock',
       label: '탱크',
-      symbol: '⏳',
+      icon: { kind: 'phosphor', name: 'cylinder' },
       createNode: (canvasPos) => {
         const addStockNode = instance.modelStore.getState().addStockNode;
         const node = addStockNode({
@@ -355,6 +356,24 @@ registerNodeKindUI({
   ],
 });
 
+/**
+ * ConstantDefinition.symbol 은 본문 카드용 한 글자 (π, e, ⊤, ⊥, ?).
+ * NodePicker 타일에서 fizzex 로 렌더할 땐 같은 의미의 latex 명령으로 치환한다 —
+ * `\pi`·`\top`·`\bot` 은 명령형 글리프, 알파벳·`?` 는 그대로.
+ */
+function constantSymbolToLatex(symbol: string): string {
+  switch (symbol) {
+    case 'π':
+      return '\\pi';
+    case '⊤':
+      return '\\top';
+    case '⊥':
+      return '\\bot';
+    default:
+      return symbol;
+  }
+}
+
 registerNodeKindUI({
   kind: 'constant',
   menuSectionLabel: '상수',
@@ -366,7 +385,7 @@ registerNodeKindUI({
       return {
         key: `const-${def.key}`,
         label: def.labels.ko,
-        symbol: def.symbol,
+        icon: { kind: 'latex', latex: constantSymbolToLatex(def.symbol) },
         createNode: (canvasPos) => {
           const addConstantNode = instance.modelStore.getState().addConstantNode;
           const setEditingNode = instance.uiStore.getState().setEditingNode;
@@ -398,18 +417,20 @@ registerNodeKindUI({
 interface ExpressionPreset {
   key: string;
   label: string;
-  symbol: string;
+  /** 노드 추가 패널 타일에 표시할 latex 글리프 (fizzex 렌더). */
+  iconLatex: string;
+  /** 식 노드 본문 latex (생성 시 초기값). */
   latex: string;
 }
 
 const EXPRESSION_PRESETS: ExpressionPreset[] = [
-  { key: 'multiply', label: '곱셈', symbol: '×', latex: 'a \\times b' },
-  { key: 'add', label: '덧셈', symbol: '+', latex: 'a + b' },
-  { key: 'subtract', label: '뺄셈', symbol: '−', latex: 'a - b' },
-  { key: 'divide', label: '나눗셈', symbol: '÷', latex: '\\frac{a}{b}' },
-  { key: 'min', label: '최솟값', symbol: 'min', latex: '\\min(a, b)' },
-  { key: 'max', label: '최댓값', symbol: 'max', latex: '\\max(a, b)' },
-  { key: 'custom', label: '사용자 자유 식', symbol: 'fx', latex: '' },
+  { key: 'multiply', label: '곱셈', iconLatex: '\\times', latex: 'a \\times b' },
+  { key: 'add', label: '덧셈', iconLatex: '+', latex: 'a + b' },
+  { key: 'subtract', label: '뺄셈', iconLatex: '-', latex: 'a - b' },
+  { key: 'divide', label: '나눗셈', iconLatex: '\\div', latex: '\\frac{a}{b}' },
+  { key: 'min', label: '최솟값', iconLatex: '\\min', latex: '\\min(a, b)' },
+  { key: 'max', label: '최댓값', iconLatex: '\\max', latex: '\\max(a, b)' },
+  { key: 'custom', label: '사용자 자유 식', iconLatex: 'f(x)', latex: '' },
 ];
 
 registerNodeKindUI({
@@ -423,7 +444,7 @@ registerNodeKindUI({
       return {
         key: `expr-${preset.key}`,
         label: preset.label,
-        symbol: preset.symbol,
+        icon: { kind: 'latex', latex: preset.iconLatex },
         createNode: (canvasPos) => {
           const addExpressionNode = instance.modelStore.getState().addExpressionNode;
           const setEditingNode = instance.uiStore.getState().setEditingNode;

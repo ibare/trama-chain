@@ -1,10 +1,22 @@
 import type { FC } from 'react';
 import type { Node, NodeId } from '@trama/core';
 import type { TramaInstance } from '../store/trama-instance.js';
+import type { PhosphorGlyphName } from '../icon/phosphor.js';
+
+/**
+ * NodePicker 타일 아이콘. 두 결을 분리한 union:
+ *   - `phosphor`: 노드 종류·생성기·관찰·집계·상태처럼 도메인 추상이 강한 항목.
+ *     화이트리스트(`PhosphorGlyphName`)에 등록된 글리프만.
+ *   - `latex`: 수학 상수·산술 연산자·논리 게이트·평균(x̄)처럼 표준 기호가 학습된 항목.
+ *     fizzex DOMRendererView 로 렌더해 노드 본문 식과 동일한 폰트·자리수 규칙 유지.
+ */
+export type NodeMenuIcon =
+  | { kind: 'phosphor'; name: PhosphorGlyphName }
+  | { kind: 'latex'; latex: string };
 
 /**
  * NodePicker에 노출될 단일 항목.
- * - `symbol`: 좌측에 짧게 표시되는 심볼 (예: "+", "×", "π").
+ * - `icon`: 타일 좌측에 표시되는 아이콘 (phosphor 글리프 또는 fizzex latex).
  * - `label`: 사용자에게 보이는 한국어 라벨.
  * - `description`: 우측 프리뷰에 표시할 설명 (선택). 향후 풍부한 설명으로 확장.
  * - `createNode(canvasPos)`: 사용자가 "추가"로 확정한 순간 호출. 생성된 노드의 id를 반환해야 한다 —
@@ -14,7 +26,7 @@ import type { TramaInstance } from '../store/trama-instance.js';
 export interface NodeMenuItem {
   key: string;
   label: string;
-  symbol?: string;
+  icon: NodeMenuIcon;
   description?: string;
   createNode: (canvasPos: { x: number; y: number }) => NodeId | null;
 }
