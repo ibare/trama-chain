@@ -18,11 +18,22 @@ export interface ViewportContainer {
   set(next: Viewport): void;
   subscribe(cb: () => void): () => void;
   getCurrentZoom(): number;
+  /**
+   * Canvas 가 mount 시 자기 SVG element 를 등록한다. 캔버스 밖의 UI(예: MiniPlayer)
+   * 가 화면 좌표 ↔ 캔버스 좌표 변환을 요청할 때 SVG 의 boundingClientRect 가 필요해서.
+   */
+  setSvgElement(el: SVGSVGElement | null): void;
+  /**
+   * 현재 SVG 가 화면에서 차지하는 영역의 중심을 캔버스 좌표로 반환.
+   * SVG 가 부착되지 않았거나 0×0 이면 null.
+   */
+  getCanvasViewportCenter(): { x: number; y: number } | null;
 }
 
 export function createViewportContainer(): ViewportContainer {
   let viewport: Viewport = { panX: 0, panY: 0, zoom: 1 };
   const listeners = new Set<() => void>();
+  let svgEl: SVGSVGElement | null = null;
 
   return {
     get(): Viewport {
@@ -47,6 +58,20 @@ export function createViewportContainer(): ViewportContainer {
     },
     getCurrentZoom(): number {
       return viewport.zoom;
+    },
+    setSvgElement(el: SVGSVGElement | null): void {
+      svgEl = el;
+    },
+    getCanvasViewportCenter(): { x: number; y: number } | null {
+      if (!svgEl) return null;
+      const rect = svgEl.getBoundingClientRect();
+      if (rect.width === 0 || rect.height === 0) return null;
+      // Canvas.toCanvasCoords 와 동일한 변환식 — clientX/Y 자리에 rect 중심을 대입.
+      // (clientX - rect.left - panX) / zoom 에서 clientX = rect.left + rect.width/2.
+      return {
+        x: (rect.width / 2 - viewport.panX) / viewport.zoom,
+        y: (rect.height / 2 - viewport.panY) / viewport.zoom,
+      };
     },
   };
 }

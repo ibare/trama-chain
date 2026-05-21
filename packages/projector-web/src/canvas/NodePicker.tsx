@@ -117,6 +117,14 @@ function NodePickerBody({ intent, instance, modelStore, close }: BodyProps): JSX
   const position = useMemo(() => {
     const vw = typeof window !== 'undefined' ? window.innerWidth : 1024;
     const vh = typeof window !== 'undefined' ? window.innerHeight : 768;
+    // global 진입(예: MiniPlayer Add 버튼)은 화면 정중앙에 배치 — 캔버스 좌표가 없으니
+    // 클램프 대신 단순 센터링.
+    if (intent.origin === 'global') {
+      return {
+        left: Math.max(VIEWPORT_PADDING, Math.round((vw - PANEL_WIDTH) / 2)),
+        top: Math.max(VIEWPORT_PADDING, Math.round((vh - PANEL_HEIGHT) / 2)),
+      };
+    }
     let left = intent.screenPos.x;
     let top = intent.screenPos.y;
     if (left + PANEL_WIDTH > vw - VIEWPORT_PADDING) left = vw - PANEL_WIDTH - VIEWPORT_PADDING;
@@ -124,7 +132,7 @@ function NodePickerBody({ intent, instance, modelStore, close }: BodyProps): JSX
     if (left < VIEWPORT_PADDING) left = VIEWPORT_PADDING;
     if (top < VIEWPORT_PADDING) top = VIEWPORT_PADDING;
     return { left, top };
-  }, [intent.screenPos.x, intent.screenPos.y]);
+  }, [intent]);
 
   useEffect(() => {
     setSelections(new Map());

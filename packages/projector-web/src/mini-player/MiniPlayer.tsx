@@ -35,13 +35,27 @@ function nextPreset(current: number): number {
 }
 
 export function MiniPlayer(): JSX.Element {
-  const { timeSettingsStore, modelStore } = useTrama();
+  const {
+    timeSettingsStore,
+    modelStore,
+    uiStore,
+    viewport: viewportContainer,
+  } = useTrama();
   const multiplier = timeSettingsStore((s) => s.stepSpeedMultiplier);
   const paused = timeSettingsStore((s) => s.paused);
   const setMultiplier = timeSettingsStore((s) => s.setStepSpeedMultiplier);
   const togglePaused = timeSettingsStore((s) => s.togglePaused);
   const simulationTimeMs = modelStore((s) => s.executionState.simulationTimeMs);
   const resetSimulation = modelStore((s) => s.resetSimulation);
+  const readOnly = uiStore((s) => s.readOnly);
+  const openNodePickerGlobal = uiStore((s) => s.openNodePickerGlobal);
+
+  // 캔버스가 부착돼 있지 않거나 0×0 이면 fallback (0,0). NodePicker 측 free-row 배치도
+  // canvasPos 만 기준으로 동작하므로 안전한 기본값.
+  function handleAdd(): void {
+    const center = viewportContainer.getCanvasViewportCenter() ?? { x: 0, y: 0 };
+    openNodePickerGlobal(center);
+  }
 
   return (
     <div className="trama-mini-player" onPointerDown={(e) => e.stopPropagation()}>
@@ -75,6 +89,17 @@ export function MiniPlayer(): JSX.Element {
       >
         {multiplier}×
       </button>
+      {!readOnly && (
+        <button
+          type="button"
+          className="trama-mini-player-button"
+          onClick={handleAdd}
+          title="노드 추가"
+          aria-label="노드 추가"
+        >
+          <PhosphorIcon name="plus" size={18} />
+        </button>
+      )}
     </div>
   );
 }

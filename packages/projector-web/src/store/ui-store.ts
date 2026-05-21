@@ -53,6 +53,8 @@ export interface BooleanInspectorState {
  *
  * - `canvas` 진입: 단일 노드 생성. 새 노드 position = canvasPos.
  * - `edge-split` 진입: 새 노드 생성 + 원래 엣지를 두 갈래로 분할. edgeId 필수.
+ * - `global` 진입: MiniPlayer Add 버튼 등 캔버스 밖에서 호출. 다이얼로그는 화면 정중앙,
+ *   새 노드는 현재 뷰포트 중심(canvasPos)에 배치.
  */
 export type NodePickerIntent =
   | {
@@ -67,6 +69,11 @@ export type NodePickerIntent =
       screenPos: { x: number; y: number };
       canvasPos: { x: number; y: number };
       edgeId: EdgeId;
+    }
+  | {
+      origin: 'global';
+      /** 캔버스 좌표 — 새 노드 position. 다이얼로그 화면 위치는 별도 계산(중앙). */
+      canvasPos: { x: number; y: number };
     };
 
 export interface RunFlashState {
@@ -146,6 +153,7 @@ export interface UIStore {
     screenPos: { x: number; y: number },
     canvasPos: { x: number; y: number },
   ) => void;
+  openNodePickerGlobal: (canvasPos: { x: number; y: number }) => void;
   closeNodePicker: () => void;
 
   openFunctionPicker: (edgeId: EdgeId, anchor: { x: number; y: number }) => void;
@@ -243,6 +251,10 @@ export function createUIStore(): UIStoreInstance {
       set({
         nodePickerIntent: { origin: 'edge-split', edgeId, screenPos, canvasPos },
       });
+    },
+    openNodePickerGlobal: (canvasPos) => {
+      if (get().readOnly) return;
+      set({ nodePickerIntent: { origin: 'global', canvasPos } });
     },
     closeNodePicker: () => set({ nodePickerIntent: null }),
 

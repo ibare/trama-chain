@@ -64,6 +64,15 @@ export function Canvas({ initialFit = 'none' }: CanvasProps = {}): JSX.Element {
     viewportContainer.set(viewport);
   }, [viewport, viewportContainer]);
 
+  // SVG element 를 viewport container 에 등록해, 캔버스 밖 UI(MiniPlayer 등)가
+  // 화면 좌표 ↔ 캔버스 좌표 변환을 요청할 수 있게 한다. unmount 시 해제.
+  useEffect(() => {
+    viewportContainer.setSvgElement(svgRef.current);
+    return () => {
+      viewportContainer.setSvgElement(null);
+    };
+  }, [viewportContainer]);
+
   // initialFit='content' — mount 시 1회만 노드 위치 평균을 캔버스 중앙으로 정렬.
   // RAF 1프레임 대기 후 svg getBoundingClientRect 를 측정 (mount 직후엔 0일 수 있음).
   // didFitRef 가드로 dev StrictMode 더블 마운트에서도 한 번만 실행.
