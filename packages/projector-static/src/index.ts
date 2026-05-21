@@ -8,7 +8,6 @@
  *
  * 다른 projector 와의 분리:
  *   - projector-web: 풀 편집기. 시뮬레이션 진행 + 드래그·연결 인터랙션.
- *   - projector-embed: 호스트 문서 안에 끼워넣는 인터랙티브 미리보기.
  *   - projector-static: 정적 출력 한 장. 시뮬레이션 없음·인터랙션 없음.
  */
 

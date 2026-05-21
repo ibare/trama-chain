@@ -40,11 +40,15 @@ const packages: ReadonlyArray<PackageEntry> = [
     peer: ['react ^19', 'react-dom ^19'],
   },
   {
-    name: '@trama/projector-embed',
+    name: '@trama/projector-static',
     role: '정적 읽기 전용 임베드',
     description:
-      'JSON을 받아 인터랙션 없이 그래프를 그려주는 가벼운 임베드. 블로그·문서 사이트·PDF 출력에 적합.',
-    exports: ['TramaEmbed — 정적 SVG 렌더러'],
+      'TramaDocument 의 미리 박제된 NodeSnapshot 을 받아 인터랙션 없이 그래프를 SVG 로 그려주는 zero-compute 렌더러. 블로그·문서 사이트·PDF 출력에 적합.',
+    exports: [
+      'TramaStaticView — 정적 SVG 렌더러',
+      'defaultStaticRenderers — 9 종 NodeKind 매핑',
+      'renderStaticNode — 단일 노드 디스패처',
+    ],
     peer: ['react ^19'],
   },
   {

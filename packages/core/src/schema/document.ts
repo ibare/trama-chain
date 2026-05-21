@@ -243,7 +243,7 @@ export const TramaDocumentSchema = z.object({
   edges: z.array(EdgeSchema),
   /**
    * 정적 렌더링용 미리 계산된 스냅샷. 저장 시점에 capture 되어 동봉되면
-   * projector-embed 같은 zero-compute 렌더러가 시뮬레이션 없이 이 자리에서
+   * projector-static 같은 zero-compute 렌더러가 시뮬레이션 없이 이 자리에서
    * 바로 시각을 만든다. 없으면 동적 환경(편집기·라이브 미리보기)이 직접
    * 시뮬레이션을 돌려 채운다.
    */

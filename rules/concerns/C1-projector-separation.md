@@ -7,7 +7,7 @@ last_verified: 2026-05-15
 
 ## When to Apply
 - `@trama/core`의 코드를 추가·수정할 때
-- projector-web/projector-embed/host-tiptap이 core API를 사용할 때
+- projector-web/projector-static/host-tiptap이 core API를 사용할 때
 - 새 패키지를 만들 때 의존성 방향 결정 시
 
 ## MUST

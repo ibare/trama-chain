@@ -24,7 +24,7 @@ concerns:
       paths:
         - "packages/core/**/*.ts"
         - "packages/projector-web/**/*.{ts,tsx}"
-        - "packages/projector-embed/**/*.{ts,tsx}"
+        - "packages/projector-static/**/*.{ts,tsx}"
       imports: ["react", "react-dom", "zustand", "@radix-ui/*"]
       patterns: ["from ['\"]@trama/core['\"]"]
 

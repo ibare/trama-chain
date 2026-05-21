@@ -58,7 +58,7 @@ rule-guard 호출 (**반드시 현재 taskId 를 프롬프트에 포함**). ISSU
 - `@trama/core` — 모델·실행·스키마. React 비의존.
 - `@trama/tokens` — `[data-trama-root]` 스코프 CSS 토큰.
 - `@trama/projector-web` — 풀 캔버스 편집기.
-- `@trama/projector-embed` — 정적 임베드.
+- `@trama/projector-static` — 정적 임베드 (NodeSnapshot 기반 zero-compute SVG).
 - `@trama/host-tiptap` — Tiptap NodeView 어댑터.
 - `@trama/host-tiptap-bundle` — Rollup ESM 번들.
 - `@trama/ui-primitives` — 공용 UI 프리미티브.

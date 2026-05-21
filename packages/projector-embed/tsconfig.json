@@ -1,9 +1,0 @@
-{
-  "extends": "../../tsconfig.base.json",
-  "compilerOptions": {
-    "outDir": "dist",
-    "noEmit": true,
-    "jsx": "react-jsx"
-  },
-  "include": ["src/**/*"]
-}

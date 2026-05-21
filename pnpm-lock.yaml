@@ -129,28 +129,6 @@ importers:
         specifier: 5.6.3
         version: 5.6.3
 
-  packages/projector-embed:
-    dependencies:
-      '@trama/core':
-        specifier: workspace:*
-        version: link:../core
-      '@trama/tokens':
-        specifier: workspace:*
-        version: link:../tokens
-      zod:
-        specifier: 3.23.8
-        version: 3.23.8
-    devDependencies:
-      '@types/react':
-        specifier: 19.2.0
-        version: 19.2.0
-      react:
-        specifier: 19.2.0
-        version: 19.2.0
-      typescript:
-        specifier: 5.6.3
-        version: 5.6.3
-
   packages/projector-static:
     dependencies:
       '@trama/core':

@@ -10,7 +10,7 @@
   - `@trama/core` — 모델·실행·스키마·단위·생성기. React 비의존.
   - `@trama/tokens` — JSON 토큰 → TS 상수 + `[data-trama-root]` 스코프 CSS
   - `@trama/projector-web` — 풀 캔버스 인터랙티브 편집기 (UI/zustand)
-  - `@trama/projector-embed` — 정적 임베드 (읽기 전용)
+  - `@trama/projector-static` — 정적 임베드 (NodeSnapshot 기반 zero-compute SVG)
   - `@trama/host-tiptap` — Tiptap NodeView 어댑터
   - `@trama/host-tiptap-bundle` — Rollup ESM 번들 (외부 호스트 배포용)
   - `@trama/ui-primitives` — 공용 UI 프리미티브

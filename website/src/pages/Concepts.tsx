@@ -145,9 +145,9 @@ const items: ReadonlyArray<ConceptItem> = [
             </tr>
             <tr>
               <td>
-                <code>@trama/projector-embed</code>
+                <code>@trama/projector-static</code>
               </td>
-              <td>정적 읽기 전용 임베드.</td>
+              <td>정적 읽기 전용 임베드 (NodeSnapshot 기반 zero-compute SVG).</td>
             </tr>
             <tr>
               <td>
