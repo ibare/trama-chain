@@ -32,11 +32,11 @@
     "@trama/tokens": "workspace:*",
     "d3-shape": "^3.2.0",
     "embla-carousel-react": "^8.6.0",
-    "fizzex": "file:../../../fizzex",
     "zod": "3.23.8",
     "zustand": "5.0.1"
   },
   "peerDependencies": {
+    "fizzex": "^0.1.0",
     "react": "^19.0.0",
     "react-dom": "^19.0.0"
   },
@@ -44,6 +44,7 @@
     "@types/d3-shape": "^3.1.8",
     "@types/react": "19.2.0",
     "@types/react-dom": "19.2.0",
+    "fizzex": "file:../../../fizzex",
     "happy-dom": "^20.9.0",
     "react": "19.2.0",
     "react-dom": "19.2.0",

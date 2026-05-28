@@ -91,6 +91,9 @@ importers:
       '@types/react-dom':
         specifier: 19.2.0
         version: 19.2.0(@types/react@19.2.0)
+      fizzex:
+        specifier: file:../../../fizzex
+        version: file:../fizzex(@tiptap/core@3.23.4(@tiptap/pm@3.23.4))(react-dom@19.2.0(react@19.2.0))(react@19.2.0)
       react:
         specifier: 19.2.0
         version: 19.2.0
@@ -154,6 +157,48 @@ importers:
         specifier: 5.6.3
         version: 5.6.3
 
+  packages/projector-static-bundle:
+    devDependencies:
+      '@rollup/plugin-commonjs':
+        specifier: ^28.0.1
+        version: 28.0.9(rollup@4.60.3)
+      '@rollup/plugin-json':
+        specifier: ^6.1.0
+        version: 6.1.0(rollup@4.60.3)
+      '@rollup/plugin-node-resolve':
+        specifier: ^15.3.0
+        version: 15.3.1(rollup@4.60.3)
+      '@rollup/plugin-replace':
+        specifier: ^6.0.1
+        version: 6.0.3(rollup@4.60.3)
+      '@trama/projector-static':
+        specifier: workspace:*
+        version: link:../projector-static
+      '@types/react':
+        specifier: 19.2.0
+        version: 19.2.0
+      react:
+        specifier: 19.2.0
+        version: 19.2.0
+      rollup:
+        specifier: ^4.28.0
+        version: 4.60.3
+      rollup-plugin-dts:
+        specifier: ^6.1.1
+        version: 6.4.1(rollup@4.60.3)(typescript@5.6.3)
+      rollup-plugin-esbuild:
+        specifier: ^6.1.1
+        version: 6.2.1(esbuild@0.23.1)(rollup@4.60.3)
+      rollup-plugin-postcss:
+        specifier: ^4.0.2
+        version: 4.0.2(postcss@8.5.14)
+      rollup-plugin-visualizer:
+        specifier: ^5.12.0
+        version: 5.14.0(rollup@4.60.3)
+      typescript:
+        specifier: 5.6.3
+        version: 5.6.3
+
   packages/projector-web:
     dependencies:
       '@phosphor-icons/core':
@@ -201,9 +246,6 @@ importers:
       embla-carousel-react:
         specifier: ^8.6.0
         version: 8.6.0(react@19.2.0)
-      fizzex:
-        specifier: file:../../../fizzex
-        version: file:../fizzex(@tiptap/core@3.23.4(@tiptap/pm@3.23.4))(react-dom@19.2.0(react@19.2.0))(react@19.2.0)
       zod:
         specifier: 3.23.8
         version: 3.23.8
@@ -220,6 +262,9 @@ importers:
       '@types/react-dom':
         specifier: 19.2.0
         version: 19.2.0(@types/react@19.2.0)
+      fizzex:
+        specifier: file:../../../fizzex
+        version: file:../fizzex(@tiptap/core@3.23.4(@tiptap/pm@3.23.4))(react-dom@19.2.0(react@19.2.0))(react@19.2.0)
       happy-dom:
         specifier: ^20.9.0
         version: 20.9.0

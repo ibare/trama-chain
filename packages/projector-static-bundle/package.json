@@ -1,15 +1,15 @@
 {
-  "name": "@trama/host-tiptap-bundle",
+  "name": "@trama/projector-static-bundle",
   "version": "0.1.0",
   "private": true,
   "type": "module",
-  "description": "Self-contained ESM bundle of @trama/host-tiptap + projector-web + core + fizzex. 메티 등 외부 호스트 앱에서 단일 의존(file: tarball)으로 소비.",
-  "main": "./dist/host-tiptap-bundle.js",
-  "types": "./dist/host-tiptap-bundle.d.ts",
+  "description": "Self-contained ESM bundle of @trama/projector-static + core + layout + tokens. 메티 등 외부 호스트 앱에서 PDF·썸네일·정적 미리보기 시나리오에 단일 의존으로 소비.",
+  "main": "./dist/projector-static-bundle.js",
+  "types": "./dist/projector-static-bundle.d.ts",
   "exports": {
     ".": {
-      "types": "./dist/host-tiptap-bundle.d.ts",
-      "import": "./dist/host-tiptap-bundle.js"
+      "types": "./dist/projector-static-bundle.d.ts",
+      "import": "./dist/projector-static-bundle.js"
     }
   },
   "files": [
@@ -22,25 +22,16 @@
     "pack": "pnpm build && npm pack"
   },
   "peerDependencies": {
-    "@tiptap/core": "^3.22.5",
-    "@tiptap/pm": "^3.22.5",
-    "react": "^19.0.0",
-    "react-dom": "^19.0.0",
-    "fizzex": "^0.1.0"
+    "react": "^19.0.0"
   },
   "devDependencies": {
     "@rollup/plugin-commonjs": "^28.0.1",
     "@rollup/plugin-json": "^6.1.0",
     "@rollup/plugin-node-resolve": "^15.3.0",
     "@rollup/plugin-replace": "^6.0.1",
-    "@tiptap/core": "^3.23.4",
-    "@tiptap/pm": "^3.23.4",
-    "@trama/host-tiptap": "workspace:*",
+    "@trama/projector-static": "workspace:*",
     "@types/react": "19.2.0",
-    "fizzex": "file:../../../fizzex",
-    "@types/react-dom": "19.2.0",
     "react": "19.2.0",
-    "react-dom": "19.2.0",
     "rollup": "^4.28.0",
     "rollup-plugin-dts": "^6.1.1",
     "rollup-plugin-esbuild": "^6.1.1",
