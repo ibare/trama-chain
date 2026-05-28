@@ -1,5 +1,5 @@
 import { useCallback, useId, useRef } from 'react';
-import { isNumericValue, type ValueNode } from '@trama/core';
+import { isNumericValue, type ValueNode } from '@trama-chain/core';
 import { useTrama } from '../store/index.js';
 import { resolveNodeUnit } from '../util/unit-resolver.js';
 

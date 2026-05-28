@@ -1,4 +1,4 @@
-import type { CapturedExecValue, NodeId, NodeSnapshot } from '@trama/core';
+import type { CapturedExecValue, NodeId, NodeSnapshot } from '@trama-chain/core';
 
 /**
  * NodeSnapshot 의 출력 슬롯 유효성 키 포맷은 `${nodeId}:${slot}` — captureSnapshot

@@ -6,10 +6,10 @@ export default function Footer(): JSX.Element {
           © {new Date().getFullYear()} Trama. 관계를 함수 형태로 정의하는 프레이밍 도구.
         </span>
         <div className="trama-footer-links">
-          <a href="https://github.com/ibare/trama" target="_blank" rel="noreferrer noopener">
+          <a href="https://github.com/ibare/trama-chain" target="_blank" rel="noreferrer noopener">
             GitHub
           </a>
-          <a href="https://github.com/ibare/trama/issues" target="_blank" rel="noreferrer noopener">
+          <a href="https://github.com/ibare/trama-chain/issues" target="_blank" rel="noreferrer noopener">
             이슈
           </a>
         </div>

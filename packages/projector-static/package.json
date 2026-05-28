@@ -1,5 +1,5 @@
 {
-  "name": "@trama/projector-static",
+  "name": "@trama-chain/projector-static",
   "version": "0.1.0",
   "private": true,
   "type": "module",
@@ -15,9 +15,9 @@
     "build": "tsc -p tsconfig.json"
   },
   "dependencies": {
-    "@trama/core": "workspace:*",
-    "@trama/layout": "workspace:*",
-    "@trama/tokens": "workspace:*",
+    "@trama-chain/core": "workspace:*",
+    "@trama-chain/layout": "workspace:*",
+    "@trama-chain/tokens": "workspace:*",
     "zod": "3.23.8"
   },
   "peerDependencies": {

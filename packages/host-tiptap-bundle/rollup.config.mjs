@@ -1,13 +1,13 @@
 // @ts-check
 /**
- * @trama/host-tiptap-bundle — rollup 설정.
+ * @trama-chain/host-tiptap-bundle — rollup 설정.
  *
  * 정책:
  *  - 단일 ESM entry (host-tiptap-bundle.js) + 자동 chunk 추론.
  *  - external: @tiptap/core, @tiptap/pm, react, react-dom — 호스트 단일 인스턴스.
  *  - manualChunks: trama-core / projector-web / fizzex / runtime 으로 의미 분리.
  *    bundle visualizer로 사이즈 회귀 점검 가능.
- *  - CSS: projector-web의 styles.css는 `@import '@trama/tokens/css'`를 포함한다.
+ *  - CSS: projector-web의 styles.css는 `@import '@trama-chain/tokens/css'`를 포함한다.
  *    rollup-plugin-postcss + postcss-import로 펼친 뒤 `inject: true`로 번들 import
  *    시점에 head에 `<style>` 1회 삽입. trama-* prefix가 셀렉터에 깔려 있어
  *    호스트 전역과 충돌 위험 낮음.
@@ -41,8 +41,8 @@ const external = [
 /**
  * chunk 의미 분리. id는 절대 경로로 들어옴.
  *
- * - @trama/projector-web: 편집기 UI. 별도 chunk.
- * - @trama/core: 모델/직렬화. 별도 chunk (projector-web과 함께 쓰이지만 메티의
+ * - @trama-chain/projector-web: 편집기 UI. 별도 chunk.
+ * - @trama-chain/core: 모델/직렬화. 별도 chunk (projector-web과 함께 쓰이지만 메티의
  *   미래 정적 뷰어가 core만 필요할 가능성 대비).
  *
  * fizzex 는 external 처리 — 호스트(메티)가 자체 fizzex 인스턴스를 제공.
@@ -122,15 +122,15 @@ const jsBundle = {
 
 const dtsBundle = {
   input: 'src/index.ts',
-  // dts 패스에서는 @trama/* workspace 패키지의 .ts 소스를 끌어들여 인라인해야
+  // dts 패스에서는 @trama-chain/* workspace 패키지의 .ts 소스를 끌어들여 인라인해야
   // 한다. peer만 external로 남긴다.
   external,
   output: {
     file: 'dist/host-tiptap-bundle.d.ts',
     format: 'es',
   },
-  // respectExternal: workspace 패키지(@trama/host-tiptap, @trama/core,
-  // @trama/projector-web)의 type 정의를 따라가 단일 d.ts에 포함시킨다.
+  // respectExternal: workspace 패키지(@trama-chain/host-tiptap, @trama-chain/core,
+  // @trama-chain/projector-web)의 type 정의를 따라가 단일 d.ts에 포함시킨다.
   plugins: [dts({ respectExternal: true })],
 };
 

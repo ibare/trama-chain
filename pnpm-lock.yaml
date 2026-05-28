@@ -33,10 +33,10 @@ importers:
 
   packages/host-tiptap:
     dependencies:
-      '@trama/core':
+      '@trama-chain/core':
         specifier: workspace:*
         version: link:../core
-      '@trama/projector-web':
+      '@trama-chain/projector-web':
         specifier: workspace:*
         version: link:../projector-web
     devDependencies:
@@ -82,7 +82,7 @@ importers:
       '@tiptap/pm':
         specifier: ^3.23.4
         version: 3.23.6
-      '@trama/host-tiptap':
+      '@trama-chain/host-tiptap':
         specifier: workspace:*
         version: link:../host-tiptap
       '@types/react':
@@ -121,10 +121,10 @@ importers:
 
   packages/layout:
     dependencies:
-      '@trama/core':
+      '@trama-chain/core':
         specifier: workspace:*
         version: link:../core
-      '@trama/tokens':
+      '@trama-chain/tokens':
         specifier: workspace:*
         version: link:../tokens
     devDependencies:
@@ -134,13 +134,13 @@ importers:
 
   packages/projector-static:
     dependencies:
-      '@trama/core':
+      '@trama-chain/core':
         specifier: workspace:*
         version: link:../core
-      '@trama/layout':
+      '@trama-chain/layout':
         specifier: workspace:*
         version: link:../layout
-      '@trama/tokens':
+      '@trama-chain/tokens':
         specifier: workspace:*
         version: link:../tokens
       zod:
@@ -171,7 +171,7 @@ importers:
       '@rollup/plugin-replace':
         specifier: ^6.0.1
         version: 6.0.3(rollup@4.60.4)
-      '@trama/projector-static':
+      '@trama-chain/projector-static':
         specifier: workspace:*
         version: link:../projector-static
       '@types/react':
@@ -231,13 +231,13 @@ importers:
       '@radix-ui/react-toggle-group':
         specifier: ^1.1.11
         version: 1.1.11(@types/react-dom@19.2.0(@types/react@19.2.0))(@types/react@19.2.0)(react-dom@19.2.0(react@19.2.0))(react@19.2.0)
-      '@trama/core':
+      '@trama-chain/core':
         specifier: workspace:*
         version: link:../core
-      '@trama/layout':
+      '@trama-chain/layout':
         specifier: workspace:*
         version: link:../layout
-      '@trama/tokens':
+      '@trama-chain/tokens':
         specifier: workspace:*
         version: link:../tokens
       d3-shape:
@@ -295,16 +295,16 @@ importers:
 
   website:
     dependencies:
-      '@trama/core':
+      '@trama-chain/core':
         specifier: workspace:*
         version: link:../packages/core
-      '@trama/host-tiptap':
+      '@trama-chain/host-tiptap':
         specifier: workspace:*
         version: link:../packages/host-tiptap
-      '@trama/projector-web':
+      '@trama-chain/projector-web':
         specifier: workspace:*
         version: link:../packages/projector-web
-      '@trama/tokens':
+      '@trama-chain/tokens':
         specifier: workspace:*
         version: link:../packages/tokens
       react:

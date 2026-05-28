@@ -1,5 +1,5 @@
 import { useCallback } from 'react';
-import type { Edge } from '@trama/core';
+import type { Edge } from '@trama-chain/core';
 import { useTrama } from '../store/index.js';
 
 /**

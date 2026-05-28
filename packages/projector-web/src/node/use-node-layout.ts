@@ -1,6 +1,6 @@
 import { useMemo } from 'react';
-import type { Node } from '@trama/core';
-import { getNodeLayout, type NodeDisplayMode, type NodeLayout } from '@trama/layout';
+import type { Node } from '@trama-chain/core';
+import { getNodeLayout, type NodeDisplayMode, type NodeLayout } from '@trama-chain/layout';
 
 interface Options {
   incomingCount: number;

@@ -6,7 +6,7 @@ import {
   type UnitCatalog,
   type UnitDef,
   type ValueNode,
-} from '@trama/core';
+} from '@trama-chain/core';
 
 const FREE_FALLBACK: ResolvedUnit = {
   id: 'free',

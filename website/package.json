@@ -1,5 +1,5 @@
 {
-  "name": "@trama/website",
+  "name": "@trama-chain/website",
   "version": "0.0.0",
   "private": true,
   "description": "Trama 공개 사이트 (GitHub Pages)",
@@ -12,10 +12,10 @@
     "clean": "rm -rf dist node_modules/.vite"
   },
   "dependencies": {
-    "@trama/core": "workspace:*",
-    "@trama/host-tiptap": "workspace:*",
-    "@trama/projector-web": "workspace:*",
-    "@trama/tokens": "workspace:*",
+    "@trama-chain/core": "workspace:*",
+    "@trama-chain/host-tiptap": "workspace:*",
+    "@trama-chain/projector-web": "workspace:*",
+    "@trama-chain/tokens": "workspace:*",
     "react": "19.2.0",
     "react-dom": "19.2.0",
     "react-router-dom": "6.27.0"

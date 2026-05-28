@@ -1,4 +1,4 @@
-import { tokens } from '@trama/tokens';
+import { tokens } from '@trama-chain/tokens';
 import {
   defaultUnitCatalog,
   isConditionNode,
@@ -9,7 +9,7 @@ import {
   type ConditionOperator,
   type Model,
   type Node,
-} from '@trama/core';
+} from '@trama-chain/core';
 import type { StaticNodeRendererProps } from '../registry.js';
 import { isSlotValid } from '../snapshot.js';
 import { PinShape, SocketVisual } from './primitives.js';

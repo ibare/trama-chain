@@ -12,7 +12,7 @@ last_verified: 2026-05-20
 
 도메인 로직은 UI 프레임워크에 의존하지 않는다.
 
-- `@trama/core`는 React·zustand·DOM·Radix·CSS에 비의존이다.
+- `@trama-chain/core`는 React·zustand·DOM·Radix·CSS에 비의존이다.
 - 같은 모델 JSON이 여러 projector(web 편집기·embed·host-tiptap)에서 각각 렌더링된다.
 - core가 만든 추상은 projector가 소비한다. 역방향 import 금지.
 

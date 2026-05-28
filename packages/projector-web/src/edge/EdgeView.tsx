@@ -4,7 +4,7 @@ import {
   isExpressionNode,
   type EdgeId,
   type Node,
-} from '@trama/core';
+} from '@trama-chain/core';
 import { useTrama } from '../store/index.js';
 import {
   selectCableMedium,
@@ -12,7 +12,7 @@ import {
   selectIsSlotActive,
 } from '../store/edge-selectors.js';
 import { shapeRegistry } from '../store/registries.js';
-import { getNodeLayout } from '@trama/layout';
+import { getNodeLayout } from '@trama-chain/layout';
 import { resolveDisplayMode } from '../node/display-mode.js';
 import { conditionSourceSlotColor, slotColor } from '../node/slot-palette.js';
 import { useExpressionMeasureStore } from '../expression/expression-measure-store.js';

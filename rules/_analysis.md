@@ -7,13 +7,13 @@
 - 주요 프레임워크/라이브러리: React 19, Zustand 5, Radix UI, Zod, fizzex (수식 엔진), d3-shape, Tiptap (호스트)
 - 모노레포 여부: 예 (pnpm workspace)
 - 모듈/패키지/앱 목록:
-  - `@trama/core` — 모델·실행·스키마·단위·생성기. React 비의존.
-  - `@trama/tokens` — JSON 토큰 → TS 상수 + `[data-trama-root]` 스코프 CSS
-  - `@trama/projector-web` — 풀 캔버스 인터랙티브 편집기 (UI/zustand)
-  - `@trama/projector-static` — 정적 임베드 (NodeSnapshot 기반 zero-compute SVG)
-  - `@trama/host-tiptap` — Tiptap NodeView 어댑터
-  - `@trama/host-tiptap-bundle` — Rollup ESM 번들 (외부 호스트 배포용)
-  - `@trama/ui-primitives` — 공용 UI 프리미티브
+  - `@trama-chain/core` — 모델·실행·스키마·단위·생성기. React 비의존.
+  - `@trama-chain/tokens` — JSON 토큰 → TS 상수 + `[data-trama-root]` 스코프 CSS
+  - `@trama-chain/projector-web` — 풀 캔버스 인터랙티브 편집기 (UI/zustand)
+  - `@trama-chain/projector-static` — 정적 임베드 (NodeSnapshot 기반 zero-compute SVG)
+  - `@trama-chain/host-tiptap` — Tiptap NodeView 어댑터
+  - `@trama-chain/host-tiptap-bundle` — Rollup ESM 번들 (외부 호스트 배포용)
+  - `@trama-chain/ui-primitives` — 공용 UI 프리미티브
   - `website` — GitHub Pages 소개 사이트
 - 빌드 시스템: tsc + Rollup (bundle만), pnpm
 - 테스트 프레임워크: Vitest 2.x
@@ -22,8 +22,8 @@
 ### 규모
 - 소스 파일 수: 약 185개 (`.ts`/`.tsx`, dist/node_modules 제외)
 - 대략적 코드 라인 수: 약 22,234 lines
-  - `@trama/core` src: 5,850
-  - `@trama/projector-web` src: 3,638 (단, model-store.ts 단일 파일 752줄)
+  - `@trama-chain/core` src: 5,850
+  - `@trama-chain/projector-web` src: 3,638 (단, model-store.ts 단일 파일 752줄)
 - 테스트 파일 수: 15개 (대부분 core)
 - styles.css 한 파일: 52KB (projector-web)
 

@@ -1,5 +1,5 @@
 import { create } from 'zustand';
-import type { NodeId } from '@trama/core';
+import type { NodeId } from '@trama-chain/core';
 import type { FizzexMeasure } from './use-fizzex-renderer.js';
 
 /**

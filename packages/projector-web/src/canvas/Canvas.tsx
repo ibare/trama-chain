@@ -1,12 +1,12 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import type { EdgeId, NodeId } from '@trama/core';
+import type { EdgeId, NodeId } from '@trama-chain/core';
 import { useTrama } from '../store/index.js';
 import { EdgeView } from '../edge/EdgeView.js';
 import { NodeView } from '../node/NodeView.js';
 import { PulseLayer } from '../pulse/PulseLayer.js';
 import { EdgeDraftView } from './EdgeDraftView.js';
 import { NodePicker } from './NodePicker.js';
-import { isConditionNode, isExpressionNode } from '@trama/core';
+import { isConditionNode, isExpressionNode } from '@trama-chain/core';
 
 const ZOOM_MIN = 0.2;
 const ZOOM_MAX = 4;

@@ -36,10 +36,10 @@ jobs:
         run: pnpm -r --filter "./packages/*" build
 
       - name: Typecheck website
-        run: pnpm --filter @trama/website typecheck
+        run: pnpm --filter @trama-chain/website typecheck
 
       - name: Build website
-        run: pnpm --filter @trama/website build
+        run: pnpm --filter @trama-chain/website build
 
       - uses: actions/upload-pages-artifact@v3
         with:

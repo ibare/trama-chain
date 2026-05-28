@@ -1,5 +1,5 @@
 {
-  "name": "@trama/layout",
+  "name": "@trama-chain/layout",
   "version": "0.1.0",
   "private": true,
   "type": "module",
@@ -14,8 +14,8 @@
     "build": "tsc -p tsconfig.json"
   },
   "dependencies": {
-    "@trama/core": "workspace:*",
-    "@trama/tokens": "workspace:*"
+    "@trama-chain/core": "workspace:*",
+    "@trama-chain/tokens": "workspace:*"
   },
   "devDependencies": {
     "typescript": "5.6.3"

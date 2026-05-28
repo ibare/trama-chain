@@ -1,12 +1,12 @@
 import { memo } from 'react';
-import { tokens } from '@trama/tokens';
-import type { ValueNode, ResolvedUnit } from '@trama/core';
+import { tokens } from '@trama-chain/tokens';
+import type { ValueNode, ResolvedUnit } from '@trama-chain/core';
 import { combinerRegistry } from '../store/registries.js';
 import { formatNodeValue } from '../util/format.js';
 import { NodeBody } from './NodeBody.js';
 import { NodeLabel } from './NodeLabel.js';
 import { InteractiveArea } from './InteractiveArea.js';
-import type { NodeLayout } from '@trama/layout';
+import type { NodeLayout } from '@trama-chain/layout';
 
 interface Props {
   node: ValueNode;

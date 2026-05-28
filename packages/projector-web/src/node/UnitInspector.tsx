@@ -11,7 +11,7 @@ import {
   type UnitCategory,
   type UnitDef,
   type ValueNode,
-} from '@trama/core';
+} from '@trama-chain/core';
 import { useTrama } from '../store/index.js';
 import { resolveNodeUnit } from '../util/unit-resolver.js';
 import { getSkin, listSkinsForUnit } from '../skin/registry.js';

@@ -8,7 +8,7 @@ interface PackageEntry {
 
 const packages: ReadonlyArray<PackageEntry> = [
   {
-    name: '@trama/core',
+    name: '@trama-chain/core',
     role: '도메인 모델·실행·스키마',
     description:
       '모델 타입, 함수 카테고리 정의, 실행 엔진(timestep, feedback), 단위(unit) 시스템, 스키마(Zod) 검증, 마크다운 ↔ JSON 직렬화 / 파싱. React 비의존. 트라마의 모든 표면이 이 패키지 위에서 동작한다.',
@@ -21,14 +21,14 @@ const packages: ReadonlyArray<PackageEntry> = [
     ],
   },
   {
-    name: '@trama/tokens',
+    name: '@trama-chain/tokens',
     role: '디자인 토큰',
     description:
       'JSON으로 정의된 디자인 토큰을 TS 상수와 스코프된 CSS 변수로 빌드. 변수는 [data-trama-root] 셀렉터 안에서만 노출되어 외부 페이지의 Tailwind·전역 CSS와 충돌하지 않는다.',
     exports: ['tokens (TS 상수 트리)', 'tokens.css (스코프된 :root 셀렉터)'],
   },
   {
-    name: '@trama/projector-web',
+    name: '@trama-chain/projector-web',
     role: '풀 캔버스 인터랙티브 편집기',
     description:
       'React 컴포넌트로 노출되는 트라마 편집기. SVG 캔버스, 노드 인터랙션, shape 직접 조작, 식 편집, 상수 엣지, 실행 시각화를 모두 포함.',
@@ -40,7 +40,7 @@ const packages: ReadonlyArray<PackageEntry> = [
     peer: ['react ^19', 'react-dom ^19'],
   },
   {
-    name: '@trama/projector-static',
+    name: '@trama-chain/projector-static',
     role: '정적 읽기 전용 임베드',
     description:
       'TramaDocument 의 미리 박제된 NodeSnapshot 을 받아 인터랙션 없이 그래프를 SVG 로 그려주는 zero-compute 렌더러. 블로그·문서 사이트·PDF 출력에 적합.',
@@ -52,7 +52,7 @@ const packages: ReadonlyArray<PackageEntry> = [
     peer: ['react ^19'],
   },
   {
-    name: '@trama/host-tiptap',
+    name: '@trama-chain/host-tiptap',
     role: 'Tiptap 노드 확장',
     description:
       'tramaBlock 펜스를 Tiptap NodeView로 마운트. 내부 React 트리는 호스트와 분리되어 ProseMirror 트랜잭션과 round-trip된다.',
@@ -71,7 +71,7 @@ const packages: ReadonlyArray<PackageEntry> = [
     ],
   },
   {
-    name: '@trama/host-tiptap-bundle',
+    name: '@trama-chain/host-tiptap-bundle',
     role: '외부 호스트용 단일 ESM 번들',
     description:
       'host-tiptap + projector-web + core + fizzex를 Rollup으로 단일 파일에 인라인. 외부 호스트가 file: tarball 하나로 통합할 수 있게 만든 배포 산출물.',

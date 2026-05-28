@@ -1,6 +1,6 @@
 import { useMemo, useState } from 'react';
-import { TramaEditor } from '@trama/projector-web';
-import { createEmptyModel, modelToDocument, serializeTrama } from '@trama/core';
+import { TramaEditor } from '@trama-chain/projector-web';
+import { createEmptyModel, modelToDocument, serializeTrama } from '@trama-chain/core';
 
 function buildInitialJson(): string {
   return serializeTrama(modelToDocument(createEmptyModel()));

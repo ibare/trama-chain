@@ -1,9 +1,28 @@
 {
-  "name": "@trama/projector-static-bundle",
+  "name": "@trama-chain/projector-static-bundle",
   "version": "0.1.0",
-  "private": true,
   "type": "module",
-  "description": "Self-contained ESM bundle of @trama/projector-static + core + layout + tokens. 메티 등 외부 호스트 앱에서 PDF·썸네일·정적 미리보기 시나리오에 단일 의존으로 소비.",
+  "description": "Self-contained ESM bundle of Trama static (zero-compute) viewer — projector-static + core + layout + tokens inlined. PDF·썸네일·정적 미리보기용.",
+  "license": "MIT",
+  "author": "ibare",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/ibare/trama-chain.git",
+    "directory": "packages/projector-static-bundle"
+  },
+  "homepage": "https://github.com/ibare/trama-chain#readme",
+  "bugs": "https://github.com/ibare/trama-chain/issues",
+  "keywords": [
+    "trama",
+    "static",
+    "snapshot",
+    "svg",
+    "viewer",
+    "graph"
+  ],
+  "publishConfig": {
+    "access": "public"
+  },
   "main": "./dist/projector-static-bundle.js",
   "types": "./dist/projector-static-bundle.d.ts",
   "exports": {
@@ -13,7 +32,8 @@
     }
   },
   "files": [
-    "dist"
+    "dist",
+    "README.md"
   ],
   "scripts": {
     "build": "rollup -c rollup.config.mjs",
@@ -29,7 +49,7 @@
     "@rollup/plugin-json": "^6.1.0",
     "@rollup/plugin-node-resolve": "^15.3.0",
     "@rollup/plugin-replace": "^6.0.1",
-    "@trama/projector-static": "workspace:*",
+    "@trama-chain/projector-static": "workspace:*",
     "@types/react": "19.2.0",
     "react": "19.2.0",
     "rollup": "^4.28.0",

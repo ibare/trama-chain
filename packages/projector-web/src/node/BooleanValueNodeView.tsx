@@ -1,6 +1,6 @@
 import { memo, useCallback, useEffect, useId } from 'react';
-import { tokens } from '@trama/tokens';
-import { isValueNode, type NodeId } from '@trama/core';
+import { tokens } from '@trama-chain/tokens';
+import { isValueNode, type NodeId } from '@trama-chain/core';
 import { useTrama } from '../store/index.js';
 import { combinerRegistry } from '../store/registries.js';
 import { useNodeLayout } from './use-node-layout.js';

@@ -1,7 +1,7 @@
 import { memo, Suspense, type LazyExoticComponent } from 'react';
-import type { ValueNode, ResolvedUnit } from '@trama/core';
+import type { ValueNode, ResolvedUnit } from '@trama-chain/core';
 import type { NumericSkinComponent } from '../skin/types.js';
-import { SKIN_SCALE_MAX, SKIN_SCALE_MIN, type NodeLayout } from '@trama/layout';
+import { SKIN_SCALE_MAX, SKIN_SCALE_MIN, type NodeLayout } from '@trama-chain/layout';
 import { SkinResizeHandle } from './SkinResizeHandle.js';
 
 interface Props {

@@ -1,4 +1,4 @@
-import { tokens } from '@trama/tokens';
+import { tokens } from '@trama-chain/tokens';
 
 const SOCKET_SIZE = parseFloat(tokens.spacing.socketSize);
 const SOCKET_DOT_SIZE = parseFloat(tokens.spacing.socketDotSize);

@@ -12,8 +12,8 @@ import {
   type NodeSnapshot,
   type ShapeRegistry,
   type TramaDocument,
-} from '@trama/core';
-import { getNodeLayout, type NodeLayout } from '@trama/layout';
+} from '@trama-chain/core';
+import { getNodeLayout, type NodeLayout } from '@trama-chain/layout';
 import { computeBounds } from './geometry.js';
 import { buildSlotIndex } from './snapshot.js';
 import {

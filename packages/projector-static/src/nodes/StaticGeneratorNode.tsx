@@ -1,5 +1,5 @@
-import { tokens } from '@trama/tokens';
-import { isGeneratorNode } from '@trama/core';
+import { tokens } from '@trama-chain/tokens';
+import { isGeneratorNode } from '@trama-chain/core';
 import type { StaticNodeRendererProps } from '../registry.js';
 import { getCapturedNumeric, isSlotValid } from '../snapshot.js';
 import { PinShape, SocketVisual } from './primitives.js';

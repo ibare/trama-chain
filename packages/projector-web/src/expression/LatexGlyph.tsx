@@ -1,5 +1,5 @@
 import { memo } from 'react';
-import { tokens } from '@trama/tokens';
+import { tokens } from '@trama-chain/tokens';
 import { useFizzexRenderer } from './use-fizzex-renderer.js';
 
 interface Props {

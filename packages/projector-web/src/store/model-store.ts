@@ -28,7 +28,7 @@ import {
   setQuestion as setQuestionOp,
   updateEdge as updateEdgeOp,
   updateNode as updateNodeOp,
-} from '@trama/core';
+} from '@trama-chain/core';
 import type {
   AddAverageNodeInput,
   AddConditionNodeInput,
@@ -49,13 +49,13 @@ import type {
   NodeId,
   NodePatch,
   Value,
-} from '@trama/core';
+} from '@trama-chain/core';
 import {
   booleanValue,
   isNumericValue,
   isValueNode,
   numericValue,
-} from '@trama/core';
+} from '@trama-chain/core';
 import { commitExecutionState } from './execution-commit.js';
 import { computeExecutionState } from './execution-merge.js';
 import { createSpawnPolicy, type SpawnPolicy } from './spawn-policy.js';

@@ -4,9 +4,9 @@ import {
   isGeneratorNode,
   isObserveNode,
   isValueNode,
-} from '@trama/core';
+} from '@trama-chain/core';
 import { useTrama } from '../store/index.js';
-import { getNodeLayout } from '@trama/layout';
+import { getNodeLayout } from '@trama-chain/layout';
 import { resolveDisplayMode } from './display-mode.js';
 import { UnitInspector } from './UnitInspector.js';
 import { ObserveInspector } from './ObserveInspector.js';

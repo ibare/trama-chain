@@ -1,5 +1,5 @@
 import type { ComponentType } from 'react';
-import type { Edge } from '@trama/core';
+import type { Edge } from '@trama-chain/core';
 
 /**
  * Shape key → 인라인 편집기 컴포넌트 매핑.

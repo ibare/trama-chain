@@ -1,7 +1,7 @@
 import { useCallback, type MouseEvent } from 'react';
 import { InteractiveArea } from './InteractiveArea.js';
 import { PhosphorGlyph } from '../icon/phosphor.js';
-import type { NodeDisplayMode } from '@trama/layout';
+import type { NodeDisplayMode } from '@trama-chain/layout';
 
 interface Props {
   /** panel 우상단 코너 좌표 (NodeFrame 로컬 좌표). 토글은 이 점에서 안쪽으로 padding만큼 들어가 배치된다. */

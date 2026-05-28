@@ -1,5 +1,5 @@
 import type { FC } from 'react';
-import type { Node, NodeId } from '@trama/core';
+import type { Node, NodeId } from '@trama-chain/core';
 import type { TramaInstance } from '../store/trama-instance.js';
 import type { PhosphorGlyphName } from '../icon/phosphor.js';
 

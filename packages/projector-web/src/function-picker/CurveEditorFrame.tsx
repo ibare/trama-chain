@@ -5,7 +5,7 @@ import {
   type PointerEvent as ReactPointerEvent,
   type ReactNode,
 } from 'react';
-import type { Edge, ResolvedUnit, Model } from '@trama/core';
+import type { Edge, ResolvedUnit, Model } from '@trama-chain/core';
 import { useTrama } from '../store/index.js';
 import { resolveNodeUnit } from '../util/unit-resolver.js';
 import { formatNodeValue } from '../util/format.js';

@@ -1,4 +1,4 @@
-import { isValueNode } from '@trama/core';
+import { isValueNode } from '@trama-chain/core';
 import type { TramaInstance } from '../store/trama-instance.js';
 
 /**

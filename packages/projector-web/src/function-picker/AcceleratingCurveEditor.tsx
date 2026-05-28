@@ -1,5 +1,5 @@
 import { useCallback, useMemo, useRef, useState } from 'react';
-import type { Edge } from '@trama/core';
+import type { Edge } from '@trama-chain/core';
 import {
   CurveEditorFrame,
   CurveHandle,

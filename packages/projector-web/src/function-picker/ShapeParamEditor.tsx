@@ -1,6 +1,6 @@
 import { useCallback } from 'react';
 import * as Form from '@radix-ui/react-form';
-import type { Edge, ShapeParamField } from '@trama/core';
+import type { Edge, ShapeParamField } from '@trama-chain/core';
 import { useTrama } from '../store/index.js';
 
 interface Props {

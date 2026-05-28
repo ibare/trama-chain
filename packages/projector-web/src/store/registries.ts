@@ -5,7 +5,7 @@ import {
   createDefaultCombinerRegistry,
   createDefaultConstantRegistry,
   createDefaultShapeRegistry,
-} from '@trama/core';
+} from '@trama-chain/core';
 
 /**
  * Projector 내부에서 공유하는 registry. 호스트가 외부에서 더 등록할 수도 있음.

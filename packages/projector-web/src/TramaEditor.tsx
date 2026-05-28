@@ -6,7 +6,7 @@ import {
   modelToDocument,
   parseTrama,
   serializeTrama,
-} from '@trama/core';
+} from '@trama-chain/core';
 import './styles.css';
 import { Canvas } from './canvas/Canvas.js';
 import { FunctionPicker } from './function-picker/FunctionPicker.js';

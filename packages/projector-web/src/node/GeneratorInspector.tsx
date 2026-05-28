@@ -3,7 +3,7 @@ import * as ToggleGroup from '@radix-ui/react-toggle-group';
 import * as Separator from '@radix-ui/react-separator';
 import * as Form from '@radix-ui/react-form';
 import { useCallback, useEffect, useState } from 'react';
-import type { GeneratorNode, GeneratorParams } from '@trama/core';
+import type { GeneratorNode, GeneratorParams } from '@trama-chain/core';
 import { useTrama } from '../store/index.js';
 import { NumberField } from '../util/NumberField.js';
 

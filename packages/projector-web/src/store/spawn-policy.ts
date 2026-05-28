@@ -5,7 +5,7 @@ import {
   type ExecValue,
   type Model,
   type NodeId,
-} from '@trama/core';
+} from '@trama-chain/core';
 import { commitExecutionState } from './execution-commit.js';
 import {
   selectCableMedium,

@@ -1,4 +1,4 @@
-import type { ExecutionState } from '@trama/core';
+import type { ExecutionState } from '@trama-chain/core';
 
 /**
  * ExecutionState 부분 갱신을 단일 머지로 캡슐화 — model-store 안에서 store.setState

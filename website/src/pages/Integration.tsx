@@ -7,7 +7,7 @@ import {
   bootstrapTrama,
   renderTramaFenceHTML,
   tramaNodeToMarkdown,
-} from '@trama/host-tiptap';
+} from '@trama-chain/host-tiptap';
 
 const SAMPLE_JSON = JSON.stringify(
   {
@@ -20,7 +20,7 @@ const SAMPLE_JSON = JSON.stringify(
   2,
 );
 
-const SNIPPET_INSTALL = `pnpm add @trama/host-tiptap-bundle`;
+const SNIPPET_INSTALL = `pnpm add @trama-chain/host-tiptap-bundle`;
 
 const SNIPPET_BOOTSTRAP = `import { Editor } from '@tiptap/core';
 import StarterKit from '@tiptap/starter-kit';
@@ -28,7 +28,7 @@ import {
   TramaExtension,
   bootstrapTrama,
   renderTramaFenceHTML,
-} from '@trama/host-tiptap-bundle';
+} from '@trama-chain/host-tiptap-bundle';
 
 // 한 번만 호출 — projector-web의 스코프 CSS 주입.
 bootstrapTrama();
@@ -46,7 +46,7 @@ const editor = new Editor({
     '<p>아래 문단</p>',
 });`;
 
-const SNIPPET_MARKDOWN = `import { tramaNodeToMarkdown, TRAMA_NODE_NAME } from '@trama/host-tiptap-bundle';
+const SNIPPET_MARKDOWN = `import { tramaNodeToMarkdown, TRAMA_NODE_NAME } from '@trama-chain/host-tiptap-bundle';
 
 const parts: string[] = [];
 editor.state.doc.descendants((node) => {
@@ -118,7 +118,7 @@ export default function Integration(): JSX.Element {
       <header className="trama-integration-header">
         <h1>호스트 통합</h1>
         <p>
-          <code>@trama/host-tiptap-bundle</code>은 Tiptap 호스트가 단일 ESM 의존만으로 trama
+          <code>@trama-chain/host-tiptap-bundle</code>은 Tiptap 호스트가 단일 ESM 의존만으로 trama
           노드를 마운트할 수 있게 한다. peer는 <code>@tiptap/core</code>,{' '}
           <code>@tiptap/pm</code>, <code>react</code>, <code>react-dom</code> 넷.
         </p>
@@ -165,7 +165,7 @@ export default function Integration(): JSX.Element {
       <section className="trama-integration-section">
         <h2>라이브 데모</h2>
         <p className="trama-note">
-          아래 영역은 실제로 <code>@trama/host-tiptap</code>을 임베드한 Tiptap 에디터. 가운데
+          아래 영역은 실제로 <code>@trama-chain/host-tiptap</code>을 임베드한 Tiptap 에디터. 가운데
           노드를 클릭/드래그/편집하고, 위·아래 문단도 같이 살아 있는지 확인하면 된다.
         </p>
         <div className="trama-integration-demo">

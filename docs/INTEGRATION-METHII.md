@@ -1,7 +1,7 @@
 # 메티 ↔ trama 통합 요청서
 
 **대상**: 메티(Methii) 측 호스트 작업자  
-**작성**: trama 측 (@trama/host-tiptap-bundle 0.1.0 산출 직후)  
+**작성**: trama 측 (@trama-chain/host-tiptap-bundle 0.1.0 산출 직후)  
 **산출물**: `packages/host-tiptap-bundle/trama-host-tiptap-bundle-0.1.0.tgz` (2.1MB, sourcemap 포함)  
 **SHA256**: `2f7cf87b72832d64d194defac47c243ea7fcb495e2ddfc5eedeccd4fb1b7e66d`
 
@@ -12,12 +12,12 @@
 
 ## 1. 무엇이 들어 있나
 
-`@trama/host-tiptap-bundle`은 다음을 단일 ESM 파일로 인라인한 Tiptap 확장 번들이다.
+`@trama-chain/host-tiptap-bundle`은 다음을 단일 ESM 파일로 인라인한 Tiptap 확장 번들이다.
 
-- `@trama/host-tiptap` — Tiptap NodeView 어댑터, 마크다운 펜스 유틸
-- `@trama/projector-web` — TramaEditor (React, 캔버스, 노드, 사이드패널 일체)
-- `@trama/core` — 모델/직렬화
-- `@trama/tokens` — CSS 변수 (postcss로 styles.css에 인라인됨)
+- `@trama-chain/host-tiptap` — Tiptap NodeView 어댑터, 마크다운 펜스 유틸
+- `@trama-chain/projector-web` — TramaEditor (React, 캔버스, 노드, 사이드패널 일체)
+- `@trama-chain/core` — 모델/직렬화
+- `@trama-chain/tokens` — CSS 변수 (postcss로 styles.css에 인라인됨)
 - `fizzex` — 식 평가 엔진
 
 번들 import 시점에 projector-web의 `styles.css`(트라마 디자인 토큰 포함)가
@@ -66,7 +66,7 @@ package/
 ```jsonc
 {
   "dependencies": {
-    "@trama/host-tiptap-bundle": "file:../../vendor/trama-host-tiptap-bundle-0.1.0.tgz"
+    "@trama-chain/host-tiptap-bundle": "file:../../vendor/trama-host-tiptap-bundle-0.1.0.tgz"
   }
 }
 ```
@@ -92,7 +92,7 @@ import {
   TRAMA_FENCE_RE,          // 마크다운에서 ```trama 펜스를 찾는 정규식
   renderTramaFenceHTML,    // JSON 문자열 → <pre data-trama="true"><code>...</code></pre>
   tramaNodeToMarkdown,     // JSON 문자열 → ```trama\n…\n``` 펜스
-} from '@trama/host-tiptap-bundle';
+} from '@trama-chain/host-tiptap-bundle';
 ```
 
 메티의 Tiptap extension-registry에 `TramaExtension`을 다른 블록 확장(예: depix,
@@ -156,7 +156,7 @@ if (lang === 'trama') {
 그대로 호출하면 된다.
 
 ```ts
-import { TRAMA_NODE_NAME, tramaNodeToMarkdown } from '@trama/host-tiptap-bundle';
+import { TRAMA_NODE_NAME, tramaNodeToMarkdown } from '@trama-chain/host-tiptap-bundle';
 
 // 메티의 prose-to-markdown 직렬화기 안
 if (node.type.name === TRAMA_NODE_NAME) {
@@ -250,7 +250,7 @@ trama 측은 `apps/web/src/routes/TiptapSandboxRoute.tsx`에서 같은 형질을
 
 trama 측에서 새 버전을 만들면:
 
-1. `pnpm --filter @trama/host-tiptap-bundle run pack`
+1. `pnpm --filter @trama-chain/host-tiptap-bundle run pack`
 2. `trama-host-tiptap-bundle-X.Y.Z.tgz` 산출
 3. SHA256 + 변경 요약을 본 문서와 같은 형태로 메티 팀에 전달
 4. 메티 측 `vendor/` 교체 + `apps/web/package.json` 버전 라인 갱신
@@ -262,7 +262,7 @@ trama 측에서 새 버전을 만들면:
 | # | 위치 | 변경 |
 |---|------|------|
 | 1 | `vendor/trama-host-tiptap-bundle-0.1.0.tgz` | 파일 배치 |
-| 2 | `apps/web/package.json` dependencies | `"@trama/host-tiptap-bundle": "file:../../vendor/trama-host-tiptap-bundle-0.1.0.tgz"` |
+| 2 | `apps/web/package.json` dependencies | `"@trama-chain/host-tiptap-bundle": "file:../../vendor/trama-host-tiptap-bundle-0.1.0.tgz"` |
 | 3 | Tiptap extension-registry | `TramaExtension` 등록 |
 | 4 | `packages/methii-markdown` `buildFenceNode` | `lang === 'trama'` 분기 추가 |
 | 5 | prose-to-markdown 직렬화기 | `tramaBlock` 노드 → `tramaNodeToMarkdown(node.textContent)` |

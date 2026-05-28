@@ -8,7 +8,7 @@
 ## 1. 목적과 범위
 
 - `packages/core/src/execution/kinds.ts` (1390줄) 를 의미 단위로 분리.
-- **public surface 동일성 유지** — `@trama/core` 의 re-export(`execution/index.ts:5 export * from './kinds.js'`) 를 통해 외부에서 보던 심볼은 그대로.
+- **public surface 동일성 유지** — `@trama-chain/core` 의 re-export(`execution/index.ts:5 export * from './kinds.js'`) 를 통해 외부에서 보던 심볼은 그대로.
 - 외부 변경 0 — projector-web/projector-embed 의 import 라인은 한 줄도 안 바뀐다.
 - 동시에 **장기 fix 들의 단위를 좁힌다**: P2/P6/P7/P8 같은 디스크립터 내부 회귀는 이후 디스크립터 1 파일만 손대고 끝낼 수 있게.
 
@@ -24,13 +24,13 @@
 ### 2.1 외부 import 진입점
 
 ```
-@trama/core
+@trama-chain/core
   └── packages/core/src/index.ts
         └── … re-export …
               └── execution/index.ts:5  →  export * from './kinds.js'
 ```
 
-`@trama/core` 를 import 하는 곳은 65 군데(projector-web/embed). 그러나 모두 *re-export 된 심볼명*으로만 의존한다. 분리는 *내부 파일 경계*만 바꾸므로 외부는 0 영향.
+`@trama-chain/core` 를 import 하는 곳은 65 군데(projector-web/embed). 그러나 모두 *re-export 된 심볼명*으로만 의존한다. 분리는 *내부 파일 경계*만 바꾸므로 외부는 0 영향.
 
 ### 2.2 core 내부 직접 import (3 곳)
 
@@ -94,7 +94,7 @@ packages/core/src/execution/
 - (A) **파일 삭제** + 디렉터리로 교체. core 내부 import 3 곳을 `./kinds/index.js` 로 수정. `execution/index.ts:5` 의 `export * from './kinds.js'` 를 `./kinds/index.js` 로 변경.
 - (B) **thin shim 유지**. `kinds.ts` 내용 전부를 `export * from './kinds/index.js';` 한 줄로. 외부 진입점은 그대로.
 
-권고: **(A)**. shim 을 두면 "어디서 무엇이 정의되는지" 그라우팅이 한 단계 늘어 디버깅 cost 가 누적된다. 외부는 `@trama/core` 만 보므로 내부 import 3 곳만 고치면 끝.
+권고: **(A)**. shim 을 두면 "어디서 무엇이 정의되는지" 그라우팅이 한 단계 늘어 디버깅 cost 가 누적된다. 외부는 `@trama-chain/core` 만 보므로 내부 import 3 곳만 고치면 끝.
 
 ---
 
@@ -117,8 +117,8 @@ packages/core/src/execution/
 ## 5. 분리 시 규칙
 
 1. **외부 noticeable surface 0 변경**
-   - `@trama/core` 가 export 하던 심볼은 *이름·시그니처·런타임 동작* 모두 동일.
-   - 점검 명령: 분리 전후로 `pnpm --filter @trama/core build` 산출물(.d.ts) 의 export 목록이 동일한지 diff.
+   - `@trama-chain/core` 가 export 하던 심볼은 *이름·시그니처·런타임 동작* 모두 동일.
+   - 점검 명령: 분리 전후로 `pnpm --filter @trama-chain/core build` 산출물(.d.ts) 의 export 목록이 동일한지 diff.
 2. **내부 cross-import 최소화**
    - 디스크립터 파일은 `../context.ts`, `../port-spec.ts`, `../descriptor.ts`, `../internals.ts` 만 import 한다.
    - 디스크립터끼리는 *서로 import 하지 않는다*. 공통 로직이 있다면 `internals.ts` 로 끌어올린다.
@@ -136,12 +136,12 @@ packages/core/src/execution/
 
 | 위험 | 원인 | 차단 방법 |
 |---|---|---|
-| public surface 누락 | 분리 중 `kinds/index.ts` 의 re-export 빠뜨림 | C5 직후 `pnpm --filter @trama/core build` 후 `.d.ts` diff |
+| public surface 누락 | 분리 중 `kinds/index.ts` 의 re-export 빠뜨림 | C5 직후 `pnpm --filter @trama-chain/core build` 후 `.d.ts` diff |
 | 모듈 평가 순환 | 디스크립터 ↔ registry ↔ kinds/index 의 cyclic import | descriptors/*.ts 는 registry 를 import 하지 않게(반대로 registry 가 descriptors 를 import) |
 | `state.ts` ↔ kinds 양방향 의존 (감사 §3.2 항목 O) | 현재도 양방향. 분리하면서 노출 | 이번 PR 범위 밖. 별도 fix(`ObserveExtractionRuntime` 이 `state.ts` 아닌 별도 모듈에 살게) 후속 PR 로. |
 | `index.ts` re-export 중복 충돌 | 같은 이름을 두 모듈이 export | `export * from` 대신 명시 re-export 권고 (아래 §7) |
-| typecheck 통과인데 런타임 깨짐 | 디스크립터 본문이 사용하는 내부 헬퍼를 잘못된 파일로 옮김 | C5 직전 `pnpm --filter @trama/core test:run` |
-| 외부 패키지가 `@trama/core` 외 경로로 import | grep 결과 0건 확인(아래 §8) | C5 후 재확인 |
+| typecheck 통과인데 런타임 깨짐 | 디스크립터 본문이 사용하는 내부 헬퍼를 잘못된 파일로 옮김 | C5 직전 `pnpm --filter @trama-chain/core test:run` |
+| 외부 패키지가 `@trama-chain/core` 외 경로로 import | grep 결과 0건 확인(아래 §8) | C5 후 재확인 |
 
 ---
 
@@ -171,7 +171,7 @@ export {
 
 - [ ] C1~C4 각 단계에서 `pnpm -r typecheck` 통과.
 - [ ] C5 후 `pnpm -r test:run` 통과 (core 단위 테스트 + 다른 패키지).
-- [ ] `pnpm --filter @trama/core build` 후 `dist/execution/kinds*.d.ts` 의 export 목록이 분리 전과 동일 (수동 diff).
+- [ ] `pnpm --filter @trama-chain/core build` 후 `dist/execution/kinds*.d.ts` 의 export 목록이 분리 전과 동일 (수동 diff).
 - [ ] `grep -rn "from '.*execution/kinds'" packages/` 결과가 core 내부 4 곳(state/propagate/recompute-node/index) 만 표시 — 외부에서 직접 깊은 경로로 import 하는 경우 0 건.
 - [ ] `grep -rn "from '.*kinds/internals'" packages/projector-web packages/projector-embed packages/host-tiptap*` 결과 0 건 — internals 누설 없음.
 - [ ] 분리 PR 의 diff 가 *코드 이동* 만으로 구성. 동작 변경 0 (`git diff -M` 의 rename 비율 70% 이상 권고).

@@ -5,15 +5,15 @@
   "description": "Trama — 관계를 함수 형태로 정의하는 프레이밍 도구",
   "scripts": {
     "build": "pnpm -r --filter './packages/**' run build",
-    "build:tokens": "pnpm --filter @trama/tokens run build",
+    "build:tokens": "pnpm --filter @trama-chain/tokens run build",
     "test": "pnpm -r --filter './packages/**' run test",
     "test:run": "pnpm -r --filter './packages/**' run test:run",
     "typecheck": "pnpm -r --filter './packages/**' run typecheck",
-    "dev": "pnpm --filter @trama/website run dev",
-    "dev:site": "pnpm --filter @trama/website run dev",
-    "build:site": "pnpm --filter @trama/website run build",
+    "dev": "pnpm --filter @trama-chain/website run dev",
+    "dev:site": "pnpm --filter @trama-chain/website run dev",
+    "build:site": "pnpm --filter @trama-chain/website run build",
     "lint": "pnpm -r run lint",
-    "postinstall": "pnpm --filter @trama/tokens run build"
+    "postinstall": "pnpm --filter @trama-chain/tokens run build"
   },
   "devDependencies": {
     "typescript": "5.6.3",

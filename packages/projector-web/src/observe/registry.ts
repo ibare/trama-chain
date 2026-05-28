@@ -1,4 +1,4 @@
-import type { ValueKind } from '@trama/core';
+import type { ValueKind } from '@trama-chain/core';
 import type { ObserveVisualizationDefinition } from './types.js';
 
 const map = new Map<string, ObserveVisualizationDefinition>();

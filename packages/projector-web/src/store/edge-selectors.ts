@@ -8,7 +8,7 @@ import {
   type ExecValue,
   type Model,
   type NodeId,
-} from '@trama/core';
+} from '@trama-chain/core';
 
 /**
  * 엣지 시각(EdgeView) 과 펄스 발사 가드(spawnOutgoingPulses) 가 같은 invariant 를

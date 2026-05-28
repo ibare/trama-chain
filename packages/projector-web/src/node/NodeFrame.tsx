@@ -1,6 +1,6 @@
 import { memo, useCallback, useEffect, useRef, type ReactNode } from 'react';
-import type { NodeId } from '@trama/core';
-import { tokens } from '@trama/tokens';
+import type { NodeId } from '@trama-chain/core';
+import { tokens } from '@trama-chain/tokens';
 import { useTrama } from '../store/index.js';
 import { type EdgeHandle } from '../canvas/drag-registry.js';
 import { useNodeFlashId } from '../pulse/use-node-flash.js';

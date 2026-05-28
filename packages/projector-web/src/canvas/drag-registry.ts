@@ -1,4 +1,4 @@
-import type { EdgeId, NodeId } from '@trama/core';
+import type { EdgeId, NodeId } from '@trama-chain/core';
 
 /**
  * 드래그 중 React 사이클을 우회해 SVG DOM을 직접 갱신하기 위한 핸들 레지스트리.

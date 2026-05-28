@@ -1,5 +1,5 @@
-import type { NodeId } from '@trama/core';
-import { tokens } from '@trama/tokens';
+import type { NodeId } from '@trama-chain/core';
+import { tokens } from '@trama-chain/tokens';
 
 /**
  * 노드 flash 트리거 레지스트리.

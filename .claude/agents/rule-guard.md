@@ -90,7 +90,7 @@ EOF
 ```bash
 /tmp/baden-trama <<'EOF'
 {"action":"check_rule","ruleId":"C1","target":"packages/core/src/foo.ts","reason":"core 신규 파일 검토","taskId":"<taskId>"}
-{"action":"rule_violation","ruleId":"C1","target":"packages/core/src/foo.ts","severity":"high","reason":"@trama/core 가 react 를 import — Projector 분리 위반","taskId":"<taskId>"}
+{"action":"rule_violation","ruleId":"C1","target":"packages/core/src/foo.ts","severity":"high","reason":"@trama-chain/core 가 react 를 import — Projector 분리 위반","taskId":"<taskId>"}
 {"action":"review_issue","reason":"C1 위반 1건 — 수정 계획 보완 필요","taskId":"<taskId>"}
 EOF
 ```

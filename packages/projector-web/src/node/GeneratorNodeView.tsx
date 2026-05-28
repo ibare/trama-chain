@@ -1,12 +1,12 @@
 import { memo, useCallback, useEffect } from 'react';
-import { tokens } from '@trama/tokens';
+import { tokens } from '@trama-chain/tokens';
 import {
   isGeneratorNode,
   isSequence,
   resolveScalar,
   unwrap,
   type NodeId,
-} from '@trama/core';
+} from '@trama-chain/core';
 import { useTrama } from '../store/index.js';
 import { useNodeLayout } from './use-node-layout.js';
 import { resolveDisplayMode } from './display-mode.js';

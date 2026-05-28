@@ -1,5 +1,5 @@
 import { memo, useEffect, useMemo, useRef, useSyncExternalStore } from 'react';
-import { tokens } from '@trama/tokens';
+import { tokens } from '@trama-chain/tokens';
 import { useTrama } from '../store/index.js';
 import type { Pulse } from './pulse-registry.js';
 import { cablePointAt } from '../edge/cable-physics.js';

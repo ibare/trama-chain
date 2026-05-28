@@ -5,7 +5,7 @@ import type {
   SequenceSample,
   Value,
   ValueKind,
-} from '@trama/core';
+} from '@trama-chain/core';
 
 /**
  * Observe 시각화 패러다임.

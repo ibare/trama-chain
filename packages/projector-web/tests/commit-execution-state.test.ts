@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
-import type { ExecutionState } from '@trama/core';
-import { numericValue } from '@trama/core';
+import type { ExecutionState } from '@trama-chain/core';
+import { numericValue } from '@trama-chain/core';
 import { commitExecutionState } from '../src/store/execution-commit.js';
 
 /**

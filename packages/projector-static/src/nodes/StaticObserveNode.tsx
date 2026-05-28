@@ -1,5 +1,5 @@
-import { tokens } from '@trama/tokens';
-import { isObserveNode, isNumericValue } from '@trama/core';
+import { tokens } from '@trama-chain/tokens';
+import { isObserveNode, isNumericValue } from '@trama-chain/core';
 import type { StaticNodeRendererProps } from '../registry.js';
 import { isSlotValid } from '../snapshot.js';
 import { PinShape, SocketVisual } from './primitives.js';

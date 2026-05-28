@@ -1,5 +1,5 @@
 import type { ComponentType } from 'react';
-import type { ResolvedUnit, ValueKind, ValueNode } from '@trama/core';
+import type { ResolvedUnit, ValueKind, ValueNode } from '@trama-chain/core';
 
 /**
  * 스킨이 다루는 도메인 영역 선언.

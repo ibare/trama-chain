@@ -1,5 +1,5 @@
 import { useSyncExternalStore } from 'react';
-import type { NodeId } from '@trama/core';
+import type { NodeId } from '@trama-chain/core';
 import { useTrama } from '../store/index.js';
 
 /**

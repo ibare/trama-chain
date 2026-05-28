@@ -5,13 +5,13 @@ import type {
   Node,
   NodeSnapshot,
   ShapeRegistry,
-} from '@trama/core';
-import type { NodeLayout } from '@trama/layout';
+} from '@trama-chain/core';
+import type { NodeLayout } from '@trama-chain/layout';
 import type { SlotIndex } from './snapshot.js';
 
 /**
  * 정적 노드 렌더러의 공통 props — 시뮬레이션 콜백 없음. 모든 데이터는 NodeSnapshot 에서
- * 끄집어내며, layout 은 @trama/layout 의 getNodeLayout 결과를 사용.
+ * 끄집어내며, layout 은 @trama-chain/layout 의 getNodeLayout 결과를 사용.
  */
 export interface StaticNodeRendererProps {
   node: Node;

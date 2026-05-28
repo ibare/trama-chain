@@ -1,5 +1,5 @@
 import { memo, useMemo } from 'react';
-import type { Value } from '@trama/core';
+import type { Value } from '@trama-chain/core';
 import type { ObserveVisualizationRenderProps } from './types.js';
 
 /**

@@ -1,4 +1,4 @@
-import { tokens } from '@trama/tokens';
+import { tokens } from '@trama-chain/tokens';
 
 /**
  * 멀티슬롯 노드의 슬롯 식별색.

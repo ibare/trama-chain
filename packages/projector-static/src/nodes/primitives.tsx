@@ -1,5 +1,5 @@
-import { tokens } from '@trama/tokens';
-import type { PinLayout } from '@trama/layout';
+import { tokens } from '@trama-chain/tokens';
+import type { PinLayout } from '@trama-chain/layout';
 
 const PIN_RADIUS = parseFloat(tokens.spacing.pinRadius);
 const SOCKET_SIZE = parseFloat(tokens.spacing.socketSize);

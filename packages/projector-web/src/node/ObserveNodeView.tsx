@@ -1,5 +1,5 @@
 import { memo, useCallback, useEffect, useMemo, useRef } from 'react';
-import { tokens } from '@trama/tokens';
+import { tokens } from '@trama-chain/tokens';
 import {
   booleanValue,
   functionHandle,
@@ -15,8 +15,8 @@ import {
   type NodeId,
   type ObserveBuffer,
   type Value,
-} from '@trama/core';
-import type { SequenceSample } from '@trama/core';
+} from '@trama-chain/core';
+import type { SequenceSample } from '@trama-chain/core';
 import { useTrama } from '../store/index.js';
 import { selectCableMedium } from '../store/edge-selectors.js';
 import { useNodeLayout } from './use-node-layout.js';

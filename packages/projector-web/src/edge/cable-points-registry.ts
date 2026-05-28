@@ -1,4 +1,4 @@
-import type { EdgeId } from '@trama/core';
+import type { EdgeId } from '@trama-chain/core';
 import type { Cable } from './cable-physics.js';
 
 /**

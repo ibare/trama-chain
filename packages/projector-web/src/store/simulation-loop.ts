@@ -7,7 +7,7 @@ import {
   type GeneratorRuntime,
   type Model,
   type NodeId,
-} from '@trama/core';
+} from '@trama-chain/core';
 import { commitExecutionState } from './execution-commit.js';
 import type { ModelStore } from './model-store.js';
 import type { AnimationLoop } from '../canvas/animation-loop.js';

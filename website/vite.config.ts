@@ -10,10 +10,10 @@ export default defineConfig({
   },
   optimizeDeps: {
     exclude: [
-      '@trama/core',
-      '@trama/host-tiptap',
-      '@trama/projector-web',
-      '@trama/tokens',
+      '@trama-chain/core',
+      '@trama-chain/host-tiptap',
+      '@trama-chain/projector-web',
+      '@trama-chain/tokens',
     ],
   },
   server: {

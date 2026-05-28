@@ -1,4 +1,4 @@
-import { tokens } from '@trama/tokens';
+import { tokens } from '@trama-chain/tokens';
 import {
   defaultUnitCatalog,
   isNumericValue,
@@ -6,7 +6,7 @@ import {
   resolveUnit,
   type ResolvedUnit,
   type UnitOverride,
-} from '@trama/core';
+} from '@trama-chain/core';
 import type { StaticNodeRendererProps } from '../registry.js';
 import { formatNodeValue } from '../format.js';
 import { getCapturedBoolean, getCapturedNumeric, isSlotValid } from '../snapshot.js';

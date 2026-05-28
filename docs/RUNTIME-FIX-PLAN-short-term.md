@@ -243,7 +243,7 @@ path.style.setProperty('--continuous-intensity', String(intensity));
 `packages/projector-web/tests/` 는 현재 `knob-geometry.test.ts` 1 개만. 단기 fix 의 T2/T6/T7/T8/T9 가 *projector-web 테스트 인프라*를 의존.
 
 **단기에는 최소 셋업**:
-- vitest 설정은 `@trama/projector-embed` 의 vitest config 를 참조 (이미 동작).
+- vitest 설정은 `@trama-chain/projector-embed` 의 vitest config 를 참조 (이미 동작).
 - DOM 의존: `@testing-library/react` 또는 `happy-dom` — 두 후보 중 happy-dom 권고 (이미 monorepo 의 다른 패키지가 쓰면 그대로).
 - model-store 의 *클로저 7 개*가 격리 어려움 → 단기 테스트는 *zustand store 생성 후 mutation/검증* 수준만. 시뮬 ticker 검증은 중기로 미룸.
 
@@ -255,13 +255,13 @@ path.style.setProperty('--continuous-intensity', String(intensity));
 
 ```
 1. typecheck 패키지 단위
-   pnpm --filter @trama/core typecheck
-   pnpm --filter @trama/projector-web typecheck
+   pnpm --filter @trama-chain/core typecheck
+   pnpm --filter @trama-chain/projector-web typecheck
 2. typecheck 전체
    pnpm -r typecheck
 3. 단위 테스트 (영향 패키지)
-   pnpm --filter @trama/core test:run
-   pnpm --filter @trama/projector-web test:run
+   pnpm --filter @trama-chain/core test:run
+   pnpm --filter @trama-chain/projector-web test:run
 4. 통합 테스트
    pnpm -r test:run
 5. rule-guard 사전 검토 + 사후 검증

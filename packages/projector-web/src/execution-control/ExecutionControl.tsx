@@ -1,6 +1,6 @@
 import { useCallback } from 'react';
 import * as Form from '@radix-ui/react-form';
-import { hasFeedbackEdges } from '@trama/core';
+import { hasFeedbackEdges } from '@trama-chain/core';
 import { useTrama } from '../store/index.js';
 import { PhosphorIcon } from '../icon/phosphor.js';
 

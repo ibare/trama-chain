@@ -1,5 +1,5 @@
-import type { EdgeId, ExecValue, NodeId } from '@trama/core';
-import { tokens } from '@trama/tokens';
+import type { EdgeId, ExecValue, NodeId } from '@trama-chain/core';
+import { tokens } from '@trama-chain/tokens';
 import type { AnimationLoop } from '../canvas/animation-loop.js';
 import type { PulseSettingsStore } from '../store/pulse-settings.js';
 import type { SimulationOrchestrator } from '../store/simulation-orchestrator.js';

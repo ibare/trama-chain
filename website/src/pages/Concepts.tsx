@@ -127,37 +127,37 @@ const items: ReadonlyArray<ConceptItem> = [
           <tbody>
             <tr>
               <td>
-                <code>@trama/core</code>
+                <code>@trama-chain/core</code>
               </td>
               <td>모델·함수·실행·단위·스키마. React 비의존.</td>
             </tr>
             <tr>
               <td>
-                <code>@trama/tokens</code>
+                <code>@trama-chain/tokens</code>
               </td>
               <td>JSON 토큰 → TS 상수 + 스코프 CSS. 글로벌 <code>:root</code>에 절대 깔지 않음.</td>
             </tr>
             <tr>
               <td>
-                <code>@trama/projector-web</code>
+                <code>@trama-chain/projector-web</code>
               </td>
               <td>풀 캔버스 인터랙티브 편집기.</td>
             </tr>
             <tr>
               <td>
-                <code>@trama/projector-static</code>
+                <code>@trama-chain/projector-static</code>
               </td>
               <td>정적 읽기 전용 임베드 (NodeSnapshot 기반 zero-compute SVG).</td>
             </tr>
             <tr>
               <td>
-                <code>@trama/host-tiptap</code>
+                <code>@trama-chain/host-tiptap</code>
               </td>
               <td>Tiptap 노드 확장 — <code>tramaBlock</code> 펜스를 NodeView로.</td>
             </tr>
             <tr>
               <td>
-                <code>@trama/host-tiptap-bundle</code>
+                <code>@trama-chain/host-tiptap-bundle</code>
               </td>
               <td>위 셋을 단일 ESM으로 묶은 산출물. 외부 호스트가 file: tarball로 소비.</td>
             </tr>

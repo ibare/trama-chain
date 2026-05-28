@@ -1,6 +1,6 @@
 import { createElement } from 'react';
 import { createRoot, type Root } from 'react-dom/client';
-import { TramaEditor } from '@trama/projector-web';
+import { TramaEditor } from '@trama-chain/projector-web';
 
 export interface TramaMountOptions {
   /** 최초 마운트 시점의 JSON 문자열 (Tiptap 노드의 textContent). */

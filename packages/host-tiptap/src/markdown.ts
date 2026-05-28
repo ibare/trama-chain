@@ -13,7 +13,7 @@ export const TRAMA_FENCE_LANG = 'trama';
 
 /**
  * 마크다운 본문에서 첫 번째 ```trama 펜스를 찾는 정규식.
- * @trama/core의 extractAndParseTramaFromMarkdown과 동일.
+ * @trama-chain/core의 extractAndParseTramaFromMarkdown과 동일.
  */
 export const TRAMA_FENCE_RE = /```trama\s*\n([\s\S]*?)\n```/m;
 
@@ -31,7 +31,7 @@ export function renderTramaFenceHTML(json: string): string {
 
 /**
  * Tiptap tramaBlock 노드의 textContent(=JSON)를 마크다운 fence 문자열로.
- * @trama/core의 serializeTramaMarkdown은 TramaDocument를 받지만, 호스트가
+ * @trama-chain/core의 serializeTramaMarkdown은 TramaDocument를 받지만, 호스트가
  * 이미 노드의 textContent로 JSON을 들고 있다면 굳이 역파싱할 필요 없이
  * 이걸로 fence만 씌우면 round-trip 안전.
  */

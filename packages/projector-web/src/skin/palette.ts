@@ -1,7 +1,7 @@
 /**
  * OKLCH primitive 팔레트 — 셀 스킨 전용 인라인 모듈.
  *
- * 토큰 시스템(@trama/tokens)이 OKLCH로 전환되면 이 모듈은 토큰으로 승격되고
+ * 토큰 시스템(@trama-chain/tokens)이 OKLCH로 전환되면 이 모듈은 토큰으로 승격되고
  * 여기서는 단순 re-export만 남게 된다. 그 전까지는 셀 스킨·컬러 피커가
  * 공유하는 단일 출처.
  *

@@ -1,5 +1,5 @@
 {
-  "name": "@trama/host-tiptap",
+  "name": "@trama-chain/host-tiptap",
   "version": "0.0.0",
   "private": true,
   "type": "module",
@@ -13,8 +13,8 @@
     "typecheck": "tsc --noEmit"
   },
   "dependencies": {
-    "@trama/core": "workspace:*",
-    "@trama/projector-web": "workspace:*"
+    "@trama-chain/core": "workspace:*",
+    "@trama-chain/projector-web": "workspace:*"
   },
   "peerDependencies": {
     "@tiptap/core": "^3.22.5",

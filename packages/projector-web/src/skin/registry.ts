@@ -1,5 +1,5 @@
 import { lazy, type LazyExoticComponent } from 'react';
-import type { ResolvedUnit, ValueKind } from '@trama/core';
+import type { ResolvedUnit, ValueKind } from '@trama-chain/core';
 import type {
   BooleanSkinComponent,
   BooleanSkinDefinition,

@@ -8,12 +8,12 @@ last_verified: 2026-05-15
 ## When to Apply
 - `.css` 파일을 추가·수정할 때
 - 새 컴포넌트의 스타일링 방식을 정할 때
-- 토큰(`@trama/tokens`)을 정의·소비할 때
+- 토큰(`@trama-chain/tokens`)을 정의·소비할 때
 
 ## MUST
 - 모든 CSS 변수와 클래스는 `[data-trama-root]` 스코프 안에서만 정의·참조한다.
 - Trama가 들어가는 외부 호스트 페이지의 스타일과 충돌하지 않도록 글로벌 표면을 봉인한다.
-- 토큰은 `@trama/tokens`에서만 정의하고, 다른 패키지는 `css` export로만 소비한다.
+- 토큰은 `@trama-chain/tokens`에서만 정의하고, 다른 패키지는 `css` export로만 소비한다.
 
 ## MUST NOT
 - `:root { ... }`에 CSS 변수를 정의하지 않는다.

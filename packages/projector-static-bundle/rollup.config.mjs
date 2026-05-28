@@ -1,13 +1,13 @@
 // @ts-check
 /**
- * @trama/projector-static-bundle — rollup 설정.
+ * @trama-chain/projector-static-bundle — rollup 설정.
  *
  * 정책:
  *  - 단일 ESM entry (projector-static-bundle.js) + 자동 chunk 추론.
  *  - external: react — 호스트 단일 인스턴스.
  *  - manualChunks: projector-static / trama-core 두 청크로 분리.
  *    bundle visualizer로 사이즈 회귀 점검 가능.
- *  - CSS: projector-static의 styles.css는 `@import '@trama/tokens/css'`를 포함한다.
+ *  - CSS: projector-static의 styles.css는 `@import '@trama-chain/tokens/css'`를 포함한다.
  *    rollup-plugin-postcss + postcss-import로 펼친 뒤 `inject: true`로 번들 import
  *    시점에 head에 `<style>` 1회 삽입. trama-* prefix가 셀렉터에 깔려 있어
  *    호스트 전역과 충돌 위험 낮음.
@@ -35,8 +35,8 @@ const external = [
 /**
  * chunk 의미 분리. id는 절대 경로로 들어옴.
  *
- * - @trama/projector-static: 정적 렌더러. 별도 chunk.
- * - @trama/core + @trama/layout: 모델·레이아웃 계산. 함께 trama-core 청크.
+ * - @trama-chain/projector-static: 정적 렌더러. 별도 chunk.
+ * - @trama-chain/core + @trama-chain/layout: 모델·레이아웃 계산. 함께 trama-core 청크.
  * - tokens 는 projector-static의 styles.css가 @import로만 끌어쓰는 CSS 토큰이라
  *   JS 사이드 의존이 거의 없어 projector-static 청크에 합쳐 순환을 끊는다.
  */

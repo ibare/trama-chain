@@ -10,7 +10,7 @@ import {
   numericValue,
   outputKey,
   type ExecutionState,
-} from '@trama/core';
+} from '@trama-chain/core';
 import {
   selectCableMedium,
   selectIsBranchingSlot,

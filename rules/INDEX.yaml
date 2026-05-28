@@ -19,14 +19,14 @@ always:
 concerns:
   - id: C1
     file: concerns/C1-projector-separation.md
-    description: 도메인(@trama/core)은 React/zustand에 의존하지 않는다
+    description: 도메인(@trama-chain/core)은 React/zustand에 의존하지 않는다
     triggers:
       paths:
         - "packages/core/**/*.ts"
         - "packages/projector-web/**/*.{ts,tsx}"
         - "packages/projector-static/**/*.{ts,tsx}"
       imports: ["react", "react-dom", "zustand", "@radix-ui/*"]
-      patterns: ["from ['\"]@trama/core['\"]"]
+      patterns: ["from ['\"]@trama-chain/core['\"]"]
 
   - id: C2
     file: concerns/C2-scoped-styles.md

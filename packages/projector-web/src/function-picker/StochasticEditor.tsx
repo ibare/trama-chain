@@ -1,6 +1,6 @@
 import { useCallback } from 'react';
 import * as Form from '@radix-ui/react-form';
-import type { Edge } from '@trama/core';
+import type { Edge } from '@trama-chain/core';
 import { useTrama } from '../store/index.js';
 import {
   CurveEditorFrame,

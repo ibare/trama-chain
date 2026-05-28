@@ -1,7 +1,7 @@
 import * as ToggleGroup from '@radix-ui/react-toggle-group';
 import * as Separator from '@radix-ui/react-separator';
 import { useCallback } from 'react';
-import type { ValueNode } from '@trama/core';
+import type { ValueNode } from '@trama-chain/core';
 import { useTrama } from '../../store/index.js';
 import {
   normalizeCellArrayParams,

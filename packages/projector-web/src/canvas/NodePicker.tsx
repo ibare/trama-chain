@@ -2,7 +2,7 @@ import { useMemo, useState, useEffect } from 'react';
 import * as Dialog from '@radix-ui/react-dialog';
 import * as ToggleGroup from '@radix-ui/react-toggle-group';
 import * as HoverCard from '@radix-ui/react-hover-card';
-import type { NodeId } from '@trama/core';
+import type { NodeId } from '@trama-chain/core';
 import { useTrama } from '../store/index.js';
 import { listNodeKindUIs, type NodeMenuItem, type NodeMenuIcon } from '../node/kind-catalog.js';
 import type { ModelStoreInstance } from '../store/model-store.js';

@@ -1,6 +1,6 @@
 import { memo, useMemo } from 'react';
 import { curveMonotoneX, line as d3Line } from 'd3-shape';
-import type { SequenceSample, Value } from '@trama/core';
+import type { SequenceSample, Value } from '@trama-chain/core';
 import type { ObserveVisualizationRenderProps } from './types.js';
 
 /**

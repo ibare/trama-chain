@@ -1,5 +1,5 @@
 import { useTrama } from '../store/index.js';
-import type { NodeId } from '@trama/core';
+import type { NodeId } from '@trama-chain/core';
 
 /**
  * 노드의 출력 소켓이 어딘가에 연결되어 있는지.

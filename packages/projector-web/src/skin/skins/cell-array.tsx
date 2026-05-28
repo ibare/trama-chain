@@ -1,5 +1,5 @@
 import { useId } from 'react';
-import { tokens } from '@trama/tokens';
+import { tokens } from '@trama-chain/tokens';
 import { InteractiveArea } from '../../node/InteractiveArea.js';
 import {
   PRIMITIVES,

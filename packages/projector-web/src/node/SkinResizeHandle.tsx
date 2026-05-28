@@ -1,6 +1,6 @@
 import { memo, useCallback, useRef } from 'react';
-import type { ValueNode } from '@trama/core';
-import { SKIN_SCALE_MAX, SKIN_SCALE_MIN, type NodeLayout } from '@trama/layout';
+import type { ValueNode } from '@trama-chain/core';
+import { SKIN_SCALE_MAX, SKIN_SCALE_MIN, type NodeLayout } from '@trama-chain/layout';
 import { useTrama } from '../store/index.js';
 
 const HANDLE_SIZE = 10;

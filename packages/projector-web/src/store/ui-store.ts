@@ -1,5 +1,5 @@
 import { create, type StoreApi, type UseBoundStore } from 'zustand';
-import type { EdgeId, NodeId } from '@trama/core';
+import type { EdgeId, NodeId } from '@trama-chain/core';
 
 export type Selection =
   | { kind: 'none' }

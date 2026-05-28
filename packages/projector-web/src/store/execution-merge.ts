@@ -10,7 +10,7 @@ import {
   type GeneratorRuntime,
   type Model,
   type NodeId,
-} from '@trama/core';
+} from '@trama-chain/core';
 import { commitExecutionState } from './execution-commit.js';
 import { combinerRegistry, shapeRegistry } from './registries.js';
 import { fizzexExpressionEvaluator } from '../expression/fizzex-evaluator.js';

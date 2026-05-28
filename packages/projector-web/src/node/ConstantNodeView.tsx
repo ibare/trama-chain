@@ -1,7 +1,7 @@
 import { memo, useCallback, useEffect, useState } from 'react';
 import * as Form from '@radix-ui/react-form';
-import { tokens } from '@trama/tokens';
-import { isConstantNode, isNumericValue, numericValue, type NodeId } from '@trama/core';
+import { tokens } from '@trama-chain/tokens';
+import { isConstantNode, isNumericValue, numericValue, type NodeId } from '@trama-chain/core';
 import { useTrama } from '../store/index.js';
 import { useNodeLayout } from './use-node-layout.js';
 import { resolveDisplayMode } from './display-mode.js';

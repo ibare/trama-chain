@@ -1,11 +1,11 @@
 import { memo, useCallback, useEffect, useRef, useState } from 'react';
-import { tokens } from '@trama/tokens';
+import { tokens } from '@trama-chain/tokens';
 import {
   isExpressionNode,
   isNodeValid,
   type EvalDiagnosis,
   type NodeId,
-} from '@trama/core';
+} from '@trama-chain/core';
 import {
   astToLatex,
   createStateFromLatex,

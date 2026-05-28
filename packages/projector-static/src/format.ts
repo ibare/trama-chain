@@ -1,4 +1,4 @@
-import type { ResolvedUnit } from '@trama/core';
+import type { ResolvedUnit } from '@trama-chain/core';
 
 export interface FormattedValue {
   primary: string;

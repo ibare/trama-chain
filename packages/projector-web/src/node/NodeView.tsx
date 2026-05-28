@@ -1,5 +1,5 @@
 import { memo } from 'react';
-import { isValueNode, type NodeId } from '@trama/core';
+import { isValueNode, type NodeId } from '@trama-chain/core';
 import { useTrama } from '../store/index.js';
 import { BooleanValueNodeView } from './BooleanValueNodeView.js';
 import { getNodeKindUI } from './kind-catalog.js';

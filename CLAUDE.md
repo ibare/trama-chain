@@ -29,7 +29,7 @@
 - **불필요**: 기존 규칙 항목을 새로 위반시킬 가능성이 0%에 가까운 변경
   - 예: 토큰 값 조정, 텍스트/주석 변경, 죽은 코드 제거, 동일 의미의 import 경로 정리, 변수 리네이밍, 가벼운 CSS 토큰 추가, website/문서 수정
 - **필요**: 규칙 적용 영역에 명백히 들어가는 변경
-  - 예: 신규 노드 종류·skin·combiner·constant·generator 추가, 신규 디스크립터, 신규 zustand store/slice, schema 추가·수정, `@trama/core` import 추가, registry 등록, generator runtime 변경
+  - 예: 신규 노드 종류·skin·combiner·constant·generator 추가, 신규 디스크립터, 신규 zustand store/slice, schema 추가·수정, `@trama-chain/core` import 추가, registry 등록, generator runtime 변경
 - **모호**: 위 두 분류 어디에도 깔끔하게 떨어지지 않는 변경
   - 예: prop 시그니처 변경, 분기 로직 추가, 모듈 경계 리팩토링, 라우팅·디스패치 구조 변경
 
@@ -55,13 +55,13 @@ rule-guard 호출 (**반드시 현재 taskId 를 프롬프트에 포함**). ISSU
 
 ## 패키지 구조 요약
 
-- `@trama/core` — 모델·실행·스키마. React 비의존.
-- `@trama/tokens` — `[data-trama-root]` 스코프 CSS 토큰.
-- `@trama/projector-web` — 풀 캔버스 편집기.
-- `@trama/projector-static` — 정적 임베드 (NodeSnapshot 기반 zero-compute SVG).
-- `@trama/host-tiptap` — Tiptap NodeView 어댑터.
-- `@trama/host-tiptap-bundle` — Rollup ESM 번들.
-- `@trama/ui-primitives` — 공용 UI 프리미티브.
+- `@trama-chain/core` — 모델·실행·스키마. React 비의존.
+- `@trama-chain/tokens` — `[data-trama-root]` 스코프 CSS 토큰.
+- `@trama-chain/projector-web` — 풀 캔버스 편집기.
+- `@trama-chain/projector-static` — 정적 임베드 (NodeSnapshot 기반 zero-compute SVG).
+- `@trama-chain/host-tiptap` — Tiptap NodeView 어댑터.
+- `@trama-chain/host-tiptap-bundle` — Rollup ESM 번들.
+- `@trama-chain/ui-primitives` — 공용 UI 프리미티브.
 
 ## 자주 쓰는 명령
 
@@ -69,7 +69,7 @@ rule-guard 호출 (**반드시 현재 taskId 를 프롬프트에 포함**). ISSU
 pnpm install
 pnpm -r typecheck
 pnpm -r test:run          # vitest --run (watch 모드 금지)
-pnpm --filter @trama/core test:run
+pnpm --filter @trama-chain/core test:run
 pnpm dev                  # http://localhost:5173/trama/ — 사용자가 직접 실행
 ```
 

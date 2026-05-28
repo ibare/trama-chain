@@ -24,7 +24,7 @@ import type {
   BindingAnalysis,
   EvaluabilityAnalysis,
   ExpressionEvaluator,
-} from '@trama/core';
+} from '@trama-chain/core';
 
 interface CompiledExpression {
   ast: RootNode | null;

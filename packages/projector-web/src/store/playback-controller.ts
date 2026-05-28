@@ -1,6 +1,6 @@
 import type { StoreApi } from 'zustand';
-import type { ExecutionState } from '@trama/core';
-import { tokens } from '@trama/tokens';
+import type { ExecutionState } from '@trama-chain/core';
+import { tokens } from '@trama-chain/tokens';
 import type { ModelStore } from './model-store.js';
 import type { NodeFlashRegistry } from '../pulse/node-flash-registry.js';
 import type { TimeSettingsStore } from './time-settings.js';

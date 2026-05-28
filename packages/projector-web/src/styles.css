@@ -1,5 +1,5 @@
 /* Trama projector-web 스타일.
-   토큰 CSS는 @trama/tokens/css에서 import — 호스트 페이지에 누출되지 않도록
+   토큰 CSS는 @trama-chain/tokens/css에서 import — 호스트 페이지에 누출되지 않도록
    [data-trama-root] 스코프 안에서만 변수 참조. 글로벌 :root 변수 사용 금지.
 
    본문은 styles/ 디렉터리로 영역별 분리. 모든 클래스는 [data-trama-root]
@@ -7,7 +7,7 @@
    도메인 순서대로 import.
 */
 
-@import "@trama/tokens/css";
+@import "@trama-chain/tokens/css";
 
 @import "./styles/base.css";
 @import "./styles/node.css";

@@ -1,4 +1,4 @@
-import type { NodeId } from '@trama/core';
+import type { NodeId } from '@trama-chain/core';
 
 /**
  * 입력 소켓(엣지 target 후보) 좌표 레지스트리.

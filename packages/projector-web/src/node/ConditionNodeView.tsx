@@ -1,13 +1,13 @@
 import { memo, useCallback, useEffect, useState } from 'react';
 import * as Form from '@radix-ui/react-form';
-import { tokens } from '@trama/tokens';
+import { tokens } from '@trama-chain/tokens';
 import {
   isConditionNode,
   isOutputValid,
   isValueNode,
   type ConditionOperator,
   type NodeId,
-} from '@trama/core';
+} from '@trama-chain/core';
 import { useTrama } from '../store/index.js';
 import { resolveNodeUnit } from '../util/unit-resolver.js';
 import { useNodeLayout } from './use-node-layout.js';

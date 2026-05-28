@@ -10,7 +10,7 @@ import type {
   ObserveExtraction,
   ObserveNode,
   ValueKind,
-} from '@trama/core';
+} from '@trama-chain/core';
 import { useTrama } from '../store/index.js';
 import {
   listObserveVisualizations,

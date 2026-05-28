@@ -17,7 +17,7 @@
 ### C1 — Projector 분리
 - `packages/core/src/**`에서 `react`/`react-dom`/`zustand`/`@radix-ui/*`/`fizzex` import 검색: **0건**.
 - DOM API(`document`/`window`/`globalThis`) 직접 사용 검색: **0건** (schema 내부 import만 noise로 매치).
-- core가 `@trama/projector-*`를 import하지 않음.
+- core가 `@trama-chain/projector-*`를 import하지 않음.
 - 판정: **PASS**.
 
 ### C2 — 스코프된 스타일

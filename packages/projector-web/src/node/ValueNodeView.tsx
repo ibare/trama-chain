@@ -1,5 +1,5 @@
 import { memo, useCallback, useEffect } from 'react';
-import { tokens } from '@trama/tokens';
+import { tokens } from '@trama-chain/tokens';
 import {
   isNumericValue,
   isOutputPending,
@@ -8,13 +8,13 @@ import {
   resolveScalar,
   unwrap,
   type NodeId,
-} from '@trama/core';
+} from '@trama-chain/core';
 import { useTrama } from '../store/index.js';
 import { combinerRegistry } from '../store/registries.js';
 import { formatNodeValue } from '../util/format.js';
 import { resolveNodeUnit } from '../util/unit-resolver.js';
 import { useNodeLayout } from './use-node-layout.js';
-import type { NodeLayout } from '@trama/layout';
+import type { NodeLayout } from '@trama-chain/layout';
 import { resolveDisplayMode, supportsDisplayModeToggle } from './display-mode.js';
 import { ValueNodeSlider } from './ValueNodeSlider.js';
 import { NodeFrame } from './NodeFrame.js';

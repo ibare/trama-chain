@@ -1,5 +1,5 @@
-import { tokens } from '@trama/tokens';
-import { isLogicGateNode, type LogicGateOperator } from '@trama/core';
+import { tokens } from '@trama-chain/tokens';
+import { isLogicGateNode, type LogicGateOperator } from '@trama-chain/core';
 import type { StaticNodeRendererProps } from '../registry.js';
 import { getCapturedBoolean, isSlotValid } from '../snapshot.js';
 import { PinShape, SocketVisual } from './primitives.js';

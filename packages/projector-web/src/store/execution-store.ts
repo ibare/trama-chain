@@ -1,5 +1,5 @@
 import type { StoreApi } from 'zustand';
-import type { Model, NodeId } from '@trama/core';
+import type { Model, NodeId } from '@trama-chain/core';
 import { computeExecutionState } from './execution-merge.js';
 import type { ModelStore } from './model-store.js';
 import type { NodeFlashRegistry } from '../pulse/node-flash-registry.js';

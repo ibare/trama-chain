@@ -1,4 +1,4 @@
-import { tokens } from "@trama/tokens";
+import { tokens } from "@trama-chain/tokens";
 import {
   isAverageNode,
   isConditionNode,
@@ -8,7 +8,7 @@ import {
   isStockNode,
   isValueNode,
   type Node,
-} from "@trama/core";
+} from "@trama-chain/core";
 
 /**
  * 모드별 패널 기준 사이즈 — 노드 *종류*가 아니라 *모드*가 크기를 정한다.

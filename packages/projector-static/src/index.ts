@@ -1,5 +1,5 @@
 /**
- * @trama/projector-static — 스냅샷 기반 zero-compute 정적 렌더러.
+ * @trama-chain/projector-static — 스냅샷 기반 zero-compute 정적 렌더러.
  *
  * 시뮬레이션을 돌리지 않고 NodeSnapshot 한 시점을 SVG 로 그린다. PDF·이미지
  * 출력처럼 시간이 흐르지 않는 정적 컨텍스트가 주된 용도. 입력은 TramaDocument 의

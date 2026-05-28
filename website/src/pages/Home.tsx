@@ -1,6 +1,6 @@
 import { useMemo, useState } from 'react';
 import { Link } from 'react-router-dom';
-import { TramaEditor } from '@trama/projector-web';
+import { TramaEditor } from '@trama-chain/projector-web';
 import {
   addEdge,
   addGeneratorNode,
@@ -9,7 +9,7 @@ import {
   createEmptyModel,
   modelToDocument,
   serializeTrama,
-} from '@trama/core';
+} from '@trama-chain/core';
 
 function buildRainTankJson(): string {
   // 빗물 탱크 — 강수 펄스가 탱크를 채우고 사용 펄스가 빼낸다. 관찰 노드는 현재 수위
@@ -81,13 +81,13 @@ const SAMPLE_FENCE = `\`\`\`trama
 }
 \`\`\``;
 
-const SNIPPET_INSTALL = `pnpm add @trama/host-tiptap-bundle`;
+const SNIPPET_INSTALL = `pnpm add @trama-chain/host-tiptap-bundle`;
 const SNIPPET_USE = `import { Editor } from '@tiptap/core';
 import StarterKit from '@tiptap/starter-kit';
 import {
   TramaExtension,
   bootstrapTrama,
-} from '@trama/host-tiptap-bundle';
+} from '@trama-chain/host-tiptap-bundle';
 
 bootstrapTrama();
 
@@ -127,7 +127,7 @@ export default function Home(): JSX.Element {
             </Link>
             <a
               className="trama-btn"
-              href="https://github.com/ibare/trama"
+              href="https://github.com/ibare/trama-chain"
               target="_blank"
               rel="noreferrer noopener"
             >
@@ -159,7 +159,7 @@ export default function Home(): JSX.Element {
       <section className="trama-section trama-section-soft">
         <h2>호스트 에디터에 임베드</h2>
         <p className="trama-section-lead">
-          <code>@trama/host-tiptap-bundle</code> 하나만 추가하면 Tiptap 문서 안에 <code>```trama</code>{' '}
+          <code>@trama-chain/host-tiptap-bundle</code> 하나만 추가하면 Tiptap 문서 안에 <code>```trama</code>{' '}
           펜스가 자동으로 인터랙티브 노드로 마운트된다.
         </p>
         <div className="trama-snippet-grid">

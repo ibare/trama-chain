@@ -1,4 +1,4 @@
-import type { ResolvedUnit } from '@trama/core';
+import type { ResolvedUnit } from '@trama-chain/core';
 
 /**
  * 값 표기는 단위 종류에 따라 형태가 다르다.

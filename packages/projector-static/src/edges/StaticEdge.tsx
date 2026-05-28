@@ -1,5 +1,5 @@
-import type { Model, NodeSnapshot } from '@trama/core';
-import type { NodeLayout } from '@trama/layout';
+import type { Model, NodeSnapshot } from '@trama-chain/core';
+import type { NodeLayout } from '@trama-chain/layout';
 import { staticEdgePath, type Point } from '../geometry.js';
 import { isSlotValid } from '../snapshot.js';
 import type { SlotIndex } from '../snapshot.js';

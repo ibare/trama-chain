@@ -1,7 +1,7 @@
 import * as Popover from '@radix-ui/react-popover';
 import * as Separator from '@radix-ui/react-separator';
 import { useCallback, useMemo } from 'react';
-import type { ValueNode } from '@trama/core';
+import type { ValueNode } from '@trama-chain/core';
 import { useTrama } from '../store/index.js';
 import { listSkinsForValueKind } from '../skin/registry.js';
 import type { SkinDefinition } from '../skin/types.js';

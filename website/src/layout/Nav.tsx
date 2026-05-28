@@ -31,7 +31,7 @@ export default function Nav(): JSX.Element {
       </ul>
       <a
         className="trama-nav-github"
-        href="https://github.com/ibare/trama"
+        href="https://github.com/ibare/trama-chain"
         target="_blank"
         rel="noreferrer noopener"
       >
