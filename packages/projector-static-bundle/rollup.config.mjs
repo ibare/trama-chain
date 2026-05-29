@@ -23,7 +23,13 @@ import replace from '@rollup/plugin-replace';
 import esbuild from 'rollup-plugin-esbuild';
 import dts from 'rollup-plugin-dts';
 import postcss from 'rollup-plugin-postcss';
+import postcssImport from 'postcss-import';
 import { visualizer } from 'rollup-plugin-visualizer';
+import { createRequire } from 'node:module';
+import path from 'node:path';
+
+// postcss-import 의 npm subpath (`@trama-chain/tokens/css`) resolution 용.
+const require = createRequire(import.meta.url);
 
 const VISUALIZE = process.env.VISUALIZE === '1';
 
@@ -80,7 +86,30 @@ const jsBundle = {
     commonjs(),
     json(),
     postcss({
-      // projector-static/styles.css → tokens/css 펼치고 head에 inject.
+      // projector-static/styles.css 는 @trama-chain/tokens/css 등을 @import 로
+      // 끌어쓴다. postcss-import 가 @import 를 *번들 시점에 모두 펼쳐 한 문자열*
+      // 로 만들어야 styleInject 가 head <style> 에 실제 CSS rule 을 박는다.
+      // 빠지면 head 에 @import 디렉티브만 들어가 브라우저가 npm 패키지 경로를
+      // fetch 시도하다 404 — 호스트가 dist 를 받아 쓸 때 정적 SVG 가 토큰 없이
+      // 렌더된다.
+      plugins: [
+        postcssImport({
+          // bare specifier (`@trama-chain/tokens/css`) 는 Node resolution 으로
+          // package.json 의 exports map (`./css` → `./dist/tokens.scoped.css`)
+          // 을 따라 실제 파일 경로로 해석. 상대 경로는 basedir 기준 절대 경로.
+          // postcss-import v16 은 항상 string 반환 요구.
+          resolve(id, basedir) {
+            if (id.startsWith('.') || id.startsWith('/') || path.isAbsolute(id)) {
+              return path.resolve(basedir, id);
+            }
+            try {
+              return require.resolve(id, { paths: [basedir] });
+            } catch {
+              return id;
+            }
+          },
+        }),
+      ],
       extract: false,
       inject: true,
       minimize: true,
