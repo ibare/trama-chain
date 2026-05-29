@@ -1,5 +1,5 @@
 {
-  "name": "@trama-chain/host-tiptap-bundle",
+  "name": "@trama-chain/tiptap",
   "version": "0.1.1",
   "type": "module",
   "description": "Tiptap NodeView for Trama — embed an interactive node-graph model editor inside your document.",
@@ -24,12 +24,12 @@
   "publishConfig": {
     "access": "public"
   },
-  "main": "./dist/host-tiptap-bundle.js",
-  "types": "./dist/host-tiptap-bundle.d.ts",
+  "main": "./dist/tiptap.js",
+  "types": "./dist/tiptap.d.ts",
   "exports": {
     ".": {
-      "types": "./dist/host-tiptap-bundle.d.ts",
-      "import": "./dist/host-tiptap-bundle.js"
+      "types": "./dist/tiptap.d.ts",
+      "import": "./dist/tiptap.js"
     }
   },
   "files": [

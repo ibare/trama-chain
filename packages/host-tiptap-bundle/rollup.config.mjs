@@ -1,9 +1,9 @@
 // @ts-check
 /**
- * @trama-chain/host-tiptap-bundle — rollup 설정.
+ * @trama-chain/tiptap — rollup 설정.
  *
  * 정책:
- *  - 단일 ESM entry (host-tiptap-bundle.js) + 자동 chunk 추론.
+ *  - 단일 ESM entry (tiptap.js) + 자동 chunk 추론.
  *  - external: @tiptap/core, @tiptap/pm, react, react-dom — 호스트 단일 인스턴스.
  *  - manualChunks: trama-core / projector-web / fizzex / runtime 으로 의미 분리.
  *    bundle visualizer로 사이즈 회귀 점검 가능.
@@ -11,7 +11,7 @@
  *    rollup-plugin-postcss + postcss-import로 펼친 뒤 `inject: true`로 번들 import
  *    시점에 head에 `<style>` 1회 삽입. trama-* prefix가 셀렉터에 깔려 있어
  *    호스트 전역과 충돌 위험 낮음.
- *  - .d.ts는 별도 패스(rollup-plugin-dts)로 단일 dist/host-tiptap-bundle.d.ts.
+ *  - .d.ts는 별도 패스(rollup-plugin-dts)로 단일 dist/tiptap.d.ts.
  *  - sourcemap: true.
  *  - VISUALIZE=1일 때 stats.html 생성.
  */
@@ -69,7 +69,7 @@ const jsBundle = {
   output: {
     dir: 'dist',
     format: 'es',
-    entryFileNames: 'host-tiptap-bundle.js',
+    entryFileNames: 'tiptap.js',
     chunkFileNames: chunkFileName,
     inlineDynamicImports: false,
     sourcemap: true,
@@ -126,7 +126,7 @@ const dtsBundle = {
   // 한다. peer + 부수효과 CSS 임포트는 external — dts 는 CSS 파싱 능력이 없다.
   external: [...external, /\.css$/],
   output: {
-    file: 'dist/host-tiptap-bundle.d.ts',
+    file: 'dist/tiptap.d.ts',
     format: 'es',
   },
   // respectExternal: workspace 패키지(@trama-chain/host-tiptap, @trama-chain/core,

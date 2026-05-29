@@ -157,7 +157,7 @@ const items: ReadonlyArray<ConceptItem> = [
             </tr>
             <tr>
               <td>
-                <code>@trama-chain/host-tiptap-bundle</code>
+                <code>@trama-chain/tiptap</code>
               </td>
               <td>위 셋을 단일 ESM으로 묶은 산출물. 외부 호스트가 file: tarball로 소비.</td>
             </tr>

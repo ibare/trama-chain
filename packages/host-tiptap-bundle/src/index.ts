@@ -1,5 +1,5 @@
 /**
- * @trama-chain/host-tiptap-bundle — self-contained ESM 번들.
+ * @trama-chain/tiptap — self-contained ESM 번들.
  *
  * 호스트 앱(예: 메티)이 file: tarball 하나로 trama를 통합할 수 있도록
  * @trama-chain/host-tiptap + projector-web + core + fizzex 의존을 모두 Rollup으로

@@ -1,9 +1,9 @@
 // @ts-check
 /**
- * @trama-chain/projector-static-bundle — rollup 설정.
+ * @trama-chain/static-projector — rollup 설정.
  *
  * 정책:
- *  - 단일 ESM entry (projector-static-bundle.js) + 자동 chunk 추론.
+ *  - 단일 ESM entry (static-projector.js) + 자동 chunk 추론.
  *  - external: react — 호스트 단일 인스턴스.
  *  - manualChunks: projector-static / trama-core 두 청크로 분리.
  *    bundle visualizer로 사이즈 회귀 점검 가능.
@@ -11,7 +11,7 @@
  *    rollup-plugin-postcss + postcss-import로 펼친 뒤 `inject: true`로 번들 import
  *    시점에 head에 `<style>` 1회 삽입. trama-* prefix가 셀렉터에 깔려 있어
  *    호스트 전역과 충돌 위험 낮음.
- *  - .d.ts는 별도 패스(rollup-plugin-dts)로 단일 dist/projector-static-bundle.d.ts.
+ *  - .d.ts는 별도 패스(rollup-plugin-dts)로 단일 dist/static-projector.d.ts.
  *  - sourcemap: true.
  *  - VISUALIZE=1일 때 stats.html 생성.
  */
@@ -59,7 +59,7 @@ const jsBundle = {
   output: {
     dir: 'dist',
     format: 'es',
-    entryFileNames: 'projector-static-bundle.js',
+    entryFileNames: 'static-projector.js',
     chunkFileNames: chunkFileName,
     inlineDynamicImports: false,
     sourcemap: true,
@@ -110,7 +110,7 @@ const dtsBundle = {
   input: 'src/index.ts',
   external,
   output: {
-    file: 'dist/projector-static-bundle.d.ts',
+    file: 'dist/static-projector.d.ts',
     format: 'es',
   },
   plugins: [dts({ respectExternal: true })],

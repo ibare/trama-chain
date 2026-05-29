@@ -10,7 +10,7 @@
  *
  * Path 데이터는 `@phosphor-icons/core` regular weight SVG에서 추출. 의존성은 source of
  * truth로 유지하지만 런타임에는 본 모듈의 상수만 참조한다 — vite `?raw` 같은 번들러
- * 종속 문법 없이 rollup(host-tiptap-bundle)에서도 동일 동작.
+ * 종속 문법 없이 rollup(@trama-chain/tiptap)에서도 동일 동작.
  */
 
 const PATHS = {

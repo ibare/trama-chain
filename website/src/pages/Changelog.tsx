@@ -10,13 +10,13 @@ const entries: ReadonlyArray<Entry> = [
     title: '호스트 정렬 — React 19 / Tiptap 3',
     notes: [
       '5개 패키지의 react·react-dom peer를 ^19.0.0으로, 실측 19.2.0으로 정렬 (Methii 호스트와 매칭).',
-      'host-tiptap·host-tiptap-bundle peer를 ^3.22.5로 좁힘. 2.x 호환 분기 제거.',
+      'host-tiptap·@trama-chain/tiptap peer를 ^3.22.5로 좁힘. 2.x 호환 분기 제거.',
       '@types/react@19의 글로벌 JSX 네임스페이스 제거에 대응하는 shim 도입 (패키지별 react-19-jsx-shim.d.ts).',
     ],
   },
   {
     date: '2026-05',
-    title: 'host-tiptap-bundle 0.1.0',
+    title: '@trama-chain/tiptap 0.1.0',
     notes: [
       'host-tiptap + projector-web + core + fizzex를 Rollup으로 단일 ESM에 인라인한 self-contained 번들.',
       'peer는 @tiptap/core·@tiptap/pm·react·react-dom 넷. 외부 호스트가 file: tarball 하나로 trama를 통합 가능.',

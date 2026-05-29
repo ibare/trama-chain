@@ -1,5 +1,5 @@
 /**
- * @trama-chain/projector-static-bundle — self-contained ESM 번들.
+ * @trama-chain/static-projector — self-contained ESM 번들.
  *
  * 호스트 앱(예: 메티)이 PDF·썸네일·정적 미리보기 같은 zero-compute
  * 시나리오에서 단일 의존으로 trama 정적 뷰어를 소비할 수 있도록

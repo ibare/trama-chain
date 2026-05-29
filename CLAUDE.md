@@ -60,7 +60,7 @@ rule-guard 호출 (**반드시 현재 taskId 를 프롬프트에 포함**). ISSU
 - `@trama-chain/projector-web` — 풀 캔버스 편집기.
 - `@trama-chain/projector-static` — 정적 임베드 (NodeSnapshot 기반 zero-compute SVG).
 - `@trama-chain/host-tiptap` — Tiptap NodeView 어댑터.
-- `@trama-chain/host-tiptap-bundle` — Rollup ESM 번들.
+- `@trama-chain/tiptap` — Rollup ESM 번들.
 - `@trama-chain/ui-primitives` — 공용 UI 프리미티브.
 
 ## 자주 쓰는 명령

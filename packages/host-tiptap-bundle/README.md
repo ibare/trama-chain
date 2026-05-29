@@ -1,4 +1,4 @@
-# @trama-chain/host-tiptap-bundle
+# @trama-chain/tiptap
 
 Trama 편집기를 Tiptap NodeView 로 호스트 에디터에 꽂는 단일 ESM 번들.
 
@@ -7,7 +7,7 @@ Trama 편집기를 Tiptap NodeView 로 호스트 에디터에 꽂는 단일 ESM 
 ## 설치
 
 ```bash
-pnpm add @trama-chain/host-tiptap-bundle
+pnpm add @trama-chain/tiptap
 ```
 
 ### peer 의존
@@ -29,7 +29,7 @@ import {
   TramaExtension,
   createTramaNodeView,
   mountTramaEditor,
-} from '@trama-chain/host-tiptap-bundle'
+} from '@trama-chain/tiptap'
 
 const editor = new Editor({
   extensions: [

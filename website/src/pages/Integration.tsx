@@ -28,7 +28,7 @@ const INITIAL_MARKDOWN =
   '\n```\n\n' +
   '아래 문단 — trama 노드 뒤의 일반 텍스트.';
 
-const SNIPPET_INSTALL = `pnpm add @trama-chain/host-tiptap-bundle`;
+const SNIPPET_INSTALL = `pnpm add @trama-chain/tiptap`;
 
 const SNIPPET_BOOTSTRAP = `import { Editor } from '@tiptap/core';
 import StarterKit from '@tiptap/starter-kit';
@@ -37,7 +37,7 @@ import {
   bootstrapTrama,
   parseTramaFenceMeta,
   renderTramaFenceHTML,
-} from '@trama-chain/host-tiptap-bundle';
+} from '@trama-chain/tiptap';
 
 bootstrapTrama();
 
@@ -60,7 +60,7 @@ const editor = new Editor({
     '<p>아래 문단</p>',
 });`;
 
-const SNIPPET_MARKDOWN = `import { tramaNodeToMarkdown, TRAMA_NODE_NAME } from '@trama-chain/host-tiptap-bundle';
+const SNIPPET_MARKDOWN = `import { tramaNodeToMarkdown, TRAMA_NODE_NAME } from '@trama-chain/tiptap';
 
 const parts: string[] = [];
 editor.state.doc.descendants((node) => {
@@ -179,7 +179,7 @@ export default function Integration(): JSX.Element {
       <header className="trama-integration-header">
         <h1>호스트 통합</h1>
         <p>
-          <code>@trama-chain/host-tiptap-bundle</code>은 Tiptap 호스트가 단일 ESM 의존만으로 trama
+          <code>@trama-chain/tiptap</code>은 Tiptap 호스트가 단일 ESM 의존만으로 trama
           노드를 마운트할 수 있게 한다. peer는 <code>@tiptap/core</code>,{' '}
           <code>@tiptap/pm</code>, <code>react</code>, <code>react-dom</code> 넷.
         </p>

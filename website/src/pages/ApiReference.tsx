@@ -71,7 +71,7 @@ const packages: ReadonlyArray<PackageEntry> = [
     ],
   },
   {
-    name: '@trama-chain/host-tiptap-bundle',
+    name: '@trama-chain/tiptap',
     role: '외부 호스트용 단일 ESM 번들',
     description:
       'host-tiptap + projector-web + core + fizzex를 Rollup으로 단일 파일에 인라인. 외부 호스트가 file: tarball 하나로 통합할 수 있게 만든 배포 산출물.',

@@ -36,15 +36,15 @@ jobs:
 
       - name: Build bundles
         run: |
-          pnpm --filter @trama-chain/host-tiptap-bundle build
-          pnpm --filter @trama-chain/projector-static-bundle build
+          pnpm --filter @trama-chain/tiptap build
+          pnpm --filter @trama-chain/static-projector build
 
-      - name: Publish @trama-chain/host-tiptap-bundle
-        run: pnpm --filter @trama-chain/host-tiptap-bundle publish --no-git-checks --access public
+      - name: Publish @trama-chain/tiptap
+        run: pnpm --filter @trama-chain/tiptap publish --no-git-checks --access public
         env:
           NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
 
-      - name: Publish @trama-chain/projector-static-bundle
-        run: pnpm --filter @trama-chain/projector-static-bundle publish --no-git-checks --access public
+      - name: Publish @trama-chain/static-projector
+        run: pnpm --filter @trama-chain/static-projector publish --no-git-checks --access public
         env:
           NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}

@@ -1,5 +1,5 @@
 {
-  "name": "@trama-chain/projector-static-bundle",
+  "name": "@trama-chain/static-projector",
   "version": "0.1.1",
   "type": "module",
   "description": "Static SVG viewer for Trama model snapshots. Zero-compute deterministic rendering — PDF, thumbnail, embed preview.",
@@ -23,12 +23,12 @@
   "publishConfig": {
     "access": "public"
   },
-  "main": "./dist/projector-static-bundle.js",
-  "types": "./dist/projector-static-bundle.d.ts",
+  "main": "./dist/static-projector.js",
+  "types": "./dist/static-projector.d.ts",
   "exports": {
     ".": {
-      "types": "./dist/projector-static-bundle.d.ts",
-      "import": "./dist/projector-static-bundle.js"
+      "types": "./dist/static-projector.d.ts",
+      "import": "./dist/static-projector.js"
     }
   },
   "files": [

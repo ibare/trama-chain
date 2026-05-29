@@ -1,4 +1,4 @@
-# @trama-chain/projector-static-bundle
+# @trama-chain/static-projector
 
 Trama 의 시뮬레이션 없는 정적 SVG 뷰어. PDF·썸네일·미리보기 같은 zero-compute 출력 시나리오 전용.
 
@@ -7,7 +7,7 @@ Trama 의 시뮬레이션 없는 정적 SVG 뷰어. PDF·썸네일·미리보기
 ## 설치
 
 ```bash
-pnpm add @trama-chain/projector-static-bundle
+pnpm add @trama-chain/static-projector
 ```
 
 ### peer 의존
@@ -20,7 +20,7 @@ pnpm add @trama-chain/projector-static-bundle
 import {
   TramaStaticView,
   defaultStaticRenderers,
-} from '@trama-chain/projector-static-bundle'
+} from '@trama-chain/static-projector'
 
 <TramaStaticView
   json={docJson}
@@ -41,7 +41,7 @@ import {
 
 ## projector-web vs projector-static
 
-| | host-tiptap-bundle | projector-static-bundle |
+| | @trama-chain/tiptap | @trama-chain/static-projector |
 |---|---|---|
 | 시뮬레이션 | 진행 | 없음 |
 | 인터랙션 | 풀 (드래그·연결·메뉴) | 없음 |
