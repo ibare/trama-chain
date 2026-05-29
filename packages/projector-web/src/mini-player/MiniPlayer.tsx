@@ -80,6 +80,15 @@ export function MiniPlayer(): JSX.Element {
       >
         <PhosphorIcon name="reset" size={18} />
       </button>
+      <button
+        type="button"
+        className="trama-mini-player-button"
+        onClick={() => viewportContainer.requestFit()}
+        title="전체 보기 (모든 노드 화면 안으로)"
+        aria-label="전체 보기"
+      >
+        <PhosphorIcon name="target" size={18} />
+      </button>
       <span className="trama-mini-player-time" aria-label="시뮬레이션 시간">
         {formatSimulationTime(simulationTimeMs)}
       </span>

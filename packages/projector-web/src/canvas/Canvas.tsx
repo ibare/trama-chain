@@ -73,35 +73,74 @@ export function Canvas({ initialFit = 'none' }: CanvasProps = {}): JSX.Element {
     };
   }, [viewportContainer]);
 
-  // initialFit='content' — mount 시 1회만 노드 위치 평균을 캔버스 중앙으로 정렬.
-  // RAF 1프레임 대기 후 svg getBoundingClientRect 를 측정 (mount 직후엔 0일 수 있음).
-  // didFitRef 가드로 dev StrictMode 더블 마운트에서도 한 번만 실행.
+  /**
+   * 모든 노드를 viewport 안으로 끌어오는 fit-to-content. 노드 bbox 가 SVG rect 의
+   * ~90% 안에 들어오도록 zoom 도 조정 (단일 노드거나 bbox 가 0×0 이면 zoom=1 로
+   * centering). zoom 은 ZOOM_MIN~ZOOM_MAX 로 클램프.
+   *
+   * - initialFit='content' (mount 1회): didFitRef 가드로 한 번만
+   * - 사용자가 MiniPlayer fit 버튼 누름: 매번 실행
+   * 같은 알고리즘이라 두 진입을 한 함수로 통합.
+   */
+  const fitToContent = useCallback(() => {
+    const el = svgRef.current;
+    if (!el) return;
+    const rect = el.getBoundingClientRect();
+    if (rect.width === 0 || rect.height === 0) return;
+    const m = modelStore.getState().model;
+    const positions = m.nodeOrder
+      .map((id) => m.nodes[id]?.position)
+      .filter((p): p is { x: number; y: number } => !!p);
+    if (positions.length === 0) return;
+    let minX = positions[0]!.x;
+    let maxX = positions[0]!.x;
+    let minY = positions[0]!.y;
+    let maxY = positions[0]!.y;
+    for (const p of positions) {
+      if (p.x < minX) minX = p.x;
+      if (p.x > maxX) maxX = p.x;
+      if (p.y < minY) minY = p.y;
+      if (p.y > maxY) maxY = p.y;
+    }
+    const cx = (minX + maxX) / 2;
+    const cy = (minY + maxY) / 2;
+    const bboxW = maxX - minX;
+    const bboxH = maxY - minY;
+    // 노드 시각 크기(STANDARD_PANEL 240×124 등) + 라벨/감속 여백을 어림해 padding.
+    const NODE_VISUAL_MARGIN = 200;
+    const FILL_RATIO = 0.9;
+    const desiredW = (bboxW + NODE_VISUAL_MARGIN) / FILL_RATIO;
+    const desiredH = (bboxH + NODE_VISUAL_MARGIN) / FILL_RATIO;
+    const z =
+      desiredW > 0 && desiredH > 0
+        ? Math.min(ZOOM_MAX, Math.max(ZOOM_MIN, Math.min(rect.width / desiredW, rect.height / desiredH)))
+        : 1;
+    setViewport({
+      panX: rect.width / 2 - cx * z,
+      panY: rect.height / 2 - cy * z,
+      zoom: z,
+    });
+  }, [modelStore]);
+
+  // initialFit='content' — mount 시 1회만. RAF 1프레임 대기 후 fit (mount 직후
+  // svg getBoundingClientRect 가 0 일 수 있음). didFitRef 로 dev StrictMode 더블
+  // 마운트에서도 한 번만 실행.
   const didFitRef = useRef(false);
   useEffect(() => {
     if (initialFit !== 'content') return;
     if (didFitRef.current) return;
     const raf = requestAnimationFrame(() => {
-      const el = svgRef.current;
-      if (!el) return;
-      const rect = el.getBoundingClientRect();
-      if (rect.width === 0 || rect.height === 0) return;
-      const m = modelStore.getState().model;
-      const positions = m.nodeOrder
-        .map((id) => m.nodes[id]?.position)
-        .filter((p): p is { x: number; y: number } => !!p);
-      if (positions.length === 0) return;
-      const cx = positions.reduce((s, p) => s + p.x, 0) / positions.length;
-      const cy = positions.reduce((s, p) => s + p.y, 0) / positions.length;
-      const z = viewportRef.current.zoom;
-      setViewport({
-        panX: rect.width / 2 - cx * z,
-        panY: rect.height / 2 - cy * z,
-        zoom: z,
-      });
+      fitToContent();
       didFitRef.current = true;
     });
     return () => cancelAnimationFrame(raf);
-  }, [initialFit, modelStore]);
+  }, [initialFit, fitToContent]);
+
+  // viewportContainer 에 fit handler 등록 — MiniPlayer 의 fit 버튼이 호출.
+  useEffect(() => {
+    viewportContainer.setFitHandler(fitToContent);
+    return () => viewportContainer.setFitHandler(null);
+  }, [viewportContainer, fitToContent]);
 
   const toCanvasCoords = useCallback((clientX: number, clientY: number) => {
     const svg = svgRef.current;

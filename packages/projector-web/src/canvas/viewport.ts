@@ -28,12 +28,21 @@ export interface ViewportContainer {
    * SVG 가 부착되지 않았거나 0×0 이면 null.
    */
   getCanvasViewportCenter(): { x: number; y: number } | null;
+  /**
+   * Canvas 가 등록하는 fit-to-content 콜백. 캔버스 밖의 UI(예: MiniPlayer 의
+   * fit 버튼) 가 viewport state 에 직접 접근하지 않고 트리거할 수 있게 한다.
+   * viewport state 는 Canvas useState 에 있으므로 콜백 패턴으로만 외부 노출.
+   */
+  setFitHandler(handler: (() => void) | null): void;
+  /** 외부 트리거 — 등록된 fit 핸들러를 호출. 핸들러가 없으면 no-op. */
+  requestFit(): void;
 }
 
 export function createViewportContainer(): ViewportContainer {
   let viewport: Viewport = { panX: 0, panY: 0, zoom: 1 };
   const listeners = new Set<() => void>();
   let svgEl: SVGSVGElement | null = null;
+  let fitHandler: (() => void) | null = null;
 
   return {
     get(): Viewport {
@@ -72,6 +81,12 @@ export function createViewportContainer(): ViewportContainer {
         x: (rect.width / 2 - viewport.panX) / viewport.zoom,
         y: (rect.height / 2 - viewport.panY) / viewport.zoom,
       };
+    },
+    setFitHandler(handler: (() => void) | null): void {
+      fitHandler = handler;
+    },
+    requestFit(): void {
+      fitHandler?.();
     },
   };
 }
