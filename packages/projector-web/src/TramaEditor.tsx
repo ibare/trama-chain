@@ -107,7 +107,19 @@ function TramaEditorInner({
   const setReadOnly = uiStore((s) => s.setReadOnly);
   const setWheelZoom = uiStore((s) => s.setWheelZoom);
   const isReadOnly = uiStore((s) => s.readOnly);
+  const isFullscreen = uiStore((s) => s.fullscreen);
+  const setFullscreen = uiStore((s) => s.setFullscreen);
   const rootRef = useRef<HTMLDivElement>(null);
+
+  // 풀스크린 중 ESC 로 탈출. 풀스크린 OFF 면 리스너 미등록.
+  useEffect(() => {
+    if (!isFullscreen) return;
+    const onKey = (e: KeyboardEvent): void => {
+      if (e.key === 'Escape') setFullscreen(false);
+    };
+    document.addEventListener('keydown', onKey);
+    return () => document.removeEventListener('keydown', onKey);
+  }, [isFullscreen, setFullscreen]);
 
   // readOnly prop을 UI store에 동기화. mount + prop 변경 시.
   useEffect(() => {
@@ -155,8 +167,9 @@ function TramaEditorInner({
     <div
       data-trama-root
       data-trama-readonly={isReadOnly ? 'true' : undefined}
+      data-trama-fullscreen={isFullscreen ? 'true' : undefined}
       ref={rootRef}
-      style={height != null ? { height } : undefined}
+      style={!isFullscreen && height != null ? { height } : undefined}
     >
       {model.question != null && !editingQuestion ? (
         <div
@@ -200,7 +213,7 @@ function TramaEditorInner({
       {!isReadOnly && <BooleanInspectorLayer />}
       {!isReadOnly && <ExecutionControl />}
       {!isReadOnly && <MiniPlayer />}
-      {height != null && onHeightChange != null && !isReadOnly && (
+      {!isFullscreen && height != null && onHeightChange != null && !isReadOnly && (
         <CanvasResizeHandle
           committedHeight={height}
           onCommit={onHeightChange}

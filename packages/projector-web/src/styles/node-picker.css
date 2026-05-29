@@ -1,6 +1,8 @@
 /* Node picker (radix Dialog) -------------------------------------------- */
 /* 노드 추가 통합 패널. 좌측 칩 그리드 + 우측 설명 프리뷰 + 하단 추가/취소 액션.
-   Dialog 자체는 Portal 없이 [data-trama-root] 안에서 렌더되어 토큰을 상속한다. */
+   Dialog 는 Dialog.Portal 로 document.body 에 teleport 되고, portal 내부
+   <div data-trama-root> 래퍼가 토큰을 다시 깐다. z-index 는 풀스크린 root
+   (9000) 보다 항상 위로. */
 [data-trama-root] .trama-node-picker {
     background: var(--color-node-fill-calm);
     border: 1px solid var(--color-node-stroke-calm);
@@ -12,7 +14,7 @@
     display: flex;
     flex-direction: column;
     overflow: hidden;
-    z-index: 1100;
+    z-index: 9999;
 }
 
 [data-trama-root] .trama-node-picker-title {

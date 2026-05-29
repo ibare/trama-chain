@@ -11,6 +11,23 @@
     -moz-osx-font-smoothing: grayscale;
 }
 
+/*
+ * 풀스크린 모드 — 브라우저 창 전체. position:fixed 로 호스트 문서 흐름을 벗어나
+ * viewport 를 가득 채운다. 인라인 height(controlled prop) 는 TramaEditor 가 풀스크린
+ * 시 자체적으로 제거하므로 여기서 100vh 가 그대로 적용된다.
+ *
+ * z-index 9000 — 호스트 페이지의 일반적인 sticky/dropdown(보통 1~100) 위, picker /
+ * inspector portal(.trama-node-picker 등 9999) 아래. 호스트의 고정 헤더 같은 게 더
+ * 높은 z-index 를 갖는 페이지에선 호스트 측에서 별도 조정.
+ */
+[data-trama-root][data-trama-fullscreen='true'] {
+    position: fixed;
+    inset: 0;
+    width: 100vw;
+    height: 100vh;
+    z-index: 9000;
+}
+
 [data-trama-root] *,
 [data-trama-root] *::before,
 [data-trama-root] *::after {

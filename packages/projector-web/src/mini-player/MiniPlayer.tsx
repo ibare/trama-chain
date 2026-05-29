@@ -50,6 +50,8 @@ export function MiniPlayer(): JSX.Element {
   const resetSimulation = modelStore((s) => s.resetSimulation);
   const readOnly = uiStore((s) => s.readOnly);
   const openNodePickerGlobal = uiStore((s) => s.openNodePickerGlobal);
+  const fullscreen = uiStore((s) => s.fullscreen);
+  const toggleFullscreen = uiStore((s) => s.toggleFullscreen);
 
   // 캔버스가 부착돼 있지 않거나 0×0 이면 fallback (0,0). NodePicker 측 free-row 배치도
   // canvasPos 만 기준으로 동작하므로 안전한 기본값.
@@ -101,6 +103,15 @@ export function MiniPlayer(): JSX.Element {
           <PhosphorIcon name="plus" size={18} />
         </button>
       )}
+      <button
+        type="button"
+        className="trama-mini-player-button"
+        onClick={toggleFullscreen}
+        title={fullscreen ? '풀스크린 종료 (Esc)' : '풀스크린'}
+        aria-label={fullscreen ? '풀스크린 종료' : '풀스크린 진입'}
+      >
+        <PhosphorIcon name={fullscreen ? 'collapse' : 'expand'} size={18} />
+      </button>
       <FpsChip />
     </div>
   );

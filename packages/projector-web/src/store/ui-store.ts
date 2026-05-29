@@ -98,6 +98,13 @@ export interface UIStore {
    * - 'never': 줌 비활성. 휠은 모두 호스트로 전파(완전 정적 시연용).
    */
   wheelZoom: 'modifier' | 'always' | 'never';
+  /**
+   * 풀스크린 모드 — 브라우저 창 전체 (CSS position:fixed; inset:0).
+   * 호스트 문서 안에 끼워 넣어 작업하기엔 폭이 좁을 때 사용자가 토글.
+   * 모니터 단위 Fullscreen API 는 사용 안 함 — picker/inspector 가 document.body
+   * 로 portal 되는 구조에서 fullscreen element 와의 stacking 충돌이 복잡해진다.
+   */
+  fullscreen: boolean;
   /** 진행 중인 엣지 드래그 */
   edgeDraft: EdgeDraft | null;
   /** 노드 추가 패널(NodePicker) 열림 의도. 캔버스/엣지-분할 진입을 단일 상태로 통합. */
@@ -124,6 +131,8 @@ export interface UIStore {
 
   setReadOnly: (v: boolean) => void;
   setWheelZoom: (v: UIStore['wheelZoom']) => void;
+  setFullscreen: (v: boolean) => void;
+  toggleFullscreen: () => void;
 
   selectNode: (id: NodeId) => void;
   selectEdge: (id: EdgeId) => void;
@@ -176,6 +185,7 @@ export function createUIStore(): UIStoreInstance {
     selection: { kind: 'none' },
     readOnly: false,
     wheelZoom: 'modifier',
+    fullscreen: false,
     edgeDraft: null,
     nodePickerIntent: null,
     functionPicker: null,
@@ -205,6 +215,12 @@ export function createUIStore(): UIStoreInstance {
       if (get().wheelZoom === v) return;
       set({ wheelZoom: v });
     },
+
+    setFullscreen: (v) => {
+      if (get().fullscreen === v) return;
+      set({ fullscreen: v });
+    },
+    toggleFullscreen: () => set({ fullscreen: !get().fullscreen }),
 
     selectNode: (id) => set({ selection: { kind: 'node', id } }),
     selectEdge: (id) => set({ selection: { kind: 'edge', id } }),
