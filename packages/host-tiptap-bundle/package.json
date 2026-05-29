@@ -1,8 +1,8 @@
 {
   "name": "@trama-chain/host-tiptap-bundle",
-  "version": "0.1.0",
+  "version": "0.1.1",
   "type": "module",
-  "description": "Self-contained ESM bundle of Trama editor as a Tiptap NodeView — projector-web + core + layout + tokens inlined. 외부 호스트 앱에서 단일 의존으로 소비.",
+  "description": "Tiptap NodeView for Trama — embed an interactive node-graph model editor inside your document.",
   "license": "MIT",
   "author": "ibare",
   "repository": {

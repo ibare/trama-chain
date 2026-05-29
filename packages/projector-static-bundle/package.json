@@ -2,7 +2,7 @@
   "name": "@trama-chain/projector-static-bundle",
   "version": "0.1.0",
   "type": "module",
-  "description": "Self-contained ESM bundle of Trama static (zero-compute) viewer — projector-static + core + layout + tokens inlined. PDF·썸네일·정적 미리보기용.",
+  "description": "Static SVG viewer for Trama model snapshots. Zero-compute deterministic rendering — PDF, thumbnail, embed preview.",
   "license": "MIT",
   "author": "ibare",
   "repository": {
