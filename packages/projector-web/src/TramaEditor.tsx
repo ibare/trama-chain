@@ -9,6 +9,7 @@ import {
 } from '@trama-chain/core';
 import './styles.css';
 import { Canvas } from './canvas/Canvas.js';
+import { CanvasResizeHandle } from './canvas/CanvasResizeHandle.js';
 import { FunctionPicker } from './function-picker/FunctionPicker.js';
 import { UnitInspectorLayer } from './node/UnitInspectorLayer.js';
 import { BooleanInspectorLayer } from './node/BooleanInspectorLayer.js';
@@ -58,6 +59,18 @@ interface Props {
    * 사용자가 한 번 패닝/줌하면 이후엔 적용되지 않는다 (mount-only one-shot).
    */
   initialFit?: 'content' | 'none';
+  /**
+   * 캔버스 높이(px) — controlled. 호스트가 값을 들고 onHeightChange 로 갱신을 받는다.
+   * 정의되면 root 인라인 height + 하단 resize 핸들 노출. 미정의면 부모 컨테이너에
+   * 위임(height:100% via base.css) + 핸들 비노출 — 풀스크린 사용 케이스.
+   *
+   * trama 는 height 를 영속하지 않는다 — 호스트(Tiptap attrs, 별도 store 등)의
+   * 책임. 마크다운 round-trip 권장 포맷은 fence info-string 의 Pandoc 스타일
+   * `\`\`\`trama {height=N}` — host-tiptap 의 parseTramaFenceMeta 헬퍼 참고.
+   */
+  height?: number;
+  /** height 변경 콜백. resize 핸들 mouseup 시 클램프된 최종값 1회. */
+  onHeightChange?: (height: number) => void;
 }
 
 export function TramaEditor(props: Props): JSX.Element {
@@ -84,6 +97,8 @@ function TramaEditorInner({
   readOnly = false,
   wheelZoom = 'modifier',
   initialFit = 'none',
+  height,
+  onHeightChange,
 }: Props): JSX.Element {
   const { modelStore, uiStore } = useTrama();
   const setModel = modelStore((s) => s.setModel);
@@ -92,6 +107,7 @@ function TramaEditorInner({
   const setReadOnly = uiStore((s) => s.setReadOnly);
   const setWheelZoom = uiStore((s) => s.setWheelZoom);
   const isReadOnly = uiStore((s) => s.readOnly);
+  const rootRef = useRef<HTMLDivElement>(null);
 
   // readOnly prop을 UI store에 동기화. mount + prop 변경 시.
   useEffect(() => {
@@ -136,7 +152,12 @@ function TramaEditorInner({
   const [editingQuestion, setEditingQuestion] = useState(false);
 
   return (
-    <div data-trama-root data-trama-readonly={isReadOnly ? 'true' : undefined}>
+    <div
+      data-trama-root
+      data-trama-readonly={isReadOnly ? 'true' : undefined}
+      ref={rootRef}
+      style={height != null ? { height } : undefined}
+    >
       {model.question != null && !editingQuestion ? (
         <div
           className="trama-question"
@@ -179,6 +200,13 @@ function TramaEditorInner({
       {!isReadOnly && <BooleanInspectorLayer />}
       {!isReadOnly && <ExecutionControl />}
       {!isReadOnly && <MiniPlayer />}
+      {height != null && onHeightChange != null && !isReadOnly && (
+        <CanvasResizeHandle
+          committedHeight={height}
+          onCommit={onHeightChange}
+          rootRef={rootRef}
+        />
+      )}
     </div>
   );
 }

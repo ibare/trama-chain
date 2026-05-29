@@ -17,7 +17,13 @@ export {
   TRAMA_FENCE_LANG,
   TRAMA_FENCE_RE,
   renderTramaFenceHTML,
+  renderTramaFenceMeta,
+  parseTramaFenceMeta,
   tramaNodeToMarkdown,
 } from '@trama-chain/host-tiptap';
 
-export type { TramaMountOptions, TramaMountHandle } from '@trama-chain/host-tiptap';
+export type {
+  TramaMountOptions,
+  TramaMountHandle,
+  TramaFenceMeta,
+} from '@trama-chain/host-tiptap';

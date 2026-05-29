@@ -1,0 +1,28 @@
+/*
+ * host-tiptap NodeView 가 호스트 문서 DOM 에 박는 두 wrapper 의 최소 sizing.
+ *
+ * NodeView 는 <pre.trama-tiptap-node><div.trama-tiptap-mount><div[data-trama-root]...
+ * 형태로 마운트한다. projector-web 의 base.css 는 [data-trama-root] 까지만 알기
+ * 때문에, 그 바깥 두 wrapper 의 sizing 컨텍스트를 호스트 측 규칙에 의존하면
+ * 메티 같은 호스트마다 CSS 를 다시 써야 한다. 그 책임을 trama 쪽으로 가져온다.
+ *
+ * - .trama-tiptap-node:  Tiptap NodeView root. block 요소로 줄 폭 전체 차지.
+ * - .trama-tiptap-mount: React root 컨테이너. 너비 100%, 높이는 안쪽
+ *                       [data-trama-root] 가 인라인 px 로 결정한다.
+ *
+ * 어느 셀렉터에도 [data-trama-root] prefix 를 쓸 수 없는 이유: 이 두 클래스는
+ * [data-trama-root] *밖* 에 있다 (root 의 부모/조상). 대신 trama-tiptap- prefix
+ * 가 호스트 전역 충돌을 막는 봉인 역할을 한다.
+ */
+
+.trama-tiptap-node {
+    display: block;
+    margin: 1em 0;
+    padding: 0;
+    background: transparent;
+}
+
+.trama-tiptap-mount {
+    display: block;
+    width: 100%;
+}

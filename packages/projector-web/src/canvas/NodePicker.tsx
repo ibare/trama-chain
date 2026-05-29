@@ -61,9 +61,27 @@ export function NodePicker(): JSX.Element | null {
         if (!next) close();
       }}
     >
-      {open && intent && (
-        <NodePickerBody intent={intent} instance={instance} modelStore={modelStore} close={close} />
-      )}
+      <Dialog.Portal>
+        {/*
+         * data-trama-root wrapper — Portal 이 content 를 document.body 로
+         * teleport 하므로 trama-* 스코프 CSS 토큰을 다시 깔아준다.
+         *
+         * 호스트 임베드(Tiptap NodeView 안) 에서 inline 렌더 시 PM 의 view
+         * reconcile 이 NodeView 를 destroy + recreate 하면서 React root 까지
+         * 폐기시켜 picker 가 한 tick 만에 증발하는 문제가 있었다 — Portal 로
+         * NodeView DOM 트리 밖에 배치해 차단.
+         */}
+        <div data-trama-root>
+          {open && intent && (
+            <NodePickerBody
+              intent={intent}
+              instance={instance}
+              modelStore={modelStore}
+              close={close}
+            />
+          )}
+        </div>
+      </Dialog.Portal>
     </Dialog.Root>
   );
 }

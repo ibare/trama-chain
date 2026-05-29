@@ -34,3 +34,22 @@
     fill: none;
 }
 
+/* 캔버스 하단 남쪽 stripe — 호스트 문서 안에서 캔버스 높이를 사용자가 직접 조절. */
+[data-trama-root] .trama-canvas-resize-handle {
+    position: absolute;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    height: 8px;
+    cursor: ns-resize;
+    z-index: 20;
+    touch-action: none;
+    background: transparent;
+    transition: background 120ms ease-out;
+}
+
+[data-trama-root] .trama-canvas-resize-handle:hover,
+[data-trama-root] .trama-canvas-resize-handle[data-active='true'] {
+    background: var(--color-canvas-grid);
+}
+

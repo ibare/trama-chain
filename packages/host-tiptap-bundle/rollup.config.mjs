@@ -123,8 +123,8 @@ const jsBundle = {
 const dtsBundle = {
   input: 'src/index.ts',
   // dts 패스에서는 @trama-chain/* workspace 패키지의 .ts 소스를 끌어들여 인라인해야
-  // 한다. peer만 external로 남긴다.
-  external,
+  // 한다. peer + 부수효과 CSS 임포트는 external — dts 는 CSS 파싱 능력이 없다.
+  external: [...external, /\.css$/],
   output: {
     file: 'dist/host-tiptap-bundle.d.ts',
     format: 'es',

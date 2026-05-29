@@ -10,6 +10,15 @@ export interface TramaMountOptions {
    * NodeView가 이걸 받아 ProseMirror 트랜잭션으로 textContent를 치환.
    */
   onChange?: (json: string) => void;
+  /**
+   * 최초 마운트 시점의 캔버스 높이(px). 영속은 호스트 책임 — Tiptap node attrs
+   * 든 별도 store 든 호스트가 결정하고, 변경된 값을 onHeightChange 로 받아 저장.
+   *
+   * 미지정 시 TramaEditor 가 부모 컨테이너에 위임(height:100%) — 풀스크린 호스트.
+   */
+  initialHeight?: number;
+  /** 캔버스 높이 변경 콜백. resize 핸들 mouseup 시 클램프된 최종값 1회. */
+  onHeightChange?: (height: number) => void;
   /** 호스트 로케일 (현재는 패스스루, 향후 i18n provider 와이어업용). */
   locale?: string;
   /** 호스트 테마 힌트 (현재는 패스스루). */
@@ -24,6 +33,8 @@ export interface TramaMountOptions {
 export interface TramaMountHandle {
   /** 외부에서 호스트가 JSON을 갱신해야 할 때 (예: 외부 동기화). */
   setJson(json: string): void;
+  /** 외부에서 호스트가 캔버스 높이를 갱신해야 할 때 (외부 attrs 변경 등). */
+  setHeight(height: number | undefined): void;
   /** 호스트가 editable 토글을 변경했을 때. */
   setEditable(editable: boolean): void;
   /** React root unmount + 자원 해제. */
@@ -36,7 +47,7 @@ export interface TramaMountHandle {
  * 동일 어댑터가 편집/읽기 전용 두 모드를 모두 다룬다 — `editable` 옵션이 곧
  * TramaEditor `readOnly` prop의 부정. 별도 정적 뷰어로 분기하지 않는다.
  *
- * 라이프사이클: NodeView가 mount(설치) → setJson(외부 변경) /
+ * 라이프사이클: NodeView가 mount(설치) → setJson/setHeight(외부 변경) /
  * setEditable(편집 권한 변경) → destroy(해체) 순으로 호출.
  */
 export function mountTramaEditor(
@@ -44,6 +55,7 @@ export function mountTramaEditor(
   opts: TramaMountOptions,
 ): TramaMountHandle {
   let currentJson = opts.initialJson;
+  let currentHeight: number | undefined = opts.initialHeight;
   let editable = opts.editable ?? true;
   let destroyed = false;
 
@@ -56,6 +68,8 @@ export function mountTramaEditor(
         value: currentJson,
         onChange: opts.onChange,
         readOnly: !editable,
+        height: currentHeight,
+        onHeightChange: opts.onHeightChange,
       }),
     );
   };
@@ -67,6 +81,12 @@ export function mountTramaEditor(
       if (destroyed) return;
       if (json === currentJson) return;
       currentJson = json;
+      render();
+    },
+    setHeight(next) {
+      if (destroyed) return;
+      if (next === currentHeight) return;
+      currentHeight = next;
       render();
     },
     setEditable(next) {
