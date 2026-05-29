@@ -1,6 +1,6 @@
 {
   "name": "@trama-chain/projector-static-bundle",
-  "version": "0.1.0",
+  "version": "0.1.1",
   "type": "module",
   "description": "Static SVG viewer for Trama model snapshots. Zero-compute deterministic rendering — PDF, thumbnail, embed preview.",
   "license": "MIT",
