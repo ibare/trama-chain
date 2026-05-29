@@ -89,6 +89,15 @@ export function MiniPlayer(): JSX.Element {
       >
         <PhosphorIcon name="target" size={18} />
       </button>
+      <button
+        type="button"
+        className="trama-mini-player-button"
+        onClick={toggleFullscreen}
+        title={fullscreen ? '풀스크린 종료 (Esc)' : '풀스크린'}
+        aria-label={fullscreen ? '풀스크린 종료' : '풀스크린 진입'}
+      >
+        <PhosphorIcon name="frame-corners" size={18} />
+      </button>
       <span className="trama-mini-player-time" aria-label="시뮬레이션 시간">
         {formatSimulationTime(simulationTimeMs)}
       </span>
@@ -112,15 +121,6 @@ export function MiniPlayer(): JSX.Element {
           <PhosphorIcon name="plus" size={18} />
         </button>
       )}
-      <button
-        type="button"
-        className="trama-mini-player-button"
-        onClick={toggleFullscreen}
-        title={fullscreen ? '풀스크린 종료 (Esc)' : '풀스크린'}
-        aria-label={fullscreen ? '풀스크린 종료' : '풀스크린 진입'}
-      >
-        <PhosphorIcon name={fullscreen ? 'collapse' : 'expand'} size={18} />
-      </button>
       <FpsChip />
     </div>
   );
